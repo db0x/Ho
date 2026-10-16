@@ -9,6 +9,11 @@
 A space strategy game in the spirit of **Spaceward Ho!** – in the browser, for up to
 16 players at once.
 
+![Classic star map with twelve AI empires](doc/screenshots/map-classic-en.webp)
+
+*The flat star map, watched: twelve AI empires at turn 45. Settled worlds tint
+their surroundings in the colour of their empire.*
+
 The planets deliberately follow the style of the original: glossy, richly coloured
 spheres where **colour shows temperature** (blue = icy to red = scorching) and
 **size shows gravity**. The more habitable a world becomes, the more Earth-like it
@@ -35,6 +40,11 @@ For a quick game: *Play 5 AI right away*. For a round with friends, *Host a new
 game*, pass on the four-letter code, fill the empty seats with AI and start. On a
 LAN the others reach the server at `http://<your-ip>:8080`. If you would rather
 watch: *Watch a game* sets up an all-AI game that runs by itself.
+
+![Lobby with the game code and the list of empires](doc/screenshots/lobby-en.webp)
+
+*The lobby: the four-letter code at the top, empty seats filled with AI, playing
+field and rules on the right.*
 
 The **logo** is hand-drawn SVG and follows the same visual language: brass for
 the lettering and an Earth-like world as the *o* – with ragged coastlines,
@@ -114,6 +124,11 @@ On the start screen and in the lobby you can choose the **playing field**.
 same game across three dimensions: the worlds lie in a **lens**, wide across and
 about 40 % of that in height – thicker in the middle, thinner towards the rim, like
 a real galaxy. Distances, range and scanners then compute in three dimensions.
+
+![The same game in the space view, worlds in a lens above the grid](doc/screenshots/map-space-en.webp)
+
+*The space view: the grid lies in the mid-plane of the galaxy, and a plumb line
+runs from every world down to it – that is how you read its height.*
 
 | Action | Input |
 |---|---|
@@ -407,7 +422,8 @@ The full wording is in [LICENSE](LICENSE). There are no separate asset licences 
 observe, because there are no assets in the usual sense: the graphics are
 hand-written SVG and canvas drawing commands, the sounds are synthesised in the
 browser at playback time, and the only dependency is `ws` (MIT as well). Everything
-in this repository is source code and is covered by the one licence.
+in this repository is source code, apart from the screenshots under
+`doc/screenshots/`; they show the game itself and fall under the same licence.
 
 **Ho!!** is an independent reimplementation and not connected with, endorsed by or
 licensed from Delta Tao Software. *Spaceward Ho!* is their trademark, and the

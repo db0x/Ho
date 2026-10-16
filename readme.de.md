@@ -9,6 +9,11 @@
 Ein Weltraum-Strategiespiel im Geist von **Spaceward Ho!** – im Browser, für bis zu
 16 Spieler gleichzeitig.
 
+![Klassische Sternkarte mit zwölf KI-Reichen](doc/screenshots/map-classic-de.webp)
+
+*Die flache Sternkarte, beim Zusehen: zwölf KI-Reiche in Runde 45. Besiedelte
+Welten färben ihre Umgebung in der Farbe ihres Reiches.*
+
 Die Planeten sind bewusst im Stil des Originals gehalten: glänzende, satt gefärbte
 Kugeln, bei denen die **Farbe die Temperatur** (blau = eisig bis rot = glühend) und
 die **Größe die Schwerkraft** anzeigt. Je bewohnbarer eine Welt wird, desto
@@ -36,6 +41,11 @@ Für eine schnelle Partie: *Sofort gegen 5 KI spielen*. Für eine Runde mit Freu
 füllen und starten. Im LAN erreichen die anderen den Server unter
 `http://<deine-ip>:8080`. Wer lieber zuschaut: *Beim Spielen zusehen* startet eine
 reine KI-Partie, die von allein läuft.
+
+![Lobby mit Spielcode und der Liste der Reiche](doc/screenshots/lobby-de.webp)
+
+*Die Lobby: oben der vierstellige Code, freie Plätze mit KI besetzt, rechts
+Spielfeld und Regeln.*
 
 Das **Logo** ist handgezeichnetes SVG und folgt derselben Bildsprache: Messing
 für die Schrift und eine erdähnliche Welt als *o* – mit zerklüfteten Küsten,
@@ -119,6 +129,11 @@ ist die flache Sternkarte wie bisher und bleibt unverändert. *Raum* verteilt
 dieselbe Partie auf drei Dimensionen: die Welten liegen in einer **Linse**, in der
 Fläche weit, in der Höhe etwa 40 % davon – mittig dicker, zum Rand hin dünner, wie
 eine echte Galaxie. Entfernungen, Reichweite und Scanner rechnen dann räumlich.
+
+![Dieselbe Partie in der Raumansicht, Welten in einer Linse über dem Gitter](doc/screenshots/map-space-de.webp)
+
+*Die Raumansicht: das Gitter liegt in der Mittelebene der Galaxie, von jeder Welt
+führt ein Lot darauf hinab – daran liest man ihre Höhe ab.*
 
 | Aktion | Eingabe |
 |---|---|
@@ -416,8 +431,9 @@ erhalten. Der genaue Wortlaut steht in [LICENSE](LICENSE). Getrennte
 Asset-Lizenzen sind nicht zu beachten, denn es gibt keine Assets im üblichen Sinn:
 Die Grafiken sind handgeschriebenes SVG und Canvas-Zeichenbefehle, die Klänge
 entstehen beim Abspielen im Browser, und die einzige Abhängigkeit ist `ws`
-(ebenfalls MIT). Alles in diesem Verzeichnis ist Quelltext und von der einen Lizenz
-gedeckt.
+(ebenfalls MIT). Bis auf die Bildschirmfotos unter `doc/screenshots/` ist alles in
+diesem Verzeichnis Quelltext; die Aufnahmen zeigen das Spiel selbst und stehen unter
+derselben Lizenz.
 
 **Ho!!** ist eine eigenständige Neuimplementierung und steht in keiner Verbindung
 zu Delta Tao Software, ist von dort weder unterstützt noch lizenziert.
