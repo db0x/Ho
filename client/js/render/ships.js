@@ -10,7 +10,11 @@ function hullGradient(ctx, len) {
   return g;
 }
 
-function engineGlow(ctx, x, y, r, phase, color = '#8fdcff') {
+// Während ein Sprite gebaut wird, sammelt dieser Puffer die bewegten Teile,
+// statt sie ins Standbild zu zeichnen - siehe drawShip.
+let collect = null;
+
+function paintGlow(ctx, x, y, r, phase, color) {
   const flick = 0.75 + 0.25 * Math.sin(phase * 6.0 + x);
   const g = ctx.createRadialGradient(x, y, 0, x, y, r * flick);
   g.addColorStop(0, 'rgba(255,255,255,0.95)');
@@ -18,6 +22,24 @@ function engineGlow(ctx, x, y, r, phase, color = '#8fdcff') {
   g.addColorStop(1, 'rgba(60,150,255,0)');
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(x, y, r * flick, 0, Math.PI * 2); ctx.fill();
+}
+
+function engineGlow(ctx, x, y, r, phase, color = '#8fdcff') {
+  // Die Fackel flackert und liegt unter dem Rumpf: beim Sprite-Bau nur vormerken.
+  if (collect) { collect.push({ over: false, run: (c, ph) => paintGlow(c, x, y, r, ph + phase, color) }); return; }
+  paintGlow(ctx, x, y, r, phase, color);
+}
+
+function paintBlink(ctx, x, y, r, phase) {
+  const blink = 0.5 + 0.5 * Math.sin(phase * 3);
+  ctx.fillStyle = `rgba(255,90,80,${0.3 + blink * 0.7})`;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+function blinkLight(ctx, x, y, r, phase) {
+  // Das Blinklicht sitzt obenauf, sonst wie die Fackel.
+  if (collect) { collect.push({ over: true, run: (c, ph) => paintBlink(c, x, y, r, ph + phase) }); return; }
+  paintBlink(ctx, x, y, r, phase);
 }
 
 function outline(ctx, w = 1) {
@@ -153,9 +175,7 @@ function drawSatellite(ctx, L, color, phase) {
   ctx.fillStyle = '#ffb45c';
   ctx.beginPath(); ctx.arc(0, 0, R * 0.17, 0, Math.PI * 2); ctx.fill();
   // Blinklicht
-  const blink = 0.5 + 0.5 * Math.sin(phase * 3);
-  ctx.fillStyle = `rgba(255,90,80,${0.3 + blink * 0.7})`;
-  ctx.beginPath(); ctx.arc(0, -R * 1.05, L * 0.05, 0, Math.PI * 2); ctx.fill();
+  blinkLight(ctx, 0, -R * 1.05, L * 0.05, phase);
 }
 
 /* -------------------------------------------------------- Kolonieschiff */
@@ -237,22 +257,76 @@ const DRAW = {
   colony: drawColony, tanker: drawTanker
 };
 
+/* ------------------------------------------------------------- Sprites */
+// Eine Silhouette ändert sich von Bild zu Bild nicht - nur Fackeln und
+// Blinklichter bewegen sich. Darum wird das Standbild einmal in ein eigenes
+// Canvas gezeichnet und danach nur noch kopiert, so wie es die Planeten
+// schon tun. Das spart je Schiff rund sieben Verläufe und ein Dutzend Pfade
+// pro Einzelbild.
+const shipCache = new Map();
+const MAX_SHIPS = 400;
+
+// Länge auf ganze Pixel runden, damit der Zwischenspeicher beim Zoomen nicht
+// überläuft. Gröber zu stufen spart kaum etwas: zu einem Zoomstand gibt es
+// ohnehin nur zwei Längen, dafür wären die Schiffe sichtbar falsch groß.
+function lenStufe(len) {
+  return Math.max(4, Math.round(len));
+}
+
+function shipSprite(type, len, color, shadow) {
+  const key = `${type}|${len}|${color}|${shadow ? 1 : 0}`;
+  const hit = shipCache.get(key);
+  if (hit) return hit;
+
+  const fn = DRAW[type] || drawFighter;
+  const pad = 10;                       // Platz für den Schlagschatten (Blur 6, Versatz 2)
+  const size = Math.ceil(len * 1.3) + pad * 2;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const g = cv.getContext('2d');
+  g.translate(size / 2, size / 2);
+  if (shadow) {
+    g.shadowColor = 'rgba(0,0,0,.6)';
+    g.shadowBlur = 6;
+    g.shadowOffsetY = 2;
+  }
+
+  // Bewegte Teile sammeln statt zeichnen; die Phase ist dabei 0, sodass in
+  // anim nur der Versatz je Fackel steckt.
+  const aussen = collect;
+  collect = [];
+  fn(g, len, color, 0);
+  const anim = collect;
+  collect = aussen;
+
+  const sprite = { canvas: cv, half: size / 2, anim };
+  if (shipCache.size > MAX_SHIPS) shipCache.clear();
+  shipCache.set(key, sprite);
+  return sprite;
+}
+
 /**
  * Zeichnet ein Schiff.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{type:string,x:number,y:number,angle?:number,len?:number,color?:string,phase?:number}} o
  */
 export function drawShip(ctx, o) {
-  const fn = DRAW[o.type] || drawFighter;
+  const sp = shipSprite(o.type, lenStufe(o.len || 26), o.color || '#9fb0c8', o.shadow !== false);
+  const phase = o.phase || 0;
   ctx.save();
   ctx.translate(o.x, o.y);
   ctx.rotate(o.angle || 0);
-  if (o.shadow !== false) {
+  // Fackeln liegen unter dem Rumpf, das Blinklicht darüber - dazwischen das Standbild.
+  // Der Schatten gilt nur für die bewegten Teile; im Sprite steckt er schon drin.
+  if (sp.anim.length && o.shadow !== false) {
     ctx.shadowColor = 'rgba(0,0,0,.6)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 2;
   }
-  fn(ctx, o.len || 26, o.color || '#9fb0c8', o.phase || 0);
+  for (const a of sp.anim) if (!a.over) a.run(ctx, phase);
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  ctx.drawImage(sp.canvas, -sp.half, -sp.half);
+  for (const a of sp.anim) if (a.over) a.run(ctx, phase);
   ctx.restore();
 }
 
