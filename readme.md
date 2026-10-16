@@ -2,6 +2,10 @@
 
 ***English** · [Deutsch](readme.de.md)*
 
+[![CI](https://github.com/db0x/Ho/actions/workflows/ci.yml/badge.svg)](https://github.com/db0x/Ho/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520-brightgreen.svg)](package.json)
+
 A space strategy game in the spirit of **Spaceward Ho!** – in the browser, for up to
 16 players at once.
 
