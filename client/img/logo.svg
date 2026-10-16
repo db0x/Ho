@@ -1,0 +1,126 @@
+<!-- Die Zeichenfläche reicht oben und unten über die Buchstaben hinaus: die
+     Atmosphäre des Planeten (r=88 um 160/75) wäre sonst an der Kante
+     abgeschnitten. Der Überstand ist durchsichtig, der Schein darf also in
+     die Nachbarschaft hineinleuchten. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -16 330 182" width="330" height="182"
+     role="img" aria-label="Ho!!">
+  <title>Ho!!</title>
+  <desc>Wortmarke: H, eine erdähnliche Welt als o, zwei Ausrufezeichen.</desc>
+  <defs>
+    <!-- Messing wie im Spiel: oben heller, unten satt -->
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd877"/>
+      <stop offset="0.45" stop-color="#f0b429"/>
+      <stop offset="1" stop-color="#d4960f"/>
+    </linearGradient>
+    <!-- Ozean: tiefes Blau, Licht von oben links -->
+    <radialGradient id="ozean" cx="0.33" cy="0.28" r="0.9">
+      <stop offset="0" stop-color="#58a9e6"/>
+      <stop offset="0.3" stop-color="#2369bb"/>
+      <stop offset="0.68" stop-color="#143f80"/>
+      <stop offset="1" stop-color="#0c2c5e"/>
+    </radialGradient>
+    <!-- Nachtseite: weicher Schattenverlauf statt harter Kante -->
+    <radialGradient id="nacht" cx="0.32" cy="0.28" r="0.8">
+      <stop offset="0.42" stop-color="#02060f" stop-opacity="0"/>
+      <stop offset="0.76" stop-color="#02060f" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#02060f" stop-opacity="0.8"/>
+    </radialGradient>
+    <radialGradient id="glanz" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.63" stop-color="#7cc0ff" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#7cc0ff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Polkappen laufen nach unten aus, sonst liegen sie wie Deckel auf -->
+    <radialGradient id="kappe" cx="0.5" cy="0.25" r="0.8">
+      <stop offset="0" stop-color="#f4faff" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#eef7ff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#eef7ff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Wolken brauchen weiche Ränder, sonst sind es Schlieren -->
+    <radialGradient id="wolke" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="kugel"><circle cx="160" cy="75" r="56"/></clipPath>
+  </defs>
+
+  <!-- Atmosphäre -->
+  <circle cx="160" cy="75" r="88" fill="url(#halo)"/>
+
+  <!-- Die Welt als "o" -->
+  <circle cx="160" cy="75" r="56" fill="url(#ozean)"/>
+  <g clip-path="url(#kugel)">
+    <!-- Schelf: dieselben Umrisse etwas größer und heller - das gibt den
+         Küsten Tiefe, wie flaches Wasser vor dem Land. -->
+    <g fill="#3f93dd" opacity="0.33" transform="translate(160 75) scale(1.05) translate(-160 -75)">
+      <path d="M114 64 L119 55 L127 50 L133 52 L139 46 L147 44 L154 47 L158 44 L164 48 L166 55
+               L161 60 L163 66 L157 70 L152 68 L147 73 L141 72 L136 78 L128 80 L121 77 L116 71 Z"/>
+      <path d="M148 104 L152 96 L160 90 L168 88 L176 90 L180 86 L188 88 L194 94 L196 101 L192 107
+               L194 113 L186 118 L178 116 L172 120 L164 119 L156 114 L150 110 Z"/>
+      <path d="M180 50 L186 43 L194 41 L201 45 L204 52 L200 58 L193 61 L186 58 L181 55 Z"/>
+    </g>
+
+    <!-- Landmassen mit zerklüfteten Küsten -->
+    <path fill="#4fb267" d="M114 64 L119 55 L127 50 L133 52 L139 46 L147 44 L154 47 L158 44 L164 48
+             L166 55 L161 60 L163 66 L157 70 L152 68 L147 73 L141 72 L136 78 L128 80 L121 77 L116 71 Z"/>
+    <path fill="#4aad62" d="M148 104 L152 96 L160 90 L168 88 L176 90 L180 86 L188 88 L194 94 L196 101
+             L192 107 L194 113 L186 118 L178 116 L172 120 L164 119 L156 114 L150 110 Z"/>
+    <path fill="#45a25c" d="M180 50 L186 43 L194 41 L201 45 L204 52 L200 58 L193 61 L186 58 L181 55 Z"/>
+
+    <!-- Hochland und Wüste: zwei weitere Töne, damit das Grün nicht flach wirkt -->
+    <path fill="#3b8e51" d="M126 60 L132 54 L140 53 L146 57 L144 63 L137 66 L129 65 Z"/>
+    <path fill="#3b8e51" opacity="0.85" d="M166 98 L173 94 L181 96 L182 101 L176 105 L168 104 Z"/>
+    <path fill="#c9a96a" opacity="0.8" d="M152 101 L160 97 L168 99 L167 105 L159 108 L152 106 Z"/>
+    <!-- Binnenseen: Löcher im Land in der Farbe des Ozeans -->
+    <ellipse cx="150" cy="56" rx="4.6" ry="3" fill="#1f5ba6" opacity="0.9" transform="rotate(-16 150 56)"/>
+    <ellipse cx="186" cy="103" rx="3.6" ry="2.4" fill="#1b5099" opacity="0.85" transform="rotate(20 186 103)"/>
+    <!-- Halbinseln und vorgelagerte Küstenstücke -->
+    <path fill="#4fb267" d="M113 70 L117 69 L120 73 L118 79 L113 79 L111 74 Z"/>
+    <path fill="#4aad62" d="M196 88 L201 89 L203 94 L199 98 L194 95 Z"/>
+    <!-- Inselketten -->
+    <ellipse cx="126" cy="98" rx="7" ry="4" fill="#4fb267" transform="rotate(-18 126 98)"/>
+    <ellipse cx="143" cy="118" rx="5.6" ry="3.2" fill="#45a25c" transform="rotate(-8 143 118)"/>
+    <circle cx="136" cy="88" r="2.6" fill="#4fb267"/>
+    <circle cx="186" cy="69" r="2.2" fill="#4aad62"/>
+    <circle cx="206" cy="90" r="2" fill="#45a25c"/>
+    <circle cx="131" cy="109" r="2.3" fill="#4aad62"/>
+    <circle cx="172" cy="79" r="1.8" fill="#4fb267"/>
+
+    <!-- Polkappen: zum Pol hin dicht, nach unten auslaufend -->
+    <ellipse cx="161" cy="21" rx="26" ry="10" fill="url(#kappe)"/>
+    <ellipse cx="162" cy="129" rx="22" ry="9" fill="url(#kappe)" opacity="0.7"/>
+
+    <!-- Wolken: sie ziehen über Wasser wie über Land -->
+    <g fill="url(#wolke)">
+      <ellipse cx="134" cy="72" rx="24" ry="7" transform="rotate(-9 134 72)"/>
+      <ellipse cx="178" cy="110" rx="20" ry="6" transform="rotate(7 178 110)"/>
+      <ellipse cx="170" cy="42" rx="17" ry="5" transform="rotate(-5 170 42)"/>
+      <ellipse cx="196" cy="74" rx="11" ry="4.5" transform="rotate(16 196 74)" opacity="0.8"/>
+    </g>
+
+    <!-- Nachtseite -->
+    <circle cx="160" cy="75" r="56" fill="url(#nacht)"/>
+    <!-- Sonnenglanz auf dem Wasser -->
+    <ellipse cx="132" cy="47" rx="14" ry="9" fill="url(#glanz)" transform="rotate(-28 132 47)"/>
+  </g>
+  <!-- Lichtkante: die Atmosphäre glüht dort, wo die Sonne steht -->
+  <path d="M112 103 A56 56 0 0 1 189 26" fill="none" stroke="#d7ecff" stroke-opacity="0.26"
+        stroke-width="2" stroke-linecap="round"/>
+  <circle cx="160" cy="75" r="56" fill="none" stroke="#9cc8f0" stroke-opacity="0.22" stroke-width="1.2"/>
+
+  <!-- H und !! -->
+  <g fill="url(#gold)">
+    <rect x="12" y="16" width="28" height="118" rx="4"/>
+    <rect x="70" y="16" width="28" height="118" rx="4"/>
+    <rect x="12" y="63" width="86" height="25" rx="3"/>
+    <path d="M232 16 h31 l-6 82 h-19 z"/>
+    <circle cx="244" cy="122" r="12.5"/>
+    <path d="M284 16 h31 l-6 82 h-19 z"/>
+    <circle cx="296" cy="122" r="12.5"/>
+  </g>
+</svg>

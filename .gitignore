@@ -147,3 +147,79 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ---------------------------------------------------------------
+# Projektspezifisch / lokale Umgebung
+# ---------------------------------------------------------------
+
+# Editoren & IDEs
+.vscode/
+.vscode-test/
+.history/
+.idea/
+*.iml
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.\#*
+\#*\#
+
+# Betriebssystem-Müll
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.Trash-*
+.fuse_hidden*
+.directory
+.nfs*
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+
+# Claude Code / KI-Werkzeuge (lokale Einstellungen bleiben lokal)
+.claude/settings.local.json
+.claude/scratchpad/
+CLAUDE.local.md
+
+# Zugangsdaten, Schlüssel, Zertifikate
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+secrets.*
+*.secret
+
+# Temporäres, Backups, Scratch
+tmp/
+temp/
+scratch/
+*.bak
+*.orig
+*.rej
+*.tmp
+*.old
+
+# Archive & Binärkram, der versehentlich hier landet
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Lokale Spielstände / Laufzeitdaten, falls der Server mal welche schreibt
+data/
+saves/
+*.sqlite
+*.sqlite3
+*.db

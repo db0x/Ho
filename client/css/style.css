@@ -1,0 +1,611 @@
+/* ========================================================================
+   Ho!! - Oberflaeche. Dunkler Weltraum, warme Messing-Akzente.
+   ===================================================================== */
+:root {
+  --bg: #05060c;
+  --bg-2: #0a0d18;
+  --panel: rgba(14, 18, 32, 0.86);
+  --panel-solid: #0e1220;
+  --line: rgba(140, 170, 220, 0.16);
+  --line-strong: rgba(160, 190, 240, 0.3);
+  --ink: #e8eefc;
+  --ink-dim: #9aa8c4;
+  --ink-faint: #67738c;
+  --gold: #f0b429;
+  --gold-dim: #a3781b;
+  --good: #52d98a;
+  --bad: #ff5f5f;
+  --radius: 10px;
+  --shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+
+/* App-Gefühl statt Webseite: nichts lässt sich versehentlich markieren, kein
+   blauer Block beim Doppelklick, kein Aufblitzen beim Antippen. Ausgenommen
+   ist alles, was man wirklich kopieren will. */
+body {
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input, textarea, .code, #me-planets, #log-list, #chat-list {
+  user-select: text; -webkit-user-select: text;
+}
+img, canvas { -webkit-user-drag: none; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--font);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--ink-dim); }
+.small { font-size: 13px; }
+.pad { padding: 14px; }
+.spacer { flex: 1; }
+.error { color: var(--bad); min-height: 19px; font-size: 14px; margin-top: 8px; }
+a { color: var(--gold); }
+
+.screen { position: fixed; inset: 0; }
+
+/* ------------------------------------------------------------- Buttons */
+button {
+  background: linear-gradient(#1b2236, #141a2a);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s, transform .06s;
+}
+button:hover { border-color: var(--gold-dim); background: linear-gradient(#232c44, #1a2133); }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary {
+  background: linear-gradient(#f3bd3c, #d79a16);
+  border-color: #ffd877;
+  color: #2a1e02;
+  font-weight: 650;
+}
+button.primary:hover { background: linear-gradient(#ffcd55, #e8a61d); }
+button.ghost { background: transparent; }
+button.tiny { padding: 4px 8px; font-size: 13px; border-radius: 6px; }
+.icon-btn { background: none; border: none; padding: 2px 8px; color: var(--ink-faint); }
+
+/* ------------------------------------------------------------- Felder */
+.field { display: block; margin: 14px 0; }
+.field > span { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
+.field input[type=text], .field input:not([type]) , input[type=text], input:not([type]) {
+  width: 100%; padding: 10px 12px;
+  background: #0b1020; border: 1px solid var(--line-strong); border-radius: 8px;
+}
+input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
+.field.slim { margin: 10px 0; }
+.field.slim > span { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; }
+.field.slim b { color: var(--gold); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--gold); }
+
+/* =================================================== Startbildschirm */
+#screen-menu { display: grid; place-items: center; background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
+.menu-sky { position: absolute; inset: 0; }
+.menu-sky canvas { width: 100%; height: 100%; display: block; }
+.menu-box {
+  position: relative; width: min(480px, 92vw);
+  background: var(--panel); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 30px 32px 22px; box-shadow: var(--shadow);
+}
+/* Die Wortmarke liegt als SVG in client/img/logo.svg - der Schein darunter
+   bleibt CSS, damit er zur Stimmung des Startbildschirms passt. */
+/* Der durchsichtige Überstand der Grafik (Platz für die Atmosphäre) wird mit
+   negativen Rändern wieder hereingeholt - sonst schöbe er die Zeile darunter
+   weg, obwohl dort nichts steht als Schein. */
+.logo { margin: -14px 0 -10px; line-height: 0; }
+.logo img {
+  display: block; width: min(300px, 76%); height: auto;
+  filter: drop-shadow(0 0 28px rgba(240, 180, 41, .28));
+}
+.tagline { margin: 6px 0 22px; color: var(--ink-dim); }
+.menu-actions { display: flex; flex-direction: column; gap: 10px; }
+.menu-actions .primary { padding: 12px; font-size: 15px; }
+.join-row { display: flex; gap: 8px; }
+.join-row input { text-transform: uppercase; letter-spacing: .3em; text-align: center; width: 140px; font-family: var(--mono); }
+.open-games { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.open-games .og {
+  display: flex; align-items: center; gap: 10px; font-size: 14px;
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020;
+}
+.open-games .og b { font-family: var(--mono); color: var(--gold); letter-spacing: .15em; }
+.hint { margin: 18px 0 0; font-size: 13px; color: var(--ink-faint); text-align: center; }
+/* Sprachwahl unter dem Hinweis: da sucht man sie, und sie draengt sich nicht vor. */
+.lang-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.lang-row .sel, .lang-row select { width: auto; }
+.lang-row .sel-btn { padding: 6px 30px 6px 10px; font-size: 13px; }
+
+/* ============================================================== Lobby */
+#screen-lobby { display: grid; place-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0%, #141b36 0%, #05060c 65%); }
+.lobby { width: min(900px, 94vw); padding: 24px 0; }
+.lobby header h2 { margin: 0 0 4px; font-size: 26px; }
+.lobby header p { margin: 0 0 18px; color: var(--ink-dim); }
+.code { font-family: var(--mono); color: var(--gold); letter-spacing: .3em; }
+.lobby-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .lobby-grid { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.panel h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.player-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
+.player-list li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: #0b1020; border: 1px solid var(--line); border-radius: 8px; }
+.player-list .swatch { width: 16px; height: 16px; border-radius: 4px; flex: none; box-shadow: 0 0 10px currentColor; }
+.player-list .tagbot { font-size: 12px; color: var(--ink-faint); border: 1px solid var(--line); padding: 1px 6px; border-radius: 20px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.lobby-foot { display: flex; justify-content: space-between; margin-top: 16px; }
+
+/* =============================================================== Spiel */
+#screen-game { background: #04050a; }
+/* touch-action: der Browser soll weder scrollen noch zoomen - die Karte
+   macht beides selbst, sonst zieht man beim Schwenken die Seite mit. */
+#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  cursor: grab; touch-action: none; }
+#map.dragging { cursor: grabbing; }
+
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 60px;
+  display: flex; align-items: center; gap: 14px; padding: 0 14px;
+  background: linear-gradient(rgba(6, 9, 18, .95), rgba(6, 9, 18, .72));
+  border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); z-index: 5;
+}
+.emblem { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 14px currentColor; flex: none; }
+.me-name { font-weight: 650; line-height: 1.1; }
+.me-sub { font-size: 12px; color: var(--ink-dim); }
+.res { display: flex; gap: 18px; margin-left: 10px; }
+.res-item { display: flex; align-items: baseline; gap: 6px; }
+.res-item .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
+.res-item .val { font-family: var(--mono); font-size: 19px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.res-item .delta { font-size: 13px; color: var(--good); }
+/* Was in dieser Runde schon verplant ist - still, solange es aufgeht. */
+.res-item .hold { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.res-item .hold.knapp { color: var(--bad); font-weight: 600; }
+.turnbox { text-align: right; }
+.turn { font-size: 14px; color: var(--ink-dim); }
+.turn span { color: var(--ink); font-family: var(--mono); }
+.timer { font-family: var(--mono); font-size: 13px; color: var(--gold); }
+.endturn { min-width: 158px; }
+.endturn.waiting { background: linear-gradient(#1d2740, #16203a); color: var(--ink-dim); border-color: var(--line-strong); font-weight: 500; }
+
+/* Docks */
+.dock {
+  position: absolute; z-index: 4;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+}
+/* Unter den Docks steht das Protokollfenster (Grundhoehe 240) bzw. die
+   Kartensteuerung - so weit reichen sie, ohne sich zu ueberlappen. */
+#leftdock { top: 72px; left: 12px; width: 288px; max-height: calc(100vh - 332px); }
+#rightdock { top: 72px; right: 12px; width: 340px; max-height: calc(100vh - 140px); }
+/* Das Protokoll ist ein Fenster: Leiste zum Ziehen, Griff zum Aufziehen.
+   Lage und Groesse setzt client/js/ui/dialog.js, hier steht nur der Start. */
+#logdock { bottom: 12px; left: 12px; width: 460px; height: 240px; z-index: 6; }
+#logdock.collapsed { height: auto; }
+#logdock.collapsed .logbody, #logdock.collapsed #chat-input-row,
+#logdock.collapsed .dlg-grip { display: none; }
+/* Waehrend gezogen wird darf nichts unter dem Zeiger reagieren. */
+.dlg.dlg-busy { user-select: none; }
+.dlg.dlg-busy .logbody { pointer-events: none; }
+
+.dlg-bar {
+  display: flex; align-items: stretch; flex: none;
+  border-bottom: 1px solid var(--line);
+  cursor: move; touch-action: none;
+}
+.dlg-bar .tabs { border-bottom: none; flex: none; }
+.dlg-bar .spacer { min-width: 20px; }
+.dlg-bar .icon-btn { align-self: center; margin-right: 6px; font-size: 16px; line-height: 1; }
+.dlg-grip {
+  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px;
+  cursor: nwse-resize; touch-action: none; z-index: 2;
+  background:
+    linear-gradient(135deg, transparent 48%, var(--line-strong) 48%, var(--line-strong) 58%, transparent 58%),
+    linear-gradient(135deg, transparent 68%, var(--line-strong) 68%, var(--line-strong) 78%, transparent 78%);
+}
+.dlg-grip:hover { background:
+    linear-gradient(135deg, transparent 48%, var(--gold-dim) 48%, var(--gold-dim) 58%, transparent 58%),
+    linear-gradient(135deg, transparent 68%, var(--gold-dim) 68%, var(--gold-dim) 78%, transparent 78%); }
+
+.tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--line); flex: none; }
+.tabs button {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  border-radius: 0; padding: 7px 10px; font-size: 13px; color: var(--ink-dim);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.tabs button:hover { color: var(--ink); background: none; }
+.tabs button.active { color: var(--gold); border-bottom-color: var(--gold); }
+.tabbody, #selection { overflow-y: auto; padding: 12px; }
+.logbody { overflow-y: auto; padding: 8px 12px; font-size: 13.5px; flex: 1 1 auto; min-height: 0; }
+
+/* Forschung */
+.tech-row { margin-bottom: 11px; }
+.tech-head { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
+.tech-head .lvl { margin-left: auto; font-family: var(--mono); color: var(--gold); }
+.tech-head .nm { font-weight: 550; }
+.tech-bar { height: 4px; background: #0b1020; border-radius: 3px; overflow: hidden; margin: 4px 0 3px; border: 1px solid var(--line); }
+.tech-bar i { display: block; height: 100%; background: linear-gradient(90deg, #4d7fe0, #7fd3ff); }
+.wrow { display: flex; align-items: center; gap: 6px; }
+.wrow input { flex: 1; }
+.wrow .pct { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); width: 38px; text-align: right; }
+.budget-box { background: #0b1020; border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+
+/* Auswahl-Panel */
+.sel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.sel-head canvas { flex: none; }
+.sel-title { font-size: 18px; font-weight: 650; line-height: 1.1; }
+.sel-sub { font-size: 13px; color: var(--ink-dim); }
+.statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; margin: 10px 0; }
+.stat { background: #0b1020; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+.stat .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); }
+.stat .v { font-family: var(--mono); font-size: 15px; }
+.meter { height: 6px; border-radius: 4px; background: #0b1020; border: 1px solid var(--line); overflow: hidden; margin-top: 4px; }
+.meter i { display: block; height: 100%; }
+.sec { border-top: 1px solid var(--line); margin: 12px -12px 0; padding: 12px 12px 0; }
+.sec h4 { margin: 0 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.buildrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.buildrow .bi { flex: none; }
+.buildrow .bname { font-size: 14px; }
+.buildrow .bcost { font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
+.buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.buildrow .bq .n { font-family: var(--mono); min-width: 16px; text-align: center; }
+.shiplist { display: flex; flex-direction: column; gap: 4px; }
+.shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }
+.shipitem .hp { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.hint-line { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
+.sel-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+/* Reich / Spieler */
+.listrow {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px;
+  cursor: pointer; border: 1px solid transparent;
+}
+.listrow:hover { background: #0b1020; border-color: var(--line); }
+.listrow .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.listrow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listrow .num { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
+.listrow.rdy .nm::after { content: " \2713"; color: var(--good); }
+
+/* Log */
+.logline { padding: 2px 0; color: var(--ink-dim); }
+.logline b { color: var(--ink); font-weight: 550; }
+.logline.combat { color: #ffb0a0; }
+.logline.tech { color: #a8d0ff; }
+.logline.colonize, .logline.settle { color: var(--good); }
+.logline.invade { color: #ffd27f; }
+.logline.warn { color: #ffb347; }
+.logline.galaxy { color: #86e4cf; }
+.logline.victory { color: var(--gold); font-weight: 600; }
+.logturn { margin-top: 6px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 4px; }
+.logline.clickable { cursor: pointer; }
+.logline.clickable:hover { color: var(--ink); }
+#chat-input-row { padding: 8px; border-top: 1px solid var(--line); }
+
+/* Kartensteuerung: unten rechts steht nur, was man staendig braucht -
+   Einpassen und Zoom. Alles Weitere klappt ueber das Zahnrad auf. */
+#mapcorner {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  max-width: calc(100vw - 24px);
+}
+#mapcontrols {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 6px; backdrop-filter: blur(10px); box-shadow: var(--shadow);
+}
+/* Alle vier gleich gross: die Zeichen sind verschieden breit, die Knoepfe
+   sollen es nicht sein. */
+#mapcontrols button {
+  width: 34px; height: 34px; padding: 0;
+  display: grid; place-items: center;
+  font-size: 15px; line-height: 1;
+}
+#btn-mapopts { font-size: 16px; }
+#btn-mapopts.auf { border-color: var(--gold-dim); color: var(--gold); }
+
+#mapsettings {
+  display: flex; flex-direction: column; gap: 10px; min-width: 190px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 14px; backdrop-filter: blur(12px); box-shadow: var(--shadow);
+  animation: sel-in .11s ease-out;
+}
+#mapsettings .chk { padding: 0; }
+#mapsettings .volrow {
+  display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-dim);
+  border-top: 1px solid var(--line); padding-top: 10px;
+}
+#mapsettings .volrow span { flex: none; }
+#mapsettings input[type=range] { width: 84px; }
+#topbar .quit { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; margin-left: 8px; }
+#topbar .quit:hover { color: var(--bad); border-color: var(--bad); }
+.modal-box.narrow { width: min(430px, 92vw); }
+#spectate { display: flex; align-items: center; gap: 6px; }
+#spectate button { padding: 6px 10px; }
+.sp-speeds { display: flex; gap: 2px; margin-left: 4px; }
+.sp-speeds button { padding: 6px 8px; font-variant-numeric: tabular-nums; }
+.sp-speeds button.active { border-color: var(--gold-dim); color: var(--gold); }
+/* Auswahlfelder: wie die Texteingaben, nur mit eigenem Pfeil - der native
+   sieht auf jedem System anders aus und passt nirgends zum Rest. */
+select {
+  appearance: none; -webkit-appearance: none;
+  padding: 10px 34px 10px 12px;
+  font: inherit;
+  color: var(--ink);
+  background-color: #0b1020;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.6 6 6.4 11 1.6' fill='none' stroke='%239aa8c4' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 11px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+select:hover:not(:disabled) { border-color: var(--gold-dim); background-color: #0e1426; }
+/* Wie bei den Texteingaben auch beim Klick, nicht nur bei Tastatursteuerung */
+select:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
+select:disabled { opacity: .45; cursor: default; }
+/* Die aufgeklappte Liste lässt sich nur begrenzt gestalten - wenigstens dunkel. */
+select option { background: var(--panel-solid); color: var(--ink); }
+
+.field select { width: 100%; }
+.join-row select { flex: 0 0 auto; }
+
+/* Eigene Auswahlliste (client/js/ui/select.js): das native <select> bleibt als
+   Zustandsträger darunter liegen, sichtbar sind Knopf und Liste. */
+.sel { position: relative; width: 100%; }
+.sel select { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.sel-btn {
+  width: 100%; text-align: left;
+  padding: 10px 34px 10px 12px;
+  font: inherit; color: var(--ink);
+  background-color: #0b1020;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.6 6 6.4 11 1.6' fill='none' stroke='%239aa8c4' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 11px 8px;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.sel-btn:hover:not(:disabled) { border-color: var(--gold-dim); background-color: #0e1426; }
+.sel-btn:focus-visible { outline: 2px solid var(--gold-dim); outline-offset: 0; }
+.sel-btn:disabled { opacity: .45; cursor: default; }
+.sel.auf .sel-btn { border-color: var(--gold-dim); background-color: #0e1426; }
+
+.sel-list {
+  display: none;
+  position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 30;
+  background: var(--panel-solid); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: var(--shadow);
+  padding: 4px; max-height: 260px; overflow-y: auto;
+}
+.sel.auf .sel-list { display: block; animation: sel-in .11s ease-out; }
+@keyframes sel-in { from { opacity: 0; transform: translateY(-4px); } }
+.sel-opt { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
+.sel-opt:hover { background: rgba(160, 190, 240, .1); }
+.sel-opt[aria-selected="true"] { color: var(--gold); background: rgba(240, 180, 41, .1); }
+
+.join-row .sel { width: auto; }
+.join-row .sel-btn { width: auto; }
+.league { display: flex; flex-direction: column; gap: 2px; }
+/* Breite festnageln: sonst zieht der nicht umbrechende Name die Mindestbreite
+   der Zeile über den Kasten hinaus und nichts wird je gekürzt. */
+.league .row { width: 100%; box-sizing: border-box; overflow: hidden;
+  padding: 6px 8px; border-radius: 8px; background: #0b1020cc; border: 1px solid var(--line); }
+.league .row.dead { opacity: .45; }
+.league .head { display: flex; align-items: center; gap: 6px; }
+.league .head .nm { flex: 1; min-width: 0; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.league .num { margin-top: 3px; font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.league .tech { margin-top: 3px; font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
+.league .bar { height: 3px; border-radius: 2px; margin-top: 5px; background: #ffffff14; overflow: hidden; }
+.league .bar i { display: block; height: 100%; }
+/* Schalter statt Haekchen: deutlicher zu erkennen und mit dem Daumen zu
+   treffen. Das Kaestchen bleibt als Zustandstraeger, nur umgemalt. */
+.chk { font-size: 13px; color: var(--ink-dim); display: flex; align-items: center; gap: 7px; padding: 0 4px; cursor: pointer; }
+.chk:hover { color: var(--ink); }
+.chk input[type=checkbox] {
+  appearance: none; -webkit-appearance: none;
+  flex: none; margin: 0; position: relative;
+  width: 34px; height: 19px; border-radius: 11px;
+  background: #0b1020; border: 1px solid var(--line-strong);
+  cursor: pointer; transition: background .15s ease, border-color .15s ease;
+}
+.chk input[type=checkbox]::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--ink-faint);
+  transition: transform .15s ease, background .15s ease;
+}
+.chk input[type=checkbox]:hover { border-color: var(--gold-dim); }
+.chk input[type=checkbox]:checked {
+  background: linear-gradient(#f3bd3c, #d79a16); border-color: #ffd877;
+}
+.chk input[type=checkbox]:checked::after { background: #2a1e02; transform: translateX(15px); }
+.chk input[type=checkbox]:focus-visible { outline: 2px solid var(--gold-dim); outline-offset: 2px; }
+.chk:has(input:checked) { color: var(--ink); }
+
+/* Toasts & Banner */
+#toasts { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 9; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+.toast {
+  background: rgba(10, 14, 26, .95); border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold); border-radius: 8px;
+  padding: 9px 15px; font-size: 14px; box-shadow: var(--shadow);
+  animation: toast-in .2s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+#turnbanner {
+  position: absolute; inset: 0; display: grid; place-items: center; z-index: 8;
+  background: rgba(4, 5, 10, .55); pointer-events: none; backdrop-filter: blur(2px);
+}
+#turnbanner .big { font-size: 50px; font-weight: 800; letter-spacing: .02em; color: var(--gold); text-shadow: 0 0 40px rgba(240,180,41,.4); }
+
+/* Modal */
+.modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(2, 3, 8, .72); }
+.modal-box {
+  width: min(820px, 94vw); max-height: 86vh; overflow: auto;
+  background: var(--panel-solid); border: 1px solid var(--line-strong);
+  border-radius: 14px; padding: 26px; box-shadow: var(--shadow);
+}
+.modal-box h2 { margin: 0 0 14px; color: var(--gold); }
+.help-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; }
+@media (max-width: 680px) { .help-cols { grid-template-columns: 1fr; } }
+.help-cols h4 { margin: 14px 0 4px; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+.help-cols p { margin: 0 0 8px; color: var(--ink-dim); font-size: 14px; }
+.modal-box > .primary { margin-top: 18px; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1d2740; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #2a3658; }
+
+/* ====================================================== Kleine Geräte
+   Auf einem Telefon ist kein Platz für schwebende Docks: die drei Panels
+   werden zu Blättern, die über eine Leiste am unteren Rand aufgehen - immer
+   nur eines. Die Karte behält den Rest des Bildschirms für sich.
+   Umschaltpunkt ist die Breite, nicht die Art des Zeigers: ein schmales
+   Fenster am Rechner hat dasselbe Platzproblem. */
+.only-phone { display: none; }
+
+/* Umschaltpunkt: zu schmal ODER zu niedrig fuer nebeneinanderliegende
+   Docks. Dieselbe Abfrage steht in client/js/ui/viewport.js. */
+@media (max-width: 760px), (max-height: 560px) {
+  .only-phone { display: block; }
+
+  /* ---------------------------------------------------- Start und Lobby */
+  .logo img { width: min(250px, 72%); }
+  .menu-box { padding: 22px 20px 18px; border-radius: 14px; }
+  .tagline { margin-bottom: 16px; }
+  .lobby { padding: 14px 12px; }
+  .lobby header h2 { font-size: 22px; }
+  .player-list { max-height: 44vh; }
+  .lobby-foot { gap: 8px; }
+  .lobby-foot button { flex: 1; }
+  .modal-box { padding: 18px 16px; max-height: 88vh; }
+  .help-cols { grid-template-columns: 1fr; }
+
+  /* ------------------------------------------------------------ Topbar */
+  #topbar { height: 54px; gap: 10px; padding: 0 10px; }
+  #topbar .me, #btn-quit { display: none; }
+  .emblem { width: 26px; height: 26px; }
+  /* Beschriftung über den Wert statt daneben: zwei nackte Zahlen
+     nebeneinander wären nicht auseinanderzuhalten, und Platz für "Geld" in
+     voller Größe ist nicht. */
+  .res { gap: 14px; margin-left: 0; }
+  .res-item { flex-wrap: wrap; align-items: baseline; gap: 0 5px; line-height: 1.15; }
+  .res-item .lbl { width: 100%; font-size: 9px; letter-spacing: .05em; }
+  .res-item .val { font-size: 16px; }
+  .res-item .delta, .res-item .hold { font-size: 10.5px; }
+  .turnbox { line-height: 1.15; }
+  .turn { font-size: 11px; }
+  .timer { font-size: 11px; }
+  .endturn { min-width: 0; padding: 7px 11px; font-size: 13.5px; white-space: nowrap; }
+  #spectate { gap: 4px; }
+  #spectate button { padding: 6px 8px; font-size: 13px; }
+  .sp-speeds { display: none; }
+
+  /* ------------------------------------------------------- Blätter */
+  #tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
+    display: flex; align-items: stretch;
+    background: var(--panel-solid); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #tabbar button {
+    flex: 1; background: none; border: none; border-radius: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 2px; font-size: 11px; color: var(--ink-dim);
+    min-height: 54px;                 /* mit dem Daumen zu treffen */
+  }
+  #tabbar button .ic { font-size: 17px; line-height: 1; }
+  #tabbar button.active { color: var(--gold); }
+  #tabbar button.active .ic { text-shadow: 0 0 10px rgba(240,180,41,.5); }
+  #tabbar button:hover { background: none; }
+
+  /* Mit ID adressiert, weil #leftdock & Co. oben ihre feste Lage per ID
+     setzen - eine Klassenregel käme dagegen nicht an. */
+  #leftdock, #rightdock, #logdock {
+    position: fixed; left: 0; right: 0; width: auto;
+    top: auto; bottom: 54px; height: 54vh; max-height: none;
+    border-radius: 14px 14px 0 0; border-bottom: none;
+    display: none; z-index: 11;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #screen-game[data-sheet="left"] #leftdock,
+  #screen-game[data-sheet="right"] #rightdock,
+  #screen-game[data-sheet="log"] #logdock { display: flex; }
+  /* Das Protokollfenster ist hier kein Fenster: Leiste und Griff entfallen. */
+  /* Das Protokoll ist hier kein Fenster - die gemerkte Geometrie gilt wieder,
+     sobald das Fenster breit genug ist (siehe client/js/ui/dialog.js). */
+  #logdock { left: 0 !important; right: 0 !important; top: auto !important;
+    bottom: 54px !important; width: auto !important; height: 54vh !important; }
+  #logdock .dlg-bar { cursor: default; }
+  .dlg-grip { display: none; }
+  #log-collapse { display: none; }
+  #logdock.collapsed .logbody, #logdock.collapsed #chat-input-row { display: block; }
+  .tabbody, #selection { padding: 12px 14px; }
+
+  /* --------------------------------------------------- Kartensteuerung */
+  #mapcorner { right: 8px; bottom: 62px; }
+  /* Nur die Knopfleiste weicht dem Blatt - die Einstellungen liegen im
+     selben Container und sind selbst ein Blatt. */
+  #screen-game[data-sheet]:not([data-sheet=""]) #mapcontrols { display: none; }
+  #mapcontrols button { width: 40px; height: 40px; }
+  #mapsettings {
+    position: fixed; left: 0; right: 0; bottom: 54px;
+    border-radius: 14px 14px 0 0; padding: 14px 16px 18px;
+    max-height: 54vh; overflow-y: auto;
+  }
+  #mapsettings .chk { padding: 6px 0; }
+  #btn-quit2 { width: 100%; margin-top: 6px; }
+
+  /* Mit dem Daumen bedienbar: Mindestgrößen für alles Anfassbare */
+  button.tiny { padding: 8px 12px; font-size: 13px; }
+  .buildrow .bq button.tiny { min-width: 38px; min-height: 36px; }
+  input[type=range] { height: 28px; }
+  .listrow { padding: 10px 8px; }
+  .shipitem { padding: 8px 8px; }
+
+  /* Meldungen über der Karte, nicht über der Leiste */
+  #toasts { top: 58px; width: min(92vw, 420px); }
+  .toast { font-size: 13px; }
+  #turnbanner .big { font-size: 34px; }
+}
+
+/* Breit, aber niedrig (Telefon quer, geteiltes Fenster): nach unten ist kein
+   Platz, nach rechts schon - das Blatt legt sich an die Seite und lässt die
+   halbe Karte frei. */
+@media (min-width: 761px) and (max-height: 560px) {
+  #leftdock, #rightdock, #logdock, #mapsettings {
+    left: auto; right: 0; width: min(54vw, 420px);
+    top: 54px; bottom: 54px; height: auto; max-height: none;
+    border-radius: 14px 0 0 0;
+  }
+  #logdock {
+    left: auto !important; right: 0 !important;
+    top: 54px !important; bottom: 54px !important;
+    width: min(54vw, 420px) !important; height: auto !important;
+  }
+  #mapsettings { top: auto; }
+  #mapcorner { bottom: 62px; right: 8px; }
+}
+
+/* Sehr niedrig und schmal zugleich: dann bleibt nur, das Blatt höher zu
+   ziehen - die Karte ist darüber noch zu sehen. */
+@media (max-width: 760px) and (max-height: 520px) {
+  #leftdock, #rightdock, #logdock, #mapsettings { height: 68vh; max-height: 68vh; }
+  #logdock { height: 68vh !important; }
+}
