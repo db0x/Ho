@@ -403,3 +403,21 @@ verbundene Spieler werden nach zwei Stunden aufgeräumt.
 - Hintergrundklang (bisher nur Effekte, keine Atmosphäre und keine Musik)
 - Eine in die Enge getriebene KI igelt sich nur ein: sie häuft Schiffe auf ihrer
   letzten Welt an, statt auszubrechen
+
+## Lizenz
+
+Der Code steht unter der **MIT-Lizenz** – benutzen, ändern, weitergeben, auch
+Kommerzielles daraus bauen; Urheberrechtsvermerk und Lizenztext bleiben dabei
+erhalten. Der genaue Wortlaut steht in [LICENSE](LICENSE). Getrennte
+Asset-Lizenzen sind nicht zu beachten, denn es gibt keine Assets im üblichen Sinn:
+Die Grafiken sind handgeschriebenes SVG und Canvas-Zeichenbefehle, die Klänge
+entstehen beim Abspielen im Browser, und die einzige Abhängigkeit ist `ws`
+(ebenfalls MIT). Alles in diesem Verzeichnis ist Quelltext und von der einen Lizenz
+gedeckt.
+
+**Ho!!** ist eine eigenständige Neuimplementierung und steht in keiner Verbindung
+zu Delta Tao Software, ist von dort weder unterstützt noch lizenziert.
+*Spaceward Ho!* ist deren Marke, und das Originalspiel bleibt deren Werk – dieses
+Projekt übernimmt die Idee und das Spielgefühl, nicht den Code, nicht die Grafiken
+und nicht die Texte. Die Planetenoptik folgt dem Original im Geist; gezeichnet
+wurde hier jede Linie neu.

@@ -394,3 +394,19 @@ connected players are cleaned up after two hours.
 - Ambient sound (effects only so far, no atmosphere and no music)
 - A cornered AI just digs in: it piles ships up on its last world instead of
   breaking out
+
+## License
+
+The code is under the **MIT license** – use it, change it, pass it on, build
+something commercial on it; keep the copyright notice and the licence text with it.
+The full wording is in [LICENSE](LICENSE). There are no separate asset licences to
+observe, because there are no assets in the usual sense: the graphics are
+hand-written SVG and canvas drawing commands, the sounds are synthesised in the
+browser at playback time, and the only dependency is `ws` (MIT as well). Everything
+in this repository is source code and is covered by the one licence.
+
+**Ho!!** is an independent reimplementation and not connected with, endorsed by or
+licensed from Delta Tao Software. *Spaceward Ho!* is their trademark, and the
+original game remains theirs – this project borrows the idea and the feel of it, not
+its code, its graphics or its texts. The planet style follows the original in
+spirit; every line of it was drawn from scratch here.
