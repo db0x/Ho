@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Ho!!</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="img/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/mark.svg">
+</head>
+<body>
+
+<!-- Vor der Lobby: ohne Sitzung gibt der Server den Spielclient nicht heraus,
+     diese Seite hier schon. Sie braucht darum nur das Stylesheet, die
+     Sprachkataloge und sich selbst. -->
+<div id="screen-login" class="screen">
+  <div class="menu-box">
+    <h1 class="logo"><img src="img/logo.svg" alt="Ho!!" width="330" height="182"></h1>
+
+    <form id="form-login" class="hidden">
+      <p class="tagline" data-i18n="auth.intro"></p>
+      <label class="field">
+        <span data-i18n="auth.user"></span>
+        <input id="in-user" name="username" autocomplete="username" autocapitalize="none"
+               spellcheck="false" maxlength="24" data-i18n-attr="placeholder:auth.userPlaceholder">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.password"></span>
+        <input id="in-pass" name="password" type="password" autocomplete="current-password" maxlength="200">
+      </label>
+      <button class="primary wide" type="submit" data-i18n="auth.login"></button>
+    </form>
+
+    <form id="form-change" class="hidden">
+      <h2 data-i18n="auth.change.title"></h2>
+      <p class="tagline" id="change-intro"></p>
+      <label class="field">
+        <span data-i18n="auth.change.current"></span>
+        <input id="in-old" type="password" autocomplete="current-password" maxlength="200">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.change.new"></span>
+        <input id="in-new" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.change.repeat"></span>
+        <input id="in-new2" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <button class="primary wide" type="submit" data-i18n="auth.change.save"></button>
+    </form>
+
+    <div id="login-error" class="error"></div>
+
+    <div class="lang-row"><span class="muted small" data-i18n="menu.language"></span>
+      <select id="in-lang"></select></div>
+  </div>
+</div>
+
+<script type="module" src="js/login.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import { WebSocket } from 'ws';
 
 const PORT = 8111 + Math.floor(Math.random() * 300);
 const server = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT) },
+  env: { ...process.env, PORT: String(PORT), HO_AUTH: 'off' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));

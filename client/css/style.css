@@ -80,11 +80,16 @@ button.tiny { padding: 4px 8px; font-size: 13px; border-radius: 6px; }
 /* ------------------------------------------------------------- Felder */
 .field { display: block; margin: 14px 0; }
 .field > span { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
-.field input[type=text], .field input:not([type]) , input[type=text], input:not([type]) {
+.field input[type=text], .field input[type=password], .field input:not([type]),
+input[type=text], input[type=password], input:not([type]) {
   width: 100%; padding: 10px 12px;
   background: #0b1020; border: 1px solid var(--line-strong); border-radius: 8px;
 }
 input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
+/* Fest vorgegeben (der Name kommt mit Anmeldung aus dem Konto): sichtbar,
+   aber erkennbar nicht zum Bearbeiten. */
+input[readonly] { color: var(--ink-dim); background: transparent; border-style: dashed; cursor: default; }
+input[readonly]:focus { outline: none; }
 .field.slim { margin: 10px 0; }
 .field.slim > span { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; }
 .field.slim b { color: var(--gold); font-variant-numeric: tabular-nums; }
@@ -126,6 +131,18 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .lang-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
 .lang-row .sel, .lang-row select { width: auto; }
 .lang-row .sel-btn { padding: 6px 30px 6px 10px; font-size: 13px; }
+
+/* =================================================== Anmeldung */
+/* Die Anmeldung (client/login.html) borgt sich die Buehne des Startbildschirms,
+   nur ohne Sternhimmel - sie soll leicht sein, nicht beeindrucken. */
+#screen-login { display: grid; place-items: center; overflow: auto; padding: 16px 0;
+  background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
+#screen-login h2 { margin: 0 0 6px; font-size: 20px; }
+#screen-login .field:first-of-type { margin-top: 12px; }
+#screen-login .wide { width: 100%; padding: 12px; font-size: 15px; margin-top: 4px; }
+/* Die Zeile mit Konto und Abmelden sitzt unter der Sprachwahl im Startmenue. */
+.account-row { display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin: 10px 0 0; font-size: 13px; color: var(--ink-faint); }
 
 /* ============================================================== Lobby */
 #screen-lobby { display: grid; place-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0%, #141b36 0%, #05060c 65%); }
