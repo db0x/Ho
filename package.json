@@ -1,6 +1,6 @@
 {
-  "name": "spaceward-ho-web",
-  "version": "0.2.0",
+  "name": "ho-web",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Ho!! - ein Weltraum-Strategiespiel im Geist von Spaceward Ho! (Web, bis zu 16 Spieler)",

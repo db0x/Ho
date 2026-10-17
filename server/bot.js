@@ -117,7 +117,7 @@ export function runBot(game, bot) {
   // --- Flotten vor dem Angriff bündeln
   const warten = new Map();
   for (const f of meineFlotten) {
-    if (f.at === null || f.at === undefined || f.dest) continue;
+    if (f.at === null || f.at === undefined || f.dest != null) continue;
     warten.set(f.at, (warten.get(f.at) || 0) + 1);
   }
   for (const p of mine) {
@@ -126,7 +126,7 @@ export function runBot(game, bot) {
 
   // --- Flottenbefehle
   const zone = holeZone(game.galaxy);
-  for (const fleet of game.fleets.filter(f => f.owner === bot.id && !f.dest && f.ships.length)) {
+  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.length)) {
     // (meineFlotten ist von vor dem Zusammenlegen - hier zählt der aktuelle Stand)
     const st = fleetStats(fleet);
     if (st.speed <= 0) continue;

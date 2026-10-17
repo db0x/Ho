@@ -146,7 +146,7 @@ function wsVersuch() {
     const r = await fetch(BASIS + trick, { redirect: 'manual' });
     const text = await r.text();
     check(r.status !== 200, `${trick} kommt ohne Sitzung heraus (${r.status})`);
-    check(!/WebSocketServer|scrypt|spaceward-ho/.test(text),
+    check(!/WebSocketServer|scrypt|"ho-web"/.test(text),
       `${trick} liefert Projektdateien aus`);
   }
   console.log('Ohne Sitzung: kein Client, keine Regeln, keine WebSocket, kein Pfadtrick.');

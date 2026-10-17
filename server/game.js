@@ -210,7 +210,7 @@ export function planetById(game, id) { return game.galaxy.planets[id]; }
 export function playerById(game, id) { return game.players.find(p => p.id === id); }
 
 function orbitFleet(game, owner, planet) {
-  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && !f.dest);
+  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && f.dest == null);
   if (!f) f = newFleet(game, owner, planet);
   return f;
 }
@@ -307,7 +307,7 @@ export function setOrders(game, player, msg) {
   }
   if (msg.split) {
     const fleet = game.fleets.find(f => f.id === msg.split.fleetId);
-    if (!fleet || fleet.owner !== player.id || fleet.dest) return;
+    if (!fleet || fleet.owner !== player.id || fleet.dest != null) return;
     const take = msg.split.ships || [];
     const moved = fleet.ships.filter(s => take.includes(s.id));
     if (!moved.length || moved.length === fleet.ships.length) return;
@@ -319,7 +319,7 @@ export function setOrders(game, player, msg) {
   if (msg.merge) {
     const planet = planetById(game, msg.merge.planetId);
     if (!planet) return;
-    const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && !f.dest);
+    const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && f.dest == null);
     if (own.length < 2) return;
     const target = own[0];
     for (const f of own.slice(1)) { target.ships.push(...f.ships); f.ships = []; }
@@ -445,7 +445,7 @@ export function resolveTurn(game) {
   // 4) Bewegung
   const zone = holeZone(game.galaxy);
   for (const fleet of game.fleets) {
-    if (!fleet.dest) continue;
+    if (fleet.dest == null) continue;
     const target = planetById(game, fleet.dest);
     const st = fleetStats(fleet);
     const owner = playerById(game, fleet.owner);

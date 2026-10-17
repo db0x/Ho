@@ -327,7 +327,7 @@ export class MapView {
     // Kurslinien - um das schwarze Loch herum, so wie geflogen wird
     const zone = holeZone(v.galaxy);
     for (const f of v.fleets) {
-      if (!f.dest) continue;
+      if (f.dest == null) continue;
       const target = v.planets[f.dest];
       if (!target) continue;
       const [ax, ay] = this.w2s(f.x, f.y);

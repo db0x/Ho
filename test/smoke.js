@@ -1,5 +1,5 @@
 // Spielt eine komplette Partie mit 16 KI-Reichen durch und prüft die Invarianten.
-import { createGame, addPlayer, startGame, resolveTurn, buildView } from '../server/game.js';
+import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders } from '../server/game.js';
 import { runBot } from '../server/bot.js';
 
 const game = createGame('Test');
@@ -68,6 +68,25 @@ for (const f of v.fleets.filter(f => !f.mine)) {
 }
 assert(colonies > 5, 'KI kolonisiert nicht');
 assert(combats > 0, 'Es gab keinen einzigen Kampf');
+
+// Planet 0 ist ein gültiges Ziel: die ID ist falsy, der Kurs darf trotzdem nicht verpuffen.
+{
+  const g = createGame('Ziel0');
+  g.settings.seed = 7;
+  g.settings.turnTimer = 0;
+  const me = addPlayer(g, { name: 'Mensch' });
+  addPlayer(g, { isBot: true, name: 'KI' });
+  startGame(g);
+  const pl = g.players.find(p => !p.isBot);
+  const fleet = g.fleets.find(f => f.owner === pl.id && f.at !== 0);
+  for (const s of fleet.ships) s.range = 1e6;
+  const r0 = setOrders(g, pl, { move: { fleetId: fleet.id, planetId: 0 } });
+  assert(!r0?.error, 'Kurs auf Planet 0 abgelehnt: ' + r0?.error);
+  const before = { x: fleet.x, y: fleet.y };
+  for (let i = 0; i < 40 && fleet.at !== 0; i++) resolveTurn(g);
+  assert(fleet.x !== before.x || fleet.y !== before.y, 'Flotte mit Ziel Planet 0 startet nicht');
+  assert(fleet.at === 0, 'Flotte erreicht Planet 0 nicht');
+}
 
 console.log('\nAlle Prüfungen bestanden.');
 
