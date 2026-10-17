@@ -30,8 +30,12 @@ each class has its own silhouette with engine glow, panelling and player colour.
 
 ```
 npm install
-npm start          # http://localhost:8080
+npm run users -- add captain   # create access, the password is printed
+npm start                      # http://localhost:8080
 ```
+
+A sign-in sits in front of the lobby – see *[Access](#access)*. While developing,
+`HO_AUTH=off npm start` takes it away.
 
 AI empires enter under names of their own – from *Admiral Wobblebeard* to
 *Czarina Candyfloss*.
@@ -256,15 +260,20 @@ shared/rules.js      Game rules, cost and combat formulas (server + browser)
 shared/i18n.js       Translation core (browser + Node)
 server/
   index.js           HTTP (static files) + WebSocket, lobby, game management, spectator pace
+  auth.js            Access: sessions, sign-in, password change, gate for HTTP and WebSocket
+  userstore.js       Accounts on disk: name and scrypt hash, written atomically
+  users.js           Tool for the host (docker exec): add, del, passwd, list
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a seed)
   bot.js             AI opponent; plays by the same rules with its own reconnaissance,
                      estimates the defence before attacking and finishes off the weakened
 client/
   index.html         Start screen, lobby, game screen
+  login.html         Sign-in and first password change - all that comes out without a session
   img/logo.svg       Wordmark (H, a world as the o, two exclamation marks)
   img/mark.svg       The same mark on its own - tab icon and launch image
   js/main.js         Wiring, game loop
+  js/login.js        Sign-in page: forms, language picker, handover to the game
   js/net.js          WebSocket with automatic reconnect
   js/i18n.js         Detect and remember the language, fill the markup
   i18n/de.js, en.js  Text catalogues
@@ -279,6 +288,7 @@ test/
   smoke.js           Plays a full game with 16 AI and checks the invariants
   blackhole.js       Spiral game: no fleet inside the no-go zone, courses route around
   multiplayer.js     Starts the real server and has 16 WebSocket clients play
+  auth.js            Access: hashes, accounts, the gate, guessing protection, path tricks
 ```
 
 **Drawing costs, so it is rationed.** A turn-based game does not need to rasterise
@@ -359,6 +369,104 @@ the first click wakes the output. After 20 seconds without a sound the audio
 context suspends itself (it would otherwise cost CPU time permanently) and wakes up
 again by itself with the next sound.
 
+## Access
+
+On a server out on the net, not everybody who knows the URL should get to play.
+A sign-in with user name and password therefore sits in front of the lobby.
+Without a valid session the server hands out neither the game client nor the
+WebSocket – and the game runs over the WebSocket, so a sign-in guarding only the
+page would be no sign-in at all.
+
+All the host holds per account is the **name** and a **scrypt hash** of the
+password, salted, with its parameters inside the hash. No clear text, no mail
+address, no session keys: those live in server memory alone and are gone after a
+restart – which ends all running games anyway.
+
+### Creating and deleting accounts
+
+Accounts come and go on the host, not in the browser:
+
+```
+docker exec ho node server/users.js add captain                # rolled password
+docker exec ho node server/users.js add captain secret-enough   # or one of your own
+docker exec ho node server/users.js list                       # who may play
+docker exec ho node server/users.js passwd captain             # reset a password
+docker exec ho node server/users.js del captain                # delete an account
+```
+
+`add` prints the first password **once** – that is the only moment it exists in
+the clear. It is good for the first sign-in only: after that the player has to
+choose their own before reaching the lobby. Same after `passwd`.
+
+`del` takes effect right away, even mid-game: HTTP requests are refused from the
+next one on, and an open WebSocket is dropped within a second. Resetting a
+password likewise ends every session of that account.
+
+Without Docker it is the same, only shorter:
+
+```
+npm run users -- add captain
+```
+
+Accounts live in `data/users.json`, inside the container in `/data/users.json` on
+a volume of its own – so a fresh image does not carry them off. The file is mode
+0600 and is written beside itself and then moved into place, so an abort cannot
+lose the whole set.
+
+### What the sign-in withstands
+
+- **Guessing is slowed down.** From the fifth failed attempt on it locks, and for
+  ever longer (30 s, 1 min, 2 min … up to 15 min). Counted per account *and* per
+  origin: so neither can one account be worked through nor can attempts be spread
+  from one place.
+- **The session cookie** is `HttpOnly` and `SameSite=Lax`, behind HTTPS also
+  `Secure`. The endpoints accept real JSON only – a form from somebody else's
+  site does not get through.
+- **An unknown name takes as long as a known one.** The response time does not
+  give away which accounts exist.
+- **Before the first password change** there is a session, but no game.
+- **Without a session** only the sign-in page comes out, plus stylesheet,
+  wordmark and the language catalogues. Neither `client/js/`, nor
+  `shared/rules.js`, nor a path with encoded separators (`/css/..%2f..%2f…`) gets
+  around that.
+
+### Behind a reverse proxy
+
+The server speaks HTTP and knows nothing of TLS – that is the proxy's job. Two
+things it must do:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;      # or no WebSocket is established
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;  # or the cookie loses its Secure flag
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+And the port then belongs to the proxy only, not to the open net:
+
+```
+HOST_BIND=127.0.0.1 docker compose up -d
+```
+
+### Settings, and switching it off
+
+While developing, the sign-in is in the way. `HO_AUTH=off` takes it away; the
+server also says clearly at startup that it stands open. On a server reachable
+from the net this has no place.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `HO_AUTH` | on | `off` switches the sign-in off |
+| `HO_USERS_FILE` | `data/users.json` | where the accounts live |
+| `HO_SESSION_DAYS` | `30` | how long a session is good for |
+| `HO_SECURE_COOKIES` | automatic | `1`/`0` forces or forbids the `Secure` flag |
+| `HO_LANG` | from the environment | language of the tool on the host |
+
 ## Tests
 
 ```
@@ -367,6 +475,7 @@ npm run test:i18n    # catalogues: same keys, same placeholders, server keys cov
 npm run test:engine  # 120 turns with 16 AI, checks balance and state invariants
 npm run test:hole    # spiral game: the no-go zone around the black hole holds
 npm run test:net     # lobby, 16 clients, simultaneous-turn logic, disconnect, chat
+npm run test:auth    # access: hashes, accounts, sign-in, password change, rate limit
 ```
 
 ## Docker
@@ -387,7 +496,20 @@ image:
 docker compose --profile test run --rm test
 ```
 
-Running games live in server memory only – restarting the container ends them.
+Inside the container the sign-in is on. Locally, where only you play, switch it
+off with a `.env` next to `docker-compose.yml` (template: `.env.example`):
+
+```
+HO_AUTH=off
+```
+
+On the server that line does not belong – without it the sign-in stays on. For a
+one-off run without a file: `HO_AUTH=off docker compose up -d`. Whether it is on
+is in the startup log (`docker compose logs ho | grep Zugang`).
+
+The accounts live on the `ho-data` volume and survive every new image; they are
+created with `docker exec` (see *[Access](#access)*). Running games live in server
+memory only – restarting the container ends them, and with them the open sessions.
 
 ## Settings
 

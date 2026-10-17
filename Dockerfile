@@ -14,6 +14,13 @@ COPY server ./server
 COPY client ./client
 COPY test ./test
 
+# Die Konten liegen ausserhalb des Images, damit ein neues Abbild sie nicht
+# mitnimmt. Das Verzeichnis gehoert dem Benutzer node - sonst koennte
+# "docker exec node server/users.js add ..." nicht schreiben.
+ENV HO_USERS_FILE=/data/users.json
+RUN mkdir -p /data && chown node:node /data
+VOLUME /data
+
 USER node
 EXPOSE 8080
 

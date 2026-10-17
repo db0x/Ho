@@ -47,8 +47,44 @@ function sprachwahl() {
   });
 }
 
+/**
+ * Konto und Abmelden unter der Sprachwahl. Laeuft der Server ohne Anmeldung
+ * (HO_AUTH=off), antwortet /api/auth/me mit 404 und die Zeile bleibt weg.
+ */
+async function konto() {
+  const zeile = document.querySelector('#account-row');
+  const name = document.querySelector('#account-name');
+  if (!zeile) return;
+  let wer = null;
+  try {
+    const r = await fetch('/api/auth/me', { cache: 'no-store' });
+    if (!r.ok) return;
+    wer = (await r.json()).user;
+  } catch { return; }
+  if (!wer) return;
+  // Der Spielername ist der Kontoname - fest, damit niemand unter fremdem
+  // Namen antritt. Durchgesetzt wird das auf dem Server; hier nur angezeigt.
+  const feld = document.querySelector('#in-name');
+  feld.value = wer;
+  feld.readOnly = true;
+  const male = () => {
+    name.textContent = t('auth.signedInAs', { user: wer });
+    feld.title = t('menu.nameFromAccount');
+  };
+  male();
+  onLocaleChange(male);
+  zeile.classList.remove('hidden');
+  document.querySelector('#link-logout').onclick = async (e) => {
+    e.preventDefault();
+    net.forget();
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* egal */ }
+    location.replace('/login.html');
+  };
+}
+
 const net = new Net();
 const lobby = new Lobby(net);
+konto();
 let map = null;
 let hud = null;
 let lastTurn = 0;

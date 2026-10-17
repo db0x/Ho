@@ -30,8 +30,12 @@ hat eine eigene Silhouette mit Triebwerksglühen, Panelstruktur und Spielerfarbe
 
 ```
 npm install
-npm start          # http://localhost:8080
+npm run users -- add captain   # Zugang anlegen, Passwort wird ausgegeben
+npm start                      # http://localhost:8080
 ```
+
+Vor der Lobby steht eine Anmeldung – siehe *[Zugang](#zugang)*. Zum Entwickeln
+nimmt `HO_AUTH=off npm start` sie weg.
 
 KI-Reiche treten unter eigenem Namen an – von *Admiral Wobblebeard* bis
 *Czarina Candyfloss*.
@@ -263,15 +267,20 @@ shared/rules.js      Spielregeln, Kosten- und Kampfformeln (Server + Browser)
 shared/i18n.js       Übersetzungskern (Browser + Node)
 server/
   index.js           HTTP (statische Dateien) + WebSocket, Lobby, Partieverwaltung, Zuschauertakt
+  auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter für HTTP und WebSocket
+  userstore.js       Konten auf der Platte: Name und scrypt-Hash, atomar geschrieben
+  users.js           Werkzeug für den Host (docker exec): add, del, passwd, list
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen Seed)
   bot.js             KI-Gegner; spielt nach denselben Regeln und mit eigener Aufklärung,
                      schätzt vor dem Angriff die Abwehr und gibt Angeschlagenen den Rest
 client/
   index.html         Startbildschirm, Lobby, Spielbildschirm
+  login.html         Anmeldung und erster Passwortwechsel - alles, was ohne Sitzung herauskommt
   img/logo.svg       Wortmarke (H, Welt als o, zwei Ausrufezeichen)
   img/mark.svg       dasselbe Zeichen allein - Tab-Symbol und Startbild
   js/main.js         Verdrahtung, Spielschleife
+  js/login.js        Anmeldeseite: Formulare, Sprachwahl, Weiterleitung ins Spiel
   js/net.js          WebSocket mit automatischem Wiederverbinden
   js/render/         planets.js (Planetenstil), ships.js (Schiffe),
                      map.js (flache Sternkarte), space.js (räumliche Sternkarte)
@@ -286,6 +295,7 @@ test/
   blackhole.js       Spiralpartie: keine Flotte in der Sperrzone, Kurse gehen aussen herum
   i18n.js            Kataloge: gleiche Schlüssel, gleiche Platzhalter, Serverschlüssel
   multiplayer.js     Startet den echten Server und lässt 16 WebSocket-Clients spielen
+  auth.js            Zugang: Hashes, Konten, Torwächter, Rateschutz, Pfadtricks
 ```
 
 **Zeichnen kostet, also wird gespart.** Ein rundenbasiertes Spiel muss die
@@ -368,6 +378,102 @@ Im Markup werden Texte ausgezeichnet statt eingetragen:
 <p data-i18n-html="help.goal.p"></p>
 ```
 
+## Zugang
+
+Auf einem Server im Netz soll nicht jeder mitspielen, der die URL kennt. Vor der
+Lobby steht darum eine Anmeldung mit Benutzername und Passwort. Ohne gültige
+Sitzung gibt der Server weder den Spielclient noch die WebSocket heraus – und das
+Spiel läuft über die WebSocket, eine Anmeldung nur vor der Seite wäre also keine.
+
+Auf dem Host steht je Konto nur der **Name** und ein **scrypt-Hash** des Passworts,
+gesalzen, mit den Parametern im Hash. Kein Klartext, keine Mailadresse, keine
+Sitzungsschlüssel: die liegen allein im Serverspeicher und sind nach einem Neustart
+weg – mit ihm sind ohnehin alle Partien weg.
+
+### Konten anlegen und löschen
+
+Konten entstehen und verschwinden auf dem Host, nicht im Browser:
+
+```
+docker exec ho node server/users.js add captain                # gewürfeltes Passwort
+docker exec ho node server/users.js add captain geheim-genug   # oder ein eigenes
+docker exec ho node server/users.js list                       # wer darf mitspielen
+docker exec ho node server/users.js passwd captain             # Passwort zurücksetzen
+docker exec ho node server/users.js del captain                # Konto löschen
+```
+
+`add` gibt das erste Passwort **einmal** aus – das ist der einzige Moment, in dem
+es im Klartext existiert. Es gilt nur für die erste Anmeldung: danach muss der
+Spieler ein eigenes wählen, bevor er in die Lobby kommt. Nach `passwd` genauso.
+
+`del` wirkt sofort, auch mitten in einer Partie: HTTP-Anfragen werden ab der
+nächsten abgewiesen, eine offene WebSocket wird binnen einer Sekunde getrennt. Ein
+zurückgesetztes Passwort beendet ebenso alle Sitzungen des Kontos.
+
+Ohne Docker geht es genauso, nur kürzer:
+
+```
+npm run users -- add captain
+```
+
+Die Konten liegen in `data/users.json`, im Container in `/data/users.json` in
+einem eigenen Volume – ein neues Abbild nimmt sie also nicht mit. Die Datei trägt
+Rechte 0600 und wird erst daneben geschrieben und dann umgeschoben, damit ein
+Abbruch nicht den ganzen Bestand verliert.
+
+### Was die Anmeldung aushält
+
+- **Rateversuche werden gebremst.** Ab dem fünften Fehlversuch wird gesperrt, und
+  zwar immer länger (30 s, 1 min, 2 min … bis 15 min). Gezählt wird nach Konto
+  *und* nach Herkunft: so lässt sich weder ein Konto durchprobieren noch von einer
+  Stelle aus streuen.
+- **Der Sitzungskeks** ist `HttpOnly` und `SameSite=Lax`, hinter HTTPS zusätzlich
+  `Secure`. Die Endpunkte nehmen nur echtes JSON an – ein Formular von einer
+  fremden Seite kommt damit nicht durch.
+- **Ein unbekannter Name braucht genauso lange wie ein bekannter.** Die
+  Antwortzeit verrät nicht, welche Konten es gibt.
+- **Vor dem ersten Passwortwechsel** gibt es eine Sitzung, aber kein Spiel.
+- **Ohne Sitzung** kommt nur die Anmeldeseite heraus, dazu Stylesheet, Wortmarke
+  und die Sprachkataloge. Weder `client/js/`, noch `shared/rules.js`, noch ein
+  Pfad mit kodierten Trennern (`/css/..%2f..%2f…`) führt daran vorbei.
+
+### Hinter einem Reverse-Proxy
+
+Der Server spricht HTTP und kennt kein TLS – das macht der Proxy davor. Zwei
+Dinge braucht er unbedingt:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;      # sonst kommt keine WebSocket zustande
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;  # sonst fehlt dem Keks das Secure-Flag
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+Und der Port gehört dann nur an den Proxy, nicht ans offene Netz:
+
+```
+HOST_BIND=127.0.0.1 docker compose up -d
+```
+
+### Einstellungen und Abschalten
+
+Zum Entwickeln ist die Anmeldung im Weg. `HO_AUTH=off` nimmt sie weg; der Server
+sagt beim Start auch deutlich, dass er offen steht. Auf einem Server, der aus dem
+Netz erreichbar ist, hat das nichts zu suchen.
+
+| Variable | Standard | Bedeutung |
+| --- | --- | --- |
+| `HO_AUTH` | an | `off` schaltet die Anmeldung ab |
+| `HO_USERS_FILE` | `data/users.json` | wo die Konten liegen |
+| `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
+| `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |
+| `HO_LANG` | aus der Umgebung | Sprache des Werkzeugs auf dem Host |
+
 ## Tests
 
 ```
@@ -376,6 +482,7 @@ npm run test:i18n    # Kataloge: gleiche Schlüssel, gleiche Platzhalter, Server
 npm run test:engine  # 120 Runden mit 16 KI, prüft Bilanz- und Zustandsinvarianten
 npm run test:hole    # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:net     # Lobby, 16 Clients, Simultanzug-Logik, Trennung, Chat
+npm run test:auth    # Zugang: Hashes, Konten, Anmeldung, Passwortwechsel, Rateschutz
 ```
 
 ## Docker
@@ -395,7 +502,21 @@ im Container hört der Server weiterhin auf 8080. Die Tests laufen im selben Ima
 docker compose --profile test run --rm test
 ```
 
-Laufende Partien liegen nur im Serverspeicher – ein Neustart des Containers beendet sie.
+Die Anmeldung ist im Container an. Lokal, wo nur du spielst, schaltest du sie mit
+einer `.env` neben der `docker-compose.yml` ab (Vorlage: `.env.example`):
+
+```
+HO_AUTH=off
+```
+
+Auf dem Server gehört diese Zeile nicht hin – ohne sie bleibt die Anmeldung an.
+Einmalig geht es auch ohne Datei: `HO_AUTH=off docker compose up -d`. Ob sie läuft,
+sagt das Protokoll beim Start (`docker compose logs ho | grep Zugang`).
+
+Die Konten liegen im Volume `ho-data` und überleben jedes neue Abbild; angelegt
+werden sie mit `docker exec` (siehe *[Zugang](#zugang)*). Laufende Partien liegen
+nur im Serverspeicher – ein Neustart des Containers beendet sie, und mit ihnen die
+offenen Sitzungen.
 
 ## Einstellungen
 

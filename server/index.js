@@ -10,6 +10,8 @@ import {
   allReady, buildView, buildSpectatorView, lobbyView, DEFAULT_SETTINGS, armTurnTimer
 } from './game.js';
 import { runBot } from './bot.js';
+import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
+import { listUsers, userFile } from './userstore.js';
 import { MAX_PLAYERS } from '../shared/rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,8 +31,17 @@ const MIME = {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  let rel = decodeURIComponent(url.pathname);
+  // Erst dekodieren, dann normalisieren - und in dieser Reihenfolge: ein
+  // kodierter Schraegstrich (%2f) uebersteht den URL-Parser und wuerde sonst
+  // erst hinter allen Pruefungen zum Trenner, etwa bei /css/..%2f..%2f.
+  let rel;
+  try { rel = path.posix.normalize(decodeURIComponent(url.pathname)); } catch { rel = ''; }
+  if (!rel.startsWith('/') || rel.includes('\0')) { res.writeHead(400).end('bad path'); return; }
   if (rel === '/') rel = '/index.html';
+  // Vor allem anderen der Zugang: erst die eigenen Endpunkte, dann das Tor.
+  // Ohne Sitzung gibt es nur die Anmeldeseite und was sie zum Anzeigen braucht.
+  if (handleAuth(req, res, rel)) return;
+  if (!gate(req, res, rel)) return;
   // /shared/* kommt aus dem gemeinsamen Verzeichnis, alles andere aus /client
   const base = rel.startsWith('/shared/') ? ROOT : path.join(ROOT, 'client');
   const file = path.normalize(path.join(base, rel));
@@ -45,7 +56,17 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  const sitzung = checkUpgrade(req);
+  if (!sitzung) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req, sitzung));
+});
 
 /** @type {Map<string, any>} */
 const games = new Map();
@@ -91,9 +112,9 @@ function chat(game, from, text) {
   }
 }
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req, sitzung) => {
   const connId = crypto.randomUUID();
-  conns.set(connId, { ws, gameId: null, playerId: null });
+  conns.set(connId, { ws, gameId: null, playerId: null, account: sitzung.user, sid: sitzung.token });
   send(ws, { t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList() });
 
   ws.on('message', (raw) => {
@@ -136,6 +157,15 @@ function openGameList() {
     .map(g => ({ id: g.id, host: g.hostName, players: g.players.length }));
 }
 
+/**
+ * Mit Anmeldung heisst ein Spieler wie sein Konto. Der Server entscheidet das,
+ * nicht der Client - ein gesperrtes Eingabefeld allein liesse sich mit einer
+ * selbst gebauten Nachricht umgehen. Ohne Anmeldung gilt der Wunschname.
+ */
+function spielerName(c, wunsch) {
+  return c.account ?? wunsch;
+}
+
 function handle(connId, ws, msg) {
   const c = conns.get(connId);
   const game = c.gameId ? games.get(c.gameId) : null;
@@ -143,10 +173,11 @@ function handle(connId, ws, msg) {
 
   switch (msg.t) {
     case 'create': {
-      const g = createGame(msg.name || 'Spieler');
+      const name = spielerName(c, msg.name);
+      const g = createGame(name || 'Spieler');
       Object.assign(g.settings, sanitizeSettings(msg.settings));
       games.set(g.id, g);
-      const p = addPlayer(g, { name: msg.name, connId });
+      const p = addPlayer(g, { name, connId });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -167,7 +198,7 @@ function handle(connId, ws, msg) {
         return;
       }
       if (g.players.length >= MAX_PLAYERS) return send(ws, { t: 'error', key: 'err.gameFull' });
-      const p = addPlayer(g, { name: msg.name, connId });
+      const p = addPlayer(g, { name: spielerName(c, msg.name), connId });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -187,7 +218,8 @@ function handle(connId, ws, msg) {
       break;
     }
     case 'setName': {
-      if (me && msg.name) { me.name = String(msg.name).slice(0, 18); broadcastLobby(game); }
+      // Ein Kontoname bleibt, wie er ist.
+      if (me && msg.name && !c.account) { me.name = String(msg.name).slice(0, 18); broadcastLobby(game); }
       break;
     }
     case 'settings': {
@@ -352,6 +384,13 @@ setInterval(() => {
 // Rundentimer und Aufräumen
 setInterval(() => {
   const now = Date.now();
+  for (const [connId, c] of conns) {
+    if (!sessionAlive(c.sid)) {
+      console.log('Sitzung beendet, Verbindung getrennt:', c.account ?? '?');
+      c.ws.close(4001);
+      conns.delete(connId);
+    }
+  }
   for (const game of games.values()) {
     if (game.state === 'running' && game.turnDeadline && now >= game.turnDeadline) {
       for (const p of game.players) p.ready = true;
@@ -367,4 +406,15 @@ setInterval(() => {
 
 server.listen(PORT, () => {
   console.log(`Ho!! läuft auf http://localhost:${PORT}`);
+  if (!authEnabled()) {
+    console.warn('Zugang: ABGESCHALTET (HO_AUTH=off) - jeder mit der URL kann mitspielen.');
+    return;
+  }
+  try {
+    const n = listUsers().length;
+    console.log(`Zugang: Anmeldung aktiv, Konten: ${n} (${userFile()})`);
+    if (!n) console.warn('Noch kein Konto. Anlegen mit: node server/users.js add <name>');
+  } catch (e) {
+    console.error('Zugang: Kontendatei unlesbar -', e.message);
+  }
 });

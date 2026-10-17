@@ -4,13 +4,23 @@ services:
     image: ho:latest
     container_name: ho
     restart: unless-stopped
-    # Linker Port = Port auf dem Host, per HOST_PORT aenderbar.
+    # Linker Port = Port auf dem Host, per HOST_PORT aenderbar. Hinter einem
+    # Reverse-Proxy gehoert HOST_BIND auf 127.0.0.1, damit nur der Proxy
+    # herankommt und niemand den Port am Zugang vorbei aufmacht.
     ports:
-      - "${HOST_PORT:-8080}:8080"
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
+    # Die Konten ueberleben jedes neue Abbild.
+    volumes:
+      - ho-data:/data
+    # Anmeldung vor der Lobby. Gehostet bleibt sie an (Standard), lokal
+    # schaltet HO_AUTH=off sie ab - am bequemsten als Zeile in einer .env
+    # neben dieser Datei. Fehlt die Angabe, gilt "an": vergessen heisst sicher.
+    environment:
+      HO_AUTH: ${HO_AUTH:-on}
     # Node laeuft sonst als PID 1 und ignoriert SIGTERM -> langsames Stoppen.
     init: true
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/login.html').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
       timeout: 5s
       start_period: 5s
@@ -22,3 +32,7 @@ services:
     image: ho:latest
     profiles: ["test"]
     command: ["npm", "test"]
+
+# Nur Name und scrypt-Hash je Konto - mehr steht hier nicht.
+volumes:
+  ho-data:
