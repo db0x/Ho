@@ -1,5 +1,7 @@
 // Sternkarten-Generator.
-import { IDEAL, TEMP_RANGE, GRAV_RANGE, dist, clamp } from '../shared/rules.js';
+import {
+  IDEAL, TEMP_RANGE, GRAV_RANGE, HOLE_BLOCK, dist, clamp, habitability, shipStats, travelDistance
+} from '../shared/rules.js';
 
 const PLANET_NAMES = [
   'Ablon', 'Aquila', 'Baruun', 'Belisar', 'Calder', 'Caspia', 'Cygnus', 'Dorne',
@@ -178,7 +180,15 @@ export function generateGalaxy(opts) {
     planets.push(makePlanet(planets.length, p.x, p.y, names, rng, 0, p.z));
   }
 
-  const homes = chooseHomeworlds(planets, playerCount, rng);
+  const blackHole = spiral ? {
+    x: Math.round(field.cx), y: Math.round(field.cy), z: 0,
+    r: Math.round(field.rIn * 0.42),
+    name: pick(rng, HOLE_NAMES)
+  } : null;
+  const zone = blackHole ? { ...blackHole, r: blackHole.r * HOLE_BLOCK } : null;
+  const bounds = { x0: margin, y0: margin, x1: width - margin, y1: height - margin, halfDepth };
+  const homes = chooseHomeworlds(planets, playerCount, rng, zone);
+  for (const h of homes) ensureNeighbours(planets, planets[h], names, rng, zone, bounds, minGap);
   const galaxy = {
     seed,
     // Grenzen statt fester Maße: die Karte kann in jede Richtung wachsen,
@@ -192,11 +202,7 @@ export function generateGalaxy(opts) {
     field,
     // Das schwarze Loch ist der Mittelpunkt der Spirale - keine Welt kommt ihm
     // nahe, besiedeln lässt es sich nicht.
-    blackHole: spiral ? {
-      x: Math.round(field.cx), y: Math.round(field.cy), z: 0,
-      r: Math.round(field.rIn * 0.42),
-      name: pick(rng, HOLE_NAMES)
-    } : null,
+    blackHole,
     // Kern für den Härtegrad: je weiter draußen, desto rauer und erzreicher
     core,
     epoch: 0,
@@ -389,17 +395,40 @@ function makePlanet(id, x, y, src, rng, h = 0, z = 0) {
   };
 }
 
-/** Wählt möglichst weit auseinanderliegende Heimatwelten (Farthest-Point-Sampling). */
-function chooseHomeworlds(planets, playerCount, rng) {
+// So weit kommt das Siedlerschiff, mit dem jedes Reich startet.
+const START_REACH = shipStats('colony', {}).range;
+// Wie viele Welten von jeder Heimat aus mit dem Startschiff erreichbar sind,
+// und dass mindestens eine davon taugt. Der Puffer hält sie sicher in
+// Reichweite, auch wenn der Weg ums schwarze Loch ein Stück länger wird.
+const START_NEIGHBOURS = 3;
+const NEIGHBOUR_REACH = START_REACH * 0.88;
+const START_HAB = 0.45;
+
+function neighboursOf(planets, home, zone, reach = NEIGHBOUR_REACH) {
+  return planets.filter(q => q !== home && !q.isHomeworld && dist(home, q) <= reach
+    && travelDistance(home, q, zone) <= reach);
+}
+
+/**
+ * Wählt möglichst weit auseinanderliegende Heimatwelten (Farthest-Point-
+ * Sampling). Welten ohne Nachbarn zählen dabei weniger - sonst landet das
+ * Verfahren zielsicher bei den Ausreißern am Rand. Ganz verboten sind sie
+ * nicht, damit die Reiche weit auseinander bleiben; was dann noch fehlt,
+ * ergänzt ensureNeighbours.
+ */
+function chooseHomeworlds(planets, playerCount, rng, zone) {
+  const weight = planets.map(p =>
+    0.6 + 0.4 * Math.min(START_NEIGHBOURS, neighboursOf(planets, p, zone).length) / START_NEIGHBOURS);
   const chosen = [];
-  const first = Math.floor(rng() * planets.length);
-  chosen.push(first);
+  const pool = planets.map((_, i) => i).filter(i => weight[i] >= 1);
+  chosen.push(pool.length ? pool[Math.floor(rng() * pool.length)] : Math.floor(rng() * planets.length));
   while (chosen.length < playerCount) {
     let best = -1, bestD = -1;
     for (let i = 0; i < planets.length; i++) {
       if (chosen.includes(i)) continue;
       let d = Infinity;
       for (const c of chosen) d = Math.min(d, dist(planets[i], planets[c]));
+      d *= weight[i];
       if (d > bestD) { bestD = d; best = i; }
     }
     if (best < 0) break;
@@ -416,4 +445,37 @@ function chooseHomeworlds(planets, playerCount, rng) {
     p.isHomeworld = true;
   }
   return chosen;
+}
+
+/**
+ * Sorgt dafür, dass das Startschiff etwas zu tun hat: fehlen um eine Heimat
+ * Welten in Reichweite, entstehen dort welche, und ist keine davon bewohnbar,
+ * wird die nächste ein wenig milder.
+ */
+function ensureNeighbours(planets, home, names, rng, zone, b, minGap) {
+  let near = neighboursOf(planets, home, zone);
+  for (let guard = 0; near.length < START_NEIGHBOURS && guard < 600; guard++) {
+    const d = minGap * 1.15 + rng() * (NEIGHBOUR_REACH - minGap * 1.15);
+    const a = rng() * Math.PI * 2;
+    // Im Raum auch nach oben oder unten, aber flach - die Linse ist dünn.
+    const tilt = b.halfDepth ? (rng() * 2 - 1) * 0.5 : 0;
+    const p = {
+      x: home.x + Math.cos(a) * Math.cos(tilt) * d,
+      y: home.y + Math.sin(a) * Math.cos(tilt) * d,
+      z: b.halfDepth ? clamp((home.z || 0) + Math.sin(tilt) * d, -b.halfDepth, b.halfDepth) : 0
+    };
+    if (p.x < b.x0 || p.y < b.y0 || p.x > b.x1 || p.y > b.y1) continue;
+    if (zone && dist(p, zone) < zone.r / HOLE_BLOCK * 2.5) continue;
+    if (planets.some(q => dist(p, q) < minGap)) continue;
+    if (travelDistance(home, p, zone) > NEIGHBOUR_REACH) continue;
+    const np = makePlanet(planets.length, p.x, p.y, names, rng, 0, p.z);
+    planets.push(np);
+    near.push(np);
+  }
+  if (near.length && !near.some(q => habitability(q) >= START_HAB)) {
+    const q = near.reduce((m, x) => dist(home, x) < dist(home, m) ? x : m);
+    // Mittelmäßig, kein Paradies: nur so weit Richtung Ideal, dass es sich lohnt.
+    q.temp = IDEAL.temp + Math.sign(q.temp - IDEAL.temp || 1) * Math.round(15 + rng() * 20);
+    q.grav = clamp(Math.round((IDEAL.grav + (rng() * 2 - 1) * 0.2) * 20) / 20, GRAV_RANGE.min, GRAV_RANGE.max);
+  }
 }

@@ -17,7 +17,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Rateversuche und noch unter dem maxmem, das Node von sich aus zulaesst.
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
-/** Namen bleiben klein geschrieben und schlicht - sie landen in Dateien und URLs. */
+/**
+ * Namen bleiben als Schluessel klein geschrieben und schlicht - sie landen in
+ * Dateien und URLs, und beim Anmelden ist die Schreibweise egal. Wie der Name
+ * angezeigt wird (BATMAN statt batman), steht daneben in `display`.
+ */
 export const NAME_RE = /^[a-z0-9][a-z0-9._-]{1,23}$/;
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD = 200;
@@ -36,6 +40,11 @@ export function normalizeName(name) {
 
 export function validName(name) {
   return NAME_RE.test(normalizeName(name));
+}
+
+/** So heisst das Konto auf dem Bildschirm. */
+export function displayName(key, user) {
+  return user?.display || key;
 }
 
 /** Null, wenn das Passwort taugt, sonst der Schluessel der Beanstandung. */
@@ -137,6 +146,7 @@ export function listUsers() {
   const users = load().users;
   return Object.keys(users).sort().map(name => ({
     name,
+    display: displayName(name, users[name]),
     mustChange: !!users[name].mustChange,
     created: users[name].created || null,
     changed: users[name].changed || null
@@ -156,14 +166,33 @@ export async function addUser(name, password) {
   const pw = password || generatePassword();
   const rüge = password ? checkPassword(pw, key) : null;
   if (rüge) throw new Error(rüge);
+  const schreibweise = String(name).trim();
   db.users[key] = {
     hash: await hashPassword(pw),
     mustChange: true,
     created: new Date().toISOString(),
-    changed: null
+    changed: null,
+    ...(schreibweise !== key ? { display: schreibweise } : {})
   };
   save(db);
-  return { name: key, password: pw, generated: gewuerfelt };
+  return { name: key, display: displayName(key, db.users[key]), password: pw, generated: gewuerfelt };
+}
+
+/**
+ * Legt die Schreibweise fest, in der ein Konto angezeigt wird. Erlaubt ist nur
+ * eine andere Gross- und Kleinschreibung desselben Namens - umbenennen hiesse,
+ * dass ein Spieler unter einem fremden Namen weiterspielt.
+ */
+export function setDisplay(name, spelling) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key]) throw new Error('auth.cli.unknown');
+  const schreibweise = String(spelling ?? '').trim();
+  if (normalizeName(schreibweise) !== key) throw new Error('auth.cli.badSpelling');
+  if (schreibweise === key) delete db.users[key].display;
+  else db.users[key].display = schreibweise;
+  save(db);
+  return { name: key, display: displayName(key, db.users[key]) };
 }
 
 export function deleteUser(name) {
@@ -210,7 +239,8 @@ export async function verifyUser(name, password) {
   const user = getUser(name);
   const ok = await verifyPassword(String(password ?? ''), user?.hash ?? 'x');
   if (!ok || !user) return null;
-  return { name: normalizeName(name), mustChange: !!user.mustChange, stamp: stampOf(user.hash) };
+  const key = normalizeName(name);
+  return { name: key, display: displayName(key, user), mustChange: !!user.mustChange, stamp: stampOf(user.hash) };
 }
 
 /**

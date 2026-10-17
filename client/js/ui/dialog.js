@@ -1,5 +1,5 @@
-// Verschiebbare Fenster. Bisher nur das Protokoll, aber bewusst allgemein
-// gehalten: Leiste zum Ziehen, Griff unten rechts zum Aufziehen, Lage und
+// Verschiebbare Fenster: das Protokoll und das Dock oben links. Bewusst
+// allgemein gehalten: Leiste zum Ziehen, Griff unten rechts zum Aufziehen, Lage und
 // Groesse ueberdauern als localStorage-Eintrag den naechsten Start.
 
 import { klein } from './viewport.js';
@@ -7,16 +7,18 @@ import { klein } from './viewport.js';
 const TOP = 64;          // unter der Topbar bleiben
 const RAND = 8;          // Mindestabstand zum Bildschirmrand
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+let oben = 6;            // z-index des zuletzt angefassten Fensters
 
 /**
  * @param {HTMLElement} el     das Fenster selbst
- * @param {object} o           { handle, grip, key, w, h, minW, minH }
+ * @param {object} o           { handle, grip, key, x, y, w, h, minW, minH }
+ *   x/y: Startlage ohne gemerkte Geometrie; ohne y sitzt das Fenster unten
  * @returns {{refresh: () => void}}
  */
 export function makeDialog(el, o) {
   const schmal = klein;
   const minW = o.minW || 320, minH = o.minH || 150;
-  const geo = Object.assign({ x: 12, y: null, w: o.w || 460, h: o.h || 240 }, load(o.key));
+  const geo = Object.assign({ x: o.x ?? 12, y: o.y ?? null, w: o.w || 460, h: o.h || 240 }, load(o.key));
   // Auf kleinen Geraeten ist das Fenster ein Blatt: Lage und Groesse macht
   // dort das Stylesheet, nicht dieses Modul. Die gemerkte Geometrie bleibt
   // erhalten und gilt wieder, sobald wieder Platz ist.
@@ -31,7 +33,8 @@ export function makeDialog(el, o) {
     const zu = el.classList.contains('collapsed');
     geo.w = clamp(geo.w, minW, Math.max(minW, innerWidth - 2 * RAND));
     geo.h = clamp(geo.h, minH, Math.max(minH, innerHeight - TOP - RAND));
-    // Ohne gespeicherte Lage unten links starten, wo das Protokoll immer sass.
+    // Ohne gespeicherte Lage und ohne Vorgabe unten links starten, wo das
+    // Protokoll immer sass.
     if (geo.y == null) geo.y = innerHeight - geo.h - 12;
     geo.x = clamp(geo.x, RAND, Math.max(RAND, innerWidth - geo.w - RAND));
     // Eingeklappt ist nur die Leiste da - dann darf das Fenster tiefer stehen.
@@ -74,6 +77,10 @@ export function makeDialog(el, o) {
       ziel.addEventListener('pointercancel', up);
     });
   }
+
+  // Wer angefasst wird, kommt nach vorn - sonst verschwände ein Fenster, das
+  // man über ein anderes zieht, darunter.
+  el.addEventListener('pointerdown', () => { el.style.zIndex = String(++oben); }, true);
 
   fassen(o.handle, 'move');
   fassen(o.grip, 'size');

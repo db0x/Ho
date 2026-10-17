@@ -262,7 +262,7 @@ server/
   index.js           HTTP (static files) + WebSocket, lobby, game management, spectator pace
   auth.js            Access: sessions, sign-in, password change, gate for HTTP and WebSocket
   userstore.js       Accounts on disk: name and scrypt hash, written atomically
-  users.js           Tool for the host (docker exec): add, del, passwd, list
+  users.js           Tool for the host (docker exec): add, del, passwd, name, list
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a seed)
   bot.js             AI opponent; plays by the same rules with its own reconnaissance,
@@ -391,6 +391,7 @@ docker exec ho node server/users.js add captain                # rolled password
 docker exec ho node server/users.js add captain secret-enough   # or one of your own
 docker exec ho node server/users.js list                       # who may play
 docker exec ho node server/users.js passwd captain             # reset a password
+docker exec ho node server/users.js name captain Captain       # how the name is shown (case only)
 docker exec ho node server/users.js del captain                # delete an account
 ```
 

@@ -7,7 +7,7 @@
 // das ist zu verkraften, denn mit ihm sind auch alle Partien weg.
 import crypto from 'node:crypto';
 import {
-  verifyUser, getUser, setPassword, stampOf, checkPassword, MIN_PASSWORD
+  verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, MIN_PASSWORD
 } from './userstore.js';
 
 /**
@@ -114,7 +114,9 @@ export function sessionOf(req) {
   if (!user || stampOf(user.hash) !== s.stamp) { sessions.delete(token); return null; }
   s.seen = now;
   s.mustChange = !!user.mustChange;
-  return { ...s, token };
+  // Die Schreibweise frisch aus der Kontendatei: ein `users.js name` wirkt
+  // damit ohne neues Anmelden.
+  return { ...s, token, display: displayName(s.user, user) };
 }
 
 /** Lebt diese Sitzung noch? Fuer offene WebSockets, die nachtraeglich fliegen. */
@@ -227,7 +229,7 @@ export function handleAuth(req, res, pfad) {
   if (route === 'me' && req.method === 'GET') {
     const s = sessionOf(req);
     if (!s) json(res, 401, { error: 'auth.err.noSession' });
-    else json(res, 200, { user: s.user, mustChange: s.mustChange, minPassword: MIN_PASSWORD });
+    else json(res, 200, { user: s.user, display: s.display, mustChange: s.mustChange, minPassword: MIN_PASSWORD });
     return true;
   }
   if (route === 'login' && req.method === 'POST') { login(req, res); return true; }
@@ -357,10 +359,10 @@ export function gate(req, res, pfad) {
  * das Spiel laeuft ueber die Socket, nicht ueber HTTP.
  */
 export function checkUpgrade(req) {
-  if (!authEnabled()) return { user: null, token: null };
+  if (!authEnabled()) return { user: null, display: null, token: null };
   const s = sessionOf(req);
   if (!s || s.mustChange) return null;
-  return { user: s.user, token: s.token };
+  return { user: s.user, display: s.display, token: s.token };
 }
 
 /** Nur fuer Tests: Zustand zuruecksetzen. */

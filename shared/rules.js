@@ -1,8 +1,6 @@
 // Gemeinsame Spielregeln - wird vom Server und vom Browser-Client importiert.
 // Alles hier ist rein funktional und ohne Seiteneffekte.
 
-export const VERSION = '0.1.0';
-
 export const MAX_PLAYERS = 16;
 
 /** Ideale Lebensbedingungen - für alle Rassen gleich (wie im Klassiker). */
@@ -106,6 +104,47 @@ export function shipCost(type, tech) {
     money: Math.max(1, Math.round((def.money + extra) * mf)),
     metal: Math.max(1, Math.round((def.metal + extra * 0.35) * mf))
   };
+}
+
+/** Aufschlag der Werft beim Umrüsten - teurer als gleich richtig bauen. */
+export const REFIT_FEE = 1.25;
+
+/**
+ * Umrüstung eines bestehenden Schiffs auf den aktuellen Stand: nur die
+ * Technik, die der Typ überhaupt eingebaut hat, und nur nach oben. Bezahlt
+ * wird der Aufpreis der neuen Stufen samt Werftzuschlag; der Rumpf bleibt.
+ * @returns {{tech: Record<string, number>, money: number, metal: number} | null}
+ *   null, wenn es nichts zu verbessern gibt
+ */
+export function refitCost(type, shipTech, tech) {
+  const def = SHIP_DEFS[type];
+  if (!def) return null;
+  const next = { ...shipTech };
+  let extra = 0;
+  for (const f of def.techs) {
+    const alt = shipTech[f] || 1, neu = tech[f] || 1;
+    if (neu <= alt) continue;
+    next[f] = neu;
+    extra += techSurcharge(neu) - techSurcharge(alt);
+  }
+  if (extra <= 0) return null;
+  const mf = miniFactor(tech.mini || 1) * REFIT_FEE;
+  return {
+    tech: next,
+    money: Math.max(1, Math.round(extra * mf)),
+    metal: Math.max(1, Math.round(extra * 0.35 * mf))
+  };
+}
+
+/** Summe über mehrere Schiffe; `count` = wie viele davon veraltet sind. */
+export function refitTotal(ships, tech) {
+  let money = 0, metal = 0, count = 0;
+  for (const s of ships) {
+    const c = refitCost(s.type, s.tech || {}, tech);
+    if (!c) continue;
+    money += c.money; metal += c.metal; count++;
+  }
+  return { money, metal, count };
 }
 
 /** Kampf- und Flugwerte eines Schiffs anhand seines eingebauten Techstands. */

@@ -2,6 +2,7 @@
 import { Net } from './net.js';
 import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
+import { openShipInfo } from './ui/shipinfo.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
@@ -22,23 +23,29 @@ bindUi();
 enhanceSelects();
 
 /**
- * Auswahlfeld fuer die Sprache im Startmenue. Ein Wechsel schreibt die Wahl
+ * Auswahlfelder fuer die Sprache, im Startmenue und im Spiel (Zahnrad unten
+ * rechts). Ein Wechsel schreibt die Wahl
  * fest, uebersetzt das Markup neu und laesst die Panels sich neu aufbauen -
  * ohne Neuladen, damit eine laufende Partie weitergeht.
  */
 function sprachwahl() {
-  const sel = document.querySelector('#in-lang');
-  if (!sel) return;
+  // Startmenü und Karteneinstellungen im Spiel - beide zeigen dieselbe Wahl.
+  const felder = ['#in-lang', '#in-lang-game'].map(s => document.querySelector(s)).filter(Boolean);
+  if (!felder.length) return;
   // Einmal aufbauen; spaeter nur die Texte auffrischen, damit die eigene
   // Auswahlliste (select.js) nicht neu gebaut werden muss.
-  sel.innerHTML = availableLocales()
-    .map(code => `<option value="${code}"></option>`).join('');
+  for (const sel of felder) {
+    sel.innerHTML = availableLocales()
+      .map(code => `<option value="${code}"></option>`).join('');
+    sel.onchange = () => useLocale(sel.value);
+  }
   const male = () => {
-    for (const opt of sel.options) opt.textContent = localeName(opt.value);
-    sel.value = getLocale();
+    for (const sel of felder) {
+      for (const opt of sel.options) opt.textContent = localeName(opt.value);
+      sel.value = getLocale();
+    }
   };
   male();
-  sel.onchange = () => useLocale(sel.value);
   onLocaleChange(() => {
     male();
     syncSelects();                 // Knopfbeschriftungen der eigenen Listen
@@ -59,7 +66,8 @@ async function konto() {
   try {
     const r = await fetch('/api/auth/me', { cache: 'no-store' });
     if (!r.ok) return;
-    wer = (await r.json()).user;
+    const me = await r.json();
+    wer = me.display || me.user;
   } catch { return; }
   if (!wer) return;
   // Der Spielername ist der Kontoname - fest, damit niemand unter fremdem
@@ -87,6 +95,11 @@ const lobby = new Lobby(net);
 konto();
 let map = null;
 let hud = null;
+// Aus der Anleitung heraus: im Spiel mit dem eigenen Techstand, sonst mit der Startstufe.
+document.querySelector('#help-ships').onclick = () => {
+  if (hud) hud.showShip('scout');
+  else openShipInfo('scout');
+};
 let lastTurn = 0;
 
 const app = {

@@ -1,5 +1,6 @@
 // Spielt eine komplette Partie mit 16 KI-Reichen durch und prüft die Invarianten.
-import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders } from '../server/game.js';
+import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders, canReach } from '../server/game.js';
+import { habitability, refitTotal, refitCost } from '../shared/rules.js';
 import { runBot } from '../server/bot.js';
 
 const game = createGame('Test');
@@ -86,6 +87,57 @@ assert(combats > 0, 'Es gab keinen einzigen Kampf');
   for (let i = 0; i < 40 && fleet.at !== 0; i++) resolveTurn(g);
   assert(fleet.x !== before.x || fleet.y !== before.y, 'Flotte mit Ziel Planet 0 startet nicht');
   assert(fleet.at === 0, 'Flotte erreicht Planet 0 nicht');
+}
+
+// Jede Heimat hat Welten, die das Startschiff erreicht - in allen Formen.
+{
+  let geprueft = 0;
+  for (const mode of ['classic', 'space']) for (const shape of ['scatter', 'spiral']) {
+    for (const seed of [1, 2, 3, 42, 4711]) {
+      const g = createGame('Start');
+      Object.assign(g.settings, { seed, mode, shape, turnTimer: 0 });
+      for (let i = 0; i < 8; i++) addPlayer(g, { isBot: true });
+      startGame(g);
+      for (const pl of g.players) {
+        const kolonie = g.fleets.find(f => f.owner === pl.id && f.ships.some(s => s.colonists > 0));
+        const ziele = g.galaxy.planets.filter(q => !q.owner && canReach(g, kolonie, q).ok);
+        assert(ziele.length >= 3, `${mode}/${shape}/${seed}: ${pl.name} erreicht mit dem Startschiff nur ${ziele.length} Welten`);
+        assert(ziele.some(q => habitability(q) >= 0.45), `${mode}/${shape}/${seed}: keine bewohnbare Startnachbarin`);
+        geprueft++;
+      }
+    }
+  }
+  console.log(`Startnachbarn: ${geprueft} Heimatwelten geprüft.`);
+}
+
+// Umrüsten: alte Schiffe bekommen die neue Technik, gegen Aufpreis.
+{
+  const g = createGame('Werft');
+  Object.assign(g.settings, { seed: 99, turnTimer: 0 });
+  addPlayer(g, { name: 'Mensch' });
+  addPlayer(g, { isBot: true });
+  startGame(g);
+  const pl = g.players[0];
+  pl.research.budgetPct = 0;
+  const flotte = g.fleets.find(f => f.owner === pl.id && f.ships.some(s => s.type === 'scout'));
+  const alt = { ...flotte.ships[0] };
+  pl.tech.speed = 4; pl.tech.range = 3; pl.tech.weapons = 5;
+  const kosten = refitTotal(flotte.ships, pl.tech);
+  assert(kosten.count === flotte.ships.length && kosten.money > 0, 'Umrüstkosten fehlen');
+  const geld = pl.money;
+  const r = setOrders(g, pl, { refit: { fleetId: flotte.id } });
+  assert(!r?.error, 'Umrüsten abgelehnt: ' + r?.error);
+  resolveTurn(g);
+  const neu = flotte.ships[0];
+  assert(neu.speed > alt.speed && neu.range > alt.range, 'Antrieb nicht umgerüstet');
+  assert(neu.tech.weapons === alt.tech.weapons, 'Späher bekommt Waffen, die er nicht hat');
+  assert(!refitCost(neu.type, neu.tech, pl.tech), 'Nach dem Umrüsten noch veraltet');
+  assert(pl.money <= geld - kosten.money + pl.income + 1, 'Umrüsten war kostenlos');
+  // Unterwegs gibt es keine Werft.
+  const weg = g.fleets.find(f => f.owner === pl.id && f.at == null)
+    || (() => { const f = g.fleets.find(x => x.owner === pl.id); f.at = null; return f; })();
+  assert(setOrders(g, pl, { refit: { fleetId: weg.id } })?.error === 'err.refitNoYard', 'Umrüsten ohne Werft möglich');
+  console.log(`Umrüsten: ${kosten.count} Späher für ${kosten.money} Cr / ${kosten.metal} Erz.`);
 }
 
 console.log('\nAlle Prüfungen bestanden.');

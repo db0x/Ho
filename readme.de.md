@@ -71,7 +71,7 @@ Server die Runde ab – Forschung, Bau, Terraforming, Bewegung, Kampf, Wirtschaf
 | **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit auch Sprungbretter; Tanker erweitern den Radius. |
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. |
 | **Abwehrbatterien** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. Eine ausgebaute Welt kostet den Angreifer eine echte Flotte. |
-| **Satelliten** | Billige, unbewegliche Verteidiger, die dauerhaft im Orbit bleiben. |
+| **Orbitalverteidigung** | Billige, unbewegliche Verteidiger, die dauerhaft im Orbit bleiben. |
 | **Ausdehnung** | Die Galaxie hat keinen festen Rand. Wer nach außen vorstößt, findet dahinter neue Welten – rauer, aber erzreicher. In der Spirale wachsen stattdessen die Arme weiter hinaus. |
 
 **Das Budget ist knapper, als der Kontostand sagt.** Abgerechnet wird in dieser
@@ -83,7 +83,7 @@ das vor dem Zugende nach – in der Topbar steht hinter Geld und Metall, was sch
 verplant ist (rot, wenn es nicht reicht), die Werft nennt den Fehlbetrag, und beim
 Klick auf *Zug beenden* kommt notfalls noch ein Hinweis.
 
-Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder Satelliten noch
+Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder Orbitalverteidigung noch
 Abwehrbatterie überlebt haben. Die Bevölkerung geht dabei zurück, der Rest wechselt
 den Besitzer.
 
@@ -161,7 +161,7 @@ Build-Schritt; die Welten bleiben dieselben Sprites und wenden sich der Kamera z
 Die KI greift eine Welt nur an, wenn ihre Flotte die Abwehr in **einem Zug**
 brechen kann – die Abwehrbatterie wird jede Runde aus der Bevölkerung neu
 aufgebaut, Belagern bringt also nichts. Sie schätzt dafür vor, was eine Welt
-kostet (Batterie, Satelliten, Flotten im Orbit), und sammelt sonst weiter.
+kostet (Batterie, Orbitalverteidigung, Flotten im Orbit), und sammelt sonst weiter.
 
 Fällt ein Reich auf drei bekannte Welten zurück, wird es zum **Kriegsziel**:
 Statt weiter an Randkolonien zu knabbern, ziehen die Flotten an der nächsten
@@ -269,7 +269,7 @@ server/
   index.js           HTTP (statische Dateien) + WebSocket, Lobby, Partieverwaltung, Zuschauertakt
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter für HTTP und WebSocket
   userstore.js       Konten auf der Platte: Name und scrypt-Hash, atomar geschrieben
-  users.js           Werkzeug für den Host (docker exec): add, del, passwd, list
+  users.js           Werkzeug für den Host (docker exec): add, del, passwd, name, list
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen Seed)
   bot.js             KI-Gegner; spielt nach denselben Regeln und mit eigener Aufklärung,
@@ -399,6 +399,7 @@ docker exec ho node server/users.js add captain                # gewürfeltes Pa
 docker exec ho node server/users.js add captain geheim-genug   # oder ein eigenes
 docker exec ho node server/users.js list                       # wer darf mitspielen
 docker exec ho node server/users.js passwd captain             # Passwort zurücksetzen
+docker exec ho node server/users.js name captain Captain       # Schreibweise der Anzeige (nur Groß/Klein)
 docker exec ho node server/users.js del captain                # Konto löschen
 ```
 

@@ -1,6 +1,6 @@
 // Alle Panels des Spielbildschirms.
 import {
-  TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost,
+  TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
   TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, holeZone, travelDistance, supplyDistance
@@ -8,6 +8,7 @@ import {
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
+import { openShipInfo } from './shipinfo.js';
 import { t, n as num, localeTag } from '../i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -51,6 +52,11 @@ export class Hud {
     const dlg = makeDialog(dock, {
       handle: $('#log-bar'), grip: $('#log-grip'), key: 'ho-logdock',
       w: 460, h: 240, minW: 320, minH: 150
+    });
+    // Das Dock oben links ebenso: verschiebbar und aufziehbar.
+    makeDialog($('#leftdock'), {
+      handle: $('#left-bar'), grip: $('#left-grip'), key: 'ho-leftdock',
+      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 260, minH: 200
     });
     const klappen = () => {
       const zu = dock.classList.toggle('collapsed');
@@ -173,12 +179,65 @@ export class Hud {
         bauGeld += c.money * anzahl; bauErz += c.metal * anzahl;
       }
     }
+    // Umrüstungen bucht der Server direkt nach dem Bau ab, mit demselben Stand.
+    for (const key of Object.keys(me.refit || {})) {
+      const r = this.refitFor(key, tech);
+      if (r) { bauGeld += r.money; bauErz += r.metal; }
+    }
     const geldFrei = me.money - forschung;
     return {
       tech, durchbruch, forschung, bauGeld, bauErz, geldFrei, erzFrei: me.metal,
       fehltGeld: Math.max(0, bauGeld - geldFrei),
       fehltErz: Math.max(0, bauErz - me.metal)
     };
+  }
+
+  /**
+   * Was eine Umrüstung kostet: 'f:<flotte>' rechnet über die Schiffe der
+   * Flotte, 'p:<welt>' über deren Satelliten (die schickt der Server fertig
+   * gerechnet, die Schiffe selbst kennt der Client nicht). Null, wenn dort
+   * keine Werft ist oder nichts veraltet.
+   */
+  refitFor(key, tech) {
+    const v = this.view;
+    if (key.startsWith('f:')) {
+      const f = v.fleets.find(x => x.mine && x.id === key.slice(2));
+      const welt = f && f.at != null ? v.planets[f.at] : null;
+      if (!welt || welt.owner !== v.you || !(welt.pop >= 1)) return null;
+      const r = refitTotal(f.ships, tech);
+      return r.count ? r : null;
+    }
+    const welt = v.planets[key.slice(2)];
+    if (!welt || welt.owner !== v.you || !(welt.pop >= 1)) return null;
+    return welt.defenseRefit?.count ? welt.defenseRefit : null;
+  }
+
+  /** Steckbrief eines Schiffstyps; ohne Angabe mit dem eigenen Techstand. */
+  showShip(type, tech, color, note) {
+    const me = this.view?.me;
+    openShipInfo(type, { tech: tech || me?.tech || {}, color: color || me?.color, note });
+  }
+
+  /** Knopf zum Umrüsten, oder der laufende Auftrag samt Abbrechen. */
+  refitBlock(key, label) {
+    const pl = this.plan();
+    const r = pl && this.refitFor(key, pl.tech);
+    if (!r) return '';
+    const ordered = !!this.view.me.refit?.[key];
+    const preis = t('refit.cost', { n: r.count, count: r.count, money: fmt(r.money), metal: fmt(r.metal) });
+    return ordered
+      ? `<p class="hint-line" style="color:var(--good)">${t('refit.ordered', { cost: preis })}</p>
+         <div class="sel-actions"><button class="tiny" data-refit="${key}" data-off="1">${t('refit.cancel')}</button></div>`
+      : `<div class="sel-actions"><button class="tiny" data-refit="${key}">${label}</button></div>
+         <p class="small muted" style="margin-top:4px">${preis}</p>`;
+  }
+
+  wireRefit(box) {
+    for (const b of box.querySelectorAll('[data-refit]')) {
+      const key = b.dataset.refit;
+      const ziel = key.startsWith('f:') ? { fleetId: key.slice(2) } : { planetId: Number(key.slice(2)) };
+      b.onclick = () => this.app.send({ t: 'orders', refit: { ...ziel, value: !b.dataset.off } });
+    }
   }
 
   // --------------------------------------------------------------- Topbar
@@ -322,7 +381,7 @@ export class Hud {
       ${mine.map(p => `<div class="listrow" data-p="${p.id}">
         <span class="dot" style="background:${tempHex(p.temp)}"></span>
         <span class="nm">${p.name}${p.terraBudget ? ' <span class="muted small">⚙</span>' : ''}</span>
-        <span class="num">${fmt1(p.pop)}/${planetCapacity(p)}</span>
+        <span class="num">${t('planet.popValue', { pop: fmt1(p.pop), cap: planetCapacity(p) })}</span>
       </div>`).join('') || `<p class="muted small">${t('empire.noColonies')}</p>`}
       <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:14px 0 6px">${t('empire.fleets')}</h4>
       ${v.fleets.filter(f => f.mine).map(f => {
@@ -424,7 +483,7 @@ export class Hud {
         <div class="stat"><div class="k">${t('planet.grav')}</div><div class="v">${(+p.grav).toFixed(2)} g</div>
           <div class="small muted">${Math.abs(dG) < 0.005 ? t('planet.ideal')
             : t('planet.offIdeal', { delta: (dG > 0 ? '+' : '') + dG.toFixed(2) + ' g' })}</div></div>
-        <div class="stat"><div class="k">${t('planet.pop')}</div><div class="v">${fmt1(p.pop)} / ${cap}</div>
+        <div class="stat"><div class="k">${t('planet.pop')}</div><div class="v">${t('planet.popValue', { pop: fmt1(p.pop), cap })}</div>
           <div class="meter"><i style="width:${cap ? Math.min(100, p.pop / cap * 100) : 0}%;background:#52d98a"></i></div></div>
         <div class="stat"><div class="k">${t('planet.habitability')}</div><div class="v">${Math.round(hab * 100)} %</div>
           <div class="meter"><i style="width:${hab * 100}%;background:linear-gradient(90deg,#4d7fe0,#52d98a)"></i></div></div>
@@ -470,6 +529,7 @@ export class Hud {
         <div class="small" id="buildwarn"></div>
         <div id="buildrows"></div>
         <div class="small muted" id="buildsum"></div>
+        ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
       </div>` : `<div class="sec"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`}
       ` : ''}
 
@@ -518,6 +578,7 @@ export class Hud {
     const rows = box.querySelector('#buildrows');
     if (rows) this.buildRows(rows, box.querySelector('#buildsum'), p, box.querySelector('#buildwarn'));
 
+    this.wireRefit(box);
     const ul = box.querySelector('#unload');
     if (ul) ul.onclick = () => {
       this.app.send({ t: 'orders', unload: { planetId: p.id } });
@@ -554,7 +615,11 @@ export class Hud {
           <button class="tiny plus">+</button>
         </span>`;
       row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color));
-      row.title = t(`ship.${type}.desc`);
+      row.title = t(`ship.${type}.desc`) + ' ' + t('shipinfo.hint');
+      for (const el of [row.querySelector('.bi'), row.querySelector('.bname')]) {
+        el.parentElement.classList.add('clickable-ship');
+        el.onclick = () => this.showShip(type, pl.tech, null, pl.durchbruch ? t('yard.breakthrough') : '');
+      }
       row.querySelector('.plus').onclick = () => this.app.send({ t: 'orders', build: { planetId: p.id, type, count: 1 } });
       row.querySelector('.minus').onclick = () => this.app.send({ t: 'orders', build: { planetId: p.id, type, count: -1 } });
       rows.appendChild(row);
@@ -689,7 +754,7 @@ export class Hud {
         <h4>${t('fleet.ships')}</h4>
         <div class="shiplist">
           ${Object.entries(groups).map(([typ, arr]) => `
-            <div class="shipitem">
+            <div class="shipitem clickable-ship" data-info="${typ}" title="${t('shipinfo.hint')}">
               <span class="gi" data-t="${typ}"></span>
               <span>${arr.length}× ${t(`ship.${typ}.name`)}
                 <span class="muted small">(${t('tech.weapons.short')}${arr[0].tech.weapons}/${t('tech.shields.short')}${arr[0].tech.shields}/${t('tech.speed.short')}${arr[0].tech.speed})</span></span>
@@ -708,17 +773,23 @@ export class Hud {
           ${f.ships.length > 1 && where ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
         </div>
         <div id="splitbox"></div>
+        ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
       </div>`}`;
 
     const col = (f.mine && v.me) ? v.me.color
       : ((v.players.find(q => q.id === f.owner) || {}).color || '#9fb0c8');
     for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
+    // Die eingebaute Technik dieser Schiffe, nicht der aktuelle Stand
+    for (const el of box.querySelectorAll('[data-info]')) {
+      el.onclick = () => this.showShip(el.dataset.info, groups[el.dataset.info][0].tech, col);
+    }
     const c = box.querySelector('#cancel');
     if (c) c.onclick = () => this.app.send({ t: 'orders', move: { fleetId: f.id, planetId: null } });
     const m = box.querySelector('#merge');
     if (m) m.onclick = () => this.app.send({ t: 'orders', merge: { planetId: f.at } });
     const sp = box.querySelector('#split');
     if (sp) sp.onclick = () => this.splitUi(box.querySelector('#splitbox'), f);
+    this.wireRefit(box);
   }
 
   splitUi(host, f) {

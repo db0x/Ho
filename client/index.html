@@ -61,7 +61,8 @@
     <div id="menu-error" class="error"></div>
     <p class="hint"><span data-i18n="menu.hint"></span><a href="#" id="link-help" data-i18n="menu.help"></a></p>
     <div class="lang-row"><span class="muted small" data-i18n="menu.language"></span>
-      <select id="in-lang" class="lang-pick"></select></div>
+      <select id="in-lang" class="lang-pick"></select>
+      <span class="ho-version inline">Ho!! v__HO_VERSION__</span></div>
     <p id="account-row" class="account-row hidden">
       <span id="account-name"></span>
       <a href="#" id="link-logout" data-i18n="auth.logout"></a>
@@ -117,6 +118,7 @@
       <button id="btn-start" class="primary" data-i18n="lobby.start"></button>
     </div>
     <div id="lobby-error" class="error"></div>
+    <p class="ho-version">Ho!! v__HO_VERSION__</p>
   </div>
 </div>
 
@@ -153,15 +155,20 @@
   <button id="btn-quit" class="icon-btn quit" data-sfx="none" data-i18n-attr="title:top.quit" data-i18n="top.quitShort"></button>
   </div>
 
-  <div id="leftdock" class="dock">
-    <div class="tabs">
-      <button data-tab="research" class="active" data-i18n="tab.research"></button>
-      <button data-tab="empire" data-i18n="tab.empire"></button>
-      <button data-tab="players" data-i18n="tab.players"></button>
+  <div id="leftdock" class="dock dlg">
+    <div id="left-bar" class="dlg-bar" data-i18n-attr="title:dock.moveTitle">
+      <div class="tabs">
+        <button data-tab="research" class="active" data-i18n="tab.research"></button>
+        <button data-tab="empire" data-i18n="tab.empire"></button>
+        <button data-tab="players" data-i18n="tab.players"></button>
+      </div>
+      <span class="spacer"></span>
+      <span class="dlg-handle" aria-hidden="true"></span>
     </div>
     <div id="tab-research" class="tabbody"></div>
     <div id="tab-empire" class="tabbody hidden"></div>
     <div id="tab-players" class="tabbody hidden"></div>
+    <div id="left-grip" class="dlg-grip" data-i18n-attr="title:log.resizeTitle"></div>
   </div>
 
   <div id="rightdock" class="dock">
@@ -188,6 +195,8 @@
        klappt bei Bedarf darueber auf. -->
   <div id="mapcorner">
     <div id="mapsettings" class="hidden">
+      <label class="langrow"><span data-i18n="menu.language"></span>
+        <select id="in-lang-game" class="lang-pick"></select></label>
       <label class="chk"><input type="checkbox" id="chk-names" checked> <span data-i18n="map.names"></span></label>
       <label class="chk"><input type="checkbox" id="chk-range"> <span data-i18n="map.ranges"></span></label>
       <label class="chk" data-i18n-attr="title:map.territoryTitle"><input type="checkbox" id="chk-terr" checked> <span data-i18n="map.territory"></span></label>
@@ -203,6 +212,7 @@
       <button id="btn-zoomout" data-i18n-attr="title:map.zoomOut">&minus;</button>
       <button id="btn-mapopts" data-i18n-attr="title:map.options" aria-expanded="false">&#9881;</button>
     </div>
+    <div class="ho-version">v__HO_VERSION__</div>
   </div>
 
   <!-- Auf dem Telefon gibt es keine schwebenden Docks, sondern eine Leiste
@@ -256,7 +266,10 @@
         <p data-i18n-html="help.combat.p"></p>
       </section>
     </div>
-    <button id="help-close" class="primary" data-i18n="help.close"></button>
+    <div class="sel-actions" style="margin-top:18px">
+      <button id="help-ships" data-i18n="shipinfo.open"></button>
+      <button id="help-close" class="primary" data-i18n="help.close"></button>
+    </div>
   </div>
 </div>
 

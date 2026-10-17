@@ -113,7 +113,8 @@ export class Lobby {
     }
   }
 
-  update(msg) {
+  /** @param {boolean} zeigen false: nur neu beschriften, den Bildschirm nicht wechseln */
+  update(msg, zeigen = true) {
     if (this.pendingQuickStart && msg.host) {
       const n = this.pendingQuickStart;
       this.pendingQuickStart = 0;
@@ -124,7 +125,7 @@ export class Lobby {
     this.isHost = msg.host;
     this.youId = msg.you;
     this.settings = msg.lobby.settings;
-    this.show('lobby');
+    if (zeigen) this.show('lobby');
     $('#lobby-code').textContent = msg.lobby.id;
     $('#lobby-count').textContent = `${msg.lobby.players.length}/16`;
     $('#lobby-players').innerHTML = msg.lobby.players.map(p => `
@@ -160,7 +161,9 @@ export class Lobby {
 
   /** Nach einem Sprachwechsel: alles neu schreiben, was hier gesetzt wird. */
   relabel() {
-    if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId });
+    // Nur beschriften: läuft die Partie schon, darf der Wechsel nicht in die
+    // Lobby zurückwerfen.
+    if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId }, false);
     if (this.offeneSpiele) this.showOpenGames(this.offeneSpiele);
   }
 

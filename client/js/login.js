@@ -76,7 +76,8 @@ else {
 // -------------------------------------------------------------------- Anmelden
 anmelden.onsubmit = (e) => {
   e.preventDefault();
-  const user = $('#in-user').value.trim().toLowerCase();
+  // Wie getippt merken - der Server vergleicht ohne Gross- und Kleinschreibung.
+  const user = $('#in-user').value.trim();
   const password = $('#in-pass').value;
   if (!user || !password) return fehler('auth.err.needFields');
   schick(anmelden, async () => {

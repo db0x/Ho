@@ -4,12 +4,13 @@
 //   docker exec ho node server/users.js list
 //   docker exec ho node server/users.js del captain
 //   docker exec ho node server/users.js passwd captain
+//   docker exec ho node server/users.js name captain Captain
 //
 // Mehr kann es nicht, und mehr soll es nicht koennen. Angelegte Konten haben
 // ein gewuerfeltes erstes Passwort, das beim ersten Anmelden gewechselt werden
 // muss - danach kennt es nur der Spieler.
 import {
-  addUser, deleteUser, listUsers, resetPassword, setPassword, userFile,
+  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, userFile,
   checkPassword, MIN_PASSWORD
 } from './userstore.js';
 import { registerLocale, setLocale, t } from '../shared/i18n.js';
@@ -40,7 +41,7 @@ async function los(befehl, name, passwort) {
     case 'add': {
       verlangeNamen(name);
       const r = await addUser(name, passwort);
-      console.log(t('auth.cli.added', { user: r.name }));
+      console.log(t('auth.cli.added', { user: r.display }));
       if (r.generated) {
         console.log(t('auth.cli.password', { password: r.password }));
         console.log(t('auth.cli.passwordHint'));
@@ -75,15 +76,22 @@ async function los(befehl, name, passwort) {
       }
       break;
     }
+    case 'name': {
+      verlangeNamen(name);
+      // Dritter Wert ist hier die Schreibweise, nicht ein Passwort.
+      const r = setDisplay(name, passwort);
+      console.log(t('auth.cli.renamed', { user: r.name, display: r.display }));
+      break;
+    }
     case 'list':
     case 'ls': {
       const users = listUsers();
       if (!users.length) { console.log(t('auth.cli.none')); break; }
       console.log(t('auth.cli.listHead', { count: users.length, file: userFile() }));
-      const breite = Math.max(...users.map(u => u.name.length));
+      const breite = Math.max(...users.map(u => u.display.length));
       for (const u of users) {
         const marke = u.mustChange ? t('auth.cli.mustChange') : '';
-        console.log(`  ${u.name.padEnd(breite)}  ${(u.created || '').slice(0, 10)}  ${marke}`);
+        console.log(`  ${u.display.padEnd(breite)}  ${(u.created || '').slice(0, 10)}  ${marke}`);
       }
       break;
     }

@@ -216,13 +216,16 @@ export class SpaceView {
     }
     items.sort((a, b) => b.depth - a.depth);
 
-    const labels = [];
+    // Namen gehören in dieselbe Reihenfolge wie ihre Welt: gesammelt und zum
+    // Schluss gezeichnet, läge der Name einer fernen Welt über allem, was
+    // davor steht.
     for (const it of items) {
+      const labels = [];
       if (it.kind === 'planet') this.drawWorld(ctx, it, colorOf, labels);
       else if (it.kind === 'hole') this.drawHole(ctx, it, labels);
       else this.drawFleet(ctx, it, colorOf);
+      for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
     }
-    for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
     if (this.hover?.type === 'planet') this.tooltip(ctx, v.planets[this.hover.id]);
   }
 

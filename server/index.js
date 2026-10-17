@@ -17,6 +17,10 @@ import { MAX_PLAYERS } from '../shared/rules.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PORT = process.env.PORT || 8080;
+// Die Version steht nur in package.json; die Seiten bekommen sie beim
+// Ausliefern eingesetzt, statt sie an zweiter Stelle zu pflegen.
+const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+const VERSION_MARK = /__HO_VERSION__/g;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -48,11 +52,12 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, { 'content-type': 'text/plain' }).end('404'); return; }
+    const ext = path.extname(file);
     res.writeHead(200, {
-      'content-type': MIME[path.extname(file)] || 'application/octet-stream',
+      'content-type': MIME[ext] || 'application/octet-stream',
       'cache-control': 'no-cache'
     });
-    res.end(data);
+    res.end(ext === '.html' ? data.toString('utf8').replace(VERSION_MARK, VERSION) : data);
   });
 });
 
@@ -114,7 +119,7 @@ function chat(game, from, text) {
 
 wss.on('connection', (ws, req, sitzung) => {
   const connId = crypto.randomUUID();
-  conns.set(connId, { ws, gameId: null, playerId: null, account: sitzung.user, sid: sitzung.token });
+  conns.set(connId, { ws, gameId: null, playerId: null, account: sitzung.display ?? sitzung.user, sid: sitzung.token });
   send(ws, { t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList() });
 
   ws.on('message', (raw) => {

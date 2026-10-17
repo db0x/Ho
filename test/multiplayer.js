@@ -10,6 +10,18 @@ const server = spawn(process.execPath, ['server/index.js'], {
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));
 await new Promise(r => server.stdout.once('data', r));
 
+// Die Seiten tragen die Version aus package.json, nie den Platzhalter.
+{
+  const { readFile } = await import('node:fs/promises');
+  const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  for (const seite of ['/', '/login.html']) {
+    const html = await (await fetch(`http://localhost:${PORT}${seite}`)).text();
+    check(!html.includes('__HO_VERSION__'), `${seite}: Versions-Platzhalter nicht ersetzt`);
+    check(html.includes('v' + version), `${seite}: Version ${version} fehlt`);
+  }
+  console.log(`Version ${version} steht auf Start- und Anmeldeseite.`);
+}
+
 const N = 16;
 const clients = [];
 let failed = null;

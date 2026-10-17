@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   hashPassword, verifyPassword, addUser, deleteUser, listUsers, getUser,
-  setPassword, verifyUser, generatePassword, checkPassword, validName
+  setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay
 } from '../server/userstore.js';
 
 // Eigene Kontendatei, damit kein echter Bestand angetastet wird.
@@ -46,6 +46,20 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   check(await verifyUser('CAPTAIN', r.password), 'Groß geschriebener Name wird abgewiesen');
   check(!await verifyUser('captain', 'falsch'), 'Falsches Passwort wird angenommen');
   check(!await verifyUser('gibtesnicht', r.password), 'Unbekanntes Konto wird angenommen');
+
+  // Schreibweise: Schlüssel klein, Anzeige wie angelegt
+  const b = await addUser('BATMAN');
+  check(b.name === 'batman' && b.display === 'BATMAN', `Schreibweise beim Anlegen verloren (${b.display})`);
+  const bv = await verifyUser('batman', b.password);
+  check(bv && bv.display === 'BATMAN', 'Anmeldung klein geschrieben liefert nicht die Schreibweise');
+  check(setDisplay('batman', 'BatMan').display === 'BatMan', 'Schreibweise lässt sich nicht ändern');
+  let falsch = null;
+  try { setDisplay('batman', 'Joker'); } catch (e) { falsch = e.message; }
+  check(falsch === 'auth.cli.badSpelling', 'Umbenennen über die Schreibweise möglich');
+  check(setDisplay('batman', 'batman').display === 'batman' && !getUser('batman').display,
+    'Rückkehr zur Kleinschreibung lässt display stehen');
+  deleteUser('batman');
+  console.log('Schreibweise: angelegt wie getippt, Anmeldung ohne Groß/Klein, nur Groß/Klein änderbar.');
 
   let doppelt = null;
   await addUser('captain').catch(e => { doppelt = e.message; });

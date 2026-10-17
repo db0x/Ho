@@ -2,7 +2,7 @@
 // schickt nur Befehle, niemals Ergebnisse.
 import {
   TECH_FIELDS, TECH_MAX_LEVEL, TECH_START_LEVEL, techCostToNext,
-  SHIP_DEFS, SHIP_TYPES, shipCost, shipStats,
+  SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
   COMBAT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS,
@@ -105,7 +105,7 @@ export function addPlayer(game, { name, isBot = false, connId = null }) {
     },
     explored: new Set(),
     knowledge: {},            // planetId -> letzter bekannter Zustand
-    orders: { builds: {}, moves: {}, unload: {} },
+    orders: { builds: {}, moves: {}, unload: {}, refit: {} },
     stats: { planets: 0, pop: 0, ships: 0, kills: 0, losses: 0 }
   };
   game.players.push(p);
@@ -285,6 +285,24 @@ export function setOrders(game, player, msg) {
       else player.orders.unload[planet.id] = true;
     }
   }
+  if (msg.refit) {
+    // Umrüsten: eine Flotte im Orbit einer eigenen Werft, oder die Satelliten
+    // einer eigenen Welt. Ausgeführt wird am Rundenende nach der Forschung,
+    // also gleich mit dem neuesten Stand.
+    const r = msg.refit;
+    const key = r.fleetId != null ? 'f:' + r.fleetId : 'p:' + r.planetId;
+    if (r.value === false) { delete player.orders.refit[key]; return; }
+    if (r.fleetId != null) {
+      const fleet = game.fleets.find(f => f.id === r.fleetId);
+      if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
+      const planet = fleet.at != null ? planetById(game, fleet.at) : null;
+      if (!planet || planet.owner !== player.id || planet.pop < 1) return { error: 'err.refitNoYard' };
+    } else {
+      const planet = planetById(game, r.planetId);
+      if (!planet || planet.owner !== player.id || planet.pop < 1) return { error: 'err.refitNoYard' };
+    }
+    player.orders.refit[key] = true;
+  }
   if (msg.terraform) {
     const planet = planetById(game, msg.terraform.planetId);
     if (planet && planet.owner === player.id) {
@@ -325,6 +343,48 @@ export function setOrders(game, player, msg) {
     for (const f of own.slice(1)) { target.ships.push(...f.ships); f.ships = []; }
     cleanupFleets(game);
   }
+}
+
+/**
+ * Führt die Umrüstaufträge eines Spielers aus. Reicht das Geld nicht für
+ * alle, werden so viele Schiffe umgerüstet, wie bezahlbar sind.
+ */
+function refitOrders(game, p, entries) {
+  for (const key of Object.keys(p.orders.refit)) {
+    const [kind, id] = [key.slice(0, 1), key.slice(2)];
+    let ships, planet;
+    if (kind === 'f') {
+      const fleet = game.fleets.find(f => f.id === id && f.owner === p.id);
+      planet = fleet && fleet.at != null ? planetById(game, fleet.at) : null;
+      ships = fleet ? fleet.ships : [];
+    } else {
+      planet = planetById(game, Number(id));
+      ships = planet?.defenses || [];
+    }
+    if (!planet || planet.owner !== p.id || planet.pop < 1) continue;
+    let done = 0, short = false;
+    for (const s of ships) {
+      const c = refitCost(s.type, s.tech, p.tech);
+      if (!c) continue;
+      if (p.money < c.money || p.metal < c.metal) { short = true; continue; }
+      p.money -= c.money;
+      p.metal -= c.metal;
+      const st = shipStats(s.type, c.tech);
+      // Der Schaden bleibt - neu ist nur, was die bessere Panzerung dazugibt.
+      s.hp = Math.max(1, s.hp + st.maxHp - s.maxHp);
+      s.maxHp = st.maxHp;
+      s.attack = Math.round(st.attack * 10) / 10;
+      if (s.speed > 0 || st.speed > 0) s.speed = Math.round(st.speed);
+      if (s.range > 0 || st.range > 0) s.range = Math.round(st.range);
+      s.tech = c.tech;
+      done++;
+    }
+    if (done) entries.push({ type: 'build', playerIds: [p.id], private: p.id, planetId: planet.id,
+      key: 'log.refitted', params: { planet: planet.name, count: done } });
+    if (short) entries.push({ type: 'warn', playerIds: [p.id], private: p.id, planetId: planet.id,
+      key: 'log.refitShort', params: { planet: planet.name } });
+  }
+  p.orders.refit = {};
 }
 
 function cleanupFleets(game) {
@@ -400,6 +460,7 @@ export function resolveTurn(game) {
       }
     }
     p.orders.builds = {};
+    refitOrders(game, p, entries);
   }
 
   // 3) Terraforming
@@ -846,6 +907,7 @@ export function buildView(game, player) {
         metalRichness: p.metalRichness, metalReserve: Math.round(p.metalReserve),
         owner: p.owner, pop: p.pop,
         defenses: p.defenses ? p.defenses.length : 0,
+        defenseRefit: p.owner === player.id && p.defenses ? refitTotal(p.defenses, player.tech) : null,
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
         isHomeworld: !!p.isHomeworld
       };
@@ -916,7 +978,8 @@ export function buildView(game, player) {
       research: { budgetPct: player.research.budgetPct, weights: { ...player.research.weights } },
       ready: player.ready,
       homeworld: player.homeworld,
-      builds: player.orders.builds
+      builds: player.orders.builds,
+      refit: player.orders.refit
     },
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot,
