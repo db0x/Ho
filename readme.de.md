@@ -296,7 +296,7 @@ client/
                      dialog.js (verschiebbare Fenster, z. B. das Protokoll),
                      viewport.js (ein Umschaltpunkt für kleine Geräte)
   js/i18n.js         Sprache erkennen, merken, Markup füllen
-  i18n/de.js, en.js  Textkataloge
+  i18n/de.json, en.json  Textkataloge
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/
   smoke.js           Spielt eine volle Partie mit 16 KI durch und prüft die Invarianten
@@ -363,8 +363,8 @@ Im Code steht kein Satz, den ein Mensch liest. Er kennt nur Schlüssel
 ```
 shared/i18n.js       Kern: t(), Platzhalter {name}, Mehrzahl (#one/#other), Zahlen
 client/js/i18n.js    Sprache erkennen und merken, Markup mit data-i18n füllen
-client/i18n/de.js    deutscher Katalog
-client/i18n/en.js    englischer Katalog
+client/i18n/de.json  deutscher Katalog
+client/i18n/en.json  englischer Katalog
 ```
 
 Auch der **Server** schickt keine fertigen Sätze mehr, sondern Schlüssel samt

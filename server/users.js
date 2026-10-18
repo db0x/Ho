@@ -13,12 +13,12 @@ import {
   addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, userFile,
   checkPassword, MIN_PASSWORD
 } from './userstore.js';
+import { readFileSync } from 'node:fs';
 import { registerLocale, setLocale, t } from '../shared/i18n.js';
-import de from '../client/i18n/de.js';
-import en from '../client/i18n/en.js';
 
-registerLocale('de', de);
-registerLocale('en', en);
+for (const code of ['de', 'en']) {
+  registerLocale(code, JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8')));
+}
 // Sprache der Umgebung, in der das Werkzeug laeuft - HO_LANG schlaegt sie.
 setLocale(String(process.env.HO_LANG || process.env.LC_ALL || process.env.LANG || 'en')
   .slice(0, 2).toLowerCase());

@@ -1,8 +1,10 @@
 // Die Kataloge müssen zueinander passen: gleiche Schlüssel, gleiche Platzhalter.
 // Ein fehlender Schlüssel fällt sonst erst im Spiel auf - als englischer Satz
 // mitten im deutschen Text oder, schlimmer, als nackter Schlüssel.
-import de from '../client/i18n/de.js';
-import en from '../client/i18n/en.js';
+import { readFileSync } from 'node:fs';
+const katalog = (code) => JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8'));
+const de = katalog('de');
+const en = katalog('en');
 import { registerLocale, setLocale, t } from '../shared/i18n.js';
 
 const kataloge = { de, en };

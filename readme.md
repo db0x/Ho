@@ -283,7 +283,7 @@ client/
   js/login.js        Sign-in page: forms, language picker, handover to the game
   js/net.js          WebSocket with automatic reconnect
   js/i18n.js         Detect and remember the language, fill the markup
-  i18n/de.js, en.js  Text catalogues
+  i18n/de.json, en.json  Text catalogues
   js/render/         planets.js (planet style), ships.js (ships),
                      map.js (flat star map), space.js (spatial star map)
   js/ui/             lobby.js, hud.js (all panels), select.js (custom select lists),
@@ -330,8 +330,8 @@ There is no human-readable sentence in the code. It only knows keys (`log.arrive
 ```
 shared/i18n.js       Core: t(), placeholders {name}, plurals (#one/#other), numbers
 client/js/i18n.js    Detect and remember the language, fill data-i18n markup
-client/i18n/de.js    German catalogue
-client/i18n/en.js    English catalogue
+client/i18n/de.json  German catalogue
+client/i18n/en.json  English catalogue
 ```
 
 The **server** no longer sends finished sentences either, but keys together with
