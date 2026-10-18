@@ -145,7 +145,7 @@ function wsVersuch() {
 
   const anmeldeseite = await hole('/login.html', { headers: seite });
   check(anmeldeseite.status === 200, 'Die Anmeldeseite selbst ist nicht zu erreichen');
-  for (const pfad of ['/js/login.js', '/js/i18n.js', '/shared/i18n.js', '/i18n/de.js', '/css/style.css', '/img/logo.svg']) {
+  for (const pfad of ['/js/login.js', '/js/i18n.js', '/shared/i18n.js', '/i18n/de.json', '/css/style.css', '/img/logo.svg']) {
     const r = await hole(pfad);
     check(r.status === 200, `Die Anmeldeseite kann ${pfad} nicht laden (${r.status})`);
   }

@@ -4,11 +4,18 @@
 import {
   registerLocale, setLocale, getLocale, availableLocales, hasLocale, t, tIn, n, localeTag
 } from '/shared/i18n.js';
-import de from '/i18n/de.js';
-import en from '/i18n/en.js';
 
-registerLocale('de', de);
-registerLocale('en', en);
+// Die Kataloge liegen als JSON unter /i18n/<code>.json: Schlüssel sind nach
+// Bereichen benannt (menu., lobby., log. ...), {werte} werden eingesetzt,
+// Schlüssel mit #one / #other sind Einzahl und Mehrzahl. Geladen wird vor
+// allem anderen - wer dieses Modul importiert, wartet, bis beide da sind.
+const SPRACHEN = ['de', 'en'];
+const kataloge = await Promise.all(SPRACHEN.map(code =>
+  fetch(`/i18n/${code}.json`).then(r => {
+    if (!r.ok) throw new Error(`Katalog ${code}: HTTP ${r.status}`);
+    return r.json();
+  })));
+SPRACHEN.forEach((code, i) => registerLocale(code, kataloge[i]));
 
 const KEY = 'ho-lang';
 const horcher = new Set();

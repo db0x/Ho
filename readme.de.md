@@ -38,7 +38,15 @@ Vor der Lobby steht eine Anmeldung – siehe *[Zugang](#zugang)*. Zum Entwickeln
 nimmt `HO_AUTH=off npm start` sie weg.
 
 KI-Reiche treten unter eigenem Namen an – von *Admiral Wobblebeard* bis
-*Czarina Candyfloss*.
+*Czarina Candyfloss* – und jedes mit eigenem Charakter: Der **Eroberer** sucht
+sich einen Rivalen und rollt ihn Welt für Welt auf, der **Siedler** breitet sich
+aus und schlägt nur zurück, der **Technokrat** kommt spät mit besserer Technik,
+der **Pirat** schickt schnelle Rudel gegen schwache Kolonien, das **Bollwerk**
+mauert sich mit Satelliten ein, bis es ausbricht, und der **Aasgeier** holt
+sich, was die anderen übrig lassen. Sie merken sich, wer sie angegriffen hat,
+verbünden sich stillschweigend gegen einen davonziehenden Spitzenreiter und
+werden ungeduldig, je länger die Partie dauert – das Spätspiel erstarrt so
+nicht zu zwölf Festungen.
 
 Für eine schnelle Partie: *Sofort gegen 5 KI spielen*. Für eine Runde mit Freunden
 *Neue Partie eröffnen*, den vierstelligen Code weitergeben, freie Plätze mit KI
@@ -67,7 +75,7 @@ Server die Runde ab – Forschung, Bau, Terraforming, Bewegung, Kampf, Wirtschaf
 |---|---|
 | **Ideal** | 20 °C und 1,0 g. Je näher eine Welt daran liegt, desto mehr Menschen leben dort und desto mehr Geld bringt sie. |
 | **Terraforming** | Kostet Geld und schiebt Temperatur und Schwerkraft Richtung Ideal. Extreme Welten brauchen erst höhere **Radikaltechnik**. |
-| **Metall** | Wird auf den eigenen Welten abgebaut, in einen globalen Vorrat gelegt und beim Schiffsbau verbraucht. Die Vorräte eines Planeten erschöpfen sich. |
+| **Metall** | Wird auf den eigenen Welten abgebaut, in einen globalen Vorrat gelegt und beim Schiffsbau verbraucht. Die Vorräte eines Planeten erschöpfen sich; danach liefert er im Tiefbau noch ein Zehntel. |
 | **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit auch Sprungbretter; Tanker erweitern den Radius. |
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. |
 | **Abwehrbatterien** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. Eine ausgebaute Welt kostet den Angreifer eine echte Flotte. |
@@ -288,7 +296,7 @@ client/
                      dialog.js (verschiebbare Fenster, z. B. das Protokoll),
                      viewport.js (ein Umschaltpunkt für kleine Geräte)
   js/i18n.js         Sprache erkennen, merken, Markup füllen
-  i18n/de.js, en.js  Textkataloge
+  i18n/de.json, en.json  Textkataloge
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/
   smoke.js           Spielt eine volle Partie mit 16 KI durch und prüft die Invarianten
@@ -355,8 +363,8 @@ Im Code steht kein Satz, den ein Mensch liest. Er kennt nur Schlüssel
 ```
 shared/i18n.js       Kern: t(), Platzhalter {name}, Mehrzahl (#one/#other), Zahlen
 client/js/i18n.js    Sprache erkennen und merken, Markup mit data-i18n füllen
-client/i18n/de.js    deutscher Katalog
-client/i18n/en.js    englischer Katalog
+client/i18n/de.json  deutscher Katalog
+client/i18n/en.json  englischer Katalog
 ```
 
 Auch der **Server** schickt keine fertigen Sätze mehr, sondern Schlüssel samt

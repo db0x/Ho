@@ -21,7 +21,7 @@ export class Lobby {
     $('#btn-create').onclick = () => {
       const name = this.name();
       this.net.forget();
-      this.net.send({ t: 'create', name, settings: { ...(this.settings || {}), mode: this.mode(), shape: this.shape() } });
+      this.net.send({ t: 'create', name, settings: { ...(this.settings || {}), mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
     };
     $('#btn-join').onclick = () => {
       const code = $('#in-code').value.trim().toUpperCase();
@@ -32,7 +32,7 @@ export class Lobby {
     $('#btn-solo').onclick = () => this.quickStart(5);
     $('#btn-watch').onclick = () => {
       this.net.forget();
-      this.net.send({ t: 'watch', bots: +$('#in-watchbots').value || 6, settings: { mode: this.mode(), shape: this.shape() } });
+      this.net.send({ t: 'watch', bots: +$('#in-watchbots').value || 6, settings: { mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
     };
     $('#in-code').onkeydown = e => { if (e.key === 'Enter') $('#btn-join').click(); };
     $('#in-name').onchange = () => saveName(this.name());
@@ -65,6 +65,9 @@ export class Lobby {
     $('#s-mode').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { mode: $('#s-mode').value } });
     };
+    $('#s-turns').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { maxTurns: +$('#s-turns').value } });
+    };
     $('#s-expand').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { expanding: $('#s-expand').checked } });
     };
@@ -77,11 +80,17 @@ export class Lobby {
   /** Form der Galaxie aus dem Startbildschirm. */
   shape() { return $('#in-shape')?.value === 'spiral' ? 'spiral' : 'scatter'; }
 
+  /** Rundenlimit aus dem Startbildschirm; 0 = unbegrenzt. */
+  maxTurns() {
+    const v = Number($('#in-turns')?.value);
+    return Number.isFinite(v) ? v : 300;
+  }
+
   /** Eröffnet eine Partie, füllt sie mit KI und startet sofort. */
   quickStart(bots) {
     this.pendingQuickStart = bots;
     this.net.forget();
-    this.net.send({ t: 'create', name: this.name(), settings: { planetsPerPlayer: 7, mode: this.mode(), shape: this.shape() } });
+    this.net.send({ t: 'create', name: this.name(), settings: { planetsPerPlayer: 7, mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
   }
 
   name() {
@@ -132,7 +141,7 @@ export class Lobby {
       <li>
         <span class="swatch" style="background:${p.color};color:${p.color}"></span>
         <span style="flex:1">${p.name}${p.id === msg.you ? ` <span class="muted small">${t('word.you')}</span>` : ''}</span>
-        ${p.isBot ? `<span class="tagbot">${t('word.ai')}</span>`
+        ${p.isBot ? `<span class="tagbot"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>`
           : (p.connected ? '' : `<span class="tagbot">${t('word.offline')}</span>`)}
         ${this.isHost && p.id !== msg.you ? `<button class="tiny" data-kick="${p.id}">×</button>` : ''}
       </li>`).join('');
@@ -149,6 +158,10 @@ export class Lobby {
     $('#s-mode').disabled = !this.isHost;
     $('#s-shape').value = s.shape === 'spiral' ? 'spiral' : 'scatter';
     $('#s-shape').disabled = !this.isHost;
+    // Werte, die es in der Auswahl nicht gibt, landen auf dem nächstgrößeren.
+    const limits = [100, 200, 300, 500];
+    $('#s-turns').value = s.maxTurns ? String(limits.find(n => n >= s.maxTurns) || 500) : '0';
+    $('#s-turns').disabled = !this.isHost;
     $('#s-expand').checked = s.expanding !== false;
     $('#s-expand').disabled = !this.isHost;
     for (const sel of Object.keys(this.sliders)) $(sel).disabled = !this.isHost;

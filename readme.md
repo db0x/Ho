@@ -38,7 +38,14 @@ A sign-in sits in front of the lobby – see *[Access](#access)*. While developi
 `HO_AUTH=off npm start` takes it away.
 
 AI empires enter under names of their own – from *Admiral Wobblebeard* to
-*Czarina Candyfloss*.
+*Czarina Candyfloss* – and each with a personality of its own: the **Conqueror**
+picks a rival and rolls it up world by world, the **Settler** spreads out and
+only fights back, the **Technocrat** strikes late with better technology, the
+**Raider** sends fast packs after weak colonies, the **Bulwark** walls itself in
+with satellites until it breaks out, and the **Vulture** takes whatever the
+others leave behind. They remember who attacked them, gang up on a runaway
+leader and lose patience as the game drags on – so the late game does not
+freeze into twelve fortresses.
 
 For a quick game: *Play 5 AI right away*. For a round with friends, *Host a new
 game*, pass on the four-letter code, fill the empty seats with AI and start. On a
@@ -66,7 +73,7 @@ the turn – research, building, terraforming, movement, combat, economy.
 |---|---|
 | **Ideal** | 20 °C and 1.0 g. The closer a world is to it, the more people live there and the more money it brings in. |
 | **Terraforming** | Costs money and pushes temperature and gravity towards the ideal. Extreme worlds need a higher level of **radical tech** first. |
-| **Metal** | Mined on your own worlds, pooled globally and consumed when building ships. A planet's reserves run out. |
+| **Metal** | Mined on your own worlds, pooled globally and consumed when building ships. A planet's reserves run out; after that, deep mining still yields a tenth. |
 | **Range** | Distance from your nearest *inhabited own* planet. New colonies are therefore stepping stones; tankers widen the radius. |
 | **Tech level** | Ships are built with the level of their build year and keep it. Higher levels make ships better *and more expensive* – **miniaturisation** brings the cost back down. |
 | **Defence batteries** | Every inhabited world defends itself, in proportion to its population. A developed world costs the attacker a real fleet. |
@@ -276,7 +283,7 @@ client/
   js/login.js        Sign-in page: forms, language picker, handover to the game
   js/net.js          WebSocket with automatic reconnect
   js/i18n.js         Detect and remember the language, fill the markup
-  i18n/de.js, en.js  Text catalogues
+  i18n/de.json, en.json  Text catalogues
   js/render/         planets.js (planet style), ships.js (ships),
                      map.js (flat star map), space.js (spatial star map)
   js/ui/             lobby.js, hud.js (all panels), select.js (custom select lists),
@@ -323,8 +330,8 @@ There is no human-readable sentence in the code. It only knows keys (`log.arrive
 ```
 shared/i18n.js       Core: t(), placeholders {name}, plurals (#one/#other), numbers
 client/js/i18n.js    Detect and remember the language, fill data-i18n markup
-client/i18n/de.js    German catalogue
-client/i18n/en.js    English catalogue
+client/i18n/de.json  German catalogue
+client/i18n/en.json  English catalogue
 ```
 
 The **server** no longer sends finished sentences either, but keys together with

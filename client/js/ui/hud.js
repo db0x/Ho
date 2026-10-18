@@ -123,6 +123,7 @@ export class Hud {
         <div class="head">
           <span class="dot" style="width:9px;height:9px;border-radius:50%;background:${p.color};box-shadow:0 0 8px ${p.color}"></span>
           <span class="nm" title="${p.name}">${p.name}</span>
+          ${p.persona ? `<span class="muted small" title="${t(`persona.${p.persona}.desc`)}">${t(`persona.${p.persona}`)}</span>` : ''}
         </div>
         <div class="num">${statsText(p.stats.planets, p.stats.pop, p.stats.ships)}</div>
         <div class="bar"><i style="width:${Math.round(p.stats.pop / maxPop * 100)}%;background:${p.color}"></i></div>
@@ -419,7 +420,7 @@ export class Hud {
       <div class="listrow ${p.ready ? 'rdy' : ''}">
         <span class="dot" style="background:${p.color};box-shadow:0 0 8px ${p.color}"></span>
         <span class="nm" style="${p.alive ? '' : 'text-decoration:line-through;opacity:.5'}">
-          ${p.name}${p.isBot ? ` <span class="muted small">${t('word.ai')}</span>` : ''}${p.connected || p.isBot ? '' : ` <span class="muted small">(${t('word.offline')})</span>`}
+          ${p.name}${p.isBot ? ` <span class="muted small"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>` : ''}${p.connected || p.isBot ? '' : ` <span class="muted small">(${t('word.offline')})</span>`}
         </span>
         <span class="num">${p.stats.planets}W ${fmt1(p.stats.pop)}M ${p.stats.ships}S</span>
       </div>`).join('');
@@ -488,7 +489,7 @@ export class Hud {
         <div class="stat"><div class="k">${t('planet.habitability')}</div><div class="v">${Math.round(hab * 100)} %</div>
           <div class="meter"><i style="width:${hab * 100}%;background:linear-gradient(90deg,#4d7fe0,#52d98a)"></i></div></div>
         <div class="stat"><div class="k">${t('planet.ore')}</div><div class="v">${fmt(p.metalReserve)}</div>
-          <div class="small muted">${t('planet.oreGrade', { n: (+p.metalRichness).toFixed(2) })}</div></div>
+          <div class="small muted">${p.metalReserve > 0 ? t('planet.oreGrade', { n: (+p.metalRichness).toFixed(2) }) : t('planet.deepMining')}</div></div>
         <div class="stat"><div class="k">${t(econ ? 'planet.yield' : 'planet.defense')}</div>
           <div class="v">${econ ? '+' + fmt(planetIncome(p)) : t('planet.satellitesShort', { n: p.defenses || 0 })}</div>
           <div class="small muted">${econ ? '+' + fmt(planetMining(p)) + ' ' + t('unit.ore')

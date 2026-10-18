@@ -51,6 +51,17 @@
       </select>
     </label>
 
+    <label class="field" style="margin-bottom:12px">
+      <span data-i18n="lobby.maxTurns"></span>
+      <select id="in-turns">
+        <option value="100" data-i18n="word.turns" data-i18n-args='{"n":100}'></option>
+        <option value="200" data-i18n="word.turns" data-i18n-args='{"n":200}'></option>
+        <option value="300" data-i18n="word.turns" data-i18n-args='{"n":300}' selected></option>
+        <option value="500" data-i18n="word.turns" data-i18n-args='{"n":500}'></option>
+        <option value="0" data-i18n="lobby.endless"></option>
+      </select>
+    </label>
+
     <div class="menu-actions">
       <button id="btn-create" class="primary" data-i18n="menu.create"></button>
       <button id="btn-solo" data-i18n="menu.solo"></button>
@@ -110,6 +121,14 @@
           <select id="s-shape">
             <option value="scatter" data-i18n="menu.shape.scatterShort"></option>
             <option value="spiral" data-i18n="menu.shape.spiralShort"></option>
+          </select></label>
+        <label class="field slim"><span data-i18n="lobby.maxTurns"></span>
+          <select id="s-turns">
+            <option value="100" data-i18n="word.turns" data-i18n-args='{"n":100}'></option>
+            <option value="200" data-i18n="word.turns" data-i18n-args='{"n":200}'></option>
+            <option value="300" data-i18n="word.turns" data-i18n-args='{"n":300}'></option>
+            <option value="500" data-i18n="word.turns" data-i18n-args='{"n":500}'></option>
+            <option value="0" data-i18n="lobby.endless"></option>
           </select></label>
         <label class="field slim"><span><span data-i18n="lobby.worldsPerPlayer"></span> <b id="v-ppp"></b></span>
           <input type="range" id="s-ppp" min="3" max="14" step="1"></label>
