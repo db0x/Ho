@@ -94,6 +94,45 @@ assert(combats > 0, 'Es gab keinen einzigen Kampf');
   assert(g.state === 'over', 'Rundenlimit greift nicht');
 }
 
+// Spirale ohne Rundenlimit: Die KI darf nicht einschlafen. Ohne Späher wuchs
+// die Karte nicht mehr, das Erz ging aus, und keine Flotte bewegte sich.
+{
+  const g = createGame('Spirale');
+  Object.assign(g.settings, { seed: 1, turnTimer: 0, maxTurns: 0, shape: 'spiral' });
+  for (let i = 0; i < 6; i++) addPlayer(g, { isBot: true });
+  startGame(g);
+  const anfang = g.galaxy.planets.length;
+  let still = 0, amLaengsten = 0;
+  while (g.turn < 220 && g.state === 'running') {
+    for (const b of g.players.filter(p => p.isBot && p.alive)) runBot(g, b);
+    still = g.fleets.some(f => f.dest != null) ? 0 : still + 1;
+    amLaengsten = Math.max(amLaengsten, still);
+    resolveTurn(g);
+  }
+  assert(amLaengsten < 15, `Spirale: ${amLaengsten} Runden lang bewegt sich keine Flotte`);
+  assert(g.galaxy.planets.length > anfang, 'Spirale: die Karte wächst nicht');
+  console.log(`Spirale: ${anfang} -> ${g.galaxy.planets.length} Welten in ${g.turn} Runden, längste Ruhe ${amLaengsten} Runden.`);
+}
+
+// Ohne Welt ist ein Reich raus - auch wenn es noch Schiffe hat.
+{
+  const g = createGame('Ohne Welt');
+  Object.assign(g.settings, { seed: 3, turnTimer: 0 });
+  addPlayer(g, { name: 'Mensch' });
+  addPlayer(g, { isBot: true });
+  startGame(g);
+  const opfer = g.players[1];
+  for (const q of g.galaxy.planets) if (q.owner === opfer.id) { q.owner = null; q.pop = 0; }
+  // Kolonieschiffe weg - sonst landet das Startschiff gleich wieder auf der Heimat.
+  for (const f of g.fleets) if (f.owner === opfer.id) f.ships = f.ships.filter(s => !s.colonists);
+  g.fleets = g.fleets.filter(f => f.ships.length);
+  assert(g.fleets.some(f => f.owner === opfer.id), 'Testaufbau: Reich ohne Schiffe');
+  resolveTurn(g);
+  assert(!opfer.alive, 'Reich ohne Welt lebt weiter');
+  assert(!g.fleets.some(f => f.owner === opfer.id), 'Geisterflotten bleiben übrig');
+  assert(g.state === 'over' && g.winner === g.players[0].id, 'Letztes Reich gewinnt nicht');
+}
+
 // Planet 0 ist ein gültiges Ziel: die ID ist falsy, der Kurs darf trotzdem nicht verpuffen.
 {
   const g = createGame('Ziel0');

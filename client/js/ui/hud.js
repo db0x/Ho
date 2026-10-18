@@ -489,7 +489,7 @@ export class Hud {
         <div class="stat"><div class="k">${t('planet.habitability')}</div><div class="v">${Math.round(hab * 100)} %</div>
           <div class="meter"><i style="width:${hab * 100}%;background:linear-gradient(90deg,#4d7fe0,#52d98a)"></i></div></div>
         <div class="stat"><div class="k">${t('planet.ore')}</div><div class="v">${fmt(p.metalReserve)}</div>
-          <div class="small muted">${t('planet.oreGrade', { n: (+p.metalRichness).toFixed(2) })}</div></div>
+          <div class="small muted">${p.metalReserve > 0 ? t('planet.oreGrade', { n: (+p.metalRichness).toFixed(2) }) : t('planet.deepMining')}</div></div>
         <div class="stat"><div class="k">${t(econ ? 'planet.yield' : 'planet.defense')}</div>
           <div class="v">${econ ? '+' + fmt(planetIncome(p)) : t('planet.satellitesShort', { n: p.defenses || 0 })}</div>
           <div class="small muted">${econ ? '+' + fmt(planetMining(p)) + ' ' + t('unit.ore')

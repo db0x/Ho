@@ -193,10 +193,17 @@ export function planetIncome(planet) {
   return planet.pop * INCOME_PER_POP * (0.55 + 0.45 * habitability(planet));
 }
 
-/** Metallabbau pro Runde (durch Vorrat begrenzt). */
+/**
+ * Tiefbau: Ist der Vorrat erschöpft, fördert eine Welt noch diesen Anteil.
+ * Ohne ihn friert jede lange Partie ein, sobald überall das Erz verbraucht
+ * ist - dann lassen sich keine Schiffe mehr bauen, auch keine Kolonieschiffe.
+ */
+export const DEEP_MINING = 0.1;
+
+/** Metallabbau pro Runde: aus dem Vorrat, danach im Tiefbau. */
 export function planetMining(planet) {
   const rate = planet.pop * MINE_PER_POP * planet.metalRichness;
-  return Math.min(planet.metalReserve, rate);
+  return Math.max(Math.min(planet.metalReserve, rate), rate * DEEP_MINING);
 }
 
 // Terraforming

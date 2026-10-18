@@ -75,7 +75,7 @@ Server die Runde ab – Forschung, Bau, Terraforming, Bewegung, Kampf, Wirtschaf
 |---|---|
 | **Ideal** | 20 °C und 1,0 g. Je näher eine Welt daran liegt, desto mehr Menschen leben dort und desto mehr Geld bringt sie. |
 | **Terraforming** | Kostet Geld und schiebt Temperatur und Schwerkraft Richtung Ideal. Extreme Welten brauchen erst höhere **Radikaltechnik**. |
-| **Metall** | Wird auf den eigenen Welten abgebaut, in einen globalen Vorrat gelegt und beim Schiffsbau verbraucht. Die Vorräte eines Planeten erschöpfen sich. |
+| **Metall** | Wird auf den eigenen Welten abgebaut, in einen globalen Vorrat gelegt und beim Schiffsbau verbraucht. Die Vorräte eines Planeten erschöpfen sich; danach liefert er im Tiefbau noch ein Zehntel. |
 | **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit auch Sprungbretter; Tanker erweitern den Radius. |
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. |
 | **Abwehrbatterien** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. Eine ausgebaute Welt kostet den Angreifer eine echte Flotte. |

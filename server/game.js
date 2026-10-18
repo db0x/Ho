@@ -653,8 +653,14 @@ export function resolveTurn(game) {
     p.stats.pop = Math.round(planets.reduce((a, q) => a + q.pop, 0) * 10) / 10;
     p.stats.ships = game.fleets.filter(f => f.owner === p.id).reduce((a, f) => a + f.ships.length, 0)
       + game.galaxy.planets.reduce((a, q) => a + ((q.owner === p.id && q.defenses) ? q.defenses.length : 0), 0);
-    if (p.alive && p.stats.planets === 0 && p.stats.ships === 0) {
+    // Ohne Welt ist Schluss: Reichweite misst sich an eigenen bewohnten Welten,
+    // übrig gebliebene Schiffe kämen also nirgends mehr hin. Sie verschwinden
+    // mit dem Reich, statt als Geisterflotten auf der Karte zu stehen. (Ein
+    // Kolonieschiff über einer freien Welt hat oben schon landen dürfen.)
+    if (p.alive && p.stats.planets === 0) {
       p.alive = false;
+      game.fleets = game.fleets.filter(f => f.owner !== p.id);
+      p.stats.ships = 0;
       entries.push({ type: 'eliminated', playerIds: [p.id],
         key: 'log.eliminated', params: { player: p.name } });
     }
@@ -693,6 +699,14 @@ const EDGE_TRIGGER = 200;    // Abstand zur äußersten Welt, ab dem die Karte n
 function maybeExpand(game, entries) {
   if (game.settings.expanding === false) return;
   const g = game.galaxy;
+  // Neues Land erst, wenn das alte weitgehend vergeben ist: Solange es mehr
+  // als zwei freie bewohnbare Welten je lebendem Reich gibt, bleibt die Karte,
+  // wie sie ist - sonst wüchse sie ins Uferlose. Unbewohnbare Welten zählen
+  // nicht mit, die nimmt ohnehin niemand.
+  const lebende = game.players.filter(p => p.alive).length;
+  let frei = 0;
+  for (const q of g.planets) if (!q.owner && planetCapacity(q) >= 1) frei++;
+  if (frei > Math.max(3, lebende * 2)) return;
   const eyes = [];
   for (const q of g.planets) if (q.owner) eyes.push(q);
   for (const f of game.fleets) eyes.push(f);

@@ -73,7 +73,7 @@ the turn – research, building, terraforming, movement, combat, economy.
 |---|---|
 | **Ideal** | 20 °C and 1.0 g. The closer a world is to it, the more people live there and the more money it brings in. |
 | **Terraforming** | Costs money and pushes temperature and gravity towards the ideal. Extreme worlds need a higher level of **radical tech** first. |
-| **Metal** | Mined on your own worlds, pooled globally and consumed when building ships. A planet's reserves run out. |
+| **Metal** | Mined on your own worlds, pooled globally and consumed when building ships. A planet's reserves run out; after that, deep mining still yields a tenth. |
 | **Range** | Distance from your nearest *inhabited own* planet. New colonies are therefore stepping stones; tankers widen the radius. |
 | **Tech level** | Ships are built with the level of their build year and keep it. Higher levels make ships better *and more expensive* – **miniaturisation** brings the cost back down. |
 | **Defence batteries** | Every inhabited world defends itself, in proportion to its population. A developed world costs the attacker a real fleet. |

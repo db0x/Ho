@@ -6,7 +6,7 @@
 // Zwillinge spielen.
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
-  holeZone, travelDistance, refitTotal, clamp
+  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById } from './game.js';
 
@@ -107,6 +107,10 @@ export function runBot(game, bot) {
   const P = ai.p;
   const planets = game.galaxy.planets;
   const zone = holeZone(game.galaxy);
+  // Mitte der Karte - von hier aus gemessen liegt der Rand, an dem sie wächst.
+  const g = game.galaxy;
+  const mitte = g.field ? { x: g.field.cx, y: g.field.cy, z: 0 }
+    : { x: (g.minX + g.maxX) / 2, y: (g.minY + g.maxY) / 2, z: 0 };
   // Ohne Rundenlimit wächst der Endspieldruck so, als wären es 300 Runden -
   // sonst gäbe es dort nichts, was das Einigeln aufbricht.
   const maxTurns = game.settings.maxTurns || 300;
@@ -136,11 +140,26 @@ export function runBot(game, bot) {
   // --- Forschung: Schwerpunkt wandert mit dem Spielverlauf und der Lage
   let forschung = (early ? P.forschung[0] : P.forschung[1]) * (1 - 0.35 * druck);
   const weights = { ...P.gewichte[early ? 0 : 1] };
+
+  // Freie Welten: welche erreichen die Kolonieschiffe, und welche kennt man
+  // zwar, kommt aber nicht hin? Für die zweiten wird Reichweite erforscht.
+  const kolonieReich = shipStats('colony', bot.tech).range;
+  const heimat = mine.filter(p => p.pop > 0.5);
+  const siedelbar = openWorlds.filter(p => planetCapacity(p) >= 1);
+  const inReichweite = siedelbar.filter(p => supplyDistance(heimat, p, zone) <= kolonieReich);
+  if (siedelbar.length > inReichweite.length && inReichweite.length < 2) weights.range += 3;
+  // Erz ist die harte Grenze: ist es knapp, gehen die letzten Brocken in
+  // Kolonien auf erzreichen Welten statt in Kriegsschiffe.
+  const erzKnapp = bot.metal < shipCost('colony', bot.tech).metal * 4;
   if (getroffen && P.umruesten) {
     // Getroffen? Dann wird aufgerüstet, nicht nachgebaut.
     forschung += 8; weights.weapons += 2; weights.shields += 2;
   }
-  forschung = Math.round(clamp(forschung, 10, 60));
+  // Ausgereizte Felder bekommen nichts mehr - und ist alles ausgereizt,
+  // fließt das Geld ganz in Schiffe statt in Forschung, die nichts mehr bringt.
+  for (const f of TECH_FIELDS) if (bot.tech[f] >= TECH_MAX_LEVEL) weights[f] = 0;
+  const offen = TECH_FIELDS.some(f => weights[f] > 0);
+  forschung = offen ? Math.round(clamp(forschung, 10, 60)) : 0;
   setOrders(game, bot, { research: { budgetPct: forschung, weights } });
   const kasse = bot.money * (1 - forschung / 100);
 
@@ -220,6 +239,17 @@ export function runBot(game, bot) {
   const yards = mine.filter(p => p.pop >= 1).sort((a, b) => b.pop - a.pop);
   const yard = yards[0];
   const front = frontwelt();
+  // Ein Sammelpunkt für alles: Gebaut wird, wo gesammelt wird - sonst zieht
+  // jede Runde ein neuer Strom frischer Jäger von der Werft zur Front.
+  const sammelpunkt = (fz && fz.sammel) || (P.einzeln === 'beute' || P.aas ? front : yard);
+  // Wache: Verteidiger halten an einer bedrohten Welt ein paar Runden aus,
+  // statt jedem vorbeiziehenden Feind hinterherzufliegen und zurück.
+  let wache = ai.wache && planetById(game, ai.wache.id);
+  if (!wache || wache.owner !== bot.id || game.turn > ai.wache.bis) {
+    wache = null; ai.wache = null;
+    const ernst = [...bedroht.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (ernst) { ai.wache = { id: ernst[0], bis: game.turn + 6 }; wache = planetById(game, ernst[0]); }
+  }
   if (yard) bauen();
 
   // --- Flotten vor dem Angriff bündeln
@@ -234,16 +264,26 @@ export function runBot(game, bot) {
   // ... und wieder sortieren: Siedler und Späher fliegen eigene Wege, sonst
   // zieht das Kolonieschiff die ganze Kampfflotte hinter sich her.
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
-    const bewaffnet = f.ships.filter(s => s.attack > 0);
-    if (!bewaffnet.length || bewaffnet.length === f.ships.length) continue;
     const siedler = f.ships.filter(s => s.colonists > 0).map(s => s.id);
-    if (siedler.length) setOrders(game, bot, { split: { fleetId: f.id, ships: siedler } });
+    if (siedler.length && siedler.length < f.ships.length) {
+      setOrders(game, bot, { split: { fleetId: f.id, ships: siedler } });
+    }
+    const bewaffnet = f.ships.filter(s => s.attack > 0);
     const rest = f.ships.filter(s => s.attack <= 0).map(s => s.id);
-    if (rest.length) setOrders(game, bot, { split: { fleetId: f.id, ships: rest } });
+    if (bewaffnet.length && rest.length) setOrders(game, bot, { split: { fleetId: f.id, ships: rest } });
+  }
+  // Späher fliegen allein - im Pulk erkunden sie nur eine Welt statt mehrerer.
+  for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
+    if (f.ships.length < 2 || !f.ships.every(s => s.type === 'scout')) continue;
+    for (const s of f.ships.slice(1)) setOrders(game, bot, { split: { fleetId: f.id, ships: [s.id] } });
   }
   if (P.rudel) rudelBilden();
 
   // --- Flottenbefehle
+  // Welten, die schon ein eigenes Kolonieschiff ansteuert - eins genügt, sonst
+  // fliegen alle zur selben Welt, und die übrigen irren danach umher.
+  const besetzt = new Set(meineFlotten
+    .filter(f => f.dest != null && f.ships.some(s => s.colonists > 0)).map(f => f.dest));
   for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.length)) {
     const st = fleetStats(fleet);
     if (st.speed <= 0) continue;
@@ -258,22 +298,32 @@ export function runBot(game, bot) {
       // Siedler: möglichst gute, freie Welt. Wer siedeln will, nimmt auch
       // weite Wege für eine gute Welt in Kauf.
       const gier = P.siedler >= 4 ? 10 : 8;
-      target = reachable(game, fleet, openWorlds.filter(p => p.id !== fleet.at),
-        p => planetCapacity(p) * gier - weit(p) * 0.1);
+      target = reachable(game, fleet, siedelbar.filter(p => p.id !== fleet.at && !besetzt.has(p.id)),
+        p => planetCapacity(p) * gier - weit(p) * 0.1
+          + (erzKnapp ? Math.min(p.metalReserve, 2000) * 0.05 : 0));
     } else if (!armed) {
-      // Späher: nächste unerkundete Welt
-      target = reachable(game, fleet, planets.filter(p => !bot.explored.has(p.id)),
-        p => -weit(p));
-      if (!target) target = reachable(game, fleet, enemyWorlds, p => -weit(p));
+      // Späher: nächste unerkundete Welt. Ist ringsum alles bekannt, geht es
+      // an den Rand - nur dort wächst die Karte, und mit ihr das Erz.
+      // Fremde Welten erst zuletzt: deren Abwehr schießt einen Späher ab. Er
+      // deckt die Welt beim Eintreffen aber noch auf - wer nur kennt, was vor
+      // der eigenen Haustür liegt, findet im Spätspiel keine Ziele mehr.
+      const sicher = p => !p.owner || p.owner === bot.id;
+      const unbekannt = planets.filter(p => !bot.explored.has(p.id));
+      target = reachable(game, fleet, unbekannt.filter(sicher), p => -weit(p));
+      if (!target) target = reachable(game, fleet, unbekannt, p => -weit(p));
+      if (!target && game.settings.expanding !== false) {
+        target = reachable(game, fleet, planets.filter(sicher), p => dist(p, mitte));
+      }
     } else {
       target = kampfziel(fleet, st, weit);
     }
     if (target && target.id !== fleet.at) {
+      if (hasColonist) besetzt.add(target.id);
       setOrders(game, bot, { move: { fleetId: fleet.id, planetId: target.id } });
     }
   }
 
-  if (P.umruesten) umruesten();
+  umruesten();
 
   bot.ready = true;
 
@@ -305,6 +355,10 @@ export function runBot(game, bot) {
       const reich = jaeger.range;
       const potenzial = macht + nachschub;
       const nurRache = P.feldzug === 'vergeltung' && druck < 0.5;
+      // Wie sehr der Preis zählt: Ein armes Reich nimmt, was billig ist; ein
+      // reiches leistet sich die wertvollen Kernwelten - sonst knabbern im
+      // Spätspiel alle nur noch an Randkolonien, und der Kern bleibt starr.
+      const kostenSkala = Math.max(60, potenzial / 25);
       let best = null, billigst = null;
       for (const p of enemyWorlds) {
         const d0 = abstand.get(p.id);
@@ -313,7 +367,7 @@ export function runBot(game, bot) {
         const kosten = wehrkraft.get(p.id) || 0;
         if (!billigst || kosten < billigst.kosten) billigst = { p, kosten };
         if (kosten * marge > potenzial) continue;
-        const s = wert(p) / (kosten / 60 + 5) * (1 - d0 / (reich * 1.6));
+        const s = wert(p) / (kosten / kostenSkala + 5) * (1 - d0 / (reich * 1.6));
         if (!best || s > best.s) best = { p, s };
       }
       // Unter Druck lieber das Billigste angehen als gar nichts.
@@ -348,20 +402,29 @@ export function runBot(game, bot) {
     const budget = kasse * P.bau;
     const myColonyShips = meineFlotten
       .reduce((a, f) => a + f.ships.filter(s => s.colonists > 0).length, 0);
-    const wantColony = Math.max(0, Math.min(P.siedler, openWorlds.length - myColonyShips));
+    // Nur so viele Kolonieschiffe, wie es erreichbare Ziele gibt - sonst
+    // stehen sie herum und haben das knappe Erz gebunden.
+    const wantColony = Math.max(0, Math.min(P.siedler, inReichweite.length - myColonyShips));
     const myShips = meineFlotten.reduce((a, f) => a + f.ships.length, 0);
-    let deckel = (10 + game.turn * 0.6 * P.flotte) * (1 + druck);
+    let deckel = (10 + game.turn * 0.6 * P.flotte + mine.length * 1.5) * (1 + druck);
     // Ein Feldzug, dem die Feuerkraft fehlt, darf den Deckel sprengen.
     if (fz && macht < fz.kosten * marge) {
       deckel = Math.max(deckel, myShips + Math.ceil((fz.kosten * marge - macht) / jaegerSchlag));
     }
     const krieg = enemyWorlds.length > 0 || bedroht.size > 0;
-    const werft = (fz && fz.sammel) || (P.einzeln === 'beute' ? front : yard) || yard;
+    const werft = sammelpunkt || yard;
 
     const order = [];
     const spaeher = () => {
+      // Ein paar Späher sind immer unterwegs, solange es etwas zu entdecken
+      // gibt oder die Karte wachsen kann.
+      // Gezählt werden nur Späher, die mit dem heutigen Stand mithalten.
+      const weitGenug = shipStats('scout', bot.tech).range * 0.75;
+      const unterwegs = meineFlotten.reduce((a, f) => a + f.ships.filter(s => s.type === 'scout' && s.range >= weitGenug).length, 0);
+      const soll = known.length < planets.length || game.settings.expanding !== false
+        ? (P.spaeher ? 3 : 2) : 0;
       if (game.turn < 6) order.push([yard, 'scout', 2]);
-      else if (known.length < planets.length * 0.35 && game.turn % (P.spaeher || 7) === 0) order.push([yard, 'scout', 1]);
+      else if (unterwegs < soll && game.turn % 3 === 0) order.push([yard, 'scout', 1]);
     };
     const kolonien = () => { if (wantColony > 0) order.push([yard, 'colony', wantColony]); };
     const satelliten = () => {
@@ -387,14 +450,17 @@ export function runBot(game, bot) {
       }
     };
     const kampfschiffe = () => {
-      if (krieg && myShips < deckel) order.push([werft, 'fighter', P.jaeger + (fz ? 2 : 0)]);
+      // Liegt viel Geld herum, wird es in Schiffe gesteckt statt gehortet.
+      const hort = Math.floor(Math.max(0, budget - 10 * jaegerKosten.money) / jaegerKosten.money * 0.4);
+      const n = Math.min(P.jaeger + (fz ? 2 : 0) + hort, Math.ceil(deckel - myShips));
+      if (krieg && n > 0) order.push([werft, 'fighter', n]);
       else if (bedroht.size) order.push([werft, 'fighter', 2]);
     };
 
     spaeher();
     if (getroffen) satelliten();
     // Kriegerische Reiche rüsten nach dem Start zuerst, dann wird gesiedelt.
-    if (P.einzeln === 'beute' && game.turn >= 35) { kampfschiffe(); kolonien(); }
+    if (P.einzeln === 'beute' && game.turn >= 35 && !erzKnapp) { kampfschiffe(); kolonien(); }
     else { kolonien(); kampfschiffe(); }
     if (!getroffen) satelliten();
 
@@ -456,28 +522,33 @@ export function runBot(game, bot) {
 
     // Nichts zu holen: sammeln - am Feldzug, an der Grenze oder zu Hause.
     let sammel = fz ? fz.sammel : null;
-    if (!sammel && garnison >= 0.3 && bedroht.size) {
-      sammel = [...bedroht.keys()].map(id => planetById(game, id))
-        .sort((a, b) => weit(a) - weit(b))[0];
-    }
-    if (!sammel) sammel = P.einzeln === 'beute' || P.aas ? front : yard;
+    if (!sammel && garnison >= 0.3) sammel = wache;
+    if (!sammel) sammel = sammelpunkt;
     if (sammel && sammel.id !== fleet.at && canReach(game, fleet, sammel).ok) return sammel;
     return null;
   }
 
   /** Veraltete Schiffe und Satelliten nachrüsten, wenn das Geld reicht. */
   function umruesten() {
-    let frei = bot.money * 0.25;
+    // Wer aufs Umrüsten setzt, tut es bei jeder Verbesserung. Alle anderen
+    // erst, wenn Reichweite oder Feuerkraft um ein Viertel zurückliegen -
+    // sonst stehen alte Späher und Jäger herum, die nirgends mehr hinkommen.
+    let frei = bot.money * (P.umruesten ? 0.25 : 0.15);
+    const veraltet = s => {
+      const neu = shipStats(s.type, bot.tech);
+      return P.umruesten || neu.range > s.range * 1.25 || neu.attack > s.attack * 1.25;
+    };
     for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
       const pl = planetById(game, f.at);
-      if (!pl || pl.owner !== bot.id || pl.pop < 1 || !f.ships.some(s => s.attack > 0)) continue;
+      if (!pl || pl.owner !== bot.id || pl.pop < 1 || f.ships.some(s => s.colonists > 0)) continue;
+      if (!f.ships.some(veraltet)) continue;
       const k = refitTotal(f.ships, bot.tech);
-      if (k.count < Math.max(2, f.ships.length / 2) || k.money > frei) continue;
+      if (!k.count || k.count < f.ships.length / 2 || k.money > frei) continue;
       setOrders(game, bot, { refit: { fleetId: f.id } });
       frei -= k.money;
     }
     for (const pl of mine) {
-      if (!pl.defenses || pl.defenses.length < 2 || pl.pop < 1) continue;
+      if (!P.umruesten || !pl.defenses || pl.defenses.length < 2 || pl.pop < 1) continue;
       const k = refitTotal(pl.defenses, bot.tech);
       if (k.count < pl.defenses.length / 2 || k.money > frei) continue;
       setOrders(game, bot, { refit: { planetId: pl.id } });
@@ -513,7 +584,8 @@ function gedaechtnis(game, bot) {
     besitz: new Map(),      // bekannte Feindwelt -> Besitzer und Bevölkerung der Vorrunde
     frisch: new Map(),      // Welt -> Runde, in der sie den Besitzer wechselte oder einbrach
     zuletztGetroffen: -99,
-    ruheSeit: game.turn     // letzte Runde, in der eine Welt den Besitzer wechselte
+    ruheSeit: game.turn,    // letzte Runde, in der eine Welt den Besitzer wechselte
+    wache: null             // bedrohte Welt, die die Verteidiger gerade halten
   };
   return bot.ai;
 }
