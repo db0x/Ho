@@ -20,6 +20,12 @@ export const PLAYER_EMBLEMS = [
   'Mond', 'Ring', 'Speer', 'Rad', 'Flamme', 'Pfeil', 'Schild', 'Hut'
 ];
 
+/**
+ * Persönlichkeiten der KI-Reiche. Wie sie spielen, steht in server/bot.js;
+ * Name und Beschreibung im Katalog unter persona.<key> / persona.<key>.desc.
+ */
+export const AI_PERSONAS = ['conqueror', 'settler', 'technocrat', 'raider', 'bulwark', 'vulture'];
+
 // ---------------------------------------------------------------- Technologie
 
 export const TECH_FIELDS = ['range', 'speed', 'weapons', 'shields', 'mini', 'radical'];

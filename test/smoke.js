@@ -70,6 +70,30 @@ for (const f of v.fleets.filter(f => !f.mine)) {
 assert(colonies > 5, 'KI kolonisiert nicht');
 assert(combats > 0, 'Es gab keinen einzigen Kampf');
 
+// Jedes KI-Reich hat eine Persönlichkeit, und sechs Bots sind sechs verschiedene.
+{
+  const g = createGame('Mischung');
+  for (let i = 0; i < 6; i++) addPlayer(g, { isBot: true });
+  addPlayer(g, { name: 'Mensch' });
+  const arten = g.players.filter(p => p.isBot).map(p => p.persona);
+  assert(new Set(arten).size === 6, 'KI-Persönlichkeiten doppelt vergeben: ' + arten.join(', '));
+  assert(g.players.find(p => !p.isBot).persona === null, 'Mensch mit KI-Persönlichkeit');
+}
+
+// Rundenlimit 0 heisst unbegrenzt: die Partie läuft über jedes Limit hinaus.
+{
+  const g = createGame('Endlos');
+  Object.assign(g.settings, { seed: 5, turnTimer: 0, maxTurns: 0 });
+  addPlayer(g, { name: 'Mensch' });
+  addPlayer(g, { isBot: true });
+  startGame(g);
+  for (let i = 0; i < 25; i++) resolveTurn(g);
+  assert(g.state === 'running', 'Unbegrenzte Partie endet nach ' + g.turn + ' Runden');
+  g.settings.maxTurns = 20;
+  resolveTurn(g);
+  assert(g.state === 'over', 'Rundenlimit greift nicht');
+}
+
 // Planet 0 ist ein gültiges Ziel: die ID ist falsy, der Kurs darf trotzdem nicht verpuffen.
 {
   const g = createGame('Ziel0');

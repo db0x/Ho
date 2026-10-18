@@ -38,7 +38,14 @@ A sign-in sits in front of the lobby – see *[Access](#access)*. While developi
 `HO_AUTH=off npm start` takes it away.
 
 AI empires enter under names of their own – from *Admiral Wobblebeard* to
-*Czarina Candyfloss*.
+*Czarina Candyfloss* – and each with a personality of its own: the **Conqueror**
+picks a rival and rolls it up world by world, the **Settler** spreads out and
+only fights back, the **Technocrat** strikes late with better technology, the
+**Raider** sends fast packs after weak colonies, the **Bulwark** walls itself in
+with satellites until it breaks out, and the **Vulture** takes whatever the
+others leave behind. They remember who attacked them, gang up on a runaway
+leader and lose patience as the game drags on – so the late game does not
+freeze into twelve fortresses.
 
 For a quick game: *Play 5 AI right away*. For a round with friends, *Host a new
 game*, pass on the four-letter code, fill the empty seats with AI and start. On a

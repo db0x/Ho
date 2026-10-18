@@ -5,7 +5,7 @@ import {
   SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
-  COMBAT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS,
+  COMBAT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
   holeZone, route, advance, travelDistance, supplyDistance
 } from '../shared/rules.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng } from './galaxy.js';
@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS = {
   expanding: true,     // Karte wächst mit der Erkundung
   mode: 'classic',     // 'classic' = flach, 'space' = räumlich (Linse)
   shape: 'scatter',    // 'scatter' = Streufeld, 'spiral' = Spirale um ein schwarzes Loch
-  maxTurns: 300,
+  maxTurns: 300,       // 0 = unbegrenzt
   seed: null
 };
 
@@ -80,7 +80,19 @@ function botName(game) {
     : 'KI ' + (game.players.length + 1);
 }
 
-export function addPlayer(game, { name, isBot = false, connId = null }) {
+/**
+ * Persönlichkeit für ein neues KI-Reich: eine, die in der Partie noch am
+ * seltensten vorkommt - so bekommt jede Runde eine bunte Mischung.
+ */
+function botPersona(game) {
+  const zahl = Object.fromEntries(AI_PERSONAS.map(k => [k, 0]));
+  for (const p of game.players) if (p.isBot && p.persona in zahl) zahl[p.persona]++;
+  const wenigste = Math.min(...Object.values(zahl));
+  const frei = AI_PERSONAS.filter(k => zahl[k] === wenigste);
+  return frei[Math.floor(Math.random() * frei.length)];
+}
+
+export function addPlayer(game, { name, isBot = false, connId = null, persona = null }) {
   if (game.players.length >= 16) return null;
   const slot = game.players.length;
   const p = {
@@ -90,6 +102,7 @@ export function addPlayer(game, { name, isBot = false, connId = null }) {
     color: PLAYER_COLORS[slot],
     emblem: PLAYER_EMBLEMS[slot],
     isBot,
+    persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
     connId,
     connected: !isBot,
     alive: true,
@@ -656,7 +669,7 @@ export function resolveTurn(game) {
     game.state = 'over';
     game.winner = alive[0].id;
     pushLog(game, [{ type: 'victory', key: 'log.victory', params: { player: alive[0].name } }]);
-  } else if (game.turn > game.settings.maxTurns) {
+  } else if (game.settings.maxTurns && game.turn > game.settings.maxTurns) {
     game.state = 'over';
     const best = alive.sort((a, b) => b.stats.pop - a.stats.pop)[0];
     game.winner = best ? best.id : null;
@@ -982,7 +995,7 @@ export function buildView(game, player) {
       refit: player.orders.refit
     },
     players: game.players.map(p => ({
-      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot,
+      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
       stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     })),
@@ -1038,7 +1051,7 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     players: game.players.map(p => ({
-      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot,
+      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
       tech: { ...p.tech },
       money: Math.round(p.money), metal: Math.round(p.metal), income: Math.round(p.income || 0),
@@ -1079,7 +1092,7 @@ export function lobbyView(game) {
     settings: game.settings,
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem,
-      isBot: p.isBot, connected: p.connected
+      isBot: p.isBot, persona: p.persona, connected: p.connected
     }))
   };
 }

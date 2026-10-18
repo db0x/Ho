@@ -38,7 +38,15 @@ Vor der Lobby steht eine Anmeldung – siehe *[Zugang](#zugang)*. Zum Entwickeln
 nimmt `HO_AUTH=off npm start` sie weg.
 
 KI-Reiche treten unter eigenem Namen an – von *Admiral Wobblebeard* bis
-*Czarina Candyfloss*.
+*Czarina Candyfloss* – und jedes mit eigenem Charakter: Der **Eroberer** sucht
+sich einen Rivalen und rollt ihn Welt für Welt auf, der **Siedler** breitet sich
+aus und schlägt nur zurück, der **Technokrat** kommt spät mit besserer Technik,
+der **Pirat** schickt schnelle Rudel gegen schwache Kolonien, das **Bollwerk**
+mauert sich mit Satelliten ein, bis es ausbricht, und der **Aasgeier** holt
+sich, was die anderen übrig lassen. Sie merken sich, wer sie angegriffen hat,
+verbünden sich stillschweigend gegen einen davonziehenden Spitzenreiter und
+werden ungeduldig, je länger die Partie dauert – das Spätspiel erstarrt so
+nicht zu zwölf Festungen.
 
 Für eine schnelle Partie: *Sofort gegen 5 KI spielen*. Für eine Runde mit Freunden
 *Neue Partie eröffnen*, den vierstelligen Code weitergeben, freie Plätze mit KI

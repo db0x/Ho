@@ -358,7 +358,8 @@ function sanitizeSettings(s) {
   if (Number.isFinite(s.startMoney)) out.startMoney = Math.min(20000, Math.max(200, Math.round(s.startMoney)));
   if (Number.isFinite(s.startMetal)) out.startMetal = Math.min(5000, Math.max(50, Math.round(s.startMetal)));
   if (Number.isFinite(s.turnTimer)) out.turnTimer = Math.min(600, Math.max(0, Math.round(s.turnTimer)));
-  if (Number.isFinite(s.maxTurns)) out.maxTurns = Math.min(999, Math.max(20, Math.round(s.maxTurns)));
+  // 0 = unbegrenzt: dann endet die Partie erst, wenn nur ein Reich übrig ist.
+  if (Number.isFinite(s.maxTurns)) out.maxTurns = s.maxTurns === 0 ? 0 : Math.min(999, Math.max(20, Math.round(s.maxTurns)));
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
