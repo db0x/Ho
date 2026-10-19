@@ -463,6 +463,18 @@ location / {
 }
 ```
 
+Unter einem Unterpfad wie `/ho/` geht es genauso. Wichtig ist der Schrägstrich
+am Ende von `proxy_pass`: erst er schneidet `/ho` ab, bevor die Anfrage beim
+Server ankommt.
+
+```nginx
+location = /ho { return 301 /ho/; }
+location /ho/ {
+    proxy_pass http://127.0.0.1:8080/;
+    # … dieselben proxy_set_header-Zeilen wie oben
+}
+```
+
 Und der Port gehört dann nur an den Proxy, nicht ans offene Netz:
 
 ```

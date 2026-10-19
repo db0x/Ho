@@ -31,7 +31,7 @@ function sprachwahl() {
 }
 
 async function api(route, method, daten) {
-  const r = await fetch(`/api/auth/${route}`, {
+  const r = await fetch(`api/auth/${route}`, {
     method,
     headers: daten ? { 'content-type': 'application/json' } : undefined,
     body: daten ? JSON.stringify(daten) : undefined,
@@ -49,7 +49,9 @@ function fehler(key, params) {
 /** Nur Ziele auf diesem Server - sonst wird die Anmeldung zum Sprungbrett. */
 function ziel() {
   const next = new URLSearchParams(location.search).get('next') || '/';
-  return /^\/($|[^/])/.test(next) ? next : '/';
+  // Der Server nennt Pfade ab seiner Wurzel; relativ gemacht bleibt man unter
+  // einem Unterpfad (/ho/), wenn ein Proxy davor sitzt.
+  return /^\/($|[^/])/.test(next) ? `.${next}` : './';
 }
 
 function zeige(welche) {

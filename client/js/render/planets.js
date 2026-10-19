@@ -1,6 +1,6 @@
 // Planetendarstellung im Stil des Klassikers: glaenzende, satt gefaerbte
 // Kugeln - Farbe = Temperatur, Größe = Schwerkraft.
-import { tempColor, rgb, habitability, IDEAL } from '/shared/rules.js';
+import { tempColor, rgb, habitability, IDEAL } from '../../shared/rules.js';
 import { t, n as n1 } from '../i18n.js';
 import { drawHexShield, SHIELD_MIN } from './fx.js';
 

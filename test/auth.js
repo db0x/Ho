@@ -133,14 +133,14 @@ function wsVersuch() {
 // --- Ohne Sitzung kommt nichts heraus
 {
   const wurzel = await hole('/', { headers: seite });
-  check(wurzel.status === 302 && wurzel.ort === '/login.html',
+  check(wurzel.status === 302 && wurzel.ort === 'login.html',
     `/ führt nicht zur Anmeldung (${wurzel.status} ${wurzel.ort})`);
   const client = await hole('/js/main.js');
   check(client.status === 401, `Der Spielclient kommt ohne Sitzung heraus (${client.status})`);
   const regeln = await hole('/shared/rules.js');
   check(regeln.status === 401, `Die Regeln kommen ohne Sitzung heraus (${regeln.status})`);
   const tief = await hole('/js/ui/hud.js', { headers: seite });
-  check(tief.status === 302 && tief.ort === '/login.html?next=%2Fjs%2Fui%2Fhud.js',
+  check(tief.status === 302 && tief.ort === '../../login.html?next=%2Fjs%2Fui%2Fhud.js',
     `Tiefer Verweis merkt sich das Ziel nicht (${tief.ort})`);
 
   const anmeldeseite = await hole('/login.html', { headers: seite });
@@ -193,7 +193,7 @@ function wsVersuch() {
 // --- Solange das erste Passwort gilt, geht es nicht weiter als bis zum Wechsel
 {
   const wurzel = await hole('/', { headers: seite });
-  check(wurzel.status === 302 && wurzel.ort === '/login.html',
+  check(wurzel.status === 302 && wurzel.ort === 'login.html',
     `Vor dem Passwortwechsel kommt der Client heraus (${wurzel.status})`);
   check(await wsVersuch() !== 'hello', 'Vor dem Passwortwechsel kommt eine WebSocket zustande');
   const me = await hole('/api/auth/me');
@@ -229,7 +229,7 @@ const NEU = 'meinEigenes-2026';
   check(wurzel.status === 200, `Der Client kommt nicht heraus (${wurzel.status})`);
   check(await wsVersuch() === 'hello', 'Mit Sitzung kommt keine WebSocket zustande');
   const anmeldeseite = await hole('/login.html', { headers: seite });
-  check(anmeldeseite.status === 302 && anmeldeseite.ort === '/',
+  check(anmeldeseite.status === 302 && anmeldeseite.ort === './',
     'Angemeldet landet man wieder auf der Anmeldeseite');
   console.log('Mit gewechseltem Passwort: Client und WebSocket stehen offen.');
 }

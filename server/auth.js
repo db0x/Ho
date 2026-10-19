@@ -336,7 +336,7 @@ export function gate(req, res, pfad) {
     // Angemeldet und nichts mehr zu tun? Dann gehoert man ins Spiel, nicht auf
     // die Anmeldeseite.
     if (pfad === '/login.html' && s && !s.mustChange) {
-      res.writeHead(302, { location: '/', 'cache-control': 'no-store' }).end();
+      res.writeHead(302, { location: './', 'cache-control': 'no-store' }).end();
       return false;
     }
     return true;
@@ -348,8 +348,11 @@ export function gate(req, res, pfad) {
     json(res, 401, { error: s ? 'auth.err.mustChange' : 'auth.err.noSession' });
     return false;
   }
-  const ziel = pfad === '/' || pfad === '/index.html' ? '/login.html'
-    : `/login.html?next=${encodeURIComponent(pfad)}`;
+  // Relative Verweise: hinter einem Proxy unter /ho/ zeigt '/login.html' sonst
+  // aus dem Spiel heraus. Fuer tiefere Pfade wieder zur Wurzel hinauf.
+  const hoch = '../'.repeat(Math.max(0, pfad.split('/').length - 2)) || './';
+  const ziel = pfad === '/' || pfad === '/index.html' ? 'login.html'
+    : `${hoch}login.html?next=${encodeURIComponent(pfad)}`;
   res.writeHead(302, { location: ziel, 'cache-control': 'no-store' }).end();
   return false;
 }
