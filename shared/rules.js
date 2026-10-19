@@ -240,6 +240,13 @@ export function terraformFullCost(planet, radicalLevel) {
 export const COMBAT_ROUNDS = 12;
 
 /**
+ * Abfangen: wer aus einem Orbit abfliegt, in dem ein bewaffneter Gegner steht,
+ * kaempft so viele Runden mit, bevor er fort ist. Drei reichen, damit ein
+ * einzelner Jaeger einen Spaeher sicher erwischt.
+ */
+export const INTERCEPT_ROUNDS = 3;
+
+/**
  * Planetare Abwehrbatterien. Jede bewohnte Welt verteidigt sich selbst -
  * große Bevölkerungen sind harte Brocken. Die Batterie wird nie dauerhaft
  * zerstört, sie steht jede Runde neu bereit.

@@ -1,6 +1,6 @@
 {
   "name": "ho-web",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Ho!! - ein Weltraum-Strategiespiel im Geist von Spaceward Ho! (Web, bis zu 16 Spieler)",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node test/i18n.js && node test/smoke.js && node test/blackhole.js && node test/multiplayer.js && node test/auth.js",
+    "test": "node test/i18n.js && node test/smoke.js && node test/blackhole.js && node test/intercept.js && node test/multiplayer.js && node test/auth.js",
     "test:engine": "node test/smoke.js",
     "test:hole": "node test/blackhole.js",
     "test:i18n": "node test/i18n.js",

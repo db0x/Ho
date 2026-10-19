@@ -117,3 +117,159 @@ export function drawBlackHole(ctx, x, y, R, phase = 0) {
   }
   ctx.restore();
 }
+
+// ------------------------------------------------------------ Satellitenschild
+
+/** Ab so vielen Satelliten zeigt eine Welt statt einzelner Satelliten den Schild. */
+export const SHIELD_MIN = 5;
+
+const shieldCache = new Map();
+// Licht von oben links vorn - dieselbe Seite, von der die Welten beleuchtet sind.
+const LICHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v); return v.map(c => c / l); })();
+
+/**
+ * Der Schild als Bild: eine Kugel aus Hexagonen. Das Wabennetz liegt auf der
+ * Kugeloberflaeche und wird senkrecht aufs Bild projiziert - zur Mitte hin
+ * sieht man die Waben von vorn, zum Rand hin schraeg und gestaucht. Licht
+ * kommt von oben links: dort leuchten die Waben hell und es sitzt ein
+ * Glanzlicht, die abgewandte Seite bleibt matt, und am Rand, wo man schraeg
+ * durch die Huelle schaut, wird sie dicht und hell.
+ */
+function shieldSprite(R) {
+  const rr = R < 40 ? Math.max(6, Math.round(R)) : Math.round(R / 4) * 4;
+  let sp = shieldCache.get(rr);
+  if (sp) return sp;
+  const pad = Math.ceil(rr * 0.14) + 4;
+  const size = (rr + pad) * 2;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const g = cv.getContext('2d');
+  const c = size / 2;
+
+  // Wabengroesse als Winkel auf der Kugel; in der Bildmitte mindestens ein
+  // paar Bildpunkte, sonst verschwimmt das Netz auf kleinen Karten.
+  // Gross im Bild (Schlachtfenster) feiner, sonst wirken die Waben grob.
+  const h = Math.max(rr > 120 ? 0.085 : 0.12, 4.2 / rr);
+  const dx = Math.sqrt(3) * h, dy = 1.5 * h;
+  const RAND = Math.PI / 2 - h * 0.35;
+  // Punkt auf der Kugel (Abstand vom Bildmittelpunkt als Winkel) -> Bild
+  const proj = (u, v) => {
+    const th = Math.min(Math.hypot(u, v), Math.PI / 2);
+    const k = th < 1e-6 ? 1 : Math.sin(th) / Math.hypot(u, v);
+    return [c + u * k * rr, c + v * k * rr];
+  };
+  g.lineJoin = 'round';
+  const n = Math.ceil(RAND / dy) + 1;
+  for (let row = -n; row <= n; row++) {
+    const off = (row & 1) ? dx / 2 : 0;
+    for (let col = -Math.ceil(RAND / dx) - 1; col <= Math.ceil(RAND / dx) + 1; col++) {
+      const u = col * dx + off, v = row * dy;
+      const th = Math.hypot(u, v);
+      if (th > RAND) continue;
+      // Flaechennormale der Wabe und wie sie zum Licht und zum Auge steht
+      const st = th < 1e-6 ? 0 : Math.sin(th) / th;
+      const nx = u * st, ny = v * st, nz = Math.cos(th);
+      const licht = nx * LICHT[0] + ny * LICHT[1] + nz * LICHT[2];
+      const hell = Math.max(0, licht);
+      const rand = Math.pow(1 - nz, 1.6);                  // Fresnel: schraeg = dicht
+      const a = Math.min(0.95, (0.24 + 0.55 * rand + 0.55 * hell * hell) * (licht < 0 ? 0.6 : 1));
+      const weiss = Math.pow(hell, 6);                       // im Glanz fast weiss
+      const col3 = [Math.round(70 + 160 * weiss), Math.round(240 + 15 * weiss), Math.round(120 + 115 * weiss)];
+      g.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const w = Math.PI / 6 + k * Math.PI / 3;
+        const [px, py] = proj(u + Math.cos(w) * h * 0.86, v + Math.sin(w) * h * 0.86);
+        k ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.closePath();
+      g.fillStyle = `rgba(${col3},${(a * 0.22 + hell * 0.06).toFixed(3)})`;
+      g.fill();
+      // Linien werden zum Rand hin schmaler wie die Waben selbst
+      g.lineWidth = Math.max(0.7, h * rr * 0.1 * (0.45 + 0.55 * nz));
+      g.strokeStyle = `rgba(${col3},${a.toFixed(3)})`;
+      g.stroke();
+    }
+  }
+
+  // Huelle: matter gruener Hauch, zum Licht hin heller
+  const lx = c + LICHT[0] * rr * 0.5, ly = c + LICHT[1] * rr * 0.5;
+  const huelle = g.createRadialGradient(lx, ly, rr * 0.1, c, c, rr);
+  huelle.addColorStop(0, 'rgba(120,255,170,0.10)');
+  huelle.addColorStop(0.7, 'rgba(60,200,110,0.04)');
+  huelle.addColorStop(1, 'rgba(60,200,110,0.10)');
+  g.fillStyle = huelle;
+  g.beginPath(); g.arc(c, c, rr, 0, TAU); g.fill();
+
+  // Glanzlicht oben links - weich, leicht in die Laenge gezogen
+  g.save();
+  g.translate(c + LICHT[0] * rr * 0.52, c + LICHT[1] * rr * 0.52);
+  g.rotate(Math.atan2(LICHT[1], LICHT[0]) + Math.PI / 2);
+  g.scale(1, 0.62);
+  const glanz = g.createRadialGradient(0, 0, 0, 0, 0, rr * 0.42);
+  glanz.addColorStop(0, 'rgba(240,255,245,0.6)');
+  glanz.addColorStop(0.35, 'rgba(170,255,200,0.24)');
+  glanz.addColorStop(1, 'rgba(120,255,170,0)');
+  g.fillStyle = glanz;
+  g.beginPath(); g.arc(0, 0, rr * 0.42, 0, TAU); g.fill();
+  g.restore();
+
+  // Leuchtender Saum, auf der Lichtseite kraeftiger
+  const saum = g.createRadialGradient(c, c, rr * 0.88, c, c, rr + pad * 0.85);
+  saum.addColorStop(0, 'rgba(90,255,140,0)');
+  saum.addColorStop(0.5, 'rgba(120,255,170,0.36)');
+  saum.addColorStop(1, 'rgba(90,255,140,0)');
+  g.fillStyle = saum;
+  g.beginPath(); g.arc(c, c, rr + pad * 0.85, 0, TAU); g.fill();
+  const bogen = g.createLinearGradient(c + LICHT[0] * rr, c + LICHT[1] * rr, c - LICHT[0] * rr, c - LICHT[1] * rr);
+  bogen.addColorStop(0, 'rgba(220,255,230,0.75)');
+  bogen.addColorStop(0.45, 'rgba(140,255,180,0.12)');
+  bogen.addColorStop(1, 'rgba(140,255,180,0.28)');
+  g.strokeStyle = bogen;
+  g.lineWidth = Math.max(1, rr * 0.03);
+  g.beginPath(); g.arc(c, c, rr - g.lineWidth / 2, 0, TAU); g.stroke();
+
+  sp = { canvas: cv, half: size / 2, rr };
+  if (shieldCache.size > 60) shieldCache.clear();
+  shieldCache.set(rr, sp);
+  return sp;
+}
+
+/**
+ * Schild um eine Welt. strength 0..1 macht ihn blasser - in der Schlacht
+ * folgt er den Satelliten, die ihn tragen; bei 0 ist er weg.
+ */
+export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1) {
+  if (strength <= 0.01 || R < 4) return;
+  const sp = shieldSprite(R);
+  const s = R / sp.rr;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // Ein schwacher Schild flackert, ein voller atmet nur leicht
+  const flimmer = strength < 0.35 ? 0.6 + 0.4 * Math.sin(phase * 31) * Math.sin(phase * 13) : 1;
+  ctx.globalAlpha *= strength * flimmer * (0.88 + 0.12 * Math.sin(phase * 1.7));
+  ctx.drawImage(sp.canvas, x - sp.half * s, y - sp.half * s, sp.canvas.width * s, sp.canvas.height * s);
+  // Energie, die langsam ueber die Huelle wandert: ein schmaler Lichtbogen
+  // auf der Schattenseite, damit die Kugel nicht starr wirkt.
+  const a = Math.atan2(-LICHT[1], -LICHT[0]) + Math.sin(phase * 0.5) * 0.9;
+  ctx.strokeStyle = 'rgba(150,255,190,0.22)';
+  ctx.lineWidth = Math.max(1, R * 0.025);
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, R * 0.96, a - 0.35, a + 0.35); ctx.stroke();
+  ctx.restore();
+}
+
+/** Treffer auf dem Schild: gruenes Aufleuchten am Einschlagpunkt, k = 0..1. */
+export function drawShieldHit(ctx, x, y, size, k) {
+  if (k < 0 || k > 1) return;
+  const a = 1 - k;
+  const r = size * (0.6 + 0.6 * k);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(220,255,230,${(a * 0.9).toFixed(3)})`);
+  g.addColorStop(0.35, `rgba(110,255,160,${(a * 0.55).toFixed(3)})`);
+  g.addColorStop(1, 'rgba(60,220,110,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.restore();
+}

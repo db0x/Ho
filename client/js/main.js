@@ -3,6 +3,7 @@ import { Net } from './net.js';
 import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
+import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
@@ -105,6 +106,15 @@ let lastTurn = 0;
 const app = {
   selection: null,
   spectator: false,
+  // Schlachtmitschriften je "Runde:Welt". Der Server schickt sie nur fuer die
+  // juengste Runde mit, also werden sie hier gesammelt.
+  battles: new Map(),
+  openBattle(key) {
+    const b = app.battles.get(key);
+    const v = map?.view;
+    if (!b || !v) return;
+    openBattle({ battle: b.battle, planet: v.planets[b.planetId], players: v.players, you: v.you });
+  },
   send: (m) => net.send(m),
   setSelection(sel) {
     app.selection = sel;
@@ -206,6 +216,7 @@ net.on('view', (m) => {
   }
 
   const newTurn = view.turn > lastTurn;
+  const neueSchlachten = merkeSchlachten(view);
   hud.update(view);
   if (newTurn && lastTurn > 0) {
     if (!view.spectator) showTurnBanner(view);
@@ -216,17 +227,38 @@ net.on('view', (m) => {
       ? ['eliminated', 'victory']
       : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy'];
     for (const l of view.log.filter(l => l.turn === view.turn - 1)) {
-      for (const e of l.entries) if (loud.includes(e.type)) hud.toast(e.text);
+      for (const e of l.entries) {
+        if (!loud.includes(e.type)) continue;
+        const key = `${l.turn}:${e.planetId}`;
+        hud.toast(hud.logText(e), null, app.battles.has(key) && e.battle ? () => app.openBattle(key) : null);
+      }
     }
+    if (neueSchlachten.length) map.playBattles?.(neueSchlachten, view.you);
   }
   lastTurn = view.turn;
 
   if (view.state === 'over') showEnd(view);
 });
 
+/** Mitschriften aus der Sicht uebernehmen; zurueck kommen die neuen. */
+function merkeSchlachten(view) {
+  const neu = [];
+  for (const l of view.log) {
+    for (const e of l.entries) {
+      if (!e.battle || e.planetId == null) continue;
+      const key = `${l.turn}:${e.planetId}`;
+      if (!app.battles.has(key)) neu.push({ planetId: e.planetId, battle: e.battle });
+      app.battles.set(key, { planetId: e.planetId, battle: e.battle });
+    }
+  }
+  while (app.battles.size > 40) app.battles.delete(app.battles.keys().next().value);
+  return neu;
+}
+
 net.on('chat', (m) => {
-  hud?.chat(m.from, m.text);
-  if (m.from === 'System') hud?.toast(m.text);
+  const text = meldung({ key: m.key, params: m.params, msg: m.text });
+  hud?.chat(m.from, text);
+  if (m.from === 'System') hud?.toast(text);
   sfx.play('chat');
 });
 

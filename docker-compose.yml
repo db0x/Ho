@@ -9,9 +9,11 @@ services:
     # herankommt und niemand den Port am Zugang vorbei aufmacht.
     ports:
       - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
-    # Die Konten ueberleben jedes neue Abbild.
+    # Die Konten ueberleben jedes neue Abbild und liegen in ./data neben
+    # dieser Datei - Backup = Verzeichnis kopieren. ./data vorher selbst
+    # anlegen, sonst legt Docker es als root an und node darf nicht schreiben.
     volumes:
-      - ho-data:/data
+      - ./data:/data
     # Anmeldung vor der Lobby. Gehostet bleibt sie an (Standard), lokal
     # schaltet HO_AUTH=off sie ab - am bequemsten als Zeile in einer .env
     # neben dieser Datei. Fehlt die Angabe, gilt "an": vergessen heisst sicher.
@@ -32,7 +34,3 @@ services:
     image: ho:latest
     profiles: ["test"]
     command: ["npm", "test"]
-
-# Nur Name und scrypt-Hash je Konto - mehr steht hier nicht.
-volumes:
-  ho-data:

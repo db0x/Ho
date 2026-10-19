@@ -258,6 +258,14 @@ const RECIPES = {
       s.tone(b, at, { type: 'square', from: 300 - i * 60, to: 70, dur: 0.22, gain: 0.06, filter: 1200 });
     }
   } },
+  // Schlachtfenster: ein einzelner Schuss und ein vergehendes Schiff
+  laser: { max: 7, gap: 0.035, vary: 0.25, build: (s, b, t) => {
+    s.tone(b, t, { type: 'sawtooth', from: 1900, to: 520, dur: 0.07, gain: 0.035, filter: 3000 });
+  } },
+  boom: { max: 3, gap: 0.09, vary: 0.2, build: (s, b, t) => {
+    s.noise(b, t, { dur: 0.55, type: 'lowpass', from: 1500, to: 120, q: 0.8, gain: 0.16 });
+    s.tone(b, t, { type: 'sine', from: 140, to: 38, dur: 0.5, gain: 0.14 });
+  } },
   invade: { max: 2, gap: 0.2, build: (s, b, t) => {
     s.tone(b, t, { type: 'square', from: 110, to: 42, dur: 0.75, gain: 0.2, filter: 700 });
     s.noise(b, t, { dur: 0.8, type: 'lowpass', from: 900, to: 90, gain: 0.17, attack: 0.02 });

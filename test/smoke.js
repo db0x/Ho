@@ -13,6 +13,7 @@ if (r.error) throw new Error(r.error);
 console.log(`Galaxie: ${game.galaxy.planets.length} Welten, ${game.galaxy.width}x${game.galaxy.height} Lj`);
 
 let combats = 0, colonies = 0, invasions = 0;
+let replays = 0, replayBytes = 0, biggest = 0;
 const TURNS = 120;
 const t0 = Date.now();
 
@@ -21,6 +22,7 @@ for (let t = 0; t < TURNS && game.state === 'running'; t++) {
   const entries = resolveTurn(game);
   for (const e of entries) {
     if (e.type === 'combat') combats++;
+    if (e.battle) checkReplay(e);
     if (e.type === 'colonize') colonies++;
     if (e.type === 'invade') invasions++;
   }
@@ -50,6 +52,35 @@ for (let t = 0; t < TURNS && game.state === 'running'; t++) {
   }
 }
 
+/**
+ * Die Mitschrift muss das Ergebnis tragen, das der Server ausgerechnet hat:
+ * nachgespielt bleiben je Seite genau so viele Schiffe uebrig, wie die
+ * Bilanz nennt - sonst zeigt die Wiederholung eine andere Schlacht.
+ */
+function checkReplay(e) {
+  const { sides, units, rounds, scuttled } = e.battle;
+  const hp = units.map(u => u[2]);
+  for (const shots of rounds) {
+    for (const [from, to, dmg] of shots) {
+      assert(units[from] && units[to], 'Mitschrift: unbekannte Einheit');
+      assert(units[from][0] !== units[to][0], 'Mitschrift: Beschuss der eigenen Seite');
+      assert(hp[from] > 0, 'Mitschrift: Toter schiesst');
+      assert(dmg > 0, 'Mitschrift: Schuss ohne Schaden');
+    }
+    for (const [, to, dmg] of shots) hp[to] = Math.round((hp[to] - dmg) * 10) / 10;
+  }
+  const weg = new Set(scuttled);
+  sides.forEach((owner, k) => {
+    const left = units.filter((u, i) => u[0] === k && u[1] !== 'battery' && hp[i] > 0 && !weg.has(i)).length;
+    const name = (game.players.find(p => p.id === owner) || {}).name;
+    const bilanz = e.params.sides.find(x => x.name === name);
+    assert(bilanz && bilanz.left === left,
+      `Mitschrift bei ${e.params.planet}: ${name} behaelt ${left}, Bilanz sagt ${bilanz?.left}`);
+  });
+  const n = JSON.stringify(e.battle).length;
+  replays++; replayBytes += n; biggest = Math.max(biggest, n);
+}
+
 const ms = Date.now() - t0;
 console.log(`\n${game.turn - 1} Runden in ${ms} ms (${(ms / (game.turn - 1)).toFixed(1)} ms/Runde)`);
 console.log(`Raumschlachten: ${combats}, Kolonisierungen: ${colonies}, Eroberungen: ${invasions}`);
@@ -69,6 +100,13 @@ for (const f of v.fleets.filter(f => !f.mine)) {
 }
 assert(colonies > 5, 'KI kolonisiert nicht');
 assert(combats > 0, 'Es gab keinen einzigen Kampf');
+assert(replays > 0, 'Keine Schlacht mit Mitschrift');
+console.log(`Mitschriften: ${replays}, im Schnitt ${(replayBytes / replays / 1024).toFixed(1)} kB, ` +
+  `größte ${(biggest / 1024).toFixed(1)} kB`);
+// Nur die juengste Runde reist mit Mitschrift - aeltere sind abgeworfen.
+for (const l of game.log) {
+  if (l.turn < game.turn) assert(l.entries.every(e => !e.battle), `Mitschrift aus Runde ${l.turn} nicht abgeworfen`);
+}
 
 // Jedes KI-Reich hat eine Persönlichkeit, und sechs Bots sind sechs verschiedene.
 {
