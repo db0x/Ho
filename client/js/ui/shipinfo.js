@@ -1,7 +1,7 @@
 // Steckbrief eines Schiffstyps: großes, bewegtes Bild und die Werte, mit denen
 // das Schiff gebaut würde. Ein Fenster für alle Typen - oben lässt sich
 // zwischen ihnen wechseln.
-import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL } from '/shared/rules.js';
+import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL } from '../../shared/rules.js';
 import { shipIcon } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';

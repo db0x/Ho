@@ -4,7 +4,7 @@ import {
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
   TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, holeZone, travelDistance, supplyDistance, batteryStats
-} from '/shared/rules.js';
+} from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';

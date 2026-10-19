@@ -1,5 +1,5 @@
 // Kleine Zeichenhilfen, die sich flache und räumliche Karte teilen.
-import { rgb } from '/shared/rules.js';
+import { rgb } from '../../shared/rules.js';
 
 export function hexRgb(h) {
   const n = parseInt(h.slice(1), 16);

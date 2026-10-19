@@ -9,8 +9,10 @@ export class Net {
   }
 
   connect() {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${proto}://${location.host}`);
+    // Relativ zur Seite, damit es auch unter einem Unterpfad (/ho/) laeuft.
+    const url = new URL('.', location.href);
+    url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.ws = new WebSocket(url);
     this.ws.onopen = () => {
       this.emit('open');
       if (this.session?.code && this.session?.token) {

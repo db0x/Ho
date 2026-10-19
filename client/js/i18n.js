@@ -3,7 +3,7 @@
 // erkennen, Markup mit data-i18n füllen, Wechsel merken.
 import {
   registerLocale, setLocale, getLocale, availableLocales, hasLocale, t, tIn, n, localeTag
-} from '/shared/i18n.js';
+} from '../shared/i18n.js';
 
 // Die Kataloge liegen als JSON unter /i18n/<code>.json: Schlüssel sind nach
 // Bereichen benannt (menu., lobby., log. ...), {werte} werden eingesetzt,
@@ -11,7 +11,7 @@ import {
 // allem anderen - wer dieses Modul importiert, wartet, bis beide da sind.
 const SPRACHEN = ['de', 'en'];
 const kataloge = await Promise.all(SPRACHEN.map(code =>
-  fetch(`/i18n/${code}.json`).then(r => {
+  fetch(`i18n/${code}.json`).then(r => {
     if (!r.ok) throw new Error(`Katalog ${code}: HTTP ${r.status}`);
     return r.json();
   })));

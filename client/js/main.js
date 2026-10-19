@@ -65,7 +65,7 @@ async function konto() {
   if (!zeile) return;
   let wer = null;
   try {
-    const r = await fetch('/api/auth/me', { cache: 'no-store' });
+    const r = await fetch('api/auth/me', { cache: 'no-store' });
     if (!r.ok) return;
     const me = await r.json();
     wer = me.display || me.user;
@@ -86,8 +86,8 @@ async function konto() {
   document.querySelector('#link-logout').onclick = async (e) => {
     e.preventDefault();
     net.forget();
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* egal */ }
-    location.replace('/login.html');
+    try { await fetch('api/auth/logout', { method: 'POST' }); } catch { /* egal */ }
+    location.replace('login.html');
   };
 }
 

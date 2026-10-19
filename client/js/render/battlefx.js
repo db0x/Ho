@@ -5,7 +5,7 @@
 // Aufblitzen auf der Karte und das Schlachtfenster mit der Wiederholung.
 import { drawShip } from './ships.js';
 import { hexRgb, drawHexShield, drawShieldHit, SHIELD_MIN } from './fx.js';
-import { INTERCEPT_ROUNDS } from '/shared/rules.js';
+import { INTERCEPT_ROUNDS } from '../../shared/rules.js';
 
 const TAU = Math.PI * 2;
 

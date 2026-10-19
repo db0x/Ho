@@ -9,7 +9,7 @@
 //   - Größe und Helligkeit nach Entfernung.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, holeZone, route, reachOutline } from '/shared/rules.js';
+import { dist, holeZone, route, reachOutline } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,

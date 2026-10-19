@@ -1,7 +1,7 @@
 // Sternkarte: Kamera, Hintergrund, Planeten, Flotten, Kurslinien.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '/shared/rules.js';
+import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN } from './fx.js';
 import { BattleFx } from './battlefx.js';

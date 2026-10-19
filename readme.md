@@ -455,6 +455,17 @@ location / {
 }
 ```
 
+A sub-path such as `/ho/` works the same way. The trailing slash on
+`proxy_pass` matters: it strips `/ho` before the request reaches the server.
+
+```nginx
+location = /ho { return 301 /ho/; }
+location /ho/ {
+    proxy_pass http://127.0.0.1:8080/;
+    # … same proxy_set_header lines as above
+}
+```
+
 And the port then belongs to the proxy only, not to the open net:
 
 ```
