@@ -1,6 +1,6 @@
 // Spielt eine komplette Partie mit 16 KI-Reichen durch und prüft die Invarianten.
 import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders, canReach } from '../server/game.js';
-import { habitability, refitTotal, refitCost } from '../shared/rules.js';
+import { habitability, refitTotal, refitCost, dist } from '../shared/rules.js';
 import { runBot } from '../server/bot.js';
 
 const game = createGame('Test');
@@ -37,6 +37,17 @@ for (let t = 0; t < TURNS && game.state === 'running'; t++) {
     assert(pl.pop >= 0 && pl.pop < 200, 'Bevölkerung außerhalb der Grenzen: ' + pl.pop);
     assert(pl.metalReserve >= 0, 'Negativer Erzvorrat');
     if (pl.owner) assert(game.players.some(p => p.id === pl.owner), 'Planet hat Phantombesitzer');
+  }
+  // Was die Scanner um die eigenen Welten erfassen, ist auf dem Stand dieser
+  // Runde - nicht auf dem vom ersten Entdecken.
+  for (const p of game.players.filter(q => q.alive)) {
+    const mine = game.galaxy.planets.filter(q => q.owner === p.id);
+    for (const pl of game.galaxy.planets) {
+      if (pl.owner === p.id || !mine.some(q => dist(q, pl) < 230)) continue;
+      const k = p.knowledge[pl.id];
+      assert(k && k.owner === pl.owner,
+        `${p.name} sieht ${pl.name} im Scanner veraltet: Besitzer ${k?.owner} statt ${pl.owner} (Stand Runde ${k?.turn})`);
+    }
   }
   for (const f of game.fleets) {
     assert(f.ships.length > 0, 'Leere Flotte übrig');

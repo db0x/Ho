@@ -653,9 +653,10 @@ export function resolveTurn(game) {
     p.income = Math.round(p.income);
   }
 
-  // 8) Sichtbarkeit, Ausdehnung, Statistik, Ausscheiden
-  updateVisibility(game);
+  // 8) Ausdehnung, Sichtbarkeit, Statistik, Ausscheiden - erst wachsen, dann
+  // schauen: neue Welten im Scannerbereich sind sonst eine Runde lang blind.
   maybeExpand(game, entries);
+  updateVisibility(game);
   for (const p of game.players) {
     const planets = game.galaxy.planets.filter(q => q.owner === p.id);
     p.stats.planets = planets.length;
@@ -926,9 +927,12 @@ export function updateVisibility(game) {
         p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn);
       }
     }
-    // Scanner: eigene Welten und Flotten sehen die Nachbarschaft grob
+    // Scanner: eigene Welten und Flotten sehen die Nachbarschaft grob - und
+    // zwar jede Runde neu. Nur beim ersten Entdecken aufzunehmen hiesse: eine
+    // Welt, die frei war, bliebe frei auf der Karte, auch wenn nebenan laengst
+    // jemand gesiedelt hat.
     for (const planet of game.galaxy.planets) {
-      if (p.explored.has(planet.id)) continue;
+      if (planet.owner === p.id || myFleets.some(f => f.at === planet.id)) continue;
       const seen = mine.some(q => dist(q, planet) < 230)
         || myFleets.some(f => dist(f, planet) < 185);
       if (seen) {
