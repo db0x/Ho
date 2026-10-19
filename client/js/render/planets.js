@@ -2,6 +2,7 @@
 // Kugeln - Farbe = Temperatur, Größe = Schwerkraft.
 import { tempColor, rgb, habitability, IDEAL } from '/shared/rules.js';
 import { t, n as n1 } from '../i18n.js';
+import { drawHexShield, SHIELD_MIN } from './fx.js';
 
 const spriteCache = new Map();
 const MAX_CACHE = 1400;
@@ -387,11 +388,19 @@ export function label(ctx, text, x, y, color, zoom, size = 12.5) {
 
 /** Kleines Planetensymbol für die Seitenleiste. */
 export function planetThumb(planet, size = 42) {
+  // In Geraetepixeln zeichnen, sonst verschwimmt das feine Wabennetz.
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const px = Math.round(size * dpr);
   const cv = document.createElement('canvas');
-  cv.width = cv.height = size;
+  cv.width = cv.height = px;
+  cv.style.width = cv.style.height = size + 'px';
   const ctx = cv.getContext('2d');
-  const sp = planetSprite({ ...planet, known: 'live' }, size * 0.34);
-  ctx.drawImage(sp.canvas, size / 2 - sp.cx, size / 2 - sp.cy);
+  // Wie auf der Karte: ab SHIELD_MIN Satelliten liegt der Schild um die Welt.
+  // Die Welt rueckt dann etwas kleiner, damit die Kugel ins Bild passt.
+  const schild = (planet.defenses || 0) >= SHIELD_MIN;
+  const sp = planetSprite({ ...planet, known: 'live' }, px * (schild ? 0.27 : 0.34));
+  ctx.drawImage(sp.canvas, px / 2 - sp.cx, px / 2 - sp.cy);
+  if (schild) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id);
   return cv;
 }
 

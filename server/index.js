@@ -110,10 +110,13 @@ function watchable(game) {
   return !!game && game.players.length > 0 && game.players.every(p => p.isBot);
 }
 
-function chat(game, from, text) {
+// Spieler schreiben Text, das System schickt { key, params } - uebersetzt
+// wird erst beim Empfaenger.
+function chat(game, from, msg) {
+  const body = typeof msg === 'string' ? { text: msg } : msg;
   for (const p of game.players) {
     const c = p.connId && conns.get(p.connId);
-    if (c) send(c.ws, { t: 'chat', from, text });
+    if (c) send(c.ws, { t: 'chat', from, ...body });
   }
 }
 
@@ -146,7 +149,7 @@ wss.on('connection', (ws, req, sitzung) => {
           if (!game.players.length) games.delete(game.id);
           else broadcastLobby(game);
         } else {
-          chat(game, 'System', `${p.name} hat die Verbindung verloren.`);
+          chat(game, 'System', { key: 'chat.lost', params: { player: p.name } });
           broadcastView(game);
           maybeResolve(game);
         }
@@ -219,7 +222,7 @@ function handle(connId, ws, msg) {
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
       if (g.state === 'lobby') broadcastLobby(g);
-      else { send(ws, { t: 'view', view: buildView(g, p) }); chat(g, 'System', `${p.name} ist zurück.`); }
+      else { send(ws, { t: 'view', view: buildView(g, p) }); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
       break;
     }
     case 'setName': {
@@ -296,7 +299,7 @@ function handle(connId, ws, msg) {
         me.connected = false;
         me.connId = null;
         me.token = null;
-        chat(game, 'System', `${me.name} hat die Partie verlassen.`);
+        chat(game, 'System', { key: 'chat.left', params: { player: me.name } });
         broadcastView(game);
         maybeResolve(game);
       }

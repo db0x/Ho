@@ -13,8 +13,9 @@ import { dist, holeZone, route, reachOutline } from '/shared/rules.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
-  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA
+  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN
 } from './fx.js';
+import { BattleFx } from './battlefx.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -48,6 +49,7 @@ export class SpaceView {
     this.onOrder = () => {};
     this.onHoverChange = () => {};
     this.stars = makeStars(4000);
+    this.battleFx = new BattleFx();
     this._bind();
     this.resize();
   }
@@ -67,6 +69,12 @@ export class SpaceView {
 
   poke(ms = 700) { this._activeUntil = performance.now() + ms; }
   get busy() { return performance.now() < this._activeUntil; }
+
+  /** Schlachten der letzten Runde an ihren Welten aufblitzen lassen. */
+  playBattles(list, you) {
+    this.battleFx.start(list, you);
+    this.poke(this.battleFx.remaining() + 100);
+  }
 
   /** Rechtshändige Basis aus Blickrichtung, Rechts und Oben. */
   basis() {
@@ -226,6 +234,15 @@ export class SpaceView {
       else this.drawFleet(ctx, it, colorOf);
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
     }
+    // Schlachten obenauf - sie sollen auffallen, auch hinter einer nahen Welt.
+    this.battleFx.draw(ctx, performance.now(), (id) => {
+      const p = v.planets[id];
+      const pr = p && this.project(p.x, p.y, p.z);
+      if (!pr) return null;
+      return { x: pr.x, y: pr.y, r: planetRadius(p) * pr.s,
+        s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)), alpha: depthFade(pr.depth, this.cam.dist),
+        shieldR: planetRadius(p) * pr.s * 1.14 + 20 * orbitScale(pr.s), shielded: p.defenses >= SHIELD_MIN };
+    }, colorOf);
     if (this.hover?.type === 'planet') this.tooltip(ctx, v.planets[this.hover.id]);
   }
 
@@ -452,8 +469,14 @@ export class SpaceView {
     // Orbitale Verteidigung: dieselbe Kreisbahn wie in der flachen Karte, nur
     // mit der projizierten Größe. Die Satelliten bleiben immer zuhause, also
     // gehören sie zur Welt und nicht zu den Flotten.
-    if (p.defenses > 0) {
-      const n = Math.min(4, p.defenses);
+    if (p.defenses >= SHIELD_MIN) {
+      ctx.save();
+      ctx.globalAlpha = ctxAlpha;
+      drawHexShield(ctx, pr.x, pr.y, r * 1.14 + 20 * orbitScale(scale), this.phase + p.id);
+      this.badge(ctx, pr.x + r + 16, pr.y - r - 10, '×' + p.defenses, colorOf(p.owner));
+      ctx.restore();
+    } else if (p.defenses > 0) {
+      const n = p.defenses;
       const sc = orbitScale(scale);
       ctx.save();
       ctx.globalAlpha = ctxAlpha;
@@ -466,7 +489,6 @@ export class SpaceView {
           color: colorOf(p.owner), phase: this.phase + i
         });
       }
-      if (p.defenses > 4) this.badge(ctx, pr.x + r + 16, pr.y - r - 10, '×' + p.defenses, colorOf(p.owner));
       ctx.restore();
     }
 

@@ -3,7 +3,8 @@ import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale 
 import { drawShip, drawTrail } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '/shared/rules.js';
 import { t } from '../i18n.js';
-import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA } from './fx.js';
+import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN } from './fx.js';
+import { BattleFx } from './battlefx.js';
 
 const ORBIT_R = 20;
 
@@ -74,6 +75,7 @@ export class MapView {
     this.onHoverChange = () => {};
     this._activeUntil = 0;
     this._tiles = new Map();
+    this.battleFx = new BattleFx();
     this._bind();
     this.resize();
   }
@@ -97,6 +99,12 @@ export class MapView {
   /** Volle Bildrate anfordern - Eingabe, neue Sicht, bewegte Kamera. */
   poke(ms = 700) { this._activeUntil = performance.now() + ms; }
   get busy() { return performance.now() < this._activeUntil; }
+
+  /** Schlachten der letzten Runde an ihren Welten aufblitzen lassen. */
+  playBattles(list, you) {
+    this.battleFx.start(list, you);
+    this.poke(this.battleFx.remaining() + 100);
+  }
 
   w2s(x, y) {
     return [(x - this.cam.x) * this.cam.zoom + this.w / 2, (y - this.cam.y) * this.cam.zoom + this.h / 2];
@@ -366,9 +374,13 @@ export class MapView {
       if (this.showNames) labels.push(...planetLabels(p, sx, sy, z, planetRadius(p) * z));
       this.hit.push({ type: 'planet', id: p.id, x: sx, y: sy, r: Math.max(12, r + 6) });
 
-      // Orbitale Verteidigung
-      if (p.defenses > 0) {
-        const n = Math.min(4, p.defenses);
+      // Orbitale Verteidigung: wenige Satelliten kreisen einzeln, ab
+      // SHIELD_MIN schliessen sie sich zum Schild um die Welt.
+      if (p.defenses >= SHIELD_MIN) {
+        drawHexShield(ctx, sx, sy, r * 1.14 + 20 * orbitScale(z), this.phase + p.id);
+        this.badge(ctx, sx + r + 16, sy - r - 10, '×' + p.defenses, colorOf(p.owner));
+      } else if (p.defenses > 0) {
+        const n = p.defenses;
         for (let i = 0; i < n; i++) {
           const a = this.phase * 0.25 + i * (Math.PI * 2 / n);
           const sc = orbitScale(z);
@@ -379,7 +391,6 @@ export class MapView {
             color: colorOf(p.owner), phase: this.phase + i
           });
         }
-        if (p.defenses > 4) this.badge(ctx, sx + r + 16, sy - r - 10, '×' + p.defenses, colorOf(p.owner));
       }
     }
 
@@ -423,6 +434,15 @@ export class MapView {
         this.hit.push({ type: 'fleet', id: f.id, x: sx, y: sy, r: 15 * scale });
       }
     }
+
+    this.battleFx.draw(ctx, performance.now(), (id) => {
+      const p = v.planets[id];
+      if (!p) return null;
+      const [sx, sy] = this.w2s(p.x, p.y);
+      if (sx < -200 || sy < -200 || sx > this.w + 200 || sy > this.h + 200) return null;
+      return { x: sx, y: sy, r: planetRadius(p) * z, s: Math.max(0.55, Math.min(1.8, 0.7 + z * 0.45)),
+        shieldR: planetRadius(p) * z * 1.14 + 20 * orbitScale(z), shielded: p.defenses >= SHIELD_MIN };
+    }, colorOf);
 
     // Beschriftungen zuletzt, damit Schiffe im Orbit sie nicht verdecken
     for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, z, l.size);

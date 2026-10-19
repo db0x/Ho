@@ -5,7 +5,7 @@ import {
   SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
-  COMBAT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
+  COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
   holeZone, route, advance, travelDistance, supplyDistance
 } from '../shared/rules.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng } from './galaxy.js';
@@ -518,8 +518,10 @@ export function resolveTurn(game) {
 
   // 4) Bewegung
   const zone = holeZone(game.galaxy);
+  const abflug = [];                 // [Flotte, Welt, von der sie diesen Zug abfliegt]
   for (const fleet of game.fleets) {
     if (fleet.dest == null) continue;
+    const start = fleet.at;
     const target = planetById(game, fleet.dest);
     const st = fleetStats(fleet);
     const owner = playerById(game, fleet.owner);
@@ -535,6 +537,7 @@ export function resolveTurn(game) {
     // Um das schwarze Loch herum statt hindurch - der Weg wird dadurch länger.
     const step = advance(fleet, route(fleet, target, zone), st.speed);
     fleet.x = step.x; fleet.y = step.y; fleet.z = step.z;
+    if (start != null && start !== fleet.dest) abflug.push([fleet, start]);
     if (step.done) {
       fleet.at = target.id; fleet.dest = null;
       if (owner) {
@@ -548,9 +551,15 @@ export function resolveTurn(game) {
   }
   for (const p of game.players) p.orders.moves = {};
 
-  // 5) Kampf
+  // 5) Kampf. Wer abfliegt, waehrend ein bewaffneter Gegner im Orbit steht,
+  // wird abgefangen: INTERCEPT_ROUNDS Gefechtsrunden muss er noch
+  // ueberstehen, dann ist er fort. Sonst entkaeme jeder Spaeher, weil alle Zuege gleichzeitig laufen.
   for (const planet of game.galaxy.planets) {
-    resolveCombatAt(game, planet, entries, rng);
+    const fliehen = abflug
+      .filter(([f, von]) => von === planet.id && f.ships.length && game.fleets.some(g =>
+        g.at === planet.id && g.owner !== f.owner && g.ships.some(s => s.attack > 0)))
+      .map(([f]) => f);
+    resolveCombatAt(game, planet, entries, rng, fliehen);
   }
   cleanupFleets(game);
 
@@ -600,8 +609,8 @@ export function resolveTurn(game) {
       planet.owner = owner;
       planet.pop = Math.round(planet.pop * 10) / 10;
       entries.push({ type: unowned ? 'colonize' : 'settle', playerIds: [owner], planetId: planet.id,
-        text: unowned ? `${p.name} kolonisiert ${planet.name}.`
-                      : `${planet.name}: ${landed} Mio. Siedler angekommen.` });
+        ...(unowned ? { key: 'log.colonize', params: { player: p.name, planet: planet.name } }
+                    : { key: 'log.settle', params: { planet: planet.name, amount: Math.round(landed * 10) / 10 } }) });
     } else if (unowned && cap < 1) {
       const hasColony = game.fleets.some(f => f.owner === owner && f.at === planet.id && f.ships.some(s => s.colonists > 0));
       if (hasColony) entries.push({ type: 'warn', playerIds: [owner], private: owner, planetId: planet.id,
@@ -775,13 +784,20 @@ function presentOwners(game, planet) {
   return [...set];
 }
 
-function resolveCombatAt(game, planet, entries, rng) {
+function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
   const sides = new Map();
   let battery = null;
   for (const f of game.fleets) {
     if (f.at !== planet.id || !f.ships.length) continue;
     if (!sides.has(f.owner)) sides.set(f.owner, []);
     sides.get(f.owner).push(...f.ships);
+  }
+  // Abgefangene kaempfen nur die ersten INTERCEPT_ROUNDS Runden mit
+  const flucht = new Set();
+  for (const f of fliehen) {
+    if (!sides.has(f.owner)) sides.set(f.owner, []);
+    sides.get(f.owner).push(...f.ships);
+    for (const s of f.ships) flucht.add(s);
   }
   if (planet.owner && planet.defenses && planet.defenses.length) {
     if (!sides.has(planet.owner)) sides.set(planet.owner, []);
@@ -804,20 +820,39 @@ function resolveCombatAt(game, planet, entries, rng) {
   if (!anyArmed) return;
 
   const before = new Map([...sides].map(([k, v]) => [k, v.length]));
+
+  // Mitschrift fuer die Wiederholung im Client: jede Einheit einmal, jeder
+  // Schuss als [Schuetze, Ziel, Schaden]. Kompakt, weil sie mit der Sicht reist.
+  const owners = [...sides.keys()];
+  const units = [];
+  const nr = new Map();
+  owners.forEach((owner, k) => {
+    for (const s of sides.get(owner)) {
+      nr.set(s, units.length);
+      units.push([k, s.isBattery ? 'battery' : s.type, s.hp, round1(s.maxHp)]);
+    }
+  });
+  const rounds = [];
+
   for (let round = 0; round < COMBAT_ROUNDS; round++) {
-    const alive = [...sides].filter(([, ships]) => ships.some(s => s.hp > 0));
+    const dabei = s => s.hp > 0 && (round < INTERCEPT_ROUNDS || !flucht.has(s));
+    const alive = [...sides].filter(([, ships]) => ships.some(dabei));
     if (alive.length < 2) break;
     const damage = [];
     for (const [owner, ships] of alive) {
-      const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(x => x.hp > 0));
+      const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(dabei));
       if (!enemies.length) continue;
       for (const s of ships) {
-        if (s.hp <= 0 || s.attack <= 0) continue;
+        if (!dabei(s) || s.attack <= 0) continue;
         const t = enemies[Math.floor(rng() * enemies.length)];
-        damage.push([t, s.attack * (0.75 + rng() * 0.5)]);
+        // Auf Zehntel gerundet - genau so steht er in der Mitschrift.
+        damage.push([t, round1(s.attack * (0.75 + rng() * 0.5)), s]);
       }
     }
-    for (const [t, dmg] of damage) t.hp -= dmg;
+    rounds.push(damage.map(([t, dmg, s]) => [nr.get(s), nr.get(t), dmg]));
+    // Auf Zehntel, wie der Schaden: sonst bliebe nach dem Abziehen ein
+    // Rest wie 2e-15 stehen, und ein Schiff ohne Huelle floege weiter.
+    for (const [t, dmg] of damage) t.hp = round1(t.hp - dmg);
     for (const [, ships] of sides) for (const s of ships) if (s.hp < 0) s.hp = 0;
   }
 
@@ -837,7 +872,7 @@ function resolveCombatAt(game, planet, entries, rng) {
   }
   // Toten entfernen
   for (const f of game.fleets) {
-    if (f.at === planet.id) f.ships = f.ships.filter(s => s.hp > 0);
+    if (f.at === planet.id || fliehen.includes(f)) f.ships = f.ships.filter(s => s.hp > 0);
   }
   if (planet.defenses) planet.defenses = planet.defenses.filter(s => s.hp > 0);
 
@@ -846,12 +881,14 @@ function resolveCombatAt(game, planet, entries, rng) {
   for (const f of game.fleets) if (f.at === planet.id && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
   if (planet.defenses && planet.defenses.some(s => s.attack > 0)) armedOwners.add(planet.owner);
   if (battery && battery.hp > 0) armedOwners.add(planet.owner);
+  const scuttled = [];
   if (armedOwners.size === 1) {
     const victor = [...armedOwners][0];
     for (const f of game.fleets) {
       if (f.at === planet.id && f.owner !== victor && f.ships.length) {
         const p = playerById(game, f.owner);
         if (p) p.stats.losses += f.ships.length;
+        for (const s of f.ships) if (nr.has(s)) scuttled.push(nr.get(s));
         f.ships = [];
       }
     }
@@ -861,13 +898,15 @@ function resolveCombatAt(game, planet, entries, rng) {
   const bilanz = [];
   for (const [owner, n] of before) {
     const p = playerById(game, owner);
-    const left = (game.fleets.filter(f => f.at === planet.id && f.owner === owner).reduce((a, f) => a + f.ships.length, 0))
+    const left = (game.fleets.filter(f => (f.at === planet.id || fliehen.includes(f)) && f.owner === owner)
+      .reduce((a, f) => a + f.ships.length, 0))
       + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0);
     bilanz.push({ name: p ? p.name : String(owner), left, before: n });
   }
   entries.push({
     type: 'combat', planetId: planet.id, playerIds: [...before.keys()],
-    key: 'log.battle', params: { planet: planet.name, sides: bilanz }
+    key: 'log.battle', params: { planet: planet.name, sides: bilanz },
+    battle: { sides: owners, units, rounds, scuttled, fled: [...flucht].map(s => nr.get(s)) }
   });
   cleanupFleets(game);
 }
@@ -911,8 +950,29 @@ function snapshotPlanet(game, planet, turn) {
   };
 }
 
+/**
+ * Kampfwerte der Satelliten einer eigenen Welt: zusammen, und der schwaechste
+ * Techstand - der sagt, ob sich Umruesten lohnt.
+ */
+function defenseStats(planet) {
+  const d = planet.defenses || [];
+  if (!d.length) return null;
+  return {
+    attack: round1(d.reduce((a, s) => a + s.attack, 0)),
+    hp: Math.round(d.reduce((a, s) => a + s.hp, 0)),
+    maxHp: Math.round(d.reduce((a, s) => a + s.maxHp, 0)),
+    weapons: Math.min(...d.map(s => s.tech?.weapons || 1)),
+    shields: Math.min(...d.map(s => s.tech?.shields || 1))
+  };
+}
+
 function pushLog(game, entries) {
   if (!entries.length) return;
+  // Nur die juengste Runde behaelt ihre Schlachtmitschriften - aeltere
+  // braucht niemand mehr, und sie wuerden mit jeder Sicht mitreisen.
+  for (const l of game.log.slice(-3)) {
+    if (l.turn < game.turn) for (const e of l.entries) delete e.battle;
+  }
   game.log.push({ turn: game.turn, entries });
   if (game.log.length > 120) game.log.shift();
 }
@@ -935,6 +995,7 @@ export function buildView(game, player) {
         owner: p.owner, pop: p.pop,
         defenses: p.defenses ? p.defenses.length : 0,
         defenseRefit: p.owner === player.id && p.defenses ? refitTotal(p.defenses, player.tech) : null,
+        defenseStats: p.owner === player.id ? defenseStats(p) : null,
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
         isHomeworld: !!p.isHomeworld
       };
@@ -1084,10 +1145,12 @@ export function buildSpectatorView(game) {
  * Satz - der Satz entsteht erst dort, in der Sprache des Spielers.
  */
 function logEntry(e) {
-  return {
+  const out = {
     type: e.type, planetId: e.planetId ?? null,
     key: e.key, params: e.params, because: e.because
   };
+  if (e.battle) out.battle = e.battle;
+  return out;
 }
 
 /** Alle sehen Siege und Ausscheiden; alles andere nur die Beteiligten. */

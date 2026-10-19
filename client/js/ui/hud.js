@@ -3,8 +3,9 @@ import {
   TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
-  TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, holeZone, travelDistance, supplyDistance
+  TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, holeZone, travelDistance, supplyDistance, batteryStats
 } from '/shared/rules.js';
+import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
@@ -446,6 +447,8 @@ export class Hud {
     const unknown = p.known === 'unknown';
     const orbit = v.fleets.filter(f => f.at === p.id);
     const myFleets = orbit.filter(f => f.mine);
+    const anflug = v.fleets.filter(f => f.dest === p.id && f.at !== p.id)
+      .sort((a, b) => this.eta(a, p) - this.eta(b, p));
 
     if (unknown) {
       box.innerHTML = `
@@ -498,6 +501,8 @@ export class Hud {
 
       ${this.courseButton(p)}
 
+      ${isMine ? this.defenseSection(p, orbit) : ''}
+
       ${isMine ? `
       <div class="sec">
         <h4>${t('terra.title')}</h4>
@@ -537,16 +542,13 @@ export class Hud {
       ${orbit.length ? `
       <div class="sec">
         <h4>${t('fleet.inOrbit')}</h4>
-        <div class="shiplist">
-          ${orbit.map(f => {
-            const pl = v.players.find(q => q.id === f.owner);
-            return `<div class="shipitem ${f.mine ? 'clickable' : ''}" ${f.mine ? `data-fleet="${f.id}"` : ''} style="cursor:${f.mine ? 'pointer' : 'default'}">
-              <span class="dot" style="width:8px;height:8px;border-radius:50%;background:${pl?.color}"></span>
-              <span>${f.mine ? t('fleet.own') : pl?.name || '?'}</span>
-              <span class="hp">${t('word.ships', { n: f.ships.length, count: f.ships.length })}${f.mine ? ' · ' + (f.stats.attack || 0) + '⚔' : ''}</span>
-            </div>`;
-          }).join('')}
-        </div>
+        <div class="shiplist">${orbit.map(f => this.fleetRow(f, p)).join('')}</div>
+      </div>` : ''}
+
+      ${anflug.length ? `
+      <div class="sec">
+        <h4>${t('fleet.incoming')}</h4>
+        <div class="shiplist">${anflug.map(f => this.fleetRow(f, p)).join('')}</div>
       </div>` : ''}
 
       ${myFleets.some(f => f.ships.some(s => s.colonists > 0)) ? (!p.owner
@@ -558,6 +560,15 @@ export class Hud {
 
     const th = box.querySelector('#thumb');
     if (th) th.appendChild(planetThumb(p, 46));
+    // shipIcon haelt jedes Bild nur einmal vor - je Zeile eine Kopie, sonst
+    // wandert es in die letzte Flotte gleicher Farbe.
+    for (const g of box.querySelectorAll('.ci')) {
+      const ic = shipIcon(g.dataset.t, 18, g.dataset.c);
+      const kopie = document.createElement('canvas');
+      kopie.width = ic.width; kopie.height = ic.height;
+      kopie.getContext('2d').drawImage(ic, 0, 0);
+      g.appendChild(kopie);
+    }
 
     const tb = box.querySelector('#tb');
     if (tb) {
@@ -590,6 +601,98 @@ export class Hud {
       item.onclick = () => this.app.setSelection({ type: 'fleet', id: item.dataset.fleet });
     }
     this.wireCourse(box, p);
+  }
+
+  /** Runden, bis eine Flotte die Welt erreicht - fremde nennt der Server. */
+  eta(f, p) {
+    if (!f.mine) return f.eta ?? Infinity;
+    const speed = f.stats?.speed || 0;
+    return speed > 0 ? Math.max(1, Math.ceil(travelDistance(f, p, holeZone(this.view.galaxy)) / speed)) : Infinity;
+  }
+
+  /** Schiffstypen einer Flotte als kleine Bilder mit Anzahl. */
+  komposition(f, color) {
+    const je = {};
+    for (const s of f.ships) je[s.type] = (je[s.type] || 0) + 1;
+    return SHIP_TYPES.filter(typ => je[typ]).map(typ =>
+      `<span class="comp" title="${je[typ]}× ${t(`ship.${typ}.name`)}"><span class="ci" data-t="${typ}" data-c="${color}"></span>${je[typ]}</span>`).join('');
+  }
+
+  /**
+   * Eine Flotte im Orbit oder im Anflug. Bei eigenen stehen Kampfkraft und
+   * Huelle dabei; bei fremden ist nur zu sehen, welche Schiffe es sind.
+   */
+  fleetRow(f, p) {
+    const v = this.view;
+    const pl = v.players.find(q => q.id === f.owner);
+    const color = pl?.color || '#9fb0c8';
+    const ziel = f.dest != null && f.dest !== p.id ? v.planets[f.dest] : null;
+    const kommt = f.dest === p.id && f.at !== p.id;
+    const runden = kommt ? this.eta(f, p) : null;
+    let rechts, unten = '';
+    if (f.mine) {
+      const hp = f.ships.reduce((a, s) => a + s.hp, 0), max = f.ships.reduce((a, s) => a + s.maxHp, 0);
+      rechts = `${fmt1(f.stats.attack || 0)} ⚔ · ${fmt(hp)}/${fmt(max)} HP`;
+      unten = `<div class="meter"><i style="width:${max ? hp / max * 100 : 0}%;background:${hp / max > 0.5 ? 'var(--good)' : hp / max > 0.25 ? 'var(--gold)' : 'var(--bad)'}"></i></div>`;
+    } else {
+      rechts = `<span class="muted">${t('fleet.strengthUnknown')}</span>`;
+    }
+    const wohin = kommt && Number.isFinite(runden) ? t('fleet.arrivesIn', { turns: t('word.turns', { n: runden, count: runden }) })
+      : ziel ? `→ ${escapeHtml(ziel.name)}` : '';
+    return `<div class="fleetrow ${f.mine ? '' : 'foe'}" data-fleet="${f.id}">
+      <div class="fr-top">
+        <span class="dot" style="background:${color}"></span>
+        <span class="fr-name">${f.mine ? t('fleet.own') : escapeHtml(pl?.name || '?')}</span>
+        <span class="hp">${rechts}</span>
+      </div>
+      ${unten}
+      <div class="fr-sub"><span class="fr-comp">${this.komposition(f, color)}</span><span>${wohin}</span></div>
+    </div>`;
+  }
+
+  /**
+   * Verteidigung einer eigenen Welt: die planetare Abwehr, die mit der
+   * Bevoelkerung waechst, die Satelliten samt Schild, die Kampfkraft im
+   * Orbit - und eine Warnung, wenn Feinde da sind oder kommen.
+   */
+  defenseSection(p, orbit) {
+    const v = this.view, me = v.me;
+    const bat = batteryStats(p.pop, me.tech);
+    const ds = p.defenseStats;
+    const n = p.defenses || 0;
+    const eigene = orbit.filter(f => f.mine).reduce((a, f) => a + (f.stats.attack || 0), 0);
+    const gesamt = (bat?.attack || 0) + (ds?.attack || 0) + eigene;
+    const feindOrbit = orbit.filter(f => !f.mine);
+    const feindAnflug = v.fleets.filter(f => !f.mine && f.dest === p.id && f.at !== p.id);
+    const schiffe = (f) => t('word.ships', { n: f.ships.length, count: f.ships.length });
+    const warnungen = [
+      ...feindOrbit.map(f => t('def.enemyOrbit', {
+        player: escapeHtml(v.players.find(q => q.id === f.owner)?.name || '?'), ships: schiffe(f) })),
+      ...feindAnflug.map(f => t(f.eta ? 'def.enemyIncoming' : 'def.enemyIncomingNoEta', {
+        player: escapeHtml(v.players.find(q => q.id === f.owner)?.name || '?'), ships: schiffe(f),
+        turns: f.eta ? t('word.turns', { n: f.eta, count: f.eta }) : '' }))
+    ];
+    const veraltet = ds && (ds.weapons < me.tech.weapons || ds.shields < me.tech.shields);
+    return `
+      <div class="sec">
+        <h4>${t('def.title')}</h4>
+        ${warnungen.map(w => `<p class="def-warn">⚠ ${w}</p>`).join('')}
+        <div class="statgrid">
+          <div class="stat"><div class="k">${t('def.battery')}</div>
+            <div class="v">${bat ? fmt1(bat.attack) + ' ⚔' : '–'}</div>
+            <div class="small muted">${bat ? t('def.batteryInfo', { hp: fmt(bat.hp) }) : t('def.batteryNone')}</div></div>
+          <div class="stat"><div class="k">${t('def.satellites')}</div>
+            <div class="v">${n}${ds ? ` · ${fmt1(ds.attack)} ⚔` : ''}</div>
+            ${ds ? `<div class="small muted">${fmt(ds.hp)}/${fmt(ds.maxHp)} HP</div>
+              <div class="meter"><i style="width:${ds.maxHp ? ds.hp / ds.maxHp * 100 : 0}%;background:var(--good)"></i></div>`
+              : `<div class="small muted">${t('def.satNone')}</div>`}</div>
+        </div>
+        ${n >= SHIELD_MIN ? `<p class="hint-line" style="color:var(--good)">⬡ ${t('def.shieldOn')}</p>`
+          : n > 0 ? `<p class="hint-line">${t('def.shieldSoon', { n: SHIELD_MIN - n, count: SHIELD_MIN - n })}</p>` : ''}
+        ${veraltet ? `<p class="hint-line">${t('def.satTech', { w: ds.weapons, s: ds.shields, W: me.tech.weapons, S: me.tech.shields })}</p>` : ''}
+        <div class="def-total"><span>${t('def.total')}</span><b>${fmt1(gesamt)} ⚔</b></div>
+        <div class="small muted">${t('def.totalHint')}</div>
+      </div>`;
   }
 
   buildRows(rows, sum, p, warn) {
@@ -851,6 +954,7 @@ export class Hud {
     if (p.direction) p.direction = t(`dir.${p.direction}`);
     if (typeof p.before === 'number') p.before = fmt1(p.before);
     if (typeof p.after === 'number') p.after = fmt1(p.after);
+    if (typeof p.amount === 'number') p.amount = fmt1(p.amount);
     if (e.because?.key) p.because = t(e.because.key, e.because.params);
     return t(e.key, p);
   }
@@ -860,9 +964,17 @@ export class Hud {
     const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
     box.innerHTML = this.view.log.slice().reverse().map(l => `
       <div class="logturn">${t('log.turnHeader', { turn: l.turn })}</div>
-      ${l.entries.map(e => `<div class="logline ${e.type} ${e.planetId != null ? 'clickable' : ''}"
-        ${e.planetId != null ? `data-p="${e.planetId}"` : ''}>${escapeHtml(this.logText(e))}</div>`).join('')}
+      ${l.entries.map(e => {
+        const key = `${l.turn}:${e.planetId}`;
+        const film = e.type === 'combat' && this.app.battles?.has(key)
+          ? `<button class="tiny bt-watch" data-b="${key}" title="${escapeHtml(t('battle.watch'))}">▶</button>` : '';
+        return `<div class="logline ${e.type} ${e.planetId != null ? 'clickable' : ''}"
+        ${e.planetId != null ? `data-p="${e.planetId}"` : ''}>${film}${escapeHtml(this.logText(e))}</div>`;
+      }).join('')}
     `).join('');
+    for (const b of box.querySelectorAll('[data-b]')) {
+      b.onclick = (ev) => { ev.stopPropagation(); this.app.openBattle(b.dataset.b); };
+    }
     for (const line of box.querySelectorAll('[data-p]')) {
       line.onclick = () => {
         const p = this.view.planets[+line.dataset.p];
@@ -883,14 +995,23 @@ export class Hud {
     box.scrollTop = box.scrollHeight;
   }
 
-  toast(text, color) {
+  /** @param {Function} [onClick] macht den Toast anklickbar (Schlacht ansehen) */
+  toast(text, color, onClick) {
     const host = $('#toasts');
     const d = document.createElement('div');
     d.className = 'toast';
     d.textContent = text;
     if (color) d.style.borderLeftColor = color;
+    if (onClick) {
+      d.classList.add('clickable');
+      const hint = document.createElement('span');
+      hint.className = 'toast-action';
+      hint.textContent = t('battle.watch');
+      d.appendChild(hint);
+      d.onclick = () => { d.remove(); onClick(); };
+    }
     host.appendChild(d);
-    setTimeout(() => d.remove(), 4200);
+    setTimeout(() => d.remove(), onClick ? 7000 : 4200);
   }
 }
 
