@@ -76,3 +76,15 @@ export function loadName() {
 export function saveName(n) {
   try { localStorage.setItem('ho-name', n); } catch {}
 }
+
+// Ohne Konto haelt der Browser das Bild selbst und reicht es beim Verbinden
+// herein; mit Konto liegt es auf dem Server.
+export function loadAvatar() {
+  try { return localStorage.getItem('ho-avatar') || null; } catch { return null; }
+}
+export function saveAvatar(dataUrl) {
+  try {
+    if (dataUrl) localStorage.setItem('ho-avatar', dataUrl);
+    else localStorage.removeItem('ho-avatar');
+  } catch {}
+}

@@ -104,8 +104,51 @@ function auf(wrap) {
   wrap.classList.add('auf');
   wrap.querySelector('.sel-btn').setAttribute('aria-expanded', 'true');
   offene.add(wrap);
+  platziere(wrap);
   wrap.querySelector('.sel-opt[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
 }
+
+const ABSTAND = 5, RAND = 8, MAX_HOEHE = 260;
+
+/**
+ * Was vom Feld aus nach oben und unten sichtbar ist: das Fenster, enger
+ * gefasst von jedem Vorfahren, der Ueberstehendes abschneidet (Docks,
+ * scrollende Panels). Dort wuerde die Liste sonst im Nichts verschwinden.
+ */
+function sichtbar(el) {
+  let oben = 0, unten = innerHeight;
+  for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+    const st = getComputedStyle(e);
+    if (/(hidden|auto|scroll|clip)/.test(st.overflowY)) {
+      const r = e.getBoundingClientRect();
+      oben = Math.max(oben, r.top); unten = Math.min(unten, r.bottom);
+    }
+  }
+  return { oben, unten };
+}
+
+/** Nach unten, wenn es dort passt, sonst dorthin, wo mehr Platz ist - und nie hoeher als der Platz. */
+function platziere(wrap) {
+  const liste = wrap.querySelector('.sel-list');
+  liste.style.maxHeight = '';
+  wrap.classList.remove('hoch');
+  const r = wrap.getBoundingClientRect();
+  const { oben, unten } = sichtbar(wrap);
+  const darunter = unten - r.bottom - ABSTAND - RAND;
+  const darueber = r.top - oben - ABSTAND - RAND;
+  const braucht = Math.min(MAX_HOEHE, liste.scrollHeight);
+  const hoch = darunter < braucht && darueber > darunter;
+  wrap.classList.toggle('hoch', hoch);
+  liste.style.maxHeight = Math.max(72, Math.min(MAX_HOEHE, hoch ? darueber : darunter)) + 'px';
+}
+
+// Aendert sich der Platz (Fenstergroesse, Scrollen), neu einpassen.
+addEventListener('resize', () => { for (const w of offene) platziere(w); });
+addEventListener('scroll', (e) => {
+  // Scrollen in der Liste selbst aendert ihren Platz nicht.
+  if (e.target?.classList?.contains('sel-list')) return;
+  for (const w of offene) platziere(w);
+}, true);
 
 function zu(wrap) {
   wrap.classList.remove('auf');

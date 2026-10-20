@@ -51,6 +51,9 @@ function sprachwahl() {
     male();
     syncSelects();                 // Knopfbeschriftungen der eigenen Listen
     lobby?.relabel();
+    // Der Sprachwechsel schreibt die Reiter aus dem Markup neu - beim Zusehen
+    // heisst der erste aber "Imperien", nicht "Forschung".
+    hud?.chrome();
     if (hud?.view) hud.update(hud.view);
   });
 }
@@ -71,14 +74,10 @@ async function konto() {
     wer = me.display || me.user;
   } catch { return; }
   if (!wer) return;
-  // Der Spielername ist der Kontoname - fest, damit niemand unter fremdem
-  // Namen antritt. Durchgesetzt wird das auf dem Server; hier nur angezeigt.
-  const feld = document.querySelector('#in-name');
-  feld.value = wer;
-  feld.readOnly = true;
+  // Den Anzeigenamen setzt das Profil (net 'hello'); er darf vom Kontonamen
+  // abweichen. Hier steht nur, mit welchem Konto man angemeldet ist.
   const male = () => {
     name.textContent = t('auth.signedInAs', { user: wer });
-    feld.title = t('menu.nameFromAccount');
   };
   male();
   onLocaleChange(male);
@@ -171,6 +170,7 @@ const app = {
 // ----------------------------------------------------------------- Nachrichten
 net.on('hello', (m) => {
   lobby.showOpenGames(m.openGames);
+  if (m.profile) lobby.setProfile(m.profile, true);
   if (!net.session) lobby.show('menu');
   // Testhilfe: ?solo=N startet direkt eine Partie gegen N KI-Reiche
   const solo = new URLSearchParams(location.search).get('solo');
@@ -178,6 +178,9 @@ net.on('hello', (m) => {
 });
 
 net.on('games', (m) => lobby.showOpenGames(m.openGames));
+// Antwort auf jede Profilaenderung - auch auf eine abgelehnte, dann mit dem
+// alten Stand, damit kein Feld etwas zeigt, das nicht gilt.
+net.on('profile', (m) => { lobby.setProfile(m.profile); lobby.relabel(); });
 net.on('lobby', (m) => lobby.update(m));
 net.on('kicked', () => { net.forget(); location.reload(); });
 
@@ -226,7 +229,7 @@ net.on('view', (m) => {
     const loud = view.spectator
       ? ['eliminated', 'victory']
       : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy'];
-    for (const l of view.log.filter(l => l.turn === view.turn - 1)) {
+    for (const l of abgerechnet(view)) {
       for (const e of l.entries) {
         if (!loud.includes(e.type)) continue;
         const key = `${l.turn}:${e.planetId}`;
@@ -287,7 +290,7 @@ function bindGame() {
     const pl = !ready ? hud?.plan() : null;
     if (pl && (pl.fehltGeld || pl.fehltErz)) {
       const fehlt = [pl.fehltGeld ? Math.round(pl.fehltGeld) + ' ' + t('unit.cr') : null,
-                     pl.fehltErz ? Math.round(pl.fehltErz) + ' ' + t('unit.ore') : null]
+                     pl.fehltErz ? Math.round(pl.fehltErz) + ' ' + t('unit.metal') : null]
         .filter(Boolean).join(` ${t('word.and')} `);
       hud.toast(t('yard.endTurnWarning', { missing: fehlt }), '#ffb347');
     }
@@ -398,12 +401,22 @@ function panOf(planetId) {
 const SFX_PRIO = ['victory', 'eliminated', 'lost', 'invade', 'combat', 'expand',
   'colonize', 'settle', 'tech', 'build', 'terra', 'arrive', 'warn'];
 
+/**
+ * Was die gerade gelaufene Abrechnung gemeldet hat. Der Server zaehlt die
+ * Runde erst hoch und legt die Meldungen danach ab - sie tragen also schon
+ * die neue Nummer. Mit "view.turn - 1" kamen Toasts und Geraeusche eine
+ * Runde zu spaet (und wirkten neben dem Protokoll wie doppelt).
+ */
+function abgerechnet(view) {
+  return view.log.filter(l => l.turn === view.turn);
+}
+
 /** Rundenabrechnung: erst der Gong, dann die Ereignisse der letzten Runde. */
 function playTurnSounds(view) {
   // Beim Zusehen im schnellen Takt schlüge der Gong jede Sekunde
   if (!view.spectator || (view.pace?.ms ?? 1500) >= 1000) sfx.play('turn');
   const picks = [];
-  for (const l of view.log.filter(l => l.turn === view.turn - 1)) {
+  for (const l of abgerechnet(view)) {
     for (const e of l.entries) {
       const name = LOG_SFX[e.type];
       if (name) picks.push({ name, pan: panOf(e.planetId) });

@@ -96,8 +96,15 @@ input[readonly]:focus { outline: none; }
 input[type=range] { width: 100%; accent-color: var(--gold); }
 
 /* =================================================== Startbildschirm */
-#screen-menu { display: grid; place-items: center; background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
-.menu-sky { position: absolute; inset: 0; }
+/* Start, Anmeldung und Lobby: mittig, solange Platz ist - und scrollbar,
+   sobald nicht. Zentriert wird ueber margin: auto am Inhalt statt ueber
+   place-items: center; das schoebe den oberen Teil eines zu hohen Inhalts
+   ueber den Rand, wo kein Scrollen mehr hinkommt. */
+#screen-menu, #screen-login, #screen-lobby { display: grid; overflow-y: auto; overscroll-behavior: contain; }
+#screen-menu > .menu-box, #screen-login > .menu-box, #screen-lobby > .lobby { margin: auto; }
+#screen-menu { padding: 16px 0; background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
+/* Der Sternenhimmel bleibt stehen, waehrend das Menue scrollt. */
+.menu-sky { position: fixed; inset: 0; }
 .menu-sky canvas { width: 100%; height: 100%; display: block; }
 .menu-box {
   position: relative; width: min(480px, 92vw);
@@ -126,6 +133,16 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020;
 }
 .open-games .og b { font-family: var(--mono); color: var(--gold); letter-spacing: .15em; }
+/* Profil im Startmenue: Bild links, Name daneben */
+.profile-row { display: flex; gap: 10px; align-items: center; }
+.avatar-pick {
+  width: 42px; height: 42px; padding: 0; flex: none; border-radius: 50%; overflow: hidden;
+  border: 1px dashed var(--line-strong); background: #0b1020; color: var(--ink-faint); font-size: 20px;
+}
+.avatar-pick.has { border: 2px solid var(--gold-dim); }
+.avatar-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-hint { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; min-height: 0; }
+.profile-hint a { color: var(--ink-faint); margin-left: auto; }
 .hint { margin: 18px 0 0; font-size: 13px; color: var(--ink-faint); text-align: center; }
 /* Sprachwahl unter dem Hinweis: da sucht man sie, und sie draengt sich nicht vor. */
 /* Versionsnummer: klein und zurückhaltend, aber immer da */
@@ -139,7 +156,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 /* =================================================== Anmeldung */
 /* Die Anmeldung (client/login.html) borgt sich die Buehne des Startbildschirms,
    nur ohne Sternhimmel - sie soll leicht sein, nicht beeindrucken. */
-#screen-login { display: grid; place-items: center; overflow: auto; padding: 16px 0;
+#screen-login { padding: 16px 0;
   background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
 #screen-login h2 { margin: 0 0 6px; font-size: 20px; }
 #screen-login .field:first-of-type { margin-top: 12px; }
@@ -149,7 +166,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   margin: 10px 0 0; font-size: 13px; color: var(--ink-faint); }
 
 /* ============================================================== Lobby */
-#screen-lobby { display: grid; place-items: center; overflow: auto; background: radial-gradient(ellipse at 50% 0%, #141b36 0%, #05060c 65%); }
+#screen-lobby { background: radial-gradient(ellipse at 50% 0%, #141b36 0%, #05060c 65%); }
 .lobby { width: min(900px, 94vw); padding: 24px 0; }
 .lobby header h2 { margin: 0 0 4px; font-size: 26px; }
 .lobby header p { margin: 0 0 18px; color: var(--ink-dim); }
@@ -163,7 +180,66 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .panel h3 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
 .player-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
 .player-list li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: #0b1020; border: 1px solid var(--line); border-radius: 8px; }
-.player-list .swatch { width: 16px; height: 16px; border-radius: 4px; flex: none; box-shadow: 0 0 10px currentColor; }
+.player-list li.me { border-color: var(--gold-dim); }
+/* Farbfeld: anklickbar, wenn man die Farbe aendern darf - sonst nur Anzeige. */
+.player-list .swatch {
+  width: 18px; height: 18px; padding: 0; border-radius: 5px; flex: none;
+  background: var(--c); border: 1px solid rgba(255,255,255,.3); box-shadow: 0 0 10px var(--c);
+}
+.player-list .swatch:not(:disabled) { cursor: pointer; outline: 1px dashed rgba(255,255,255,.35); outline-offset: 2px; }
+.player-list .swatch:not(:disabled):hover { transform: scale(1.12); background: var(--c); }
+.player-list .swatch:disabled { opacity: 1; cursor: default; }
+.player-list .pname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.player-list .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-list .name-edit {
+  width: 11em; max-width: 100%; padding: 3px 7px; font-weight: 600;
+  background: transparent; border: 1px dashed var(--line-strong); border-radius: 6px;
+}
+.player-list .name-edit:hover, .player-list .name-edit:focus { background: #0b1020; border-style: solid; }
+.player-list .avatar-btn { padding: 0; border: none; background: none; border-radius: 50%; flex: none; }
+.player-list .avatar-btn:hover .avatar { box-shadow: 0 0 0 2px var(--gold-dim); }
+.tag-host { font-size: 11px; color: var(--gold); border: 1px solid var(--gold-dim); padding: 0 6px; border-radius: 20px; }
+
+/* Spielerbild: rund, mit der Spielerfarbe als Ring; ohne Bild der Anfangsbuchstabe. */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%; overflow: hidden;
+  background: color-mix(in srgb, var(--c) 30%, #0b1020); color: #fff; font-weight: 650;
+  box-shadow: 0 0 0 2px var(--c); line-height: 1;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Palette zum Umfaerben */
+.color-pop {
+  position: fixed; z-index: 60; display: grid; grid-template-columns: repeat(8, 26px); gap: 6px;
+  padding: 10px; background: var(--panel-solid); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.color-pop button { width: 26px; height: 26px; padding: 0; border-radius: 6px; background: var(--c); border: 2px solid transparent; }
+.color-pop button:hover { background: var(--c); border-color: #fff; }
+.color-pop button.cur { border-color: #fff; box-shadow: 0 0 10px var(--c); }
+/* Vergeben: Ecke ausgeschnitten - waehlbar heisst hier tauschen. */
+.color-pop button.taken { clip-path: polygon(0 0, 100% 0, 100% 62%, 62% 100%, 0 100%); }
+.color-pop button:disabled { opacity: .25; cursor: not-allowed; }
+
+/* Einstellungen nur ansehen: keine Regler, keine Knoepfe - nur Werte. */
+.lock-hint {
+  margin: -4px 0 10px; padding: 8px 10px; font-size: 13px; color: var(--ink-dim);
+  background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 8px;
+}
+.lock-hint::before { content: '🔒 '; }
+.ro-only { display: none; }
+#lobby-settings.readonly .ro-only { display: inline; margin-left: auto; color: var(--gold); }
+#lobby-settings.readonly input[type=range],
+#lobby-settings.readonly .chk input[type=checkbox] { display: none; }
+#lobby-settings.readonly .field.slim { display: flex; align-items: baseline; gap: 10px; margin: 6px 0; }
+#lobby-settings.readonly .field.slim > span { flex: 1; margin: 0; }
+#lobby-settings.readonly .sel { width: auto; }
+#lobby-settings.readonly .sel-btn:disabled {
+  opacity: 1; padding: 0; border: none; background: none; color: var(--gold); font-weight: 650; text-align: right;
+}
+#lobby-settings.readonly .chk { cursor: default; color: var(--ink); font-size: 14px; }
+#lobby-settings.readonly .chk:hover { color: var(--ink); }
+#lobby-settings.readonly .field.slim, #lobby-settings.readonly .chk { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .player-list .tagbot { font-size: 12px; color: var(--ink-faint); border: 1px solid var(--line); padding: 1px 6px; border-radius: 20px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .lobby-foot { display: flex; justify-content: space-between; margin-top: 16px; }
@@ -180,19 +256,46 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   position: absolute; top: 0; left: 0; right: 0; height: 60px;
   display: flex; align-items: center; gap: 14px; padding: 0 14px;
   background: linear-gradient(rgba(6, 9, 18, .95), rgba(6, 9, 18, .72));
-  border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); z-index: 5;
+  border-bottom: 1px solid var(--line); backdrop-filter: blur(10px);
+  /* Ueber den Fenstern (z 4-6, siehe dialog.js) und Einblendungen: der
+     Haushalt klappt aus der Kopfleiste nach unten und darf nie darunter liegen. */
+  z-index: 10;
 }
-.emblem { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 14px currentColor; flex: none; }
+.emblem { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 14px currentColor; flex: none; overflow: hidden; }
+.emblem img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 7px; border: 2px solid currentColor; box-sizing: border-box; }
 .me-name { font-weight: 650; line-height: 1.1; }
 .me-sub { font-size: 12px; color: var(--ink-dim); }
-.res { display: flex; gap: 18px; margin-left: 10px; }
-.res-item { display: flex; align-items: baseline; gap: 6px; }
+.res { position: relative; display: flex; gap: 6px; margin-left: 4px; }
+/* Knopf, sieht aber wie eine Anzeige aus: erst beim Zeigen wird er greifbar. */
+.res-item {
+  display: flex; align-items: baseline; gap: 6px;
+  background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px;
+}
+.res-item:hover, .res-item[aria-expanded="true"] { background: rgba(255,255,255,.04); border-color: var(--line); }
+.res-item:active { transform: none; }
 .res-item .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
 .res-item .val { font-family: var(--mono); font-size: 19px; color: var(--gold); font-variant-numeric: tabular-nums; }
-.res-item .delta { font-size: 13px; color: var(--good); }
-/* Was in dieser Runde schon verplant ist - still, solange es aufgeht. */
-.res-item .hold { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-.res-item .hold.knapp { color: var(--bad); font-weight: 600; }
+/* Stand nach dem Rundenende - still, solange alles aufgeht. */
+.res-item .next { font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.res-item .next.knapp { color: var(--bad); font-weight: 600; }
+
+/* Haushalt: die Rechnung hinter "jetzt -> nächste Runde" */
+.ledger {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: 340px;
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 12px 14px;
+}
+.ledger h4 { margin: 0 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.ledger table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ledger th { text-align: left; font-weight: 400; color: var(--ink); padding: 4px 0; }
+.ledger td { text-align: right; font-family: var(--mono); padding: 4px 0 4px 12px; white-space: nowrap; vertical-align: top; }
+.ledger thead td { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
+.ledger th small { display: block; font-size: 11.5px; }
+.ledger .bad { color: var(--bad); }
+.ledger tr.stand th, .ledger tr.stand td { color: var(--ink-dim); }
+.ledger tr.ein td { color: var(--good); }
+.ledger tr.summe th, .ledger tr.summe td { border-top: 1px solid var(--line-strong); padding-top: 6px; font-weight: 650; color: var(--gold); }
+.ledger p { margin: 8px 0 0; line-height: 1.4; }
 .turnbox { text-align: right; }
 .turn { font-size: 14px; color: var(--ink-dim); }
 .turn span { color: var(--ink); font-family: var(--mono); }
@@ -297,7 +400,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .buildrow .bname { font-size: 14px; }
 .buildrow .bcost { font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
 .buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
-.buildrow .bq .n { font-family: var(--mono); min-width: 16px; text-align: center; }
+/* Feste Breite fuer bis zu drei Stellen: sonst rueckt "−" bei 10 oder 100 zur Seite. */
+.buildrow .bq .n { font-family: var(--mono); min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .shiplist { display: flex; flex-direction: column; gap: 4px; }
 .shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }
 .shipitem .hp { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
@@ -456,6 +560,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
   padding: 4px; max-height: 260px; overflow-y: auto;
 }
 .sel.auf .sel-list { display: block; animation: sel-in .11s ease-out; }
+/* Nach oben aufgeklappt, wenn darunter kein Platz ist (select.js). */
+.sel.hoch .sel-list { top: auto; bottom: calc(100% + 5px); }
 @keyframes sel-in { from { opacity: 0; transform: translateY(-4px); } }
 .sel-opt { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
 .sel-opt:hover { background: rgba(160, 190, 240, .1); }
@@ -615,7 +721,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .help-cols { grid-template-columns: 1fr; }
 
   /* ------------------------------------------------------------ Topbar */
-  #topbar { height: 54px; gap: 10px; padding: 0 10px; }
+  /* Ueber den Blaettern (z 11) und der Leiste unten - wegen des Haushalts. */
+  #topbar { height: 54px; gap: 10px; padding: 0 10px; z-index: 13; }
   #topbar .me, #btn-quit { display: none; }
   .emblem { width: 26px; height: 26px; }
   /* Beschriftung über den Wert statt daneben: zwei nackte Zahlen
@@ -625,7 +732,10 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .res-item { flex-wrap: wrap; align-items: baseline; gap: 0 5px; line-height: 1.15; }
   .res-item .lbl { width: 100%; font-size: 9px; letter-spacing: .05em; }
   .res-item .val { font-size: 16px; }
-  .res-item .delta, .res-item .hold { font-size: 10.5px; }
+  .res { gap: 2px; }
+  .res-item { padding: 2px 3px; gap: 0 4px; }
+  .res-item .next { font-size: 10.5px; }
+  .ledger { position: fixed; top: 58px; left: 8px; right: 8px; width: auto; }
   .turnbox { line-height: 1.15; }
   .turn { font-size: 11px; }
   .timer { font-size: 11px; }
@@ -727,3 +837,22 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #leftdock, #rightdock, #logdock, #mapsettings { height: 68vh; max-height: 68vh; }
   #logdock { height: 68vh !important; }
 }
+
+/* Werft: Zusammenfassung mit fester Hoehe (zwei Zeilen) - Knöpfe darunter
+   bleiben beim Bestellen an ihrem Platz. */
+.buildsum { margin-top: 6px; }
+.buildsum > div, .oneline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.45; }
+
+/* Rangliste: Platz, Bild, Name - rechts die Bevölkerung, nach der gewertet wird */
+.rank-hint { margin: 0 0 8px; }
+.rankrow .rank { width: 1.6em; flex: none; text-align: right; font-family: var(--mono); color: var(--ink-faint); }
+.rankrow.me { border-color: var(--gold-dim); }
+.rankrow.me .rank { color: var(--gold); }
+.rankrow .who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.rankrow .who .nm { flex: none; }
+.rankrow .who small { font-size: 11px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rankrow .num { white-space: nowrap; }
+.rankrow .num b { color: var(--ink); font-weight: 600; }
+.rankrow.dead { opacity: .5; }
+.rankrow.dead .nm { text-decoration: line-through; }
+

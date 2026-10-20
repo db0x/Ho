@@ -234,25 +234,59 @@ const NEU = 'meinEigenes-2026';
   console.log('Mit gewechseltem Passwort: Client und WebSocket stehen offen.');
 }
 
-// --- Mit Anmeldung heisst man wie sein Konto - egal, was der Client schickt
+// --- Mit Anmeldung heisst man wie im Profil: create kann das nicht umgehen,
+//     'profile' schon - aber nie wie ein anderes Konto.
 {
+  await addUser('rivale', 'rivalenPasswort1');
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: keks } });
-  let lobby = null;
+  let lobby = null, profil = null, hallo = null;
+  const fehlerKeys = [];
   ws.on('message', (raw) => {
     const m = JSON.parse(raw.toString());
-    if (m.t === 'hello') ws.send(JSON.stringify({ t: 'create', name: 'Hochstapler' }));
+    if (m.t === 'hello') { hallo = m; ws.send(JSON.stringify({ t: 'create', name: 'Hochstapler' })); }
     if (m.t === 'lobby') lobby = m.lobby;
+    if (m.t === 'profile') profil = m.profile;
+    if (m.t === 'error') fehlerKeys.push(m.key);
   });
-  for (let i = 0; i < 40 && !lobby; i++) await wait(50);
+  const bis = async (fn) => { for (let i = 0; i < 60 && !fn(); i++) await wait(50); };
+  await bis(() => lobby);
   const ich = () => lobby?.players[0]?.name;
+  check(hallo?.profile?.account === 'captain', 'hello nennt das Konto nicht');
   check(ich() === 'captain', `Spielername ist '${ich()}' statt des Kontonamens`);
+
   lobby = null;
-  ws.send(JSON.stringify({ t: 'setName', name: 'Hochstapler' }));
-  ws.send(JSON.stringify({ t: 'addBot' }));      // loest eine neue Lobbysicht aus
-  for (let i = 0; i < 40 && !lobby; i++) await wait(50);
-  check(ich() === 'captain', `setName hat den Kontonamen ueberschrieben ('${ich()}')`);
+  ws.send(JSON.stringify({ t: 'profile', name: 'Kapitän <b>Nemo</b>' }));
+  await bis(() => lobby);
+  check(ich() === 'Kapitän bNemo/b', `Umbenennen wirkt nicht oder Markup bleibt stehen ('${ich()}')`);
+  check(getUser('captain').nick === 'Kapitän bNemo/b', 'Anzeigename steht nicht im Konto');
+  check(lobby.players[0].account === 'captain', 'Lobby verrät das Konto hinter dem Anzeigenamen nicht');
+
+  profil = null;
+  ws.send(JSON.stringify({ t: 'profile', name: 'RIVALE' }));
+  await bis(() => profil);
+  check(fehlerKeys.includes('profile.err.taken'), 'Name eines anderen Kontos wird angenommen');
+  check(profil?.name === 'Kapitän bNemo/b', `Abgelehnter Name steht trotzdem im Profil ('${profil?.name}')`);
+
+  // Bild: ein winziges PNG geht durch, Unsinn nicht
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  profil = null; lobby = null;
+  ws.send(JSON.stringify({ t: 'profile', avatar: png }));
+  await bis(() => profil && lobby);
+  check(/^api\/avatar\/u-captain\?v=/.test(profil?.avatar || ''), `Kein Bild-URL im Profil (${profil?.avatar})`);
+  check(lobby?.players[0]?.avatar === profil?.avatar, 'Lobby zeigt das neue Bild nicht');
+  const bild = await hole('/' + profil.avatar);
+  check(bild.status === 200 && bild.roh.headers.get('content-type') === 'image/png', `Bild kommt nicht heraus (${bild.status})`);
+  const fremd = await fetch(`${BASIS}/${profil.avatar}`, { redirect: 'manual' });
+  check(fremd.status !== 200, 'Bild kommt ohne Sitzung heraus');
+  fehlerKeys.length = 0; profil = null;
+  ws.send(JSON.stringify({ t: 'profile', avatar: 'data:image/png;base64,PHN2Zz48L3N2Zz4=' }));
+  await bis(() => profil);
+  check(fehlerKeys.includes('profile.err.image'), 'Ein Nicht-PNG mit PNG-Etikett wird angenommen');
+  ws.send(JSON.stringify({ t: 'profile', avatar: null, name: 'captain' }));
+  await wait(150);
+  check(!getUser('captain').avatar && !getUser('captain').nick, 'Profil lässt sich nicht zurücksetzen');
   ws.close();
-  console.log('Spielername: kommt aus dem Konto, weder create noch setName ändern ihn.');
+  console.log('Profil: Anzeigename frei (aber nie ein fremdes Konto), Bild geprüft und nur mit Sitzung.');
 }
 
 // --- Ein gelöschtes Konto fliegt sofort, auch aus einer offenen Sitzung

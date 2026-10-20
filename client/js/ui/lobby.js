@@ -1,6 +1,8 @@
 // Startbildschirm und Lobby.
-import { loadName, saveName } from '../net.js';
+import { loadName, saveName, loadAvatar, saveAvatar } from '../net.js';
 import { syncSelects } from './select.js';
+import { pickAvatar, avatarHtml } from './avatar.js';
+import { PLAYER_COLORS } from '../../shared/rules.js';
 import { t, n as num } from '../i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -35,7 +37,13 @@ export class Lobby {
       this.net.send({ t: 'watch', bots: +$('#in-watchbots').value || 6, settings: { mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
     };
     $('#in-code').onkeydown = e => { if (e.key === 'Enter') $('#btn-join').click(); };
-    $('#in-name').onchange = () => saveName(this.name());
+    $('#in-name').onchange = () => this.rename($('#in-name').value);
+    $('#btn-avatar').onclick = () => this.chooseAvatar();
+    $('#link-avatar-off').onclick = (e) => {
+      e.preventDefault();
+      if (!this.profile?.account) saveAvatar(null);
+      this.net.send({ t: 'profile', avatar: null });
+    };
     $('#link-help').onclick = (e) => { e.preventDefault(); $('#help').classList.remove('hidden'); };
     $('#help-close').onclick = () => $('#help').classList.add('hidden');
 
@@ -50,7 +58,7 @@ export class Lobby {
     const sliders = {
       '#s-ppp': ['planetsPerPlayer', v => t('word.worlds', { n: v }), '#v-ppp'],
       '#s-money': ['startMoney', v => `${num(+v)} ${t('unit.cr')}`, '#v-money'],
-      '#s-metal': ['startMetal', v => `${num(+v)} ${t('unit.ore')}`, '#v-metal'],
+      '#s-metal': ['startMetal', v => `${num(+v)} ${t('unit.metal')}`, '#v-metal'],
       '#s-timer': ['turnTimer', v => +v === 0 ? t('lobby.noLimit') : t('unit.seconds', { n: v }), '#v-timer']
     };
     for (const [sel, [key, fmt, out]] of Object.entries(sliders)) {
@@ -95,8 +103,96 @@ export class Lobby {
 
   name() {
     const n = $('#in-name').value.trim() || 'Captain';
-    saveName(n);
+    if (!this.profile?.account) saveName(n);
     return n;
+  }
+
+  // ------------------------------------------------------------- Profil
+
+  /**
+   * Stand des Profils vom Server (nach 'hello' und jeder Aenderung). Mit
+   * Konto ist er massgeblich; ohne Konto reicht der Browser beim ersten Mal
+   * nach, was er sich gemerkt hat.
+   */
+  setProfile(profile, erstesMal = false) {
+    if (erstesMal && !profile.account) {
+      const bild = loadAvatar();
+      const name = loadName();
+      if (bild || name) {
+        this.net.send({ t: 'profile', ...(name ? { name } : {}), ...(bild ? { avatar: bild } : {}) });
+      }
+    }
+    this.profile = profile;
+    if (profile.account && profile.name) $('#in-name').value = profile.name;
+    const btn = $('#btn-avatar');
+    btn.innerHTML = profile.avatar ? `<img src="${profile.avatar}" alt="">` : '<span class="plus">+</span>';
+    btn.classList.toggle('has', !!profile.avatar);
+    $('#link-avatar-off').classList.toggle('hidden', !profile.avatar);
+    this.profileHint();
+  }
+
+  profileHint() {
+    const a = this.profile?.account;
+    $('#profile-account').textContent = a ? t('profile.account', { account: a }) : '';
+  }
+
+  rename(wert) {
+    const name = String(wert || '').trim();
+    if (!name || name === this.profile?.name) return;
+    if (!this.profile?.account) saveName(name);
+    $('#in-name').value = name;
+    this.net.send({ t: 'profile', name });
+  }
+
+  async chooseAvatar() {
+    const bild = await pickAvatar();
+    if (!bild) return;
+    if (!this.profile?.account) saveAvatar(bild);
+    this.net.send({ t: 'profile', avatar: bild });
+  }
+
+  // ------------------------------------------------------------- Farben
+
+  /** Palette unter dem angeklickten Farbfeld. */
+  colorMenu(anker, playerId) {
+    this.closeColorMenu();
+    const spieler = this.lobby.players;
+    const ziel = spieler.find(p => p.id === playerId);
+    if (!ziel) return;
+    const pop = document.createElement('div');
+    pop.className = 'color-pop';
+    pop.setAttribute('role', 'listbox');
+    pop.innerHTML = PLAYER_COLORS.map(c => {
+      const traeger = spieler.find(p => p.color === c);
+      // Die Farbe eines Mitspielers nimmt nur der Gastgeber - dann wird getauscht.
+      const zu = traeger && traeger !== ziel && !traeger.isBot && !this.isHost;
+      const titel = !traeger ? '' : traeger === ziel ? t('lobby.colorCurrent')
+        : t(zu ? 'lobby.colorTakenBy' : 'lobby.colorSwap', { player: traeger.name });
+      return `<button type="button" data-c="${c}" style="--c:${c}" title="${titel}"
+        class="${traeger === ziel ? 'cur' : traeger ? 'taken' : ''}" ${zu ? 'disabled' : ''}></button>`;
+    }).join('');
+    document.body.appendChild(pop);
+    const r = anker.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
+    pop.style.top = (r.bottom + 6) + 'px';
+    for (const b of pop.querySelectorAll('button:not([disabled])')) {
+      b.onclick = () => {
+        this.net.send({ t: 'color', color: b.dataset.c, ...(playerId !== this.youId ? { playerId } : {}) });
+        this.closeColorMenu();
+      };
+    }
+    this.colorPop = pop;
+    setTimeout(() => {
+      this._colorAway = (e) => { if (!pop.contains(e.target)) this.closeColorMenu(); };
+      addEventListener('pointerdown', this._colorAway);
+    });
+  }
+
+  closeColorMenu() {
+    this.colorPop?.remove();
+    this.colorPop = null;
+    if (this._colorAway) removeEventListener('pointerdown', this._colorAway);
+    this._colorAway = null;
   }
 
   error(sel, msg) { $(sel).textContent = msg; setTimeout(() => { $(sel).textContent = ''; }, 5000); }
@@ -137,21 +233,58 @@ export class Lobby {
     if (zeigen) this.show('lobby');
     $('#lobby-code').textContent = msg.lobby.id;
     $('#lobby-count').textContent = `${msg.lobby.players.length}/16`;
-    $('#lobby-players').innerHTML = msg.lobby.players.map(p => `
-      <li>
-        <span class="swatch" style="background:${p.color};color:${p.color}"></span>
-        <span style="flex:1">${p.name}${p.id === msg.you ? ` <span class="muted small">${t('word.you')}</span>` : ''}</span>
+    // Wird gerade der eigene Name bearbeitet, darf der Neuaufbau ihn nicht
+    // unter den Fingern wegziehen.
+    const feld = document.activeElement?.classList?.contains('name-edit') ? document.activeElement : null;
+    const entwurf = feld ? { value: feld.value, a: feld.selectionStart, b: feld.selectionEnd } : null;
+    const gastgeber = msg.lobby.players[0];
+    $('#lobby-players').innerHTML = msg.lobby.players.map(p => {
+      const ich = p.id === msg.you;
+      const farbe = ich || (this.isHost && p.isBot);
+      return `
+      <li class="${ich ? 'me' : ''}">
+        <button type="button" class="swatch" style="--c:${p.color}" data-color="${p.id}"
+          ${farbe ? `title="${t('lobby.pickColor')}"` : 'disabled'}></button>
+        ${ich ? `<button type="button" class="avatar-btn" data-avatar title="${t('profile.pick')}">${avatarHtml(p, 30)}</button>`
+          : avatarHtml(p, 30)}
+        <span class="pname">
+          ${ich ? `<input class="name-edit" value="${p.name}" maxlength="18" title="${t('lobby.renameTitle')}" aria-label="${t('menu.name')}">`
+            : `<span class="nm">${p.name}</span>`}
+          ${ich ? `<span class="muted small">${t('word.you')}</span>` : ''}
+          ${p.account ? `<span class="muted small" title="${t('lobby.accountTitle')}">@${p.account}</span>` : ''}
+          ${p.id === gastgeber?.id ? `<span class="tag-host">${t('lobby.host')}</span>` : ''}
+        </span>
         ${p.isBot ? `<span class="tagbot"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>`
           : (p.connected ? '' : `<span class="tagbot">${t('word.offline')}</span>`)}
-        ${this.isHost && p.id !== msg.you ? `<button class="tiny" data-kick="${p.id}">×</button>` : ''}
-      </li>`).join('');
+        ${this.isHost && !ich ? `<button class="tiny" data-kick="${p.id}" title="${t('lobby.kick')}">×</button>` : ''}
+      </li>`;
+    }).join('');
     for (const b of $('#lobby-players').querySelectorAll('[data-kick]')) {
       b.onclick = () => this.net.send({ t: 'kick', playerId: b.dataset.kick });
     }
+    for (const b of $('#lobby-players').querySelectorAll('[data-color]:not([disabled])')) {
+      b.onclick = () => (this.colorPop ? this.closeColorMenu() : this.colorMenu(b, b.dataset.color));
+    }
+    const ava = $('#lobby-players [data-avatar]');
+    if (ava) ava.onclick = () => this.chooseAvatar();
+    const edit = $('#lobby-players .name-edit');
+    if (edit) {
+      edit.onchange = () => this.rename(edit.value);
+      edit.onkeydown = (e) => { if (e.key === 'Enter') edit.blur(); if (e.key === 'Escape') { edit.value = this.profile?.name || edit.value; edit.blur(); } };
+      if (entwurf) { edit.value = entwurf.value; edit.focus(); edit.setSelectionRange(entwurf.a, entwurf.b); }
+    }
+    if (this.colorPop) this.closeColorMenu();
+
+    // Gaeste sehen, was gilt - aber nichts, das nach Bedienen aussieht.
+    $('#lobby-settings').classList.toggle('readonly', !this.isHost);
+    const schloss = $('#settings-lock');
+    schloss.classList.toggle('hidden', this.isHost);
+    schloss.textContent = this.isHost ? '' : t('lobby.settingsLocked', { host: gastgeber?.name || '' });
+    for (const el of document.querySelectorAll('#screen-lobby .host-only')) el.classList.toggle('hidden', !this.isHost);
     const s = msg.lobby.settings;
     $('#s-ppp').value = s.planetsPerPlayer; $('#v-ppp').textContent = t('word.worlds', { n: s.planetsPerPlayer });
     $('#s-money').value = s.startMoney; $('#v-money').textContent = `${num(s.startMoney)} ${t('unit.cr')}`;
-    $('#s-metal').value = s.startMetal; $('#v-metal').textContent = `${num(s.startMetal)} ${t('unit.ore')}`;
+    $('#s-metal').value = s.startMetal; $('#v-metal').textContent = `${num(s.startMetal)} ${t('unit.metal')}`;
     $('#s-timer').value = s.turnTimer;
     $('#v-timer').textContent = s.turnTimer === 0 ? t('lobby.noLimit') : t('unit.seconds', { n: s.turnTimer });
     $('#s-mode').value = s.mode === 'space' ? 'space' : 'classic';
@@ -163,6 +296,7 @@ export class Lobby {
     $('#s-turns').value = s.maxTurns ? String(limits.find(n => n >= s.maxTurns) || 500) : '0';
     $('#s-turns').disabled = !this.isHost;
     $('#s-expand').checked = s.expanding !== false;
+    $('#v-expand').textContent = t(s.expanding !== false ? 'word.yes' : 'word.no');
     $('#s-expand').disabled = !this.isHost;
     for (const sel of Object.keys(this.sliders)) $(sel).disabled = !this.isHost;
     syncSelects();            // Knöpfe an die eben gesetzten Werte angleichen
@@ -178,6 +312,7 @@ export class Lobby {
     // Lobby zurückwerfen.
     if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId }, false);
     if (this.offeneSpiele) this.showOpenGames(this.offeneSpiele);
+    this.profileHint();
   }
 
   // Zarte Sternanimation hinter dem Startmenü
