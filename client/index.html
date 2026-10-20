@@ -30,10 +30,19 @@
     <h1 class="logo"><img src="img/logo.svg" alt="Ho!!" width="330" height="182"></h1>
     <p class="tagline" data-i18n="menu.tagline"></p>
 
-    <label class="field">
+    <!-- Profil: Bild und Anzeigename. Gilt fuer jede Partie, mit Konto auch
+         auf jedem Geraet. -->
+    <div class="field">
       <span data-i18n="menu.name"></span>
-      <input id="in-name" maxlength="18" data-i18n-attr="placeholder:menu.namePlaceholder">
-    </label>
+      <div class="profile-row">
+        <button type="button" id="btn-avatar" class="avatar-pick" data-i18n-attr="title:profile.pick"></button>
+        <input id="in-name" maxlength="18" autocomplete="nickname" data-i18n-attr="placeholder:menu.namePlaceholder">
+      </div>
+      <div class="profile-hint">
+        <span id="profile-account" class="muted small"></span>
+        <a href="#" id="link-avatar-off" class="small hidden" data-i18n="profile.remove"></a>
+      </div>
+    </div>
 
     <label class="field" style="margin-bottom:12px">
       <span data-i18n="menu.board"></span>
@@ -105,13 +114,15 @@
       <div class="panel">
         <h3><span data-i18n="lobby.empires"></span> <span id="lobby-count" class="muted"></span></h3>
         <ul id="lobby-players" class="player-list"></ul>
-        <div class="row">
+        <div class="row host-only">
           <button id="btn-addbot" data-i18n="lobby.addBot"></button>
           <button id="btn-fill" data-i18n="lobby.fill"></button>
         </div>
       </div>
-      <div class="panel">
+      <div class="panel" id="lobby-settings">
         <h3 data-i18n="lobby.settings"></h3>
+        <!-- Gaeste sehen die Einstellungen nur - das muss man sofort sehen. -->
+        <p id="settings-lock" class="lock-hint hidden"></p>
         <label class="field slim"><span data-i18n="menu.board"></span>
           <select id="s-mode">
             <option value="classic" data-i18n="menu.board.classic"></option>
@@ -141,6 +152,7 @@
         <p class="muted small" data-i18n="lobby.timerHint"></p>
         <label class="chk" style="padding:0;margin-top:10px">
           <input type="checkbox" id="s-expand" checked> <span data-i18n="lobby.expand"></span>
+          <b id="v-expand" class="ro-only"></b>
         </label>
         <p class="muted small" data-i18n="lobby.expandHint"></p>
       </div>
@@ -164,9 +176,13 @@
       <div id="me-name" class="me-name">-</div>
       <div class="me-sub"><span id="me-planets"></span></div>
     </div>
-    <div class="res">
-      <div class="res-item"><span class="lbl" data-i18n="top.money"></span><span id="r-money" class="val">0</span><span id="r-income" class="delta"></span><span id="r-hold-money" class="hold"></span></div>
-      <div class="res-item"><span class="lbl" data-i18n="top.metal"></span><span id="r-metal" class="val">0</span><span id="r-hold-metal" class="hold"></span></div>
+    <!-- Kontostand jetzt -> nach dem Rundenende; aufgeschlüsselt im Haushalt. -->
+    <div class="res" id="res">
+      <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
+        <span class="lbl" data-i18n="top.money"></span><span id="r-money" class="val">0</span><span id="r-money-next" class="next"></span></button>
+      <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
+        <span class="lbl" data-i18n="top.metal"></span><span id="r-metal" class="val">0</span><span id="r-metal-next" class="next"></span></button>
+      <div id="ledger" class="ledger hidden" role="dialog" aria-labelledby="ledger-title"></div>
     </div>
     <div class="spacer"></div>
     <div class="turnbox">

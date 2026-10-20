@@ -7,11 +7,15 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
-  allReady, buildView, buildSpectatorView, lobbyView, DEFAULT_SETTINGS, armTurnTimer
+  allReady, buildView, buildSpectatorView, lobbyView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile } from './userstore.js';
+import { listUsers, userFile, getUser, setProfile } from './userstore.js';
+import {
+  cleanName, nameAllowed, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
+  accountAvatarUrl, handleAvatar
+} from './profile.js';
 import { MAX_PLAYERS } from '../shared/rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +50,7 @@ const server = http.createServer((req, res) => {
   // Ohne Sitzung gibt es nur die Anmeldeseite und was sie zum Anzeigen braucht.
   if (handleAuth(req, res, rel)) return;
   if (!gate(req, res, rel)) return;
+  if (handleAvatar(req, res, rel)) return;
   // /shared/* kommt aus dem gemeinsamen Verzeichnis, alles andere aus /client
   const base = rel.startsWith('/shared/') ? ROOT : path.join(ROOT, 'client');
   const file = path.normalize(path.join(base, rel));
@@ -122,8 +127,21 @@ function chat(game, from, msg) {
 
 wss.on('connection', (ws, req, sitzung) => {
   const connId = crypto.randomUUID();
-  conns.set(connId, { ws, gameId: null, playerId: null, account: sitzung.display ?? sitzung.user, sid: sitzung.token });
-  send(ws, { t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList() });
+  const c = {
+    ws, gameId: null, playerId: null, sid: sitzung.token,
+    account: sitzung.display ?? sitzung.user, accountKey: sitzung.user ?? null,
+    profile: { name: null, avatar: null }
+  };
+  if (c.accountKey) {
+    let konto = null;
+    try { konto = getUser(c.accountKey); } catch { /* Kontendatei unlesbar */ }
+    c.profile = { name: konto?.nick || c.account, avatar: accountAvatarUrl(c.accountKey) };
+  }
+  conns.set(connId, c);
+  send(ws, {
+    t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
+    profile: { ...c.profile, account: c.accountKey ? c.account : null }
+  });
 
   ws.on('message', (raw) => {
     let msg;
@@ -166,12 +184,38 @@ function openGameList() {
 }
 
 /**
- * Mit Anmeldung heisst ein Spieler wie sein Konto. Der Server entscheidet das,
- * nicht der Client - ein gesperrtes Eingabefeld allein liesse sich mit einer
- * selbst gebauten Nachricht umgehen. Ohne Anmeldung gilt der Wunschname.
+ * Mit Anmeldung heisst ein Spieler wie in seinem Profil - geaendert wird das
+ * nur ueber 'profile', wo der Server prueft, dass niemand den Namen eines
+ * anderen Kontos annimmt. Ohne Anmeldung gilt der Wunschname. In der Partie
+ * bekommt ein doppelter Name eine Nummer.
  */
-function spielerName(c, wunsch) {
-  return c.account ?? wunsch;
+function spielerName(c, game, wunsch, selfId) {
+  const name = c.accountKey ? c.profile.name : (cleanName(wunsch) || c.profile.name);
+  return uniqueName(game, name || 'Captain', selfId);
+}
+
+/** Neue Seite eines Profils annehmen. Gibt einen Fehlerschluessel zurueck oder null. */
+function profilAendern(c, msg) {
+  if (msg.name !== undefined) {
+    const name = cleanName(msg.name);
+    if (c.accountKey) {
+      const rüge = nameAllowed(name, c.accountKey);
+      if (rüge) return rüge;
+      // Wer wieder wie sein Konto heisst, braucht keinen eigenen Eintrag.
+      setProfile(c.accountKey, { nick: name === c.account ? null : name });
+    } else if (name.length < 2) return 'profile.err.short';
+    c.profile.name = name;
+  }
+  if (msg.avatar !== undefined) {
+    let bild = null;
+    if (msg.avatar !== null) {
+      bild = parseAvatar(msg.avatar);
+      if (bild.error) return bild.error;
+    }
+    if (c.accountKey) c.profile.avatar = putAccountAvatar(c.accountKey, bild);
+    else c.profile.avatar = bild ? putGuestAvatar(bild, c.profile.avatar?.match(/avatar\/(g-[^?]+)/)?.[1]) : null;
+  }
+  return null;
 }
 
 function handle(connId, ws, msg) {
@@ -181,11 +225,12 @@ function handle(connId, ws, msg) {
 
   switch (msg.t) {
     case 'create': {
-      const name = spielerName(c, msg.name);
-      const g = createGame(name || 'Spieler');
+      const g = createGame('');
+      const name = spielerName(c, g, msg.name);
+      g.hostName = name;
       Object.assign(g.settings, sanitizeSettings(msg.settings));
       games.set(g.id, g);
-      const p = addPlayer(g, { name, connId });
+      const p = addPlayer(g, { name, connId, avatar: c.profile.avatar, account: c.accountKey ? c.account : null });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -206,7 +251,10 @@ function handle(connId, ws, msg) {
         return;
       }
       if (g.players.length >= MAX_PLAYERS) return send(ws, { t: 'error', key: 'err.gameFull' });
-      const p = addPlayer(g, { name: spielerName(c, msg.name), connId });
+      const p = addPlayer(g, {
+        name: spielerName(c, g, msg.name), connId,
+        avatar: c.profile.avatar, account: c.accountKey ? c.account : null
+      });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -225,9 +273,34 @@ function handle(connId, ws, msg) {
       else { send(ws, { t: 'view', view: buildView(g, p) }); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
       break;
     }
-    case 'setName': {
-      // Ein Kontoname bleibt, wie er ist.
-      if (me && msg.name && !c.account) { me.name = String(msg.name).slice(0, 18); broadcastLobby(game); }
+    case 'profile': {
+      const rüge = profilAendern(c, msg);
+      if (rüge) send(ws, { t: 'error', key: rüge });
+      send(ws, { t: 'profile', profile: { ...c.profile, account: c.accountKey ? c.account : null } });
+      if (rüge || !me) return;
+      // Das Bild geht immer mit; umbenannt wird nur vor dem Start - danach
+      // stuende der alte Name schon in Protokoll und Chat.
+      me.avatar = c.profile.avatar;
+      if (game.state === 'lobby') {
+        if (msg.name !== undefined) {
+          me.name = spielerName(c, game, c.profile.name, me.id);
+          if (game.players[0] === me) game.hostName = me.name;
+        }
+        broadcastLobby(game);
+      } else broadcastView(game);
+      break;
+    }
+    case 'color': {
+      if (!game || !me) return;
+      // Die eigene Farbe darf jeder waehlen, die der KI-Reiche der Gastgeber.
+      const wer = msg.playerId ? game.players.find(p => p.id === msg.playerId) : me;
+      const host = game.players[0] === me;
+      if (!wer || (wer !== me && !(wer.isBot && host))) return;
+      // Traegt ein Mitspieler die Farbe schon, wird nur getauscht, wenn der
+      // Gastgeber es will - sonst verliert jemand ungefragt seine Farbe.
+      const traeger = game.players.find(p => p !== wer && p.color === msg.color);
+      if (traeger && !traeger.isBot && !host) return send(ws, { t: 'error', key: 'lobby.colorTaken' });
+      if (setPlayerColor(game, wer, String(msg.color || ''))) broadcastLobby(game);
       break;
     }
     case 'settings': {

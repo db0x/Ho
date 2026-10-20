@@ -496,6 +496,10 @@ const satellite = {
 };
 
 /* -------------------------------------------------------- Kolonieschiff */
+// Groesse einer Wohnkuppel relativ zur gezeichneten Kuppel (Radius 15).
+// Bei 1 ragt sie deutlich ueber den Traeger (halbe Breite 10,5).
+const KUPPEL = 1;
+
 const colony = {
   r: 58,
   engines: [
@@ -535,64 +539,65 @@ const colony = {
       });
     }
     // Rumpf
-    const hull = () => sym(ctx, [[50, 0], [44, -7], [32, -14.5], [-30, -15], [-44, -12], [-50, -6], [-50, 0]]);
-    hull(); fillShadowed(ctx, metal(ctx, -15, 15), S);
+    // Schmaler Traeger: die drei Kuppeln sollen links und rechts ueberstehen.
+    const hull = () => sym(ctx, [[50, 0], [44, -5.5], [34, -10], [-30, -10.5], [-44, -8.5], [-50, -4.5], [-50, 0]]);
+    hull(); fillShadowed(ctx, metal(ctx, -11, 11), S);
     inside(ctx, hull, () => {
-      for (const x of [30, -22, -36]) seam(ctx, x, -16, x, 16);
-      seam(ctx, -44, -9, 30, -9, 0.3); seam(ctx, -44, 9, 30, 9, 0.3);
-      // Fensterreihen, teils beleuchtet
-      for (const s of [-1, 1]) for (let i = 0; i < 9; i++) {
-        const x = -32 + i * 2.6 + (i > 3 ? 16 : 0);
-        if (x > 28) continue;
-        const an = (i * 7 + (s > 0 ? 3 : 0)) % 5 !== 0;
-        ctx.fillStyle = an ? '#ffe7a3' : '#2a3142';
-        ctx.fillRect(x, s * 11.6 - 0.8, 1.5, 1.6);
-        if (an) { ctx.fillStyle = 'rgba(255,220,140,.25)'; ctx.fillRect(x - 0.4, s * 11.6 - 1.2, 2.3, 2.4); }
-      }
-      vents(ctx, -42, -3, 4, 3, 1.5); vents(ctx, -42, 3, 4, 3, 1.5);
-      rivets(ctx, 24, 36, -6, 4, 0.3); rivets(ctx, 24, 36, 6, 4, 0.3);
+      for (const x of [36, -48]) seam(ctx, x, -12, x, 12);
+      seam(ctx, -48, -6.5, 36, -6.5, 0.3); seam(ctx, -48, 6.5, 36, 6.5, 0.3);
+      rivets(ctx, 38, 44, -3.5, 3, 0.3); rivets(ctx, 38, 44, 3.5, 3, 0.3);
     });
     bevel(ctx, hull, 1);
     // Brücke
     const br = () => sym(ctx, [[47, 0], [43, -3.6], [37, -4.4], [36, 0]]);
     glass(ctx, br, 36, 47, -4.4, 4.4, '#7fe0ff', S);
-    // Wohnkuppel mit Park
-    const dome = () => { ctx.beginPath(); ctx.arc(4, 0, 15, 0, TAU); };
-    ctx.save();
-    dome(); fillShadowed(ctx, '#173a2c', S);
-    inside(ctx, dome, () => {
-      const lawn = ctx.createRadialGradient(4, 0, 0, 4, 0, 15);
-      lawn.addColorStop(0, '#4fae5e'); lawn.addColorStop(1, '#1d5a35');
-      ctx.fillStyle = lawn; ctx.fillRect(-12, -16, 32, 32);
-      // Wasser, Wege, Bäume, Häuser
-      ctx.fillStyle = '#3a8fc7'; ctx.beginPath(); ctx.ellipse(8, 4, 4.2, 2.6, 0.4, 0, TAU); ctx.fill();
-      ctx.strokeStyle = 'rgba(230,220,180,.6)'; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(-10, -4); ctx.quadraticCurveTo(2, -1, 16, -6); ctx.moveTo(4, -14); ctx.lineTo(4, 14); ctx.stroke();
-      const trees = [[-6, 6], [-3, 9], [-8, 1], [12, -9], [9, -11], [0, -9], [-4, -11], [14, 1], [-1, 4]];
-      for (const [x, y] of trees) {
-        ctx.fillStyle = '#1f6b3a'; ctx.beginPath(); ctx.arc(x + 0.4, y + 0.4, 1.8, 0, TAU); ctx.fill();
-        ctx.fillStyle = '#5fc46e'; ctx.beginPath(); ctx.arc(x, y, 1.4, 0, TAU); ctx.fill();
-      }
-      for (const [x, y] of [[9, -3], [11, -2], [0, 1], [-2, -4]]) {
-        ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x, y, 1.6, 1.6);
-        ctx.fillStyle = '#ffd77a'; ctx.fillRect(x + 0.5, y + 0.5, 0.6, 0.6);
-      }
-      // Glaswölbung: Rippen, Spiegelung, Randschatten
-      ctx.strokeStyle = 'rgba(210,240,255,.35)'; ctx.lineWidth = 0.35;
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * Math.PI;
-        ctx.beginPath(); ctx.ellipse(4, 0, 15, 15 * Math.abs(Math.cos(a)), Math.PI / 2, 0, TAU); ctx.stroke();
-      }
-      ctx.beginPath(); ctx.arc(4, 0, 9, 0, TAU); ctx.stroke();
-      const rim = ctx.createRadialGradient(4, 0, 9, 4, 0, 15);
-      rim.addColorStop(0, 'rgba(0,20,30,0)'); rim.addColorStop(1, 'rgba(0,20,30,.55)');
-      ctx.fillStyle = rim; ctx.fillRect(-12, -16, 32, 32);
-      ctx.fillStyle = 'rgba(255,255,255,.45)';
-      ctx.beginPath(); ctx.ellipse(1, -8, 8, 2.6, -0.25, 0, TAU); ctx.fill();
-    });
-    ctx.lineWidth = 1.4; ctx.strokeStyle = '#c3ccdb'; dome(); ctx.stroke();
-    ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(5,8,16,.9)'; ctx.beginPath(); ctx.arc(4, 0, 15.8, 0, TAU); ctx.stroke();
-    ctx.restore();
+    // Drei grosse Wohnkuppeln mit Park - das Kennzeichen des Siedlerschiffs.
+    // Der Park ist je etwas gedreht, damit sie nicht wie kopiert aussehen.
+    // Von hinten nach vorn: die vordere liegt jeweils obenauf.
+    for (const [x, dreh] of [[-33, 2.1], [-7, -0.9], [19, 0.5]]) {
+      ctx.save();
+      ctx.translate(x, 0); ctx.scale(KUPPEL, KUPPEL); ctx.translate(-4, 0);
+      const dome = () => { ctx.beginPath(); ctx.arc(4, 0, 15, 0, TAU); };
+      ctx.save();
+      dome(); fillShadowed(ctx, '#173a2c', S);
+      inside(ctx, dome, () => {
+        // Nur der Park dreht sich - Glas und Spiegelung behalten ihr Licht von oben.
+        ctx.save(); ctx.translate(4, 0); ctx.rotate(dreh); ctx.translate(-4, 0);
+        const lawn = ctx.createRadialGradient(4, 0, 0, 4, 0, 15);
+        lawn.addColorStop(0, '#4fae5e'); lawn.addColorStop(1, '#1d5a35');
+        ctx.fillStyle = lawn; ctx.fillRect(-12, -16, 32, 32);
+        // Wasser, Wege, Bäume, Häuser
+        ctx.fillStyle = '#3a8fc7'; ctx.beginPath(); ctx.ellipse(8, 4, 4.2, 2.6, 0.4, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(230,220,180,.6)'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(-10, -4); ctx.quadraticCurveTo(2, -1, 16, -6); ctx.moveTo(4, -14); ctx.lineTo(4, 14); ctx.stroke();
+        const trees = [[-6, 6], [-3, 9], [-8, 1], [12, -9], [9, -11], [0, -9], [-4, -11], [14, 1], [-1, 4]];
+        for (const [x, y] of trees) {
+          ctx.fillStyle = '#1f6b3a'; ctx.beginPath(); ctx.arc(x + 0.4, y + 0.4, 1.8, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#5fc46e'; ctx.beginPath(); ctx.arc(x, y, 1.4, 0, TAU); ctx.fill();
+        }
+        for (const [x, y] of [[9, -3], [11, -2], [0, 1], [-2, -4]]) {
+          ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x, y, 1.6, 1.6);
+          ctx.fillStyle = '#ffd77a'; ctx.fillRect(x + 0.5, y + 0.5, 0.6, 0.6);
+        }
+        ctx.restore();
+        // Glaswölbung: Rippen, Spiegelung, Randschatten
+        ctx.strokeStyle = 'rgba(210,240,255,.35)'; ctx.lineWidth = 0.35;
+        for (let i = 0; i < 6; i++) {
+          const a = i / 6 * Math.PI;
+          ctx.beginPath(); ctx.ellipse(4, 0, 15, 15 * Math.abs(Math.cos(a)), Math.PI / 2, 0, TAU); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(4, 0, 9, 0, TAU); ctx.stroke();
+        const rim = ctx.createRadialGradient(4, 0, 9, 4, 0, 15);
+        rim.addColorStop(0, 'rgba(0,20,30,0)'); rim.addColorStop(1, 'rgba(0,20,30,.55)');
+        ctx.fillStyle = rim; ctx.fillRect(-12, -16, 32, 32);
+        ctx.fillStyle = 'rgba(255,255,255,.45)';
+        ctx.beginPath(); ctx.ellipse(1, -8, 8, 2.6, -0.25, 0, TAU); ctx.fill();
+      });
+      ctx.lineWidth = 1.4; ctx.strokeStyle = '#c3ccdb'; dome(); ctx.stroke();
+      ctx.lineWidth = 0.4; ctx.strokeStyle = 'rgba(5,8,16,.9)'; ctx.beginPath(); ctx.arc(4, 0, 15.8, 0, TAU); ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+    }
   }
 };
 

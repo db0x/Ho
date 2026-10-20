@@ -195,12 +195,35 @@ export function setDisplay(name, spelling) {
   return { name: key, display: displayName(key, db.users[key]) };
 }
 
+/**
+ * Profil eines Kontos: frei gewaehlter Anzeigename (`nick`) und die Version
+ * des Bildes (`avatar`, das Bild selbst liegt in server/profile.js). null
+ * entfernt den Eintrag, undefined laesst ihn stehen.
+ */
+export function setProfile(name, { nick, avatar } = {}) {
+  const key = normalizeName(name);
+  const db = load();
+  const user = db.users[key];
+  if (!user) throw new Error('auth.cli.unknown');
+  for (const [feld, wert] of Object.entries({ nick, avatar })) {
+    if (wert === undefined) continue;
+    if (wert === null || wert === '') delete user[feld];
+    else user[feld] = String(wert);
+  }
+  save(db);
+  return { name: key, nick: user.nick || null, avatar: user.avatar || null };
+}
+
 export function deleteUser(name) {
   const key = normalizeName(name);
   const db = load();
   if (!db.users[key]) return false;
   delete db.users[key];
   save(db);
+  // Das Profilbild gehoert zum Konto und geht mit (siehe server/profile.js).
+  for (const art of ['png', 'jpeg', 'webp']) {
+    try { fs.unlinkSync(path.join(path.dirname(userFile()), 'avatars', `${key}.${art}`)); } catch { /* keins */ }
+  }
   return true;
 }
 

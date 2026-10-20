@@ -7,7 +7,18 @@ import { klein } from './viewport.js';
 const TOP = 64;          // unter der Topbar bleiben
 const RAND = 8;          // Mindestabstand zum Bildschirmrand
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-let oben = 6;            // z-index des zuletzt angefassten Fensters
+// Reihenfolge der Fenster von hinten nach vorn. Die z-Werte bleiben in einem
+// festen Band (ab UNTEN) - ein Zaehler, der bei jedem Klick waechst, schob ein
+// Fenster sonst irgendwann ueber die Kopfleiste samt Haushalt und zuletzt
+// sogar ueber die Rueckfragen (.modal).
+const stapel = [];
+const UNTEN = 5;
+
+function nachVorn(el) {
+  stapel.splice(stapel.indexOf(el), 1);
+  stapel.push(el);
+  stapel.forEach((w, i) => { w.style.zIndex = String(UNTEN + i); });
+}
 
 /**
  * @param {HTMLElement} el     das Fenster selbst
@@ -80,7 +91,12 @@ export function makeDialog(el, o) {
 
   // Wer angefasst wird, kommt nach vorn - sonst verschwände ein Fenster, das
   // man über ein anderes zieht, darunter.
-  el.addEventListener('pointerdown', () => { el.style.zIndex = String(++oben); }, true);
+  // Auf dem Telefon sind es Blaetter mit eigener Ordnung (CSS) - dort nichts setzen.
+  stapel.push(el);
+  el.addEventListener('pointerdown', () => {
+    if (schmal.matches) el.style.zIndex = '';
+    else nachVorn(el);
+  }, true);
 
   fassen(o.handle, 'move');
   fassen(o.grip, 'size');

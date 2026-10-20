@@ -39,9 +39,14 @@ const TAU = Math.PI * 2;
 // Form des Strudels - beide Ansichten rechnen damit, damit sie gleich aussehen.
 export const SWIRL = { arme: 7, drall: 2.2, innen: 0.3, aussen: 0.75, tempo: 0.3 };
 
-/** Punkt auf einem Strudelarm: t von 0 (innen) bis 1 (außen). */
+/**
+ * Punkt auf einem Strudelarm: t von 0 (innen) bis 1 (außen). Die Arme
+ * schleppen nach: nach außen laufen sie im Uhrzeigersinn aus, gedreht wird
+ * gegen ihn - so sieht es nach Einsaugen aus, nicht nach Ausschleudern, und
+ * der Strudel läuft mit dem gestrichelten Ring der Gefahrenzone.
+ */
 export function swirlPoint(R, phase, arm, t) {
-  const a = phase * SWIRL.tempo + arm * (TAU / SWIRL.arme) + SWIRL.drall * t;
+  const a = -phase * SWIRL.tempo + arm * (TAU / SWIRL.arme) + SWIRL.drall * t;
   const r = R * (SWIRL.innen + SWIRL.aussen * t * t);
   return [Math.cos(a) * r, Math.sin(a) * r];
 }

@@ -1,15 +1,17 @@
 // Alle Panels des Spielbildschirms.
 import {
-  TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost, refitTotal,
+  TECH_FIELDS, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
-  TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, holeZone, travelDistance, supplyDistance, batteryStats
+  holeZone, travelDistance, supplyDistance, batteryStats
 } from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
 import { openShipInfo } from './shipinfo.js';
+import { forecast, refitShips } from '../../shared/budget.js';
+import { avatarHtml } from './avatar.js';
 import { t, n as num, localeTag } from '../i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -65,6 +67,27 @@ export class Hud {
       dlg.refresh();
     };
     $('#log-collapse').onclick = klappen;
+
+    // Haushalt: mit dem Zeiger darueber zur Ansicht, per Klick angeheftet.
+    const res = $('#res'), ledger = $('#ledger');
+    let angeheftet = false;
+    const zeige = (auf) => {
+      ledger.classList.toggle('hidden', !auf);
+      for (const b of res.querySelectorAll('button')) b.setAttribute('aria-expanded', String(auf));
+      if (auf) this.ledger();
+    };
+    for (const b of res.querySelectorAll('button')) {
+      b.onclick = () => { angeheftet = !angeheftet; zeige(angeheftet); };
+    }
+    res.onpointerenter = (e) => { if (e.pointerType === 'mouse' && this.view?.me) zeige(true); };
+    res.onpointerleave = (e) => { if (e.pointerType === 'mouse' && !angeheftet) zeige(false); };
+    addEventListener('pointerdown', (e) => {
+      if (ledger.classList.contains('hidden') || res.contains(e.target)) return;
+      angeheftet = false; zeige(false);
+    });
+    addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !ledger.classList.contains('hidden')) { angeheftet = false; zeige(false); }
+    });
     $('#log-bar').ondblclick = (e) => { if (!e.target.closest('button, input')) klappen(); };
 
     // Solange ein Regler gezogen wird, darf das Panel nicht neu aufgebaut
@@ -117,7 +140,7 @@ export class Hud {
   /** Tabelle aller Reiche - beim Zusehen das Interessanteste am Bild. */
   league() {
     const v = this.view;
-    const rows = v.players.slice().sort((a, b) => (b.alive - a.alive) || b.stats.pop - a.stats.pop);
+    const rows = rangfolge(v.players);
     const maxPop = Math.max(1, ...rows.map(p => p.stats.pop));
     $('#tab-research').innerHTML = `<div class="league">${rows.map(p => `
       <div class="row ${p.alive ? '' : 'dead'}">
@@ -129,89 +152,77 @@ export class Hud {
         <div class="num">${statsText(p.stats.planets, p.stats.pop, p.stats.ships)}</div>
         <div class="bar"><i style="width:${Math.round(p.stats.pop / maxPop * 100)}%;background:${p.color}"></i></div>
         <div class="tech">${TECH_FIELDS.map(f => t(`tech.${f}.short`) + p.tech[f]).join(' ')}
-          · ${fmt(p.money)} ${t('unit.cr')} · ${fmt(p.metal)} ${t('unit.ore')}</div>
+          · ${fmt(p.money)} ${t('unit.cr')} · ${fmt(p.metal)} ${t('unit.metal')}</div>
       </div>`).join('')}</div>`;
   }
 
   /**
-   * Techstand, mit dem am Rundenende gebaut wird. Der Server forscht vor dem
-   * Bau, und ein Schiff kostet nach dem Stand zum Bauzeitpunkt - in der Runde
-   * eines Durchbruchs waere eine Vorschau mit dem alten Stand deutlich zu
-   * billig. Gerechnet wird genau wie dort (siehe server/game.js, Schritt 1).
-   */
-  techNachForschung(me) {
-    const gewichte = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0);
-    // Ohne Gewichtung gibt der Server das Budget wieder frei.
-    const budget = gewichte > 0
-      ? Math.min(me.money, Math.floor(me.money * me.research.budgetPct / 100)) : 0;
-    const tech = { ...me.tech };
-    if (budget <= 0) return { tech, budget: 0, durchbruch: false };
-    let durchbruch = false;
-    for (const f of TECH_FIELDS) {
-      const anteil = budget * me.research.weights[f] / gewichte;
-      if (anteil <= 0) continue;
-      let punkte = (me.techProgress?.[f]?.points || 0) + anteil;
-      while (tech[f] < TECH_MAX_LEVEL && punkte >= techCostToNext(tech[f])) {
-        punkte -= techCostToNext(tech[f]);
-        tech[f]++;
-        durchbruch = true;
-      }
-    }
-    return { tech, budget, durchbruch };
-  }
-
-  /**
-   * Was am Rundenende wirklich zur Verfuegung steht. Der Server bucht in
-   * dieser Reihenfolge ab: zuerst die Forschung, dann den Schiffsbau - die
-   * Einnahmen kommen erst danach. Wer nur auf den Kontostand schaut, haelt
-   * deshalb Auftraege fuer bezahlbar, die es nicht sind; und weil das Budget
-   * fuer alle Welten zusammen gilt, reicht der Blick auf eine Werft nicht.
+   * Was am Rundenende mit Geld und Metall geschieht - gerechnet in
+   * shared/budget.js genau wie im Server (test/budget.js haelt beides
+   * zusammen). Hier nur fuer Kopfleiste, Werft und Haushalt aufbereitet.
    */
   plan() {
-    const me = this.view?.me;
+    const v = this.view, me = v?.me;
     if (!me) return null;
-    const { tech, budget: forschung, durchbruch } = this.techNachForschung(me);
-    let bauGeld = 0, bauErz = 0;
-    for (const [pid, q] of Object.entries(me.builds || {})) {
-      // Welten ohne Bevoelkerung bauen nicht - der Server ueberspringt sie.
-      const welt = this.view.planets[pid];
-      if (!welt || welt.owner !== this.view.you || !(welt.pop >= 1)) continue;
-      for (const [typ, anzahl] of Object.entries(q)) {
-        const c = shipCost(typ, tech);
-        bauGeld += c.money * anzahl; bauErz += c.metal * anzahl;
-      }
-    }
-    // Umrüstungen bucht der Server direkt nach dem Bau ab, mit demselben Stand.
-    for (const key of Object.keys(me.refit || {})) {
-      const r = this.refitFor(key, tech);
-      if (r) { bauGeld += r.money; bauErz += r.metal; }
-    }
-    const geldFrei = me.money - forschung;
+    const f = forecast(v);
+    // Jede Zeile gerundet, die Summe aus den gerundeten Zeilen - sonst geht
+    // die Rechnung im Haushalt um eine Einheit nicht auf.
+    const r = Math.round;
+    const hh = {
+      jetzt: { geld: r(me.money), metall: r(me.metal) },
+      forschung: r(f.forschung), anteil: me.research.budgetPct,
+      bau: { geld: r(f.bau.gebucht.geld), metall: r(f.bau.gebucht.metall),
+             ausfall: f.bau.geplant.n - f.bau.gebucht.n, gesamt: f.bau.geplant.n,
+             ohneGeld: f.bau.ohneGeld, ohneMetall: f.bau.ohneMetall },
+      umruest: { geld: r(f.umr.gebucht.geld), metall: r(f.umr.gebucht.metall),
+                 fehlt: f.umr.geplant.n > f.umr.gebucht.n, ohneGeld: f.umr.ohneGeld, ohneMetall: f.umr.ohneMetall },
+      terra: { geld: r(f.terra.gebucht), fehlt: r(f.terra.geplant - f.terra.gebucht), welten: f.terra.welten },
+      ein: { geld: r(f.einnahmen), metall: r(f.foerderung) }
+    };
+    hh.danach = {
+      geld: hh.jetzt.geld - hh.forschung - hh.bau.geld - hh.umruest.geld - hh.terra.geld + hh.ein.geld,
+      metall: hh.jetzt.metall - hh.bau.metall - hh.umruest.metall + hh.ein.metall
+    };
+    hh.knapp = hh.bau.ausfall > 0 || hh.umruest.fehlt || hh.terra.fehlt > 0;
+
+    // Fuer die Werft: Bau und Umrüstung zusammen, geplant gegen verfuegbar.
+    const bauGeld = f.bau.geplant.geld + f.umr.geplant.geld;
+    const bauErz = f.bau.geplant.metall + f.umr.geplant.metall;
     return {
-      tech, durchbruch, forschung, bauGeld, bauErz, geldFrei, erzFrei: me.metal,
-      fehltGeld: Math.max(0, bauGeld - geldFrei),
-      fehltErz: Math.max(0, bauErz - me.metal)
+      tech: f.tech, durchbruch: f.durchbruch, forschung: f.forschung,
+      bauGeld, bauErz, geldFrei: f.verfuegbar.geld, erzFrei: f.verfuegbar.metall,
+      fehltGeld: Math.max(0, bauGeld - f.verfuegbar.geld),
+      fehltErz: Math.max(0, bauErz - f.verfuegbar.metall),
+      haushalt: hh
     };
   }
 
   /**
-   * Was eine Umrüstung kostet: 'f:<flotte>' rechnet über die Schiffe der
-   * Flotte, 'p:<welt>' über deren Satelliten (die schickt der Server fertig
-   * gerechnet, die Schiffe selbst kennt der Client nicht). Null, wenn dort
-   * keine Werft ist oder nichts veraltet.
+   * Ginge der Haushalt mit diesem zusaetzlichen Auftrag noch auf? Dieselbe
+   * Pruefung macht der Server - der Knopf zeigt nur vorher, was er annimmt.
+   * @param {{build?: [number, string], refit?: string}} extra
+   */
+  leistbar(extra) {
+    const v = this.view;
+    const builds = JSON.parse(JSON.stringify(v.me.builds || {}));
+    const refit = { ...(v.me.refit || {}) };
+    if (extra.build) {
+      const [pid, typ] = extra.build;
+      (builds[pid] ||= {})[typ] = (builds[pid][typ] || 0) + 1;
+    }
+    if (extra.refit) refit[extra.refit] = true;
+    const f = forecast({ ...v, me: { ...v.me, builds, refit } });
+    return f.bau.geplant.n === f.bau.gebucht.n && f.umr.geplant.n === f.umr.gebucht.n;
+  }
+
+  /**
+   * Was eine Umrüstung kostet ('f:<flotte>' oder 'p:<welt>'), mit dem
+   * Techstand nach der Forschung. Null, wenn dort keine Werft ist oder
+   * nichts veraltet.
    */
   refitFor(key, tech) {
-    const v = this.view;
-    if (key.startsWith('f:')) {
-      const f = v.fleets.find(x => x.mine && x.id === key.slice(2));
-      const welt = f && f.at != null ? v.planets[f.at] : null;
-      if (!welt || welt.owner !== v.you || !(welt.pop >= 1)) return null;
-      const r = refitTotal(f.ships, tech);
-      return r.count ? r : null;
-    }
-    const welt = v.planets[key.slice(2)];
-    if (!welt || welt.owner !== v.you || !(welt.pop >= 1)) return null;
-    return welt.defenseRefit?.count ? welt.defenseRefit : null;
+    const r = refitTotal(refitShips(this.view, key), tech);
+    return r.count ? r : null;
   }
 
   /** Steckbrief eines Schiffstyps; ohne Angabe mit dem eigenen Techstand. */
@@ -227,11 +238,13 @@ export class Hud {
     if (!r) return '';
     const ordered = !!this.view.me.refit?.[key];
     const preis = t('refit.cost', { n: r.count, count: r.count, money: fmt(r.money), metal: fmt(r.metal) });
-    return ordered
-      ? `<p class="hint-line" style="color:var(--good)">${t('refit.ordered', { cost: preis })}</p>
-         <div class="sel-actions"><button class="tiny" data-refit="${key}" data-off="1">${t('refit.cancel')}</button></div>`
-      : `<div class="sel-actions"><button class="tiny" data-refit="${key}">${label}</button></div>
-         <p class="small muted" style="margin-top:4px">${preis}</p>`;
+    // Knopf oben, eine Zeile Text darunter - in beiden Zuständen gleich, damit
+    // nichts darunter verrutscht, wenn man umrüstet oder abbricht.
+    const text = ordered ? t('refit.ordered', { cost: preis }) : preis;
+    return `<div class="sel-actions">${ordered
+        ? `<button class="tiny" data-refit="${key}" data-off="1">${t('refit.cancel')}</button>`
+        : `<button class="tiny" data-refit="${key}"${this.leistbar({ refit: key }) ? '' : ` disabled title="${t('yard.cantAfford')}"`}>${label}</button>`}</div>
+      <p class="small oneline" style="margin-top:4px;color:${ordered ? 'var(--good)' : 'var(--ink-faint)'}" title="${text}">${text}</p>`;
   }
 
   wireRefit(box) {
@@ -268,33 +281,30 @@ export class Hud {
     const em = $('#me-emblem');
     em.style.background = `linear-gradient(135deg, ${me.color}, ${shadeHex(me.color, 0.55)})`;
     em.style.color = me.color;
+    // Mit Bild zeigt das Wappen das Bild, die Farbe bleibt als Rahmen.
+    if (em.dataset.avatar !== (me.avatar || '')) {
+      em.dataset.avatar = me.avatar || '';
+      em.innerHTML = me.avatar ? `<img src="${me.avatar}" alt="">` : '';
+    }
     $('#me-name').textContent = me.name;
     const mine = v.planets.filter(p => p.owner === v.you);
     const pop = mine.reduce((a, p) => a + (p.pop || 0), 0);
     const ships = v.fleets.filter(f => f.mine).reduce((a, f) => a + f.ships.length, 0);
     $('#me-planets').textContent = statsText(mine.length, pop, ships);
-    $('#r-money').textContent = fmt(me.money);
-    $('#r-income').textContent = me.income ? '+' + fmt(me.income) : '';
-    $('#r-metal').textContent = fmt(me.metal);
     $('#r-turn').textContent = v.turn;
 
-    // Immer sichtbar, was diese Runde schon verplant ist - sonst merkt man
-    // erst im Protokoll, dass der Bau nicht bezahlt werden konnte.
-    const pl = this.plan();
-    const hm = $('#r-hold-money'), he = $('#r-hold-metal');
-    const verplantGeld = pl.forschung + pl.bauGeld;
-    hm.textContent = verplantGeld ? '−' + fmt(verplantGeld) : '';
-    hm.classList.toggle('knapp', pl.fehltGeld > 0);
-    const grund = t('top.heldTitle', { research: fmt(pl.forschung), build: fmt(pl.bauGeld) });
-    hm.title = verplantGeld
-      ? (pl.fehltGeld ? t('top.heldShortMoney', { base: grund, missing: fmt(pl.fehltGeld) }) : grund)
-      : '';
-    he.textContent = pl.bauErz ? '−' + fmt(pl.bauErz) : '';
-    he.classList.toggle('knapp', pl.fehltErz > 0);
-    const grundErz = t('top.heldTitleOre', { build: fmt(pl.bauErz) });
-    he.title = pl.bauErz
-      ? (pl.fehltErz ? t('top.heldShortOre', { base: grundErz, missing: fmt(pl.fehltErz) }) : grundErz)
-      : '';
+    // Jetzt -> nach dem Rundenende. Wie es dazu kommt, steht im Haushalt
+    // (Klick oder Zeiger auf die Zahlen) - eine Rechnung, keine Einzelteile.
+    const hh = this.plan().haushalt;
+    $('#r-money').textContent = fmt(hh.jetzt.geld);
+    $('#r-metal').textContent = fmt(hh.jetzt.metall);
+    const naechste = (el, wert, knapp) => {
+      el.textContent = '→ ' + fmt(wert);
+      el.classList.toggle('knapp', knapp);
+    };
+    naechste($('#r-money-next'), hh.danach.geld, hh.bau.ohneGeld || hh.umruest.ohneGeld || hh.terra.fehlt > 0);
+    naechste($('#r-metal-next'), hh.danach.metall, hh.bau.ohneMetall || hh.umruest.ohneMetall);
+    if (!$('#ledger').classList.contains('hidden')) this.ledger();
 
     const btn = $('#btn-endturn');
     const waiting = me.ready;
@@ -305,6 +315,46 @@ export class Hud {
       ? t('top.waiting', { ready: readyCount, total: others.length })
       : t('top.endTurn');
     btn.disabled = v.state !== 'running';
+  }
+
+  /**
+   * Haushalt der laufenden Runde: von oben nach unten genau so, wie der
+   * Server am Rundenende abbucht, unten das Ergebnis aus der Kopfleiste.
+   */
+  ledger() {
+    const hh = this.plan()?.haushalt;
+    if (!hh) return;
+    const minus = n => n ? '−' + fmt(n) : '';
+    const plus = n => n ? '+' + fmt(n) : '';
+    const und = (...teile) => teile.filter(Boolean).join(` ${t('word.and')} `);
+    const zeile = (cls, label, geld, metall, rüge = '') => `
+      <tr class="${cls}"><th>${label}${rüge ? `<small class="bad">${rüge}</small>` : ''}</th>
+        <td>${geld}</td><td>${metall}</td></tr>`;
+    const zeilen = [zeile('stand', t('ledger.now'), fmt(hh.jetzt.geld), fmt(hh.jetzt.metall))];
+    zeilen.push(zeile('', t('ledger.research', { pct: hh.anteil }), minus(hh.forschung), ''));
+    // Woran es scheitert: Geld, Metall oder beides
+    const woran = (x) => und(x.ohneGeld && t('top.money'), x.ohneMetall && t('top.metal'));
+    if (hh.bau.gesamt) {
+      zeilen.push(zeile('', t('ledger.build'), minus(hh.bau.geld), minus(hh.bau.metall),
+        hh.bau.ausfall ? t('ledger.buildShort', { n: hh.bau.ausfall, total: hh.bau.gesamt, what: woran(hh.bau) }) : ''));
+    }
+    if (hh.umruest.geld || hh.umruest.metall || hh.umruest.fehlt) {
+      zeilen.push(zeile('', t('ledger.refit'), minus(hh.umruest.geld), minus(hh.umruest.metall),
+        hh.umruest.fehlt ? t('ledger.refitShort', { what: woran(hh.umruest) }) : ''));
+    }
+    if (hh.terra.welten) {
+      zeilen.push(zeile('', t('ledger.terra', { n: hh.terra.welten, count: hh.terra.welten }), minus(hh.terra.geld), '',
+        hh.terra.fehlt ? t('ledger.terraShort', { missing: fmt(hh.terra.fehlt) }) : ''));
+    }
+    zeilen.push(zeile('ein', t('ledger.income'), plus(hh.ein.geld), plus(hh.ein.metall)));
+    zeilen.push(zeile('summe', t('ledger.next'), fmt(hh.danach.geld), fmt(hh.danach.metall)));
+    $('#ledger').innerHTML = `
+      <h4 id="ledger-title">${t('ledger.title', { turn: this.view.turn })}</h4>
+      <table>
+        <thead><tr><th></th><td>${t('top.money')}</td><td>${t('top.metal')}</td></tr></thead>
+        <tbody>${zeilen.join('')}</tbody>
+      </table>
+      <p class="small muted">${t('ledger.order')}</p>`;
   }
 
   // Läuft in der Zeichenschleife: nur schreiben, wenn sich der Text ändert.
@@ -324,7 +374,8 @@ export class Hud {
   research() {
     const v = this.view, me = v.me;
     const total = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0) || 1;
-    const budget = Math.round(me.money * me.research.budgetPct / 100);
+    // Dieselbe Zahl wie im Haushalt (abgerundet, ohne Gewichtung keine Forschung).
+    const budget = this.plan().forschung;
     const box = $('#tab-research');
     box.innerHTML = `
       <div class="budget-box">
@@ -417,14 +468,23 @@ export class Hud {
   players() {
     const v = this.view;
     const box = $('#tab-players');
-    box.innerHTML = v.players.map(p => `
-      <div class="listrow ${p.ready ? 'rdy' : ''}">
-        <span class="dot" style="background:${p.color};box-shadow:0 0 8px ${p.color}"></span>
-        <span class="nm" style="${p.alive ? '' : 'text-decoration:line-through;opacity:.5'}">
-          ${p.name}${p.isBot ? ` <span class="muted small"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>` : ''}${p.connected || p.isBot ? '' : ` <span class="muted small">(${t('word.offline')})</span>`}
+    let platz = 0;
+    box.innerHTML = `<p class="hint-line rank-hint">${v.maxTurns ? t('rank.hint', { n: v.maxTurns }) : t('rank.hintEndless')}</p>` + rangfolge(v.players).map(p => {
+      if (p.alive) platz++;
+      return `
+      <div class="listrow rankrow ${p.ready ? 'rdy' : ''} ${p.id === v.you ? 'me' : ''} ${p.alive ? '' : 'dead'}">
+        <span class="rank">${p.alive ? platz : '–'}</span>
+        ${avatarHtml(p, 22)}
+        <span class="who">
+          <span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>
+          <small>${[p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '') : null,
+                    p.connected || p.isBot ? null : t('word.offline'),
+                    p.alive ? `${t('word.worlds', { n: p.stats.planets, count: p.stats.planets })} · ${t('word.ships', { n: p.stats.ships, count: p.stats.ships })}` : null
+                   ].filter(Boolean).join(' · ')}</small>
         </span>
-        <span class="num">${p.stats.planets}W ${fmt1(p.stats.pop)}M ${p.stats.ships}S</span>
-      </div>`).join('');
+        <span class="num"><b>${p.alive ? t('word.pop', { n: fmt1(p.stats.pop) }) : t('rank.out')}</b></span>
+      </div>`;
+    }).join('');
   }
 
   // ------------------------------------------------------------ Auswahl
@@ -495,7 +555,7 @@ export class Hud {
           <div class="small muted">${p.metalReserve > 0 ? t('planet.oreGrade', { n: (+p.metalRichness).toFixed(2) }) : t('planet.deepMining')}</div></div>
         <div class="stat"><div class="k">${t(econ ? 'planet.yield' : 'planet.defense')}</div>
           <div class="v">${econ ? '+' + fmt(planetIncome(p)) : t('planet.satellitesShort', { n: p.defenses || 0 })}</div>
-          <div class="small muted">${econ ? '+' + fmt(planetMining(p)) + ' ' + t('unit.ore')
+          <div class="small muted">${econ ? '+' + fmt(planetMining(p)) + ' ' + t('unit.metal')
             : t('planet.satellites', { n: p.defenses || 0, count: p.defenses || 0 })}</div></div>
       </div>
 
@@ -532,7 +592,6 @@ export class Hud {
       ${p.pop >= 1 ? `
       <div class="sec">
         <h4>${t('yard.title')}</h4>
-        <div class="small" id="buildwarn"></div>
         <div id="buildrows"></div>
         <div class="small muted" id="buildsum"></div>
         ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
@@ -588,7 +647,7 @@ export class Hud {
     }
 
     const rows = box.querySelector('#buildrows');
-    if (rows) this.buildRows(rows, box.querySelector('#buildsum'), p, box.querySelector('#buildwarn'));
+    if (rows) this.buildRows(rows, box.querySelector('#buildsum'), p);
 
     this.wireRefit(box);
     const ul = box.querySelector('#unload');
@@ -695,7 +754,7 @@ export class Hud {
       </div>`;
   }
 
-  buildRows(rows, sum, p, warn) {
+  buildRows(rows, sum, p) {
     const me = this.view.me;
     const queue = me.builds[p.id] || {};
     // Preise nach dem Techstand, der beim Bau gilt - sonst stimmte die Summe
@@ -711,12 +770,12 @@ export class Hud {
         <span class="bi"></span>
         <span>
           <div class="bname">${t(`ship.${type}.name`)}</div>
-          <div class="bcost">${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.ore')}</div>
+          <div class="bcost">${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}</div>
         </span>
         <span class="bq">
           <button class="tiny minus">−</button>
           <span class="n">${n}</span>
-          <button class="tiny plus">+</button>
+          <button class="tiny plus"${this.leistbar({ build: [p.id, type] }) ? '' : ` disabled title="${t('yard.cantAfford')}"`}>+</button>
         </span>`;
       row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color));
       row.title = t(`ship.${type}.desc`) + ' ' + t('shipinfo.hint');
@@ -733,40 +792,24 @@ export class Hud {
       const c = shipCost(typ, pl.tech);
       cm += c.money * anzahl; ce += c.metal * anzahl;
     }
-    // Geprueft wird gegen das, was nach der Forschung uebrig bleibt, und gegen
-    // alle Auftraege zusammen - nicht nur gegen den dieser Welt.
-    const knappGeld = pl.fehltGeld > 0, knappErz = pl.fehltErz > 0;
-    const farbe = eng => eng ? 'var(--bad)' : 'var(--gold)';
+    // Genau zwei Zeilen, immer: darunter liegen Umrüst-Knopf und Flotten, und
+    // die duerfen beim Klicken auf + und - nicht wandern. Was nicht in eine
+    // Zeile passt, steht vollstaendig im Tooltip. Ob das Geld reicht, prueft
+    // schon der Server (gesperrtes +); der Haushalt oben zeigt die Rechnung.
+    const knapp = pl.fehltGeld > 0 || pl.fehltErz > 0;      // sollte nicht vorkommen
     const andereGeld = pl.bauGeld - cm, andereErz = pl.bauErz - ce;
-    // "40 Cr und 20 Erz" - je nach Sprache mit "and"
-    const fehlt = [
-      knappGeld ? `${fmt(pl.fehltGeld)} ${t('unit.cr')}` : null,
-      knappErz ? `${fmt(pl.fehltErz)} ${t('unit.ore')}` : null
-    ].filter(Boolean).join(` ${t('word.and')} `);
-    if (warn) {
-      warn.innerHTML = (knappGeld || knappErz)
-        ? `<b style="color:var(--bad)">${t('yard.shortfall', { missing: fehlt })}</b>`
-          + ` <span class="muted">${t('yard.shortfallTail')}</span>`
-        : '';
-      warn.style.marginBottom = warn.innerHTML ? '8px' : '0';
-    }
-    const auftrag = t('yard.order', { money: fmt(cm), metal: fmt(ce) })
-      .replace('<b>', `<b style="color:${farbe(knappGeld)}">`)
-      .replace('<b>', `<b style="color:${farbe(knappErz)}">`);
-    sum.innerHTML = cm
-      ? auftrag
-        + (andereGeld > 0 || andereErz > 0
-          ? `<br><span class="muted">${t('yard.otherYards', { money: fmt(andereGeld), metal: fmt(andereErz) })}</span>` : '')
-        + (pl.durchbruch ? `<br><span class="muted">${t('yard.breakthrough')}</span>` : '')
-        + (knappGeld || knappErz
-          ? `<br><b style="color:var(--bad)">${t('yard.notEnough', { missing: fehlt })}</b> `
-            + `<span class="muted">${t('yard.leftAfterResearch', {
-                research: fmt(pl.forschung), money: fmt(pl.geldFrei), metal: fmt(pl.erzFrei) })}</span>`
-          : '')
-      : (pl.bauGeld
-        ? `<span class="muted">${t('yard.noOrderHere', { money: fmt(pl.bauGeld), metal: fmt(pl.bauErz) })}</span>`
-          + (knappGeld || knappErz ? `<br><b style="color:var(--bad)">${t('yard.budgetTooSmall')}</b>` : '')
-        : `<span class="muted">${t('yard.noOrder')}</span>`);
+    const zeile1 = cm || ce
+      ? t('yard.orderShort', { money: fmt(cm), metal: fmt(ce) })
+      : t('yard.noOrder');
+    const zeile2 = [
+      pl.durchbruch && (cm || ce) ? t('yard.breakthrough') : null,
+      andereGeld > 0 || andereErz > 0 ? t('yard.otherYards', { money: fmt(andereGeld), metal: fmt(andereErz) }) : null
+    ].filter(Boolean).join(' ');
+    sum.className = 'small buildsum';
+    sum.innerHTML = `<div class="${cm || ce ? '' : 'muted'}" style="${knapp ? 'color:var(--bad)' : ''}"></div><div class="muted"></div>`;
+    const [z1, z2] = sum.children;
+    z1.textContent = zeile1; z1.title = zeile1;
+    z2.textContent = zeile2 || '\u00a0'; z2.title = zeile2;
   }
 
 /**
@@ -1016,6 +1059,16 @@ export class Hud {
 }
 
 /** "3 Welten · 16,9 Mio · 5 Schiffe" - jedes Stueck in seiner Mehrzahlform. */
+/**
+ * Reihenfolge der Rangliste - wie das Spiel am Rundenlimit wertet: wer die
+ * meisten Einwohner hat, gewinnt (server/game.js). Bei Gleichstand zaehlen
+ * Welten, dann Schiffe; ausgeschiedene Reiche stehen unten.
+ */
+function rangfolge(players) {
+  return players.slice().sort((a, b) => (b.alive - a.alive)
+    || b.stats.pop - a.stats.pop || b.stats.planets - a.stats.planets || b.stats.ships - a.stats.ships);
+}
+
 function statsText(welten, pop, schiffe) {
   return t('top.myStats', {
     worlds: t('word.worlds', { n: welten, count: welten }),

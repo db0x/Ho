@@ -72,6 +72,28 @@ check(extra.errors[0] === 'err.gameFull',
   `Abweisung kam als '${extra.errors[0]}' statt als Schlüssel err.gameFull`);
 console.log('17. Spieler abgewiesen mit Schlüssel:', extra.errors[0]);
 
+// --- Farben frei waehlen: jede nur einmal, Tausch nur durch den Host
+{
+  const gast = clients[1], dritter = clients[2];
+  const farbe = (c) => host.lobby.players.find(p => p.id === c.id)?.color;
+  const hostFarbe = farbe(host), gastFarbe = farbe(gast);
+  gast.errors.length = 0;
+  send(gast, { t: 'color', color: hostFarbe });
+  check(await until(() => gast.errors.includes('lobby.colorTaken')), 'Gast nimmt dem Host ungefragt die Farbe');
+  check(farbe(host) === hostFarbe, 'Hostfarbe hat sich trotzdem geändert');
+  send(host, { t: 'color', color: gastFarbe });
+  check(await until(() => farbe(host) === gastFarbe && farbe(gast) === hostFarbe), 'Host kann nicht mit dem Gast tauschen');
+  send(dritter, { t: 'color', color: '#123456' });
+  await wait(100);
+  check(!host.lobby.players.some(p => p.color === '#123456'), 'Farbe ausserhalb der Palette angenommen');
+  check(new Set(host.lobby.players.map(p => p.color)).size === N, 'Farben nach dem Tausch nicht mehr eindeutig');
+  // Gleicher Name in derselben Partie bekommt eine Nummer
+  send(dritter, { t: 'profile', name: 'Host' });
+  check(await until(() => host.lobby.players.find(p => p.id === dritter.id)?.name === 'Host 2'),
+    `Doppelter Name nicht nummeriert (${host.lobby.players.find(p => p.id === dritter.id)?.name})`);
+  console.log('Farbwahl: eindeutig, Tausch nur durch den Host; doppelte Namen werden nummeriert.');
+}
+
 // --- Start
 send(host, { t: 'start' });
 check(await until(() => clients.every(c => c === extra || c.views.length > 0), 6000), 'Nicht alle Clients haben die Startsicht erhalten');

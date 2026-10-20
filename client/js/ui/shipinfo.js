@@ -101,7 +101,7 @@ function zeigen() {
       st.attack ? anders(st.attack, basis.attack) : null, fmt1),
     zeile(t('fleet.hull'), `${fmt(st.maxHp)} HP`, anders(st.maxHp, basis.maxHp)),
     st.colonists ? zeile(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
-    zeile(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.ore')}`)
+    zeile(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
   ].join('');
   const stufen = def.techs.map(f => `${t(`tech.${f}.name`)} ${tech[f] || TECH_START_LEVEL}`).join(' · ');
 

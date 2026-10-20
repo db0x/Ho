@@ -31,7 +31,7 @@ for (const k of alle) {
 // 3) Jeder Schlüssel, den Server oder Werkzeug nennen kann, muss übersetzbar
 //    sein - sonst steht im Browser oder auf der Konsole der nackte Schlüssel.
 const { readFile } = await import('node:fs/promises');
-const quellen = ['game.js', 'index.js', 'auth.js', 'userstore.js', 'users.js'];
+const quellen = ['game.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
 let quelle = '';
 for (const name of quellen) {
   quelle += await readFile(new URL('../server/' + name, import.meta.url), 'utf8');

@@ -1,0 +1,254 @@
+# Spielen
+
+*[English](playing.md) · **Deutsch*** · [← Übersicht](../readme.de.md)
+
+- [Eine Partie beginnen](#eine-partie-beginnen)
+- [Spielprinzip](#spielprinzip)
+- [Geld, Metall und der Haushalt](#geld-metall-und-der-haushalt)
+- [Kampf und Eroberung](#kampf-und-eroberung)
+- [Form der Galaxie: Streufeld oder Spirale](#form-der-galaxie-streufeld-oder-spirale)
+- [Zwei Spielfelder: Klassik und Raum](#zwei-spielfelder-klassik-und-raum)
+- [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand)
+- [Die KI-Reiche](#die-ki-reiche)
+- [Zusehen](#zusehen)
+- [Rangliste und Sieg](#rangliste-und-sieg)
+- [Steuerung](#steuerung)
+- [Auf dem Telefon](#auf-dem-telefon)
+- [Die Optik](#die-optik)
+
+## Eine Partie beginnen
+
+- **Schnell:** *Sofort gegen 5 KI spielen* – Partie anlegen, auffüllen, los.
+- **Mit Freunden:** *Neue Partie eröffnen*, den vierstelligen Code weitergeben,
+  freie Plätze mit KI füllen, starten. Im LAN erreichen die anderen den Server
+  unter `http://<deine-ip>:8080`.
+- **Zuschauen:** *Beim Spielen zusehen* startet eine reine KI-Partie, die von
+  allein läuft (siehe [Zusehen](#zusehen)).
+
+![Lobby mit Spielcode und der Liste der Reiche](screenshots/lobby-de.webp)
+
+**Profil.** Im Startbildschirm stehen dein Anzeigename und dein Bild. Klick auf
+den Kreis neben dem Namen lädt ein Bild hoch; es wird im Browser quadratisch
+zugeschnitten und verkleinert. Mit Konto gehören Name und Bild zum Konto und
+gelten auf jedem Gerät, ohne Konto merkt sie sich der Browser. Der Name ist frei
+wählbar, darf aber nicht wie ein *anderes* Konto heißen; in einer Partie heißt
+jeder anders (notfalls mit Nummer), und weicht der Name vom Konto ab, steht der
+Kontoname klein daneben. In der Lobby lassen sich Name und Bild in der eigenen
+Zeile ändern.
+
+**Farben.** Ein Klick auf das eigene Farbfeld öffnet die Palette. Jede Farbe gibt
+es einmal; vergebene haben eine abgeschnittene Ecke. Die Farbe eines Mitspielers
+nimmt nur der Host – dann tauschen beide. Der Host färbt auch die KI-Reiche.
+
+**Einstellungen** legt der Host fest; alle anderen sehen sie als reine Anzeige
+mit dem Hinweis, wer sie ändern kann:
+
+| Einstellung | Bedeutung |
+|---|---|
+| Spielfeld | *Klassik* (flach) oder *Raum* (dreidimensional) |
+| Form der Galaxie | *Streufeld* oder *Spirale* mit schwarzem Loch |
+| Rundenlimit | 100, 200, 300, 500 oder unbegrenzt |
+| Welten pro Spieler | 3–14 |
+| Startkapital, Startmetall | Kasse zu Beginn |
+| Zugzeit | 0 = es wird gewartet, bis alle fertig sind |
+| Galaxie wächst | siehe [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand); aus ergibt eine feste Karte |
+
+**Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
+übersprungen und kann jederzeit zurückkehren (der Platz wird im Browser
+gespeichert). Wer über *Verlassen* aussteigt, gibt den Platz endgültig auf: das
+Reich bleibt stehen und wird übersprungen. Partien ohne verbundene Spieler werden
+nach zwei Stunden aufgeräumt.
+
+## Spielprinzip
+
+Alle ziehen **gleichzeitig**. Jeder erteilt seine Befehle und klickt
+*Zug beenden*; sobald alle fertig sind (oder die Zugzeit abläuft), rechnet der
+Server die Runde ab – Forschung, Bau, Umrüstung, Terraforming, Bewegung, Kampf,
+Kolonisierung, Wirtschaft.
+
+| Begriff | Bedeutung |
+|---|---|
+| **Ideal** | 20 °C und 1,0 g. Je näher eine Welt daran liegt, desto mehr Menschen leben dort und desto mehr Geld bringt sie. |
+| **Terraforming** | Kostet jede Runde das eingestellte Budget und schiebt Temperatur und Schwerkraft Richtung Ideal. Extreme Welten brauchen erst höhere **Radikaltechnik**. |
+| **Metall** | Wird auf den eigenen Welten gefördert, in einen gemeinsamen Vorrat gelegt und beim Schiffsbau verbraucht. Der Vorrat eines Planeten erschöpft sich; danach liefert er im Tiefbau noch ein Zehntel. |
+| **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit Sprungbretter; Tanker erweitern den Radius. |
+| **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. Veraltete Schiffe lassen sich in einer Werft **umrüsten**. |
+| **Abwehrbatterie** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. |
+| **Orbitalverteidigung** | Billige, unbewegliche Satelliten, die dauerhaft im Orbit bleiben. Ab fünf Stück spannen sie einen Schild auf. |
+
+Die Schiffstypen – Späher, Jäger, Orbitalverteidigung, Kolonieschiff, Tanker –
+erklärt der Steckbrief im Spiel (Klick auf ein Schiff in der Werft oder
+*Schiffstypen ansehen* in der Anleitung).
+
+## Geld, Metall und der Haushalt
+
+Abgebucht wird am Rundenende in fester Reihenfolge: **Forschung, Schiffsbau,
+Umrüstung, Terraforming** – die **Einnahmen kommen zuletzt** und bezahlen erst
+die nächste Runde. Fürs Bauen steht also *Geld minus Forschungsanteil* bereit,
+und zwar für alle Werften zusammen. Ein Durchbruch in derselben Runde macht
+Schiffe teurer, weil sie mit dem neuen Stand gebaut werden.
+
+Damit das niemand im Kopf rechnen muss:
+
+- Die Kopfleiste zeigt **jetzt → nächste Runde**, etwa `Geld 1.600 → 811`.
+- Ein Klick (oder der Mauszeiger) auf Geld oder Metall öffnet den **Haushalt**:
+  Bestand, jeder Posten in Abbuchungsreihenfolge, Einnahmen und Förderung,
+  darunter das Ergebnis. Die Vorschau rechnet mit genau den Regeln des Servers;
+  nur Kämpfe und Eroberungen in derselben Runde können die Einnahmen noch ändern.
+- **Angenommen wird nur, was bezahlbar ist.** Reicht es nicht mehr, ist `+` in
+  der Werft gesperrt, und der Server lehnt den Auftrag mit einem Hinweis ab.
+  Zieht man danach den Forschungsanteil hoch, bleibt er beim höchsten Wert
+  stehen, bei dem die Aufträge noch aufgehen – **Aufträge gehen vor**. Ein Bau,
+  der am Rundenende am Geld scheitert, kommt dadurch nicht vor.
+
+## Kampf und Eroberung
+
+Treffen in einem Orbit feindliche Flotten aufeinander, wird gekämpft – vorn
+steht, wer austeilt, dahinter, wer beschützt wird. Wer abfliegt, während ein
+bewaffneter Gegner im Orbit steht, wird **abgefangen** und muss noch drei
+Gefechtsrunden überstehen. Jede Schlacht lässt sich nachträglich ansehen: ein
+Klick auf die Meldung öffnet die Aufzeichnung.
+
+Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder
+Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht
+dabei zurück, der Rest wechselt den Besitzer.
+
+## Form der Galaxie: Streufeld oder Spirale
+
+*Streufeld* verteilt die Welten gleichmäßig. *Spirale* baut eine Galaxie, wie man
+sie sich vorstellt: zwei oder drei logarithmische Arme um einen dichten Kern, und
+in der Mitte ein **schwarzes Loch** mit Namen wie *Charybdis* oder *Nyx*.
+
+Das Loch ist Gelände, kein Hintergrund. Um den Schlund liegt eine **Sperrzone**
+(gestrichelter Ring): dort entsteht keine Welt, und keine Flotte fliegt hinein.
+Wer ein Ziel dahinter anfliegt, wird **automatisch außen herum** geführt. Der Weg
+wird länger und kostet Runden; auch die **Reichweite** misst den fliegbaren Weg,
+nicht die Luftlinie – Welten hinter dem Loch liegen spielerisch weiter weg, als sie
+aussehen. Der Reichweiten-Umriss auf der Karte hat deshalb zum Loch hin eine Delle,
+und *Flotte hierher* ist für unerreichbare Welten von vornherein gesperrt.
+
+Eine Spirale wächst nach außen: Stößt jemand an die Armspitzen vor, reichen die
+Arme weiter, und neue Welten entstehen entlang der Arme.
+
+## Zwei Spielfelder: Klassik und Raum
+
+*Klassik* ist die flache Sternkarte. *Raum* verteilt dieselbe Partie auf drei
+Dimensionen: die Welten liegen in einer **Linse**, mittig dicker, zum Rand hin
+dünner. Entfernungen, Reichweite und Scanner rechnen dann räumlich.
+
+![Dieselbe Partie in der Raumansicht, Welten in einer Linse über dem Gitter](screenshots/map-space-de.webp)
+
+Drei Lesehilfen halten den Raum lesbar: ein **Gitter** in der Mittelebene, ein
+**Lot** von jeder Welt auf dieses Gitter (daran liest man die Höhe ab) und eine
+Abstufung von Größe und Helligkeit nach Entfernung. Steuerung siehe
+[Steuerung](#steuerung).
+
+## Eine Galaxie ohne Rand
+
+Kommt eine Flotte oder besiedelte Welt der Grenze näher als 200 Lj, schiebt sich
+die Karte dort hinaus und ein neuer Streifen Welten entsteht – höchstens einer pro
+Runde. Je weiter draußen, desto unwirtlicher die Welten (extremere Temperatur und
+Schwerkraft), dafür mit mehr und besserem Metall. Draußen zu siedeln lohnt sich,
+kostet aber Terraforming und Radikaltechnik. Mit 16 KI wächst die Karte von 96
+auf rund 390 Welten in 120 Runden. Abschaltbar in der Lobby.
+
+## Die KI-Reiche
+
+KI-Reiche treten unter eigenem Namen an – von *Admiral Wobblebeard* bis *Czarina
+Candyfloss* – und jedes mit eigenem Charakter:
+
+| Charakter | Spielweise |
+|---|---|
+| **Eroberer** | sucht sich einen Rivalen und rollt ihn Welt für Welt auf |
+| **Siedler** | breitet sich aus und schlägt nur zurück |
+| **Technokrat** | kommt spät, dafür mit besserer Technik |
+| **Pirat** | schickt schnelle Rudel gegen schwache Kolonien |
+| **Bollwerk** | mauert sich mit Satelliten ein, bis es ausbricht |
+| **Aasgeier** | holt sich, was die anderen übrig lassen |
+
+Sie merken sich, wer sie angegriffen hat, verbünden sich stillschweigend gegen
+einen davonziehenden Spitzenreiter und werden ungeduldig, je länger die Partie
+dauert.
+
+Angegriffen wird nur, wenn die Flotte die Abwehr in **einem Zug** brechen kann –
+die Abwehrbatterie wächst jede Runde aus der Bevölkerung nach, Belagern bringt
+nichts. Fällt ein Reich auf drei bekannte Welten zurück, wird es zum
+**Kriegsziel**: die Flotten sammeln sich und schlagen erst zu, wenn es für den
+Gnadenstoß reicht.
+
+## Zusehen
+
+*Beim Spielen zusehen* setzt eine Partie mit 4 bis 16 KI-Reichen auf. Es gibt
+kein eigenes Reich, dafür liegt alles offen: jede Welt, jede Flotte samt
+Zusammensetzung, das vollständige Protokoll und eine Tabelle aller Reiche.
+
+Oben rechts sitzen **Pause**, **Schritt** und die Geschwindigkeiten ½× bis 4×
+(1× ist eine Runde alle 1,5 Sekunden); die Leertaste hält an. Der Partiecode oben
+links lässt weitere Zuschauer unter *Beitreten* dazukommen. Zusehen geht nur bei
+reinen KI-Partien – sonst sähe ein Zuschauer die Karten aller Spieler.
+
+## Rangliste und Sieg
+
+Die Rangliste ordnet die Reiche nach **Bevölkerung**, bei Gleichstand nach Welten,
+dann nach Schiffen. Danach wird auch gewertet: Wer beim Rundenlimit die meisten
+Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt.
+
+## Steuerung
+
+| Aktion | Eingabe |
+|---|---|
+| Karte bewegen / zoomen | Ziehen, Mausrad, `+` / `−` |
+| Auswählen | Linksklick auf Welt oder Flotte |
+| Kurs setzen | Flotte wählen, dann **Rechtsklick** (oder Shift-Klick) auf die Zielwelt – oder Zielwelt anklicken und im Panel *Flotte hierher* |
+| Zug beenden | Knopf oben rechts oder `Leertaste` |
+| Haushalt ansehen | Klick oder Zeiger auf Geld bzw. Metall in der Kopfleiste |
+| Karte einpassen | `F` |
+| Auswahl aufheben | `Esc` |
+| Hilfe | `H` |
+| Fenster verschieben / vergrößern | Titelleiste ziehen bzw. Griff unten rechts; Doppelklick klappt das Protokoll ein |
+| Anzeige und Ton | Zahnrad unten rechts |
+| Partie verlassen | *Verlassen* oben rechts |
+
+Zusätzlich im **Raum**-Spielfeld:
+
+| Aktion | Eingabe |
+|---|---|
+| Kamera drehen | Ziehen |
+| Blickpunkt verschieben | **Shift**+Ziehen (oder mittlere Taste) |
+| Draufsicht | `T` |
+
+## Auf dem Telefon
+
+Ist das Fenster **schmaler als 760** oder **niedriger als 560 Punkte**, baut sich
+die Oberfläche um (geprüft auf einem 21:9-Gerät, hoch und quer):
+
+- Statt der schwebenden Fenster gibt es eine **Leiste am unteren Rand**
+  (Karte · Reich · Auswahl · Protokoll · Mehr); immer nur ein **Blatt** ist offen.
+- Hochkant liegt das Blatt unten, quer an der rechten Seite.
+- Eine Welt antippen schlägt ihr Blatt auf und rückt sie in den freien Teil der
+  Karte; auf leeren Raum tippen klappt es zu.
+- Die Kopfleiste wird einzeilig; *Partie verlassen* steht unter *Mehr*.
+
+| Geste | Klassik | Raum |
+|---|---|---|
+| Ein Finger ziehen | Karte schieben | Kamera drehen |
+| Zwei Finger spreizen / zusammenziehen | zoomen | zoomen |
+| Zwei Finger schieben | Karte schieben | Blickpunkt verschieben |
+| Tippen | auswählen | auswählen |
+
+Einen Kurs setzt man ohne Rechtsklick: Flotte antippen, Zielwelt antippen, im
+Blatt *Flotte hierher*.
+
+## Die Optik
+
+Die Planeten folgen bewusst dem Stil des Originals: glänzende, satt gefärbte
+Kugeln, bei denen die **Farbe die Temperatur** (blau = eisig bis rot = glühend)
+und die **Größe die Schwerkraft** zeigt. Je bewohnbarer eine Welt wird, desto
+erdähnlicher sieht sie aus – Ozeane, Kontinente mit zerklüfteten Küsten, Wolken
+und Polkappen. Terraforming sieht man so direkt auf der Karte.
+
+Besiedelte Welten färben ihre Umgebung in der Farbe ihres Reiches; benachbarte
+Welten verschmelzen zu einer Fläche, sodass man auf einen Blick sieht, wem welche
+Ecke gehört. Die Schiffe sind von Hand gezeichnet – jede Klasse mit eigener
+Silhouette, Triebwerksglühen, Panelfugen, Positionslichtern und Spielerfarbe; das
+Kolonieschiff erkennt man an seinen drei Wohnkuppeln.

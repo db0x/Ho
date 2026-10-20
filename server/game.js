@@ -8,6 +8,7 @@ import {
   COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
   holeZone, route, advance, travelDistance, supplyDistance
 } from '../shared/rules.js';
+import { forecast } from '../shared/budget.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng } from './galaxy.js';
 
 export const DEFAULT_SETTINGS = {
@@ -92,14 +93,37 @@ function botPersona(game) {
   return frei[Math.floor(Math.random() * frei.length)];
 }
 
-export function addPlayer(game, { name, isBot = false, connId = null, persona = null }) {
+/** Die erste Farbe der Palette, die noch niemand traegt. */
+function freeColor(game) {
+  const belegt = new Set(game.players.map(p => p.color));
+  return PLAYER_COLORS.find(c => !belegt.has(c)) || PLAYER_COLORS[game.players.length % PLAYER_COLORS.length];
+}
+
+/**
+ * Farbe waehlen. Jede Farbe gibt es nur einmal; traegt sie schon jemand,
+ * tauschen beide - so bleibt auch bei 16 Reichen jede Farbe waehlbar.
+ */
+export function setPlayerColor(game, player, color) {
+  if (game.state !== 'lobby' || !PLAYER_COLORS.includes(color)) return false;
+  const andere = game.players.find(p => p !== player && p.color === color);
+  if (andere) andere.color = player.color;
+  player.color = color;
+  return true;
+}
+
+export function addPlayer(game, { name, isBot = false, connId = null, persona = null, avatar = null, account = null }) {
   if (game.players.length >= 16) return null;
   const slot = game.players.length;
+  // Ids bleiben eindeutig, auch wenn zwischendurch jemand gegangen ist.
+  let nr = slot + 1;
+  while (game.players.some(p => p.id === 'p' + nr)) nr++;
   const p = {
-    id: 'p' + (slot + 1),
+    id: 'p' + nr,
     slot,
     name: name || (isBot ? botName(game) : 'Spieler ' + (slot + 1)),
-    color: PLAYER_COLORS[slot],
+    color: freeColor(game),
+    avatar,
+    account,
     emblem: PLAYER_EMBLEMS[slot],
     isBot,
     persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
@@ -129,9 +153,9 @@ export function removePlayer(game, playerId) {
   const i = game.players.findIndex(p => p.id === playerId);
   if (i < 0) return;
   game.players.splice(i, 1);
+  // Die Farbe bleibt, wie sie gewaehlt wurde; nur die Plaetze ruecken auf.
   game.players.forEach((p, idx) => {
     p.slot = idx;
-    p.color = PLAYER_COLORS[idx];
     p.emblem = PLAYER_EMBLEMS[idx];
   });
 }
@@ -162,7 +186,6 @@ export function startGame(game) {
     home.owner = p.id;
     home.pop = 12;
     p.homeworld = home.id;
-    p._lastTech = { ...p.tech };
     // Startflotten: ein schnelles Späherpaar und ein Siedlerschiff
     const scouts = newFleet(game, p.id, home);
     addShip(game, scouts, 'scout', p.tech);
@@ -271,25 +294,82 @@ export function canReach(game, fleet, target) {
 
 // ------------------------------------------------------------------- Befehle
 
+// ------------------------------------------------------- Bezahlbarkeit
+
+/**
+ * Was dieser Spieler am Rundenende bezahlen kann - mit genau der Rechnung,
+ * die auch der Client im Haushalt zeigt (shared/budget.js). Die Sicht dafuer
+ * ist auf das beschraenkt, was der Haushalt braucht.
+ */
+function haushalt(game, player) {
+  return forecast({
+    you: player.id,
+    me: {
+      money: player.money, metal: player.metal, tech: player.tech, research: player.research,
+      techProgress: Object.fromEntries(TECH_FIELDS.map(f => [f, { points: player.researchPoints[f] }])),
+      builds: player.orders.builds, refit: player.orders.refit
+    },
+    planets: game.galaxy.planets.map(w => w.owner === player.id ? { ...w, defenseShips: w.defenses || [] } : { id: w.id, owner: w.owner }),
+    fleets: game.fleets.map(f => ({ id: f.id, at: f.at, mine: f.owner === player.id, ships: f.ships }))
+  });
+}
+
+/** Geht alles auf, was in Auftrag steht - Bau und Umrüstung vollstaendig? */
+function bezahlbar(game, player) {
+  const h = haushalt(game, player);
+  return h.bau.geplant.n === h.bau.gebucht.n && h.umr.geplant.n === h.umr.gebucht.n;
+}
+
+/** Bauauftrag aendern; leere Eintraege verschwinden. */
+function bauSchritt(player, planetId, type, delta) {
+  const q = player.orders.builds[planetId] || (player.orders.builds[planetId] = {});
+  q[type] = Math.max(0, (q[type] || 0) + delta);
+  if (q[type] === 0) delete q[type];
+  if (!Object.keys(q).length) delete player.orders.builds[planetId];
+}
+
 export function setOrders(game, player, msg) {
   if (game.state !== 'running') return;
+  // Grundsatz: angenommen wird nur, was am Rundenende auch bezahlt werden
+  // kann. Eine Meldung "Bau unvollstaendig" darf es nicht geben - sie kaeme
+  // erst, wenn sich nichts mehr aendern laesst.
   if (msg.research) {
     const r = msg.research;
+    const vorher = { budgetPct: player.research.budgetPct, weights: { ...player.research.weights } };
     if (typeof r.budgetPct === 'number') player.research.budgetPct = clamp(Math.round(r.budgetPct), 0, 100);
     if (r.weights) {
       for (const f of TECH_FIELDS) {
         if (typeof r.weights[f] === 'number') player.research.weights[f] = clamp(Math.round(r.weights[f]), 0, 10);
       }
     }
+    // Die Forschung wird zuerst abgebucht. Nimmt sie den Auftraegen das Geld
+    // weg (oder verteuert ein Durchbruch die Schiffe), gilt der hoechste
+    // Anteil, bei dem alles aufgeht - Bauauftraege gehen vor.
+    if (!bezahlbar(game, player)) {
+      const wunsch = player.research.budgetPct;
+      while (player.research.budgetPct > 0 && !bezahlbar(game, player)) player.research.budgetPct--;
+      if (!bezahlbar(game, player)) player.research = { ...player.research, ...vorher };   // sollte nicht vorkommen
+      else if (player._forschungGedeckelt !== game.turn && player.research.budgetPct < wunsch) {
+        player._forschungGedeckelt = game.turn;      // einmal je Runde sagen, nicht bei jedem Reglerschritt
+        return { error: 'notice.researchCapped', params: { pct: player.research.budgetPct } };
+      }
+    }
   }
   if (msg.build) {
-    const { planetId, type, count } = msg.build;
+    const { planetId, type } = msg.build;
+    const count = Math.round(Number(msg.build.count));
     const planet = planetById(game, planetId);
-    if (!planet || planet.owner !== player.id || !SHIP_TYPES.includes(type)) return;
-    const q = player.orders.builds[planetId] || (player.orders.builds[planetId] = {});
-    q[type] = Math.max(0, (q[type] || 0) + count);
-    if (q[type] === 0) delete q[type];
-    if (!Object.keys(q).length) delete player.orders.builds[planetId];
+    if (!planet || planet.owner !== player.id || !SHIP_TYPES.includes(type) || !Number.isFinite(count) || !count) return;
+    if (count < 0) { bauSchritt(player, planetId, type, count); return; }
+    // Wo niemand lebt, baut der Server nicht - also auch nichts annehmen.
+    if (planet.pop < 1) return { error: 'yard.needPop' };
+    for (let i = 0; i < Math.min(count, 99); i++) {
+      bauSchritt(player, planetId, type, 1);
+      if (!bezahlbar(game, player)) {
+        bauSchritt(player, planetId, type, -1);
+        return { error: 'notice.buildUnaffordable' };
+      }
+    }
   }
   if (msg.unload) {
     const planet = planetById(game, msg.unload.planetId);
@@ -315,6 +395,10 @@ export function setOrders(game, player, msg) {
       if (!planet || planet.owner !== player.id || planet.pop < 1) return { error: 'err.refitNoYard' };
     }
     player.orders.refit[key] = true;
+    if (!bezahlbar(game, player)) {
+      delete player.orders.refit[key];
+      return { error: 'notice.refitUnaffordable' };
+    }
   }
   if (msg.terraform) {
     const planet = planetById(game, msg.terraform.planetId);
@@ -382,6 +466,7 @@ function refitOrders(game, p, entries) {
       if (p.money < c.money || p.metal < c.metal) { short = true; continue; }
       p.money -= c.money;
       p.metal -= c.metal;
+      p.ledger.refit.money += c.money; p.ledger.refit.metal += c.metal;
       const st = shipStats(s.type, c.tech);
       // Der Schaden bleibt - neu ist nur, was die bessere Panzerung dazugibt.
       s.hp = Math.max(1, s.hp + st.maxHp - s.maxHp);
@@ -415,14 +500,22 @@ export function resolveTurn(game) {
   const rng = game.rng;
   for (const p of game.galaxy.planets) p._orbitLost = false;
 
+  // Was diese Runde wirklich gebucht wird, je Posten - zum Nachpruefen der
+  // Vorschau im Client (shared/budget.js, test/budget.js).
+  for (const p of game.players) {
+    p.ledger = { research: 0, build: { money: 0, metal: 0 }, refit: { money: 0, metal: 0 }, terra: 0, income: 0, mined: 0 };
+  }
+
   // 1) Forschung
   for (const p of game.players) {
     if (!p.alive) continue;
     const budget = Math.min(p.money, Math.floor(p.money * p.research.budgetPct / 100));
     if (budget <= 0) continue;
-    p.money -= budget;
     const total = TECH_FIELDS.reduce((a, f) => a + p.research.weights[f], 0);
-    if (total <= 0) { p.money += budget; continue; }
+    if (total <= 0) continue;
+    p.money -= budget;
+    p.ledger.research = budget;
+    const vorher = { ...p.tech };
     const advanced = [];
     for (const f of TECH_FIELDS) {
       const share = budget * p.research.weights[f] / total;
@@ -432,9 +525,9 @@ export function resolveTurn(game) {
         p.researchPoints[f] -= techCostToNext(p.tech[f]);
         p.tech[f]++;
       }
-      if (p.tech[f] > (p._lastTech?.[f] ?? p.tech[f])) advanced.push({ field: f, level: p.tech[f] });
+      // Gegen den Stand vor dieser Runde - auch der allererste Durchbruch zaehlt.
+      if (p.tech[f] > vorher[f]) advanced.push({ field: f, level: p.tech[f] });
     }
-    p._lastTech = { ...p.tech };
     if (advanced.length) {
       entries.push({ type: 'tech', playerIds: [p.id], private: p.id,
         key: 'log.breakthrough', params: { fields: advanced } });
@@ -455,6 +548,7 @@ export function resolveTurn(game) {
           if (p.money < cost.money || p.metal < cost.metal) break;
           p.money -= cost.money;
           p.metal -= cost.metal;
+          p.ledger.build.money += cost.money; p.ledger.build.metal += cost.metal;
           if (type === 'satellite') {
             (planet.defenses || (planet.defenses = [])).push(makeDefense(game, type, p.tech));
           } else {
@@ -508,6 +602,7 @@ export function resolveTurn(game) {
       planet.grav = Math.round(planet.grav * 1000) / 1000;
     }
     p.money -= spend;
+    p.ledger.terra += spend;
     if (Math.abs(planet.temp - IDEAL.temp) < 0.05 && Math.abs(planet.grav - IDEAL.grav) < 0.002) {
       planet.temp = IDEAL.temp; planet.grav = IDEAL.grav;
       planet.terraBudget = 0;
@@ -629,9 +724,11 @@ export function resolveTurn(game) {
     const inc = planetIncome(planet);
     p.money += inc;
     p.income += inc;
+    p.ledger.income += inc;
     const mined = planetMining(planet);
     planet.metalReserve = Math.max(0, planet.metalReserve - mined);
     p.metal += mined;
+    p.ledger.mined += mined;
     const cap = planetCapacity(planet);
     if (cap < 1) {
       planet.pop = Math.max(0, planet.pop - Math.max(0.4, planet.pop * 0.25));
@@ -995,17 +1092,29 @@ export function buildView(game, player) {
       return {
         ...base, known: 'live',
         temp: p.temp, grav: p.grav, sizeFactor: p.sizeFactor,
-        metalRichness: p.metalRichness, metalReserve: Math.round(p.metalReserve),
+        metalRichness: p.metalRichness,
+        // Genau, nicht gerundet: der Haushalt im Client rechnet damit die
+        // Foerderung nach (gerundet wird erst bei der Anzeige).
+        metalReserve: p.owner === player.id ? p.metalReserve : Math.round(p.metalReserve),
         owner: p.owner, pop: p.pop,
         defenses: p.defenses ? p.defenses.length : 0,
-        defenseRefit: p.owner === player.id && p.defenses ? refitTotal(p.defenses, player.tech) : null,
+        // Typ und Techstand jedes Satelliten: umgerüstet wird mit dem Stand
+        // nach der Forschung, und den kennt erst der Client-Haushalt.
+        defenseShips: p.owner === player.id && p.defenses ? p.defenses.map(d => ({ type: d.type, tech: d.tech })) : null,
         defenseStats: p.owner === player.id ? defenseStats(p) : null,
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
         isHomeworld: !!p.isHomeworld
       };
     }
     const k = player.knowledge[p.id];
-    if (k) return { ...base, known: 'memory', ...k, terraBudget: 0, isHomeworld: !!p.isHomeworld };
+    // Eine Erinnerung, in der man selbst Besitzer war, ist ueberholt: liefe
+    // die Welt noch auf einen, waere sie oben in Sicht. Den Verlust hat das
+    // Protokoll gemeldet - also auch hier nicht mehr als eigene zeigen, sonst
+    // zaehlen Liste, Einkommen und Werft eine Welt mit, die einem nicht gehoert.
+    if (k) {
+      const owner = k.owner === player.id ? p.owner : k.owner;
+      return { ...base, known: 'memory', ...k, owner, terraBudget: 0, isHomeworld: !!p.isHomeworld };
+    }
     return { ...base, known: 'unknown' };
   });
 
@@ -1053,6 +1162,7 @@ export function buildView(game, player) {
     you: player.id,
     deadline: game.turnDeadline,
     mode: game.settings.mode || 'classic',
+    maxTurns: game.settings.maxTurns || 0,       // 0 = ohne Limit: es gewinnt, wer uebrig bleibt
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -1061,11 +1171,13 @@ export function buildView(game, player) {
       blackHole: game.galaxy.blackHole || null
     },
     me: {
-      id: player.id, name: player.name, color: player.color, emblem: player.emblem,
-      money: Math.round(player.money), metal: Math.round(player.metal), income: player.income,
+      id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
+      // Auf eine Nachkommastelle genau, wie der Server rechnet - mit dem
+      // gerundeten Stand laege die Forschungsvorschau gelegentlich um 1 daneben.
+      money: Math.round(player.money * 10) / 10, metal: Math.round(player.metal * 10) / 10, income: player.income,
       tech: { ...player.tech },
       techProgress: Object.fromEntries(TECH_FIELDS.map(f => [f, {
-        points: Math.round(player.researchPoints[f]), next: techCostToNext(player.tech[f])
+        points: player.researchPoints[f], next: techCostToNext(player.tech[f])
       }])),
       research: { budgetPct: player.research.budgetPct, weights: { ...player.research.weights } },
       ready: player.ready,
@@ -1074,7 +1186,7 @@ export function buildView(game, player) {
       refit: player.orders.refit
     },
     players: game.players.map(p => ({
-      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot, persona: p.persona,
+      id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
       stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     })),
@@ -1122,6 +1234,7 @@ export function buildSpectatorView(game) {
     deadline: null,
     pace: { ...game.pace },
     mode: game.settings.mode || 'classic',
+    maxTurns: game.settings.maxTurns || 0,       // 0 = ohne Limit: es gewinnt, wer uebrig bleibt
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -1130,7 +1243,7 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     players: game.players.map(p => ({
-      id: p.id, name: p.name, color: p.color, emblem: p.emblem, isBot: p.isBot, persona: p.persona,
+      id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
       tech: { ...p.tech },
       money: Math.round(p.money), metal: Math.round(p.metal), income: Math.round(p.income || 0),
@@ -1172,7 +1285,10 @@ export function lobbyView(game) {
     state: game.state,
     settings: game.settings,
     players: game.players.map(p => ({
-      id: p.id, name: p.name, color: p.color, emblem: p.emblem,
+      id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar,
+      // Das Konto dahinter, wenn der Anzeigename anders lautet - wer mit
+      // wem spielt, soll erkennbar bleiben.
+      account: p.account && p.account.toLowerCase() !== p.name.toLowerCase() ? p.account : null,
       isBot: p.isBot, persona: p.persona, connected: p.connected
     }))
   };
