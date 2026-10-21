@@ -256,6 +256,18 @@ const session = (msg) => new Promise((ok) => {
 //     without signing in again.
 {
 
+  // Every admin message, read from the server's source - so a future admin
+  // feature that forgets the check fails here without anyone remembering to
+  // add it. A normal account must get a refusal and no admin data for each.
+  const serverSource = fs.readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const adminTypes = [...serverSource.matchAll(/case '(admin[A-Za-z]*)'/g)].map(m => m[1]);
+  check(adminTypes.length >= 6, `Admin messages not found in the source (${adminTypes})`);
+  for (const t of adminTypes) {
+    const tried = await session({ t, code: 'ABCD', text: 'x', id: 'x', note: 'x' });
+    check(tried.errors.includes('err.notAdmin') && !tried.data && !tried.sent && !tried.invite,
+      `A normal account gets through '${t}' (${JSON.stringify(tried.errors)})`);
+  }
+
   const plain = await session({ t: 'admin' });
   check(plain.hello?.admin === false, 'hello calls a normal account an admin');
   check(!plain.data && plain.errors.includes('err.notAdmin'), 'A normal account gets the admin overview');
@@ -373,7 +385,7 @@ const session = (msg) => new Promise((ok) => {
   check(notAllowedMsg.errors.includes('err.notAdmin'), 'A normal account may send announcements');
   const revoked = await session({ t: 'admin' });
   check(!revoked.data && revoked.errors.includes('err.notAdmin'), 'Revoked admin still gets the overview');
-  console.log('Admin flag: overview, watching, announcements and ending games only for admins, granting and revoking apply immediately.');
+  console.log(`Admin flag: all ${adminTypes.length} admin messages refused for normal accounts; granting and revoking apply immediately.`);
 }
 
 // --- With sign-in you are named as in your profile: create cannot get around
