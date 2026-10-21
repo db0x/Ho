@@ -90,6 +90,14 @@ Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
   Startbildschirm. Der Server prüft das Flag bei jeder
   Anfrage – `admin … off` wirkt also ohne Abmelden. Ohne Anmeldung (`HO_AUTH=off`)
   gibt es keine Admins.
+- Admins können über dieses Panel auch Spieler **einladen**: „Einladungslink
+  erzeugen“ erstellt einen Einmal-Link (mit optionaler Notiz wie „für Max“). Der neue
+  Spieler öffnet ihn, wählt Benutzernamen und Passwort und ist sofort angemeldet –
+  kein erstes Passwort zum Weitergeben, kein Passwortwechsel. Jeder Link funktioniert
+  **einmal** und verfällt nach **24 Stunden**; offene Einladungen stehen dort und
+  lassen sich widerrufen. Der Link wird nur beim Erzeugen angezeigt: `invites.json`
+  neben `users.json` enthält nur einen Hash davon, wer die Datei liest, bekommt also
+  keinen gültigen Link.
 - Den **Anzeigenamen** im Spiel wählt jeder Spieler selbst (siehe
   [Spielen › Profil](playing.de.md#eine-partie-beginnen)); `name` ändert nur die
   Schreibweise des Kontonamens, etwa für die Zeile „Angemeldet als …“.

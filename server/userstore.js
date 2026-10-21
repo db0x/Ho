@@ -148,6 +148,7 @@ export function listUsers() {
     name,
     display: displayName(name, users[name]),
     nick: users[name].nick || null,
+    invitedBy: users[name].invitedBy || null,
     avatar: users[name].avatar || null,          // image version; the image is in profile.js
     admin: !!users[name].admin,
     mustChange: !!users[name].mustChange,
@@ -178,23 +179,30 @@ export function setAdmin(name, on) {
 /**
  * Creates an account. Without a password one is generated and returned -
  * this is the only moment it exists in plain text.
+ * Options: `mustChange` (default true - a password someone else chose has
+ * to be replaced), `invitedBy` (the admin whose invite link was used).
  */
-export async function addUser(name, password) {
+export async function addUser(name, password, { mustChange = true, invitedBy = null } = {}) {
   const key = normalizeName(name);
   if (!validName(key)) throw new Error('auth.cli.badName');
-  const db = load();
-  if (db.users[key]) throw new Error('auth.cli.exists');
+  if (load().users[key]) throw new Error('auth.cli.exists');
   const generated = !password;
   const pw = password || generatePassword();
   const problem = password ? checkPassword(pw, key) : null;
   if (problem) throw new Error(problem);
   const spelling = String(name).trim();
+  const hash = await hashPassword(pw);
+  // Hashing takes a while: check again right before writing, in one go, so
+  // two simultaneous sign-ups with the same name cannot overwrite each other.
+  const db = load();
+  if (db.users[key]) throw new Error('auth.cli.exists');
   db.users[key] = {
-    hash: await hashPassword(pw),
-    mustChange: true,
+    hash,
+    mustChange,
     created: new Date().toISOString(),
     changed: null,
-    ...(spelling !== key ? { display: spelling } : {})
+    ...(spelling !== key ? { display: spelling } : {}),
+    ...(invitedBy ? { invitedBy } : {})
   };
   save(db);
   return { name: key, display: displayName(key, db.users[key]), password: pw, generated };

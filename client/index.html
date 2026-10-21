@@ -122,6 +122,21 @@
       </div>
     </div>
     <div id="admin-games" class="admin-list"></div>
+    <h3><span data-i18n="admin.invites"></span> <span id="admin-invites-count" class="muted"></span></h3>
+    <div class="admin-invite-new">
+      <input id="admin-invite-note" maxlength="60" autocomplete="off" data-i18n-attr="placeholder:admin.inviteNote">
+      <button type="button" id="admin-invite-create" class="tiny primary" data-i18n="admin.inviteCreate"></button>
+    </div>
+    <!-- The fresh link: shown once, the server keeps only a hash of it. -->
+    <div id="admin-invite-link" class="admin-invite-link hidden">
+      <p class="small" data-i18n="admin.inviteOnce"></p>
+      <div class="ail-row">
+        <input id="admin-invite-url" readonly>
+        <button type="button" id="admin-invite-copy" class="tiny" data-i18n="admin.copy"></button>
+        <button type="button" id="admin-invite-close" class="tiny" data-i18n="admin.msgCancel"></button>
+      </div>
+    </div>
+    <div id="admin-invites" class="admin-list"></div>
     <h3><span data-i18n="admin.accounts"></span> <span id="admin-accounts-count" class="muted"></span></h3>
     <div id="admin-accounts" class="admin-list"></div>
   </section>

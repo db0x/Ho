@@ -9,7 +9,7 @@ import {
   holeZone, route, advance, travelDistance, supplyDistance
 } from '../shared/rules.js';
 import { forecast } from '../shared/budget.js';
-import { generateGalaxy, expandGalaxy, expandSpiral, makeRng } from './galaxy.js';
+import { generateGalaxy, expandGalaxy, expandSpiral, makeRng, newSeed } from './galaxy.js';
 
 export const DEFAULT_SETTINGS = {
   planetsPerPlayer: 6,
@@ -113,7 +113,7 @@ export function setPlayerColor(game, player, color) {
   return true;
 }
 
-export function addPlayer(game, { name, isBot = false, connId = null, persona = null, avatar = null, account = null }) {
+export function addPlayer(game, { name, isBot = false, connId = null, persona = null, avatar = null, account = null, accountKey = null }) {
   if (game.players.length >= 16) return null;
   const slot = game.players.length;
   // Ids stay unique even if someone left in between.
@@ -126,6 +126,7 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     color: freeColor(game),
     avatar,
     account,
+    accountKey,             // normalized account name: one seat per account and game
     emblem: PLAYER_EMBLEMS[slot],
     isBot,
     persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
@@ -168,7 +169,8 @@ export function removePlayer(game, playerId) {
 export function startGame(game) {
   const n = game.players.length;
   if (n < 1) return { error: 'err.tooFewPlayers' };
-  const seed = game.settings.seed ?? ((Math.random() * 1e9) | 0);
+  // Players never choose or see the seed (see makeRng); only tests set one directly.
+  const seed = game.settings.seed ?? newSeed();
   game.galaxy = generateGalaxy({
     playerCount: Math.max(2, n),
     planetsPerPlayer: game.settings.planetsPerPlayer,
@@ -177,7 +179,7 @@ export function startGame(game) {
     seed
   });
   game.settings.seed = game.galaxy.seed;
-  game.rng = makeRng(game.galaxy.seed ^ 0x9e3779b9);
+  game.rng = makeRng(`${game.galaxy.seed}:play`);
   game.state = 'running';
   game.turn = 1;
   game.log = [];
@@ -1288,7 +1290,8 @@ export function lobbyView(game) {
   return {
     id: game.id,
     state: game.state,
-    settings: game.settings,
+    // Everything but the seed: knowing it would reveal the whole map.
+    settings: { ...game.settings, seed: undefined },
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar,
       // The account behind it if the display name differs - who plays with

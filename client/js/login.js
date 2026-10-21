@@ -1,7 +1,7 @@
-// Sign-in and first password change. A separate, tiny page - the game client
-// is only served once the session is established.
+// Sign-in, first password change and redeeming an invite link. A separate,
+// tiny page - the game client is only served once the session is established.
 import {
-  initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, t
+  initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, localeTag, t
 } from './i18n.js';
 import { startStars, sceneReady, leaveTo } from './ui/scene.js';
 
@@ -10,7 +10,10 @@ const NAME_KEY = 'ho-user';
 
 const loginForm = $('#form-login');
 const changeForm = $('#form-change');
+const inviteForm = $('#form-invite');
+const inviteToken = new URLSearchParams(location.search).get('invite');
 let minPassword = 8;
+let invite = null;           // {expires, by, note} of an invite link being redeemed
 
 initLocale();
 languagePicker();
@@ -26,6 +29,7 @@ function languagePicker() {
     // The password change hint carries a number and is not filled from the
     // markup - it has to be set again after every change.
     $('#change-intro').textContent = t('auth.change.intro', { n: minPassword });
+    if (invite) paintInvite();
   };
   paint();
   sel.onchange = () => useLocale(sel.value);
@@ -56,23 +60,51 @@ function target() {
   return /^\/($|[^/])/.test(next) ? `.${next}` : './';
 }
 
+/** Intro and note of an invite - again after every language change. */
+function paintInvite() {
+  $('#invite-intro').textContent = t(invite.by ? 'auth.invite.introBy' : 'auth.invite.intro', {
+    admin: invite.by,
+    n: minPassword,
+    time: new Date(invite.expires).toLocaleString(localeTag(), { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+  });
+  // The admin's own words: as text, never as markup.
+  const note = $('#invite-note');
+  note.textContent = invite.note || '';
+  note.classList.toggle('hidden', !invite.note);
+}
+
 function show(which) {
   loginForm.classList.toggle('hidden', which !== 'login');
   changeForm.classList.toggle('hidden', which !== 'change');
+  inviteForm.classList.toggle('hidden', which !== 'invite');
   sceneReady();
-  const first = which === 'login'
-    ? ($('#in-user').value ? $('#in-pass') : $('#in-user'))
-    : ($('#in-old').value ? $('#in-new') : $('#in-old'));
+  const first = which === 'login' ? ($('#in-user').value ? $('#in-pass') : $('#in-user'))
+    : which === 'change' ? ($('#in-old').value ? $('#in-new') : $('#in-old'))
+    : $('#in-inv-user');
   first.focus();
 }
 
-// Already signed in? Then move on right away - otherwise going back in the
-// history would leave you in front of the empty form again.
 const me = await api('me', 'GET');
 if (me.minPassword) minPassword = me.minPassword;
 applyI18n();
-if (me.ok && !me.mustChange) location.replace(target());
-else {
+if (inviteToken) {
+  // An invite link wins over an existing session: whoever opens it wants a
+  // new account (and the admin may want to try their own link).
+  const inv = await api(`invite?token=${encodeURIComponent(inviteToken)}`, 'GET');
+  if (inv.ok) {
+    invite = { expires: inv.expires, by: inv.by, note: inv.note };
+    if (inv.minPassword) minPassword = inv.minPassword;
+    paintInvite();
+    show('invite');
+  } else {
+    show('login');
+    showError(inv.error || 'auth.err.inviteInvalid', inv.params);
+  }
+} else if (me.ok && !me.mustChange) {
+  // Already signed in? Then move on right away - otherwise going back in the
+  // history would leave you in front of the empty form again.
+  location.replace(target());
+} else {
   try { $('#in-user').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* never mind */ }
   $('#change-intro').textContent = t('auth.change.intro', { n: minPassword });
   show(me.ok ? 'change' : 'login');
@@ -111,6 +143,23 @@ changeForm.onsubmit = (e) => {
     const a = await api('change', 'POST', { password, newPassword });
     if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
     leaveTo(target());
+    return null;
+  });
+};
+
+// ---------------------------------------------------------------- Invite link
+inviteForm.onsubmit = (e) => {
+  e.preventDefault();
+  const user = $('#in-inv-user').value.trim();
+  const password = $('#in-inv-pass').value;
+  if (!user || !password) return showError('auth.err.needFields');
+  if (password !== $('#in-inv-pass2').value) return showError('auth.err.mismatch');
+  if (password.length < minPassword) return showError('auth.err.tooShort', { n: minPassword });
+  submit(inviteForm, async () => {
+    const a = await api('redeem', 'POST', { token: inviteToken, user, password });
+    if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
+    try { localStorage.setItem(NAME_KEY, user); } catch { /* never mind */ }
+    leaveTo('./');
     return null;
   });
 };

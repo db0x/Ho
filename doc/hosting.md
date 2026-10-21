@@ -91,6 +91,13 @@ Without Docker it is the same, only shorter: `npm run users -- add captain`.
   the flag on every request, so `admin … off`
   takes effect without signing out. Without sign-in (`HO_AUTH=off`) there are no
   admins.
+- Admins can also **invite** players from that panel: “Create invite link” makes a
+  one-time link (with an optional note such as “for Max”). The new player opens it,
+  picks a user name and a password and is signed in right away – no first password
+  to pass on, no password change. Each link works **once** and expires after
+  **24 hours**; open invites are listed there and can be revoked. The link is shown
+  only when it is created: `invites.json` next to `users.json` holds just a hash of
+  it, so reading that file does not reveal a working link.
 - Players pick their in-game **display name** themselves (see
   [Playing › Profile](playing.md#starting-a-game)); `name` only changes the
   spelling of the account name, e.g. for the "Signed in as …" line.

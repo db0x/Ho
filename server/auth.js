@@ -7,8 +7,10 @@
 // bearable, since all games are gone with it too.
 import crypto from 'node:crypto';
 import {
-  verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, MIN_PASSWORD
+  verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, validName, addUser, MIN_PASSWORD
 } from './userstore.js';
+import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
+import { nameAllowed } from './profile.js';
 
 /**
  * Look up an account without an unreadable file killing the server: it is read
@@ -234,6 +236,8 @@ export function handleAuth(req, res, urlPath) {
   }
   if (route === 'login' && req.method === 'POST') { login(req, res); return true; }
   if (route === 'change' && req.method === 'POST') { change(req, res); return true; }
+  if (route.startsWith('invite') && req.method === 'GET') { checkInvite(req, res); return true; }
+  if (route === 'redeem' && req.method === 'POST') { redeem(req, res); return true; }
   if (route === 'logout' && req.method === 'POST') {
     const token = cookies(req)[COOKIE];
     if (token) sessions.delete(token);
@@ -243,6 +247,84 @@ export function handleAuth(req, res, urlPath) {
   }
   json(res, 404, { error: 'auth.err.unknownRoute' });
   return true;
+}
+
+// ---------------------------------------------------------------- Invites
+
+/** GET /api/auth/invite?token=… - is this link still good? Uses nothing up. */
+function checkInvite(req, res) {
+  const ip = origin(req);
+  const wait = lockedFor(`v:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
+  const token = new URL(req.url, 'http://x').searchParams.get('token') || '';
+  let invite = null;
+  try { invite = peekInvite(token); } catch (e) { console.error(e.message); }
+  if (!invite) {
+    // Guessing tokens is throttled like guessing passwords - with a counter
+    // of its own, so it locks out invites, not the regular sign-in.
+    failedAttempt(`v:${ip}`);
+    return json(res, 404, { error: 'auth.err.inviteInvalid' });
+  }
+  // Who invited and their note are meant for the new player too - the note
+  // is the admin's own words, sent as text.
+  json(res, 200, { ok: true, expires: invite.expires, by: invite.by, note: invite.note, minPassword: MIN_PASSWORD });
+}
+
+/**
+ * POST /api/auth/redeem {token, user, password} - creates the account and
+ * signs the new player in. Everything that can be checked without using the
+ * invite up is checked first: a taken name or a short password leaves the
+ * link valid for another try.
+ */
+async function redeem(req, res) {
+  let data;
+  try { data = await body(req); } catch (e) {
+    console.warn('Invite redemption not understood:', e.message);
+    return json(res, 400, { error: 'auth.err.badRequest' });
+  }
+  const ip = origin(req);
+  const wait = lockedFor(`v:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
+
+  const token = String(data.token ?? '');
+  const name = String(data.user ?? '').trim();
+  const password = String(data.password ?? '');
+  let invite = null;
+  try { invite = peekInvite(token); } catch (e) { console.error(e.message); }
+  if (!invite) {
+    failedAttempt(`v:${ip}`);
+    return json(res, 404, { error: 'auth.err.inviteInvalid' });
+  }
+  if (!name || !password) return json(res, 400, { error: 'auth.err.needFields' });
+  if (!validName(name)) return json(res, 400, { error: 'auth.cli.badName' });
+  try {
+    // Neither an account name nor anyone's display name may be taken over.
+    const taken = nameAllowed(name, null);
+    if (taken) return json(res, 400, { error: taken });
+  } catch (e) {
+    console.error(e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  const problem = checkPassword(password, name);
+  if (problem) return json(res, 400, { error: problem, params: { n: MIN_PASSWORD } });
+
+  // From here on the invite is used up - synchronously, before the first
+  // await, so a second request with the same link finds nothing.
+  const used = consumeInvite(token);
+  if (!used) return json(res, 404, { error: 'auth.err.inviteInvalid' });
+  let user;
+  try {
+    user = await addUser(name, password, { mustChange: false, invitedBy: used.by });
+  } catch (e) {
+    restoreInvite(used);
+    if (e.message === 'auth.cli.exists') return json(res, 400, { error: 'profile.err.taken' });
+    console.error('Creating an account from an invite failed:', e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  const stored = account(user.name);
+  setCookie(req, res, newSession({ name: user.name, stamp: stampOf(stored.hash), mustChange: false }));
+  console.log(`Account ${user.display} created via invite of ${used.by}`);
+  json(res, 200, { ok: true, user: user.name });
 }
 
 async function login(req, res) {
@@ -335,7 +417,8 @@ export function gate(req, res, urlPath) {
   if (isPublic(urlPath)) {
     // Signed in with nothing left to do? Then you belong in the game, not on
     // the sign-in page.
-    if (urlPath === '/login.html' && s && !s.mustChange) {
+    const invite = new URL(req.url, 'http://x').searchParams.has('invite');
+    if (urlPath === '/login.html' && s && !s.mustChange && !invite) {
       res.writeHead(302, { location: './', 'cache-control': 'no-store' }).end();
       return false;
     }

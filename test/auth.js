@@ -6,6 +6,7 @@ import { WebSocket } from 'ws';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { inviteFile } from '../server/invites.js';
 import {
   hashPassword, verifyPassword, addUser, deleteUser, listUsers, getUser,
   setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay, setAdmin
@@ -237,12 +238,13 @@ const NEW = 'myOwnPassword-2026';
 /** Opens a socket, sends `msg` after hello and collects what comes back. */
 const session = (msg) => new Promise((ok) => {
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
-  const got = { hello: null, data: null, sent: null, errors: [] };
+  const got = { hello: null, data: null, sent: null, invite: null, errors: [] };
   ws.on('message', (raw) => {
     const m = JSON.parse(raw.toString());
     if (m.t === 'hello') { got.hello = m; ws.send(JSON.stringify(msg)); }
     if (m.t === 'adminData') got.data = m;
     if (m.t === 'adminMsgSent') got.sent = m;
+    if (m.t === 'adminInviteCreated') got.invite = m;
     if (m.t === 'error') got.errors.push(m.key);
     if (['adminData', 'adminMsgSent', 'error'].includes(m.t)) { ws.close(); ok(got); }
   });
@@ -300,7 +302,11 @@ const session = (msg) => new Promise((ok) => {
   // dangerous case is a game whose humans are all offline: for the server
   // they count as ready, so a spectator pace would play it through.
   {
-    const absent = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+    // Another account plays it - an admin must not watch a game they play in.
+    await addUser('absentee', 'absenteePassword1', { mustChange: false });
+    const signIn = await fetch(`${BASE}/api/auth/login`, asJson({ user: 'absentee', password: 'absenteePassword1' }));
+    const absentCookie = signIn.headers.get('set-cookie').split(';')[0];
+    const absent = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: absentCookie } });
     let watchCode = null;
     absent.on('message', (raw) => {
       const m = JSON.parse(raw.toString());
@@ -329,6 +335,25 @@ const session = (msg) => new Promise((ok) => {
     await wait(1500);
     check(views.every(x => x.turn === v?.turn), `Watched game ran by itself (turns ${views.map(x => x.turn).join(',')})`);
     watcher.close();
+    deleteUser('absentee');
+  }
+
+  // Fairness: an admin who plays in a game must not watch it without fog,
+  // and one account gets one seat per game.
+  const ownWatch = await session({ t: 'adminWatch', code });
+  check(ownWatch.errors.includes('err.watchOwnGame'), 'An admin can watch their own game without fog');
+  {
+    const host = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+    let lobbyCode = null;
+    host.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.t === 'hello') host.send(JSON.stringify({ t: 'create', name: 'z' }));
+      if (m.t === 'joined') lobbyCode = m.code;
+    });
+    for (let i = 0; i < 60 && !lobbyCode; i++) await wait(50);
+    const second = await session({ t: 'join', code: lobbyCode });
+    check(second.errors.includes('err.alreadySeated'), 'The same account gets a second seat in one game');
+    host.close();
   }
 
   const gone = await session({ t: 'adminEnd', code });
@@ -409,6 +434,81 @@ const session = (msg) => new Promise((ok) => {
   check(!getUser('captain').avatar && !getUser('captain').nick, 'Profile cannot be reset');
   ws.close();
   console.log('Profile: display name free (but never another account), image checked and only with a session.');
+}
+
+// --- Invite links: an admin creates one, a new player picks name and
+//     password with it. One use only, 24 hours at most.
+{
+  /** Requests without the shared cookie - the new player has their own. */
+  const redeem = async (data) => {
+    const r = await fetch(`${BASE}/api/auth/redeem`, asJson(data));
+    let body = null;
+    try { body = await r.json(); } catch { /* empty */ }
+    return { status: r.status, body, cookie: r.headers.get('set-cookie')?.split(';')[0] || null };
+  };
+  const peek = async (token) => (await fetch(`${BASE}/api/auth/invite?token=${encodeURIComponent(token)}`)).status;
+
+  setAdmin('captain', true);
+  const made = await session({ t: 'adminInvite', note: 'for the test' });
+  const token = made.invite?.token;
+  check(token && token.length >= 30, 'No invite token comes back');
+  const listed = made.data?.invites.find(i => i.id === made.invite?.invite.id);
+  check(listed?.note === 'for the test' && listed.by === 'captain', `Invite not listed (${JSON.stringify(made.data?.invites)})`);
+  check(!JSON.stringify(made.data).includes(token), 'The admin overview shows the token');
+  check(!fs.readFileSync(inviteFile(), 'utf8').includes(token), 'invites.json holds the token in plain text');
+
+  check(await peek(token) === 200, 'A fresh invite is not recognised');
+  const shown = await (await fetch(`${BASE}/api/auth/invite?token=${encodeURIComponent(token)}`)).json();
+  check(shown.note === 'for the test' && shown.by === 'captain', `The invitee does not see who invited and the note (${JSON.stringify(shown)})`);
+  check(await peek('nonsense') === 404, 'A made-up invite is accepted');
+
+  // Problems that can be fixed leave the link valid.
+  const taken = await redeem({ token, user: 'captain', password: 'newPlayer-123' });
+  check(taken.status === 400 && taken.body.error === 'profile.err.taken', `Taken name accepted (${JSON.stringify(taken.body)})`);
+  const short = await redeem({ token, user: 'newbie', password: 'short' });
+  check(short.status === 400 && short.body.error === 'auth.err.tooShort', 'Too short password accepted');
+  check(await peek(token) === 200, 'A failed attempt used the invite up');
+
+  // Two requests at once with the same link: exactly one account.
+  const [a, b] = await Promise.all([
+    redeem({ token, user: 'Newbie', password: 'newPlayer-123' }),
+    redeem({ token, user: 'otherbie', password: 'newPlayer-456' })
+  ]);
+  const wins = [a, b].filter(r => r.status === 200);
+  check(wins.length === 1, `One link created ${wins.length} accounts`);
+  check([a, b].some(r => r.body?.error === 'auth.err.inviteInvalid'), 'The losing request gets no clear answer');
+  const created = getUser('newbie') ? 'newbie' : 'otherbie';
+  check(!getUser(created === 'newbie' ? 'otherbie' : 'newbie'), 'The losing request created an account too');
+  const fresh = getUser(created);
+  check(fresh && !fresh.mustChange && fresh.invitedBy === 'captain', `New account is wrong (${JSON.stringify(fresh)})`);
+  check(created !== 'newbie' || fresh.display === 'Newbie', 'The spelling of the chosen name is lost');
+  const winner = wins[0];
+  const own = await fetch(`${BASE}/`, { headers: { cookie: winner.cookie, accept: 'text/html' }, redirect: 'manual' });
+  check(own.status === 200, `The new player is not signed in (${own.status})`);
+  const after = await session({ t: 'admin' });
+  check(!after.data?.invites.some(i => i.id === made.invite.invite.id), 'A used invite is still listed');
+  const again = await redeem({ token, user: 'thirdbie', password: 'newPlayer-789' });
+  check(again.status === 404 && !getUser('thirdbie'), 'A used invite creates another account');
+
+  // Expiry: 24 hours at most, even if nobody touches the link.
+  const old = (await session({ t: 'adminInvite' })).invite.token;
+  const file = JSON.parse(fs.readFileSync(inviteFile(), 'utf8'));
+  for (const i of file.invites) i.expires = Date.now() - 1;
+  fs.writeFileSync(inviteFile(), JSON.stringify(file));
+  check(await peek(old) === 404, 'An expired invite is still valid');
+  check(JSON.parse(fs.readFileSync(inviteFile(), 'utf8')).invites.length === 0, 'Expired invites stay in the file');
+
+  // Revoking
+  const revokable = await session({ t: 'adminInvite', note: 'oops' });
+  const gone = await session({ t: 'adminRevokeInvite', id: revokable.invite.invite.id });
+  check(!gone.data?.invites.some(i => i.id === revokable.invite.invite.id), 'Revoked invite still listed');
+  check(await peek(revokable.invite.token) === 404, 'A revoked invite still works');
+
+  setAdmin('captain', false);
+  const notAllowed = await session({ t: 'adminInvite' });
+  check(notAllowed.errors.includes('err.notAdmin') && !notAllowed.invite, 'A normal account may create invites');
+  deleteUser(created);
+  console.log('Invites: once only, 24 h at most, revocable, token never stored or shown again.');
 }
 
 // --- A deleted account is out immediately, even from an open session
