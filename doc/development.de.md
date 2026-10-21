@@ -23,11 +23,12 @@ shared/
 server/
   index.js           HTTP + WebSocket, Lobby, Partieverwaltung, Zuschauertakt
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
-  galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen Seed)
+  galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
   userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil – atomar geschrieben
   profile.js         Anzeigenamen und Profilbilder: prüfen, speichern, ausliefern
+  invites.js         Einmal-Einladungslinks: erzeugen, prüfen, einlösen, verfallen (nur Hashes)
   users.js           Werkzeug für den Host: add, del, passwd, name, admin, list
 client/
   index.html         Startbildschirm, Lobby, Spielbildschirm
@@ -52,6 +53,21 @@ test/                siehe Tests
 gefilterte Sicht: unerforschte Welten sind nur Positionen, einmal besuchte zeigen
 den letzten bekannten Stand, und von fremden Flotten ist nur die Schiffszahl
 sichtbar – nie Technikstand oder Hülle.
+
+**Ein manipulierter Client bringt nichts.** Der Browser schickt nur Befehle; der
+Server prüft jeden (Besitz, Reichweite, Bezahlbarkeit, Grenzen) und rechnet jedes
+Ergebnis selbst aus. Außerdem:
+- Der Seed der Karte ist ein 128-Bit-Geheimnis, das der Server würfelt – Spieler
+  können ihn weder setzen noch sehen –, und Karte wie Kampf nutzen einen
+  kryptografischen Generator (HMAC-SHA256, `makeRng` in `server/galaxy.js`). Mit einem
+  kleinen 32-Bit-Generator ließe sich der Seed aus den Weltpositionen, die jeder sieht,
+  durchprobieren – und damit jede verborgene Welt und jeder künftige Kampfwurf.
+- Ein Platz pro Konto und Partie; ein Admin kann einer Partie, in der er mitspielt,
+  nicht ohne Nebel zusehen.
+- Systemmeldungen tragen ein eigenes Kennzeichen, Namen wie „System“ oder „Admin“
+  sind reserviert.
+- Jede Verbindung hat ein Nachrichtenbudget (40 auf einmal, 20 pro Sekunde); wer den
+  Server flutet, wird getrennt. Nachrichten sind auf 256 KB begrenzt.
 
 **Aufklärung reicht bis zum Kurs.** Eine fremde Flotte wird geortet, wenn sie bei
 einer sichtbaren Welt steht, näher als 300 Lj an einer eigenen Welt oder näher als

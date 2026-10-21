@@ -64,6 +64,29 @@
       <button class="primary wide" type="submit" data-i18n="auth.change.save"></button>
     </form>
 
+    <!-- Invite link: the new player picks name and password themselves. -->
+    <form id="form-invite" class="hidden">
+      <h2 data-i18n="auth.invite.title"></h2>
+      <p class="tagline" id="invite-intro"></p>
+      <blockquote id="invite-note" class="invite-note hidden"></blockquote>
+      <label class="field">
+        <span data-i18n="auth.invite.user"></span>
+        <input id="in-inv-user" name="username" autocomplete="username" autocapitalize="none"
+               spellcheck="false" maxlength="24" data-i18n-attr="placeholder:auth.userPlaceholder">
+      </label>
+      <p class="small muted invite-hint" data-i18n="auth.invite.userHint"></p>
+      <label class="field">
+        <span data-i18n="auth.invite.password"></span>
+        <input id="in-inv-pass" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.invite.repeat"></span>
+        <input id="in-inv-pass2" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <button class="primary wide" type="submit" data-i18n="auth.invite.submit"></button>
+    </form>
+
+
     <div id="login-error" class="error"></div>
 
     <div class="lang-row"><span class="muted small" data-i18n="menu.language"></span>

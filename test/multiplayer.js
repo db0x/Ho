@@ -37,6 +37,7 @@ function makeClient(name) {
       if (m.t === 'lobby') { c.lobby = m.lobby; c.host = m.host; }
       if (m.t === 'view') c.views.push(m.view);
       if (m.t === 'error') c.errors.push(m.key || m.msg);
+      if (m.t === 'chat') (c.chats ||= []).push(m);
     });
     clients.push(c);
   });
@@ -92,6 +93,18 @@ console.log('17th player turned away with key:', extra.errors[0]);
   check(await until(() => host.lobby.players.find(p => p.id === third.id)?.name === 'Host 2'),
     `Duplicate name not numbered (${host.lobby.players.find(p => p.id === third.id)?.name})`);
   console.log('Color choice: unique, swapping only by the host; duplicate names get numbered.');
+}
+
+// --- Fairness: nobody chooses or sees the map seed, nobody is called "System"
+{
+  send(host, { t: 'settings', settings: { seed: 42, planetsPerPlayer: 5 } });
+  await wait(150);
+  check(!('seed' in host.lobby.settings), `The lobby reveals or accepts a seed (${JSON.stringify(host.lobby.settings)})`);
+  const third = clients[2];
+  third.errors.length = 0;
+  send(third, { t: 'profile', name: 'System' });
+  check(await until(() => third.errors.includes('profile.err.reserved')), 'A player can call themselves "System"');
+  console.log('Fairness: no seed in the lobby, reserved names refused.');
 }
 
 // --- Start
@@ -165,6 +178,22 @@ for (const c of clients) {
 send(host, { t: 'chat', text: 'Hello galaxy' });
 check(await until(() => chatSeen >= N - 2), `Chat reached only ${chatSeen} of ${N - 2} players`);
 console.log(`Chat reached ${chatSeen} players.`);
+// System messages carry a flag of their own - player chat never does.
+const said = host.chats || [];
+check(said.some(m => m.key === 'chat.lost' && m.system === true), 'The disconnect message is not flagged as system');
+check(said.filter(m => m.text === 'Hello galaxy').every(m => !m.system), 'Player chat is flagged as system');
+
+// --- Flooding the server is cut off instead of slowing everyone down
+{
+  const flood = await makeClient('Flood');
+  let replies = 0, closed = false;
+  flood.ws.on('message', (raw) => { if (JSON.parse(raw.toString()).t === 'games') replies++; });
+  flood.ws.on('close', () => { closed = true; });
+  for (let i = 0; i < 1000; i++) flood.ws.send(JSON.stringify({ t: 'list' }));
+  check(await until(() => closed, 4000), 'A flooding connection is not closed');
+  check(replies < 100, `The server answered ${replies} of 1000 flood messages`);
+  console.log(`Flood: ${replies} of 1000 messages answered, connection closed.`);
+}
 
 // Keep an eye on the view size
 const size = Buffer.byteLength(JSON.stringify(vEnd));

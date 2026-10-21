@@ -12,8 +12,9 @@ import {
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
 import { listUsers, userFile, getUser, setProfile, isAdmin } from './userstore.js';
+import { createInvite, listInvites, revokeInvite } from './invites.js';
 import {
-  cleanName, nameAllowed, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
+  cleanName, nameAllowed, reservedName, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
   accountAvatarUrl, handleAvatar
 } from './profile.js';
 import { MAX_PLAYERS } from '../shared/rules.js';
@@ -66,7 +67,22 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ noServer: true });
+// The largest legitimate message is a profile image (AVATAR_MAX, base64
+// encoded); the library default of 100 MB would let anyone tie up memory.
+const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+
+// Message throttle per connection (token bucket). Generous for people - the
+// UI sends at most a few messages per second, sliders are throttled - but a
+// script flooding the server would slow the game down for everyone.
+const RATE = { burst: 40, perSecond: 20, dropsBeforeClose: 200 };
+function allowMessage(c) {
+  const now = Date.now();
+  c.tokens = Math.min(RATE.burst, (c.tokens ?? RATE.burst) + (now - (c.refilled ?? now)) / 1000 * RATE.perSecond);
+  c.refilled = now;
+  if (c.tokens >= 1) { c.tokens--; return true; }
+  c.dropped = (c.dropped || 0) + 1;
+  return false;
+}
 
 server.on('upgrade', (req, socket, head) => {
   const session = checkUpgrade(req);
@@ -138,7 +154,9 @@ function attachSpectator(c, connId, game) {
 // Players write text, the system sends { key, params } - translation only
 // happens at the recipient.
 function chat(game, from, msg) {
-  const body = typeof msg === 'string' ? { text: msg } : msg;
+  // System messages (keys) are flagged as such: the client must not tell
+  // them apart by the sender's name - a player could be called "System".
+  const body = typeof msg === 'string' ? { text: msg } : { ...msg, system: true };
   for (const p of game.players) {
     const c = p.connId && conns.get(p.connId);
     if (c) send(c.ws, { t: 'chat', from, ...body });
@@ -165,6 +183,14 @@ wss.on('connection', (ws, req, session) => {
   });
 
   ws.on('message', (raw) => {
+    const conn = conns.get(connId);
+    if (conn && !allowMessage(conn)) {
+      if (conn.dropped > RATE.dropsBeforeClose) {
+        console.warn(`Connection of ${conn.account ?? 'a guest'} closed: message flood`);
+        ws.close(1008, 'rate limit');
+      }
+      return;
+    }
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     try { handle(connId, ws, msg); } catch (e) {
@@ -216,8 +242,9 @@ function adminOverview() {
     if (!online.has(c.accountKey)) online.set(c.accountKey, []);
     online.get(c.accountKey).push({ since: c.since, game: c.gameId });
   }
-  let accounts = [];
+  let accounts = [], invites = [];
   try { accounts = listUsers(); } catch { /* account file unreadable - show the games anyway */ }
+  try { invites = listInvites(); } catch (e) { console.error(e.message); }
   return {
     now: Date.now(),
     games: [...games.values()].map(adminGameView)
@@ -226,13 +253,15 @@ function adminOverview() {
       const sessions = online.get(u.name) || [];
       return {
         name: u.name, display: u.display, nick: u.nick, admin: u.admin, mustChange: u.mustChange,
+        invitedBy: u.invitedBy,
         avatar: u.avatar ? accountAvatarUrl(u.name) : null,
         created: u.created, changed: u.changed,
         online: sessions.length > 0,
         onlineSince: sessions.length ? Math.min(...sessions.map(s => s.since)) : null,
         games: [...new Set(sessions.map(s => s.game).filter(Boolean))]
       };
-    })
+    }),
+    invites
   };
 }
 
@@ -276,6 +305,22 @@ function adminMessage(game, from, text) {
   return delivered;
 }
 
+/**
+ * Takes a connection out of the lobby it sits in, before it opens or joins
+ * another game - otherwise the old seat would linger as a ghost player.
+ */
+function leaveLobby(c, connId) {
+  const old = c.gameId && games.get(c.gameId);
+  if (!old || old.state !== 'lobby') return;
+  const p = old.players.find(q => q.id === c.playerId && q.connId === connId);
+  if (p) {
+    removePlayer(old, p.id);
+    if (!old.players.length) games.delete(old.id);
+    else broadcastLobby(old);
+  }
+  c.gameId = null; c.playerId = null;
+}
+
 function openGameList() {
   return [...games.values()]
     .filter(g => g.state === 'lobby' && g.players.length < MAX_PLAYERS)
@@ -290,7 +335,7 @@ function openGameList() {
  */
 function playerName(c, game, wanted, selfId) {
   const name = c.accountKey ? c.profile.name : (cleanName(wanted) || c.profile.name);
-  return uniqueName(game, name || 'Captain', selfId);
+  return uniqueName(game, name && !reservedName(name) ? name : 'Captain', selfId);
 }
 
 /** Accept a new side of a profile. Returns an error key or null. */
@@ -303,6 +348,7 @@ function changeProfile(c, msg) {
       // Whoever is named like their account again needs no entry of their own.
       setProfile(c.accountKey, { nick: name === c.account ? null : name });
     } else if (name.length < 2) return 'profile.err.short';
+    else if (reservedName(name)) return 'profile.err.reserved';
     c.profile.name = name;
   }
   if (msg.avatar !== undefined) {
@@ -324,12 +370,13 @@ function handle(connId, ws, msg) {
 
   switch (msg.t) {
     case 'create': {
+      leaveLobby(c, connId);
       const g = createGame('');
       const name = playerName(c, g, msg.name);
       g.hostName = name;
       Object.assign(g.settings, sanitizeSettings(msg.settings));
       games.set(g.id, g);
-      const p = addPlayer(g, { name, connId, avatar: c.profile.avatar, account: c.accountKey ? c.account : null });
+      const p = addPlayer(g, { name, connId, avatar: c.profile.avatar, account: c.accountKey ? c.account : null, accountKey: c.accountKey });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -346,9 +393,15 @@ function handle(connId, ws, msg) {
         return;
       }
       if (g.players.length >= MAX_PLAYERS) return send(ws, { t: 'error', key: 'err.gameFull' });
+      // One seat per account: a second tab must not bring a second empire
+      // that plays into the hands of the first.
+      if (c.accountKey && g.players.some(p => p.accountKey === c.accountKey)) {
+        return send(ws, { t: 'error', key: 'err.alreadySeated' });
+      }
+      leaveLobby(c, connId);
       const p = addPlayer(g, {
         name: playerName(c, g, msg.name), connId,
-        avatar: c.profile.avatar, account: c.accountKey ? c.account : null
+        avatar: c.profile.avatar, account: c.accountKey ? c.account : null, accountKey: c.accountKey
       });
       p.token = crypto.randomUUID();
       c.gameId = g.id; c.playerId = p.id;
@@ -505,6 +558,11 @@ function handle(connId, ws, msg) {
       const g = games.get(String(msg.code || '').toUpperCase());
       if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
       if (g.state === 'lobby') return send(ws, { t: 'error', key: 'err.notStarted' });
+      // Watching without fog while playing in the same game would be cheating -
+      // for admins too.
+      if (g.state === 'running' && g.players.some(p => p.accountKey === c.accountKey && p.alive)) {
+        return send(ws, { t: 'error', key: 'err.watchOwnGame' });
+      }
       attachSpectator(c, connId, g);
       console.log(`Admin ${c.account} watches game ${g.id}`);
       break;
@@ -546,6 +604,21 @@ function handle(connId, ws, msg) {
       send(ws, { t: 'adminMsgSent', code: g.id, delivered });
       break;
     }
+    case 'adminInvite': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      // The token goes back to this admin only, once - the server keeps just a hash.
+      const { token, invite } = createInvite(c.account, msg.note);
+      console.log(`Admin ${c.account} created invite ${invite.id}${invite.note ? ` (${JSON.stringify(invite.note)})` : ''}`);
+      send(ws, { t: 'adminInviteCreated', token, invite });
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminRevokeInvite': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      if (revokeInvite(String(msg.id || ''))) console.log(`Admin ${c.account} revoked invite ${msg.id}`);
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
     case 'list': {
       send(ws, { t: 'games', openGames: openGameList() });
       break;
@@ -565,7 +638,6 @@ function sanitizeSettings(s) {
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
-  if (s.seed === null || Number.isFinite(s.seed)) out.seed = s.seed;
   return out;
 }
 

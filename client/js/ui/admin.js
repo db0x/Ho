@@ -24,6 +24,19 @@ export class AdminPanel {
       const watch = e.target.closest('[data-watch]');
       if (watch) this.watch(watch.dataset.watch);
     });
+    $('#admin-invite-create').onclick = () => {
+      this.net.send({ t: 'adminInvite', note: $('#admin-invite-note').value });
+    };
+    $('#admin-invite-note').onkeydown = (e) => { if (e.key === 'Enter') $('#admin-invite-create').click(); };
+    $('#admin-invite-copy').onclick = () => this.copyInvite();
+    $('#admin-invite-close').onclick = () => {
+      $('#admin-invite-link').classList.add('hidden');
+      $('#admin-invite-url').value = '';
+    };
+    $('#admin-invites').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-revoke]');
+      if (b) this.net.send({ t: 'adminRevokeInvite', id: b.dataset.revoke });
+    });
     // The composer sits outside the list on purpose: the list is rebuilt on
     // every poll and would throw away a half-written message.
     $('#admin-compose-cancel').onclick = () => this.compose(null);
@@ -78,6 +91,32 @@ export class AdminPanel {
     this.net.send({ t: 'adminWatch', code });
   }
 
+  /**
+   * A fresh invite: the server sends the token once. The link is built from
+   * this page's own address, so it also works behind a proxy under a subpath.
+   */
+  inviteCreated(m) {
+    const url = new URL(`login.html?invite=${encodeURIComponent(m.token)}`, location.href).href;
+    $('#admin-invite-url').value = url;
+    $('#admin-invite-link').classList.remove('hidden');
+    $('#admin-invite-note').value = '';
+    $('#admin-invite-copy').textContent = t('admin.copy');
+    $('#admin-invite-url').select();
+  }
+
+  async copyInvite() {
+    const field = $('#admin-invite-url');
+    try {
+      await navigator.clipboard.writeText(field.value);
+    } catch {
+      // No clipboard API without https (e.g. on a LAN address): fall back to
+      // the selection, which the old copy command can still handle.
+      field.select();
+      document.execCommand('copy');
+    }
+    $('#admin-invite-copy').textContent = t('admin.copied');
+  }
+
   /** Opens the message composer for a game, or closes it with null. */
   compose(code) {
     this.composing = code;
@@ -118,6 +157,8 @@ export class AdminPanel {
     });
     $('#admin-games-count').textContent = d.games.length;
     $('#admin-accounts-count').textContent = d.accounts.length;
+    $('#admin-invites-count').textContent = d.invites.length;
+    $('#admin-invites').innerHTML = d.invites.map(i => this.inviteRow(i)).join('');
     $('#admin-games').innerHTML = d.games.length
       ? d.games.map(g => this.gameCard(g)).join('')
       : `<p class="muted small">${t('admin.noGames')}</p>`;
@@ -183,8 +224,22 @@ export class AdminPanel {
     </li>`;
   }
 
+  inviteRow(i) {
+    const facts = [
+      t('admin.inviteBy', { admin: esc(i.by) }),
+      t('admin.inviteCreated', { ago: this.ago(i.created) }),
+      t('admin.inviteExpires', { ago: this.ago(i.expires) })
+    ].join(' · ');
+    return `<div class="admin-invite">
+      <span class="ai-note">${i.note ? esc(i.note) : `<span class="muted">${t('admin.inviteNoNote')}</span>`}</span>
+      <button type="button" class="tiny" data-revoke="${esc(i.id)}">${t('admin.revoke')}</button>
+      <span class="muted small ai-facts">${facts}</span>
+    </div>`;
+  }
+
   accountRow(a) {
-    const name = esc(a.display) + (a.nick && a.nick !== a.display ? ` <small class="muted">${t('admin.nick', { nick: esc(a.nick) })}</small>` : '');
+    const name = esc(a.display) + (a.nick && a.nick !== a.display ? ` <small class="muted">${t('admin.nick', { nick: esc(a.nick) })}</small>` : '')
+      + (a.invitedBy ? ` <small class="muted">${t('admin.invitedBy', { admin: esc(a.invitedBy) })}</small>` : '');
     const status = a.online
       ? t('admin.online', { ago: this.ago(a.onlineSince) })
         + (a.games.length ? ' · ' + t('admin.inGame', { code: a.games.map(esc).join(', ') }) : '')
@@ -210,7 +265,8 @@ function relative(deltaMs) {
   const abs = Math.abs(s);
   if (abs < 60) return rtf.format(s, 'second');
   if (abs < 3600) return rtf.format(Math.round(s / 60), 'minute');
-  if (abs < 86400) return rtf.format(Math.round(s / 3600), 'hour');
+  // Hours up to two days: "in 23 hours" says more than "tomorrow".
+  if (abs < 2 * 86400) return rtf.format(Math.round(s / 3600), 'hour');
   return rtf.format(Math.round(s / 86400), 'day');
 }
 

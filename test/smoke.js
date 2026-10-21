@@ -2,6 +2,7 @@
 import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders, canReach } from '../server/game.js';
 import { habitability, refitTotal, refitCost, dist } from '../shared/rules.js';
 import { runBot } from '../server/bot.js';
+import { generateGalaxy } from '../server/galaxy.js';
 
 const game = createGame('Test');
 game.settings.seed = 20251012;
@@ -117,6 +118,15 @@ console.log(`Records: ${replays}, on average ${(replayBytes / replays / 1024).to
 // Only the latest turn travels with records - older ones are dropped.
 for (const l of game.log) {
   if (l.turn < game.turn) assert(l.entries.every(e => !e.battle), `Record from turn ${l.turn} not dropped`);
+}
+
+// The map seed: without one the server rolls a secret 128-bit seed, with
+// one the map is reproducible (tests rely on that).
+{
+  const a = generateGalaxy({ playerCount: 4 }), b = generateGalaxy({ playerCount: 4 });
+  assert(/^[0-9a-f]{32}$/.test(a.seed) && a.seed !== b.seed, `Seed is not a fresh 128-bit secret (${a.seed})`);
+  const same = (s) => JSON.stringify(generateGalaxy({ playerCount: 4, seed: s }).planets);
+  assert(same(42) === same(42) && same(42) !== same(43), 'Seeded maps are not reproducible');
 }
 
 // Every AI empire has a personality, and six bots are six different ones.

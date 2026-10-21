@@ -35,12 +35,22 @@ export function cleanName(name) {
 }
 
 /**
+ * Names nobody may take: they would pass for messages of the game or of
+ * the instance's admins in chat and lobby.
+ */
+const RESERVED = new Set(['system', 'admin', 'administrator', 'server', 'ho!!', 'ho']);
+export function reservedName(name) {
+  return RESERVED.has(normalizeName(name));
+}
+
+/**
  * May an account use this name? Any name, just not that of another account -
  * otherwise someone would play under a fellow player's name.
  */
 export function nameAllowed(name, ownKey) {
   const n = normalizeName(name);
   if (n.length < 2) return 'profile.err.short';
+  if (reservedName(n)) return 'profile.err.reserved';
   for (const u of listUsers()) {
     if (u.name === ownKey) continue;
     if (u.name === n || normalizeName(u.display) === n || normalizeName(getUser(u.name)?.nick) === n) {

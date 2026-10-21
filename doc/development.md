@@ -23,11 +23,12 @@ shared/
 server/
   index.js           HTTP + WebSocket, lobby, game management, spectator pace
   game.js            Game state, turn resolution, views (player and spectator)
-  galaxy.js          Star map: scatter or spiral, expansion (deterministic via a seed)
+  galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
   userstore.js       Accounts on disk: name, scrypt hash, profile – written atomically
   profile.js         Display names and profile pictures: check, store, serve
+  invites.js         One-time invite links: create, check, use up, expire (hashes only)
   users.js           Tool for the host: add, del, passwd, name, admin, list
 client/
   index.html         Start screen, lobby, game screen
@@ -52,6 +53,21 @@ test/                see Tests
 view: unexplored worlds are positions only, worlds visited once show the last known
 state, and of foreign fleets only the ship count is visible – never tech level or
 hull.
+
+**Nothing to gain from a manipulated client.** The browser only sends orders; the
+server checks each one (ownership, range, affordability, limits) and computes every
+result itself. On top of that:
+- The map seed is a 128-bit secret rolled by the server – players can neither set
+  nor see it – and map and combat use a cryptographic generator (HMAC-SHA256,
+  `makeRng` in `server/galaxy.js`). With a small 32-bit generator the seed could be
+  brute-forced from the world positions everyone sees, and with it every hidden world
+  and every future combat roll.
+- One seat per account and game; an admin cannot watch a game without fog of war
+  while playing in it.
+- System messages carry a flag of their own, names like “System” or “Admin” are
+  reserved.
+- Each connection has a message budget (burst 40, 20 per second); flooding gets the
+  connection closed. Messages are limited to 256 KB.
 
 **Reconnaissance reaches as far as the course.** A foreign fleet is detected when it
 sits at a visible world, closer than 300 ly to one of your worlds or closer than

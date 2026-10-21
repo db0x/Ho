@@ -188,6 +188,7 @@ net.on('hello', (m) => {
 net.on('games', (m) => lobby.showOpenGames(m.openGames));
 net.on('adminData', (m) => admin.update(m));
 net.on('adminMsgSent', (m) => admin.messageSent(m));
+net.on('adminInviteCreated', (m) => admin.inviteCreated(m));
 // An admin speaks to everyone in the game: a banner that has to be
 // acknowledged, plus a line in the radio log for later.
 net.on('adminMsg', (m) => {
@@ -294,7 +295,9 @@ function collectBattles(view) {
 net.on('chat', (m) => {
   const text = message({ key: m.key, params: m.params, msg: m.text });
   hud?.chat(m.from, text);
-  if (m.from === 'System') hud?.toast(text);
+  // Only real system messages pop up - recognised by the server's flag, not
+  // by the name: a player could be called "System".
+  if (m.system) hud?.toast(text);
   sfx.play('chat');
 });
 

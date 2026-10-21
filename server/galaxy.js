@@ -1,4 +1,5 @@
 // Star map generator.
+import crypto from 'node:crypto';
 import {
   IDEAL, TEMP_RANGE, GRAV_RANGE, HOLE_BLOCK, dist, clamp, habitability, shipStats, travelDistance
 } from '../shared/rules.js';
@@ -43,16 +44,31 @@ const MARGIN = 110;
 // height, and thinner towards the edge.
 const DEPTH_RATIO = 0.3;        // half thickness, relative to the shorter edge
 
-/** Deterministic PRNG (mulberry32) so games are reproducible. */
+/**
+ * Deterministic random numbers for map and combat: the same seed gives the
+ * same game, which keeps tests reproducible.
+ *
+ * Deliberately a cryptographic generator (HMAC-SHA256 in counter mode) and
+ * not a small fast one: every player sees the positions of all worlds from
+ * the first turn. With a 32-bit generator the seed could be brute-forced
+ * from those positions in seconds - and with it every hidden world and
+ * every future combat roll. Here the outputs reveal nothing about the seed.
+ */
 export function makeRng(seed) {
-  let a = seed >>> 0;
+  const key = String(seed);
+  let counter = 0, block = null, pos = 8;
   return function () {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    if (pos >= 8) {
+      block = crypto.createHmac('sha256', key).update(String(counter++)).digest();
+      pos = 0;
+    }
+    return block.readUInt32LE(4 * pos++) / 4294967296;
   };
+}
+
+/** A fresh secret seed: 128 random bits, known only to the server. */
+export function newSeed() {
+  return crypto.randomBytes(16).toString('hex');
 }
 
 function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
@@ -125,13 +141,13 @@ function lensZ(galaxy, rng, x, y) {
 
 /**
  * Generates the galaxy.
- * @param {{playerCount:number, planetsPerPlayer?:number, seed?:number,
+ * @param {{playerCount:number, planetsPerPlayer?:number, seed?:number|string,
  *          mode?:'classic'|'space', shape?:'scatter'|'spiral'}} opts
  */
 export function generateGalaxy(opts) {
   const playerCount = clamp(opts.playerCount, 2, 16);
   const perPlayer = opts.planetsPerPlayer ?? 6;
-  const seed = opts.seed ?? (Math.random() * 1e9) | 0;
+  const seed = opts.seed ?? newSeed();
   const rng = makeRng(seed);
 
   const count = Math.max(playerCount * 2, Math.round(playerCount * perPlayer));
@@ -149,7 +165,7 @@ export function generateGalaxy(opts) {
   const halfDepth = space ? Math.round(height * DEPTH_RATIO) : 0;
   const core = { x: width / 2, y: height / 2, r: Math.sqrt(width * width + height * height) / 2 };
   const field = spiral
-    ? spiralField(width / 2, height / 2, Math.min(width, height) * 0.47, 2 + (seed % 2), 0.75)
+    ? spiralField(width / 2, height / 2, Math.min(width, height) * 0.47, 2 + Math.floor(rng() * 2), 0.75)
     : null;
 
   const planets = [];
@@ -228,7 +244,7 @@ export function expandSpiral(galaxy) {
   const g = galaxy, f = g.field;
   if (!f) return [];
   g.epoch++;
-  const rng = makeRng((g.seed ^ Math.imul(g.epoch, 0x9E3779B1)) >>> 0);
+  const rng = makeRng(`${g.seed}:expand:${g.epoch}`);
   const rOld = f.rOut;
   const rNew = rOld + BAND;
   f.rOut = rNew;                                  // arms reach further out
@@ -293,7 +309,7 @@ export function expandGalaxy(galaxy, dir) {
   if (!r || r.x1 <= r.x0 || r.y1 <= r.y0) return [];
 
   g.epoch++;
-  const rng = makeRng((g.seed ^ Math.imul(g.epoch, 0x9E3779B1)) >>> 0);
+  const rng = makeRng(`${g.seed}:expand:${g.epoch}`);
   const count = Math.max(1, Math.round((r.x1 - r.x0) * (r.y1 - r.y0) / AREA_PER_PLANET));
   // Only check the gap to neighbors near the strip
   const near = g.planets.filter(q =>
