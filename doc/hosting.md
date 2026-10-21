@@ -67,6 +67,7 @@ docker exec ho node server/users.js list                       # who may play
 docker exec ho node server/users.js passwd captain             # reset a password
 docker exec ho node server/users.js name captain Captain       # spelling of the account name
 docker exec ho node server/users.js del captain                # delete an account
+docker exec ho node server/users.js admin captain              # make an admin (… admin captain off)
 ```
 
 Without Docker it is the same, only shorter: `npm run users -- add captain`.
@@ -78,6 +79,18 @@ Without Docker it is the same, only shorter: `npm run users -- add captain`.
   next one on, and an open WebSocket is dropped within a second. The account's
   profile picture is deleted with it. Resetting a password likewise ends every
   session.
+- `admin` marks an account as **admin** of the instance. Admins play like everyone
+  else, but their start screen gets an extra panel: every game on the server (state,
+  turn, since when, who plays with which account) and every account (online or not,
+  in which game). From there an admin can **watch** any running game – without
+  fog of war and without touching its pace; games with humans keep waiting for
+  their players – send a **message** to everyone in a
+  game – e.g. to announce downtime; it appears as a banner that players have to
+  acknowledge – and **end** any game (two clicks);
+  everyone in it is sent back to the start screen with a notice. The server checks
+  the flag on every request, so `admin … off`
+  takes effect without signing out. Without sign-in (`HO_AUTH=off`) there are no
+  admins.
 - Players pick their in-game **display name** themselves (see
   [Playing › Profile](playing.md#starting-a-game)); `name` only changes the
   spelling of the account name, e.g. for the "Signed in as …" line.

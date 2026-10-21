@@ -1,6 +1,6 @@
-// Steckbrief eines Schiffstyps: großes, bewegtes Bild und die Werte, mit denen
-// das Schiff gebaut würde. Ein Fenster für alle Typen - oben lässt sich
-// zwischen ihnen wechseln.
+// Profile of a ship type: a large, animated image and the stats the ship
+// would be built with. One window for all types - you can switch between
+// them at the top.
 import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL } from '../../shared/rules.js';
 import { shipIcon } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
@@ -8,11 +8,11 @@ import { t, localeTag, onLocaleChange } from '../i18n.js';
 
 const fmt = n => Math.round(n).toLocaleString(localeTag());
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(localeTag(), { maximumFractionDigits: 1 });
-const BILD = 250;            // Kantenlänge der Bühne in CSS-Pixeln
+const STAGE = 250;           // edge length of the stage in CSS pixels
 
-let modal = null, frame = 0, offen = null;
+let modal = null, frame = 0, current = null;
 
-function bauen() {
+function build() {
   modal = document.createElement('div');
   modal.id = 'shipinfo';
   modal.className = 'modal hidden';
@@ -25,120 +25,120 @@ function bauen() {
     <button class="primary si-close"></button>
   </div>`;
   document.body.appendChild(modal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) schliessen(); });
-  modal.querySelector('.si-close').onclick = schliessen;
-  // In der Erfassungsphase, damit Escape nicht zugleich die Auswahl auf der
-  // Karte aufhebt.
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  modal.querySelector('.si-close').onclick = close;
+  // In the capture phase, so Escape does not also clear the selection on
+  // the map.
   addEventListener('keydown', (e) => {
-    if (offen && e.key === 'Escape') { e.stopPropagation(); schliessen(); }
+    if (current && e.key === 'Escape') { e.stopPropagation(); close(); }
   }, true);
-  // Sprachwechsel bei offenem Steckbrief: gleich in der neuen Sprache zeigen
+  // Language change with the profile open: show it in the new language right away
   onLocaleChange(() => {
-    if (!offen) return;
+    if (!current) return;
     modal.querySelector('.si-close').textContent = t('shipinfo.close');
-    zeigen();
+    render();
   });
 }
 
 /**
  * @param {string} type
  * @param {{tech?: Record<string, number>, color?: string, note?: string}} o
- *   Techstand, mit dem gebaut würde (ohne: Startstufe), die Reichsfarbe und
- *   ein Hinweis unter den Werten
+ *   tech levels it would be built with (without: starting level), the empire
+ *   color and a note below the stats
  */
 export function openShipInfo(type, o = {}) {
   if (!SHIP_DEFS[type]) return;
-  if (!modal) bauen();
-  offen = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '' };
+  if (!modal) build();
+  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '' };
   modal.querySelector('.si-close').textContent = t('shipinfo.close');
-  zeigen();
+  render();
   modal.classList.remove('hidden');
   cancelAnimationFrame(frame);
-  frame = requestAnimationFrame(malen);
+  frame = requestAnimationFrame(paint);
 }
 
-function schliessen() {
-  offen = null;
+function close() {
+  current = null;
   cancelAnimationFrame(frame);
   modal?.classList.add('hidden');
 }
 
-function zeigen() {
-  const { type, tech, color, note } = offen;
+function render() {
+  const { type, tech, color, note } = current;
   const def = SHIP_DEFS[type];
   const st = shipStats(type, tech);
-  const basis = shipStats(type, {});
+  const base = shipStats(type, {});
   const cost = shipCost(type, tech);
 
   const tabs = modal.querySelector('.si-tabs');
   tabs.innerHTML = '';
-  for (const typ of SHIP_TYPES) {
+  for (const kind of SHIP_TYPES) {
     const b = document.createElement('button');
-    b.className = 'tiny' + (typ === type ? ' primary' : '');
-    b.title = t(`ship.${typ}.name`);
-    // shipIcon hält jedes Bild nur einmal vor - eine Kopie, damit es nicht
-    // aus einer Bauliste herausgezogen wird.
-    const ic = shipIcon(typ, 22, color);
-    const kopie = document.createElement('canvas');
-    kopie.width = ic.width; kopie.height = ic.height;
-    kopie.style.width = kopie.style.height = '22px';
-    kopie.getContext('2d').drawImage(ic, 0, 0);
-    b.append(kopie, document.createTextNode(' ' + t(`ship.${typ}.name`)));
-    b.onclick = () => { offen.type = typ; zeigen(); };
+    b.className = 'tiny' + (kind === type ? ' primary' : '');
+    b.title = t(`ship.${kind}.name`);
+    // shipIcon keeps every image only once - a copy, so it is not pulled out
+    // of a build list.
+    const ic = shipIcon(kind, 22, color);
+    const copy = document.createElement('canvas');
+    copy.width = ic.width; copy.height = ic.height;
+    copy.style.width = copy.style.height = '22px';
+    copy.getContext('2d').drawImage(ic, 0, 0);
+    b.append(copy, document.createTextNode(' ' + t(`ship.${kind}.name`)));
+    b.onclick = () => { current.type = kind; render(); };
     tabs.appendChild(b);
   }
 
-  // Wert, und darunter der Grundwert, sobald die Technik ihn verbessert hat.
-  const zeile = (k, v, grund, fmtf = fmt) => `<div class="stat"><div class="k">${k}</div>
-    <div class="v">${v}</div>${grund != null ? `<div class="small muted">${t('shipinfo.base', { v: fmtf(grund) })}</div>` : ''}</div>`;
-  const anders = (a, b) => Math.round(a * 10) !== Math.round(b * 10) ? b : null;
+  // The value, and below it the base value once tech has improved it.
+  const row = (k, v, baseValue, fmtf = fmt) => `<div class="stat"><div class="k">${k}</div>
+    <div class="v">${v}</div>${baseValue != null ? `<div class="small muted">${t('shipinfo.base', { v: fmtf(baseValue) })}</div>` : ''}</div>`;
+  const differs = (a, b) => Math.round(a * 10) !== Math.round(b * 10) ? b : null;
   const stats = [
-    zeile(t('fleet.speed'), st.mobile ? `${fmt(st.speed)} ${t('unit.lyPerTurn')}` : t('shipinfo.immobile'),
-      st.mobile ? anders(st.speed, basis.speed) : null),
-    zeile(t('fleet.range'), st.range ? `${fmt(st.range)} ${t('unit.ly')}` : '–',
-      st.range ? anders(st.range, basis.range) : null),
-    zeile(t('fleet.attack'), st.attack ? fmt1(st.attack) : '–',
-      st.attack ? anders(st.attack, basis.attack) : null, fmt1),
-    zeile(t('fleet.hull'), `${fmt(st.maxHp)} HP`, anders(st.maxHp, basis.maxHp)),
-    st.colonists ? zeile(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
-    zeile(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
+    row(t('fleet.speed'), st.mobile ? `${fmt(st.speed)} ${t('unit.lyPerTurn')}` : t('shipinfo.immobile'),
+      st.mobile ? differs(st.speed, base.speed) : null),
+    row(t('fleet.range'), st.range ? `${fmt(st.range)} ${t('unit.ly')}` : '–',
+      st.range ? differs(st.range, base.range) : null),
+    row(t('fleet.attack'), st.attack ? fmt1(st.attack) : '–',
+      st.attack ? differs(st.attack, base.attack) : null, fmt1),
+    row(t('fleet.hull'), `${fmt(st.maxHp)} HP`, differs(st.maxHp, base.maxHp)),
+    st.colonists ? row(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
+    row(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
   ].join('');
-  const stufen = def.techs.map(f => `${t(`tech.${f}.name`)} ${tech[f] || TECH_START_LEVEL}`).join(' · ');
+  const levels = def.techs.map(f => `${t(`tech.${f}.name`)} ${tech[f] || TECH_START_LEVEL}`).join(' · ');
 
   modal.querySelector('.si-text').innerHTML = `
     <h2>${t(`ship.${type}.name`)}</h2>
     <p class="si-lead">${t(`ship.${type}.desc`)}</p>
     <div class="statgrid">${stats}</div>
-    <p class="small muted">${t('shipinfo.techs', { list: stufen })}${note ? '<br>' + note : ''}</p>
+    <p class="small muted">${t('shipinfo.techs', { list: levels })}${note ? '<br>' + note : ''}</p>
     <h4>${t('shipinfo.use')}</h4>
     <p class="si-use">${t(`ship.${type}.info`)}</p>`;
 }
 
-function malen(ms) {
-  if (!offen) return;
+function paint(ms) {
+  if (!current) return;
   const cv = modal.querySelector('.si-stage canvas');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const px = Math.round(BILD * dpr);
+  const px = Math.round(STAGE * dpr);
   if (cv.width !== px) {
     cv.width = cv.height = px;
-    cv.style.width = cv.style.height = BILD + 'px';
+    cv.style.width = cv.style.height = STAGE + 'px';
   }
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, px, px);
   const s = ms / 1000;
-  // Ohne Antrieb treibt ein Satellit nur und dreht sich; alles andere fliegt
-  // leicht schwankend nach oben.
-  const fest = !SHIP_DEFS[offen.type].speedMul;
+  // Without propulsion a satellite only drifts and rotates; everything else
+  // flies upwards, swaying slightly.
+  const stationary = !SHIP_DEFS[current.type].speedMul;
   const len = px * 0.58, S = len / 100;
   drawShipHD(ctx, {
-    type: offen.type,
-    // Etwas nach oben gerückt: die Flamme braucht hinten Platz.
+    type: current.type,
+    // Moved up a little: the flame needs room at the back.
     x: px / 2 + Math.sin(s * 0.7) * px * 0.015,
-    y: px / 2 - (fest ? 0 : 10 * S) + Math.sin(s * 1.1) * px * 0.02,
-    angle: fest ? s * 0.2 : -Math.PI / 2 + Math.sin(s * 0.6) * 0.1,
+    y: px / 2 - (stationary ? 0 : 10 * S) + Math.sin(s * 1.1) * px * 0.02,
+    angle: stationary ? s * 0.2 : -Math.PI / 2 + Math.sin(s * 0.6) * 0.1,
     len,
-    color: offen.color,
+    color: current.color,
     phase: s
   });
-  frame = requestAnimationFrame(malen);
+  frame = requestAnimationFrame(paint);
 }

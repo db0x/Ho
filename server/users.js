@@ -1,16 +1,17 @@
-// Konten verwalten - gedacht fuer den Host, nicht fuer den Browser:
+// Manage accounts - meant for the host, not for the browser:
 //
 //   docker exec ho node server/users.js add captain
 //   docker exec ho node server/users.js list
 //   docker exec ho node server/users.js del captain
 //   docker exec ho node server/users.js passwd captain
 //   docker exec ho node server/users.js name captain Captain
+//   docker exec ho node server/users.js admin captain [on|off]
 //
-// Mehr kann es nicht, und mehr soll es nicht koennen. Angelegte Konten haben
-// ein gewuerfeltes erstes Passwort, das beim ersten Anmelden gewechselt werden
-// muss - danach kennt es nur der Spieler.
+// It cannot do more, and it is not supposed to. New accounts get a random
+// first password that has to be changed on the first sign-in - after that
+// only the player knows it.
 import {
-  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, userFile,
+  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, setAdmin, userFile,
   checkPassword, MIN_PASSWORD
 } from './userstore.js';
 import { readFileSync } from 'node:fs';
@@ -19,16 +20,16 @@ import { registerLocale, setLocale, t } from '../shared/i18n.js';
 for (const code of ['de', 'en']) {
   registerLocale(code, JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8')));
 }
-// Sprache der Umgebung, in der das Werkzeug laeuft - HO_LANG schlaegt sie.
+// Language of the environment the tool runs in - HO_LANG overrides it.
 setLocale(String(process.env.HO_LANG || process.env.LC_ALL || process.env.LANG || 'en')
   .slice(0, 2).toLowerCase());
 
-const [befehl, name, passwort] = process.argv.slice(2);
+const [command, name, password] = process.argv.slice(2);
 
 try {
-  await los(befehl, name, passwort);
+  await run(command, name, password);
 } catch (e) {
-  // Beanstandungen reisen als Schluessel; alles andere ist ein echter Fehler.
+  // Complaints travel as keys; anything else is a real error.
   const text = /^[a-z]+\.[A-Za-z.]+$/.test(e.message)
     ? t(e.message, { user: name, n: MIN_PASSWORD })
     : e.message;
@@ -36,11 +37,11 @@ try {
   process.exit(1);
 }
 
-async function los(befehl, name, passwort) {
-  switch (befehl) {
+async function run(command, name, password) {
+  switch (command) {
     case 'add': {
-      verlangeNamen(name);
-      const r = await addUser(name, passwort);
+      requireName(name);
+      const r = await addUser(name, password);
       console.log(t('auth.cli.added', { user: r.display }));
       if (r.generated) {
         console.log(t('auth.cli.password', { password: r.password }));
@@ -53,7 +54,7 @@ async function los(befehl, name, passwort) {
     case 'del':
     case 'delete':
     case 'rm': {
-      verlangeNamen(name);
+      requireName(name);
       if (!deleteUser(name)) throw new Error('auth.cli.unknown');
       console.log(t('auth.cli.deleted', { user: name.toLowerCase() }));
       console.log(t('auth.cli.deletedHint'));
@@ -61,11 +62,11 @@ async function los(befehl, name, passwort) {
     }
     case 'passwd':
     case 'reset': {
-      verlangeNamen(name);
-      if (passwort) {
-        const rüge = checkPassword(passwort, name);
-        if (rüge) throw new Error(rüge);
-        await setPassword(name, passwort, { mustChange: true });
+      requireName(name);
+      if (password) {
+        const problem = checkPassword(password, name);
+        if (problem) throw new Error(problem);
+        await setPassword(name, password, { mustChange: true });
         console.log(t('auth.cli.reset', { user: name.toLowerCase() }));
         console.log(t('auth.cli.mustChangeHint'));
       } else {
@@ -77,10 +78,19 @@ async function los(befehl, name, passwort) {
       break;
     }
     case 'name': {
-      verlangeNamen(name);
-      // Dritter Wert ist hier die Schreibweise, nicht ein Passwort.
-      const r = setDisplay(name, passwort);
+      requireName(name);
+      // Here the third value is the spelling, not a password.
+      const r = setDisplay(name, password);
       console.log(t('auth.cli.renamed', { user: r.name, display: r.display }));
+      break;
+    }
+    case 'admin': {
+      requireName(name);
+      // Here the third value is on/off; without it the flag is granted.
+      const value = String(password ?? 'on').toLowerCase();
+      if (!['on', 'off'].includes(value)) throw new Error('auth.cli.badAdminValue');
+      const r = setAdmin(name, value === 'on');
+      console.log(t(r.admin ? 'auth.cli.adminOn' : 'auth.cli.adminOff', { user: r.name }));
       break;
     }
     case 'list':
@@ -88,10 +98,11 @@ async function los(befehl, name, passwort) {
       const users = listUsers();
       if (!users.length) { console.log(t('auth.cli.none')); break; }
       console.log(t('auth.cli.listHead', { count: users.length, file: userFile() }));
-      const breite = Math.max(...users.map(u => u.display.length));
+      const width = Math.max(...users.map(u => u.display.length));
       for (const u of users) {
-        const marke = u.mustChange ? t('auth.cli.mustChange') : '';
-        console.log(`  ${u.display.padEnd(breite)}  ${(u.created || '').slice(0, 10)}  ${marke}`);
+        const mark = [u.admin ? t('auth.cli.isAdmin') : '', u.mustChange ? t('auth.cli.mustChange') : '']
+          .filter(Boolean).join(', ');
+        console.log(`  ${u.display.padEnd(width)}  ${(u.created || '').slice(0, 10)}  ${mark}`);
       }
       break;
     }
@@ -102,12 +113,12 @@ async function los(befehl, name, passwort) {
       console.log(t('auth.cli.usage', { file: userFile(), n: MIN_PASSWORD }));
       break;
     default:
-      console.error(t('auth.cli.badCommand', { cmd: befehl }));
+      console.error(t('auth.cli.badCommand', { cmd: command }));
       console.error(t('auth.cli.usage', { file: userFile(), n: MIN_PASSWORD }));
       process.exit(1);
   }
 }
 
-function verlangeNamen(name) {
+function requireName(name) {
   if (!name) throw new Error('auth.cli.needName');
 }

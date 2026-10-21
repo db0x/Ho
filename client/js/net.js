@@ -1,4 +1,4 @@
-// WebSocket-Anbindung mit automatischem Wiederverbinden.
+// WebSocket connection with automatic reconnect.
 export class Net {
   constructor() {
     this.handlers = new Map();
@@ -9,7 +9,7 @@ export class Net {
   }
 
   connect() {
-    // Relativ zur Seite, damit es auch unter einem Unterpfad (/ho/) laeuft.
+    // Relative to the page so it also works under a subpath (/ho/).
     const url = new URL('.', location.href);
     url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.ws = new WebSocket(url);
@@ -26,7 +26,9 @@ export class Net {
         this.session = { code: msg.code, token: msg.token, playerId: msg.playerId };
         saveSession(this.session);
       }
-      if (msg.t === 'kicked' || (msg.t === 'error' && /nicht gefunden|Schlüssel/.test(msg.msg || ''))) {
+      // The seat is gone (game removed, server restarted): forget it so the
+      // next connect does not try to resume it again.
+      if (msg.t === 'kicked' || msg.t === 'ended' || (msg.t === 'error' && STALE_SESSION.includes(msg.key))) {
         clearSession();
         this.session = null;
       }
@@ -60,6 +62,7 @@ export class Net {
 }
 
 const KEY = 'ho-session';
+const STALE_SESSION = ['err.gameNotFound', 'err.noSeat'];
 function loadSession() {
   try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; }
 }
@@ -77,8 +80,8 @@ export function saveName(n) {
   try { localStorage.setItem('ho-name', n); } catch {}
 }
 
-// Ohne Konto haelt der Browser das Bild selbst und reicht es beim Verbinden
-// herein; mit Konto liegt es auf dem Server.
+// Without an account the browser keeps the image itself and hands it in when
+// connecting; with an account it is stored on the server.
 export function loadAvatar() {
   try { return localStorage.getItem('ho-avatar') || null; } catch { return null; }
 }

@@ -1,4 +1,4 @@
-// Sternkarte: Kamera, Hintergrund, Planeten, Flotten, Kurslinien.
+// Star map: camera, background, planets, fleets, course lines.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
@@ -8,21 +8,21 @@ import { BattleFx } from './battlefx.js';
 
 const ORBIT_R = 20;
 
-// Der Himmel entsteht in Kacheln statt einmalig für eine feste Galaxiengröße -
-// so wächst er mit der Karte mit. Bei kleinem Zoom wird eine gröbere Stufe
-// genommen, damit immer ähnlich viele Sterne auf dem Schirm stehen.
+// The sky is built in tiles instead of once for a fixed galaxy size - that
+// way it grows along with the map. At low zoom a coarser level is used so
+// there are always about the same number of stars on screen.
 const SKY_TILE = 900;
-// Drei Sternenebenen statt einer Wolke: viele kleine weit hinten, wenige große
-// vorn. Jede zieht in ihrem eigenen Tempo vorbei - zusammen ergibt das die
-// ruhige Tiefe, die ein stehendes Sternfeld nicht hat.
+// Three star layers instead of one cloud: many small ones far back, few big
+// ones in front. Each drifts past at its own pace - together that gives the
+// calm depth a static star field lacks.
 const SKY_LAYERS = [
   { p: 0.45, n: 20, r: 1 },
   { p: 0.70, n: 8, r: 2 },
   { p: 1.00, n: 4, r: 3 }
 ];
-const DRIFT_PX = 7;        // Bildpunkte je Sekunde auf der vordersten Ebene
+const DRIFT_PX = 7;        // pixels per second on the frontmost layer
 
-/** Zufall, der nur von der Kachel abhängt - derselbe Himmel bei jedem Besuch. */
+/** Randomness that depends only on the tile - the same sky on every visit. */
 function tileRng(level, layer, tx, ty) {
   let h = Math.imul(tx | 0, 0x27d4eb2d) ^ Math.imul(ty | 0, 0x165667b1)
     ^ Math.imul(level + 1, 0x9e3779b1) ^ Math.imul(Math.round(layer * 100), 0x85ebca6b);
@@ -37,8 +37,8 @@ function tileRng(level, layer, tx, ty) {
 }
 
 const nebCache = new Map();
-/** Nebel einmal je Farbton in ein kleines Canvas; skaliert blitten ist billiger
- *  als ein großer Verlauf pro Bild. */
+/** Nebula once per hue into a small canvas; blitting it scaled is cheaper
+ *  than a large gradient per frame. */
 function nebulaSprite(hue) {
   let cv = nebCache.get(hue);
   if (cv) return cv;
@@ -80,11 +80,11 @@ export class MapView {
     this.resize();
   }
 
-  // ------------------------------------------------------------- Kamera
+  // ------------------------------------------------------------- Camera
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    // Gemerkt, weil jeder Zugriff auf clientWidth das Layout neu berechnen
-    // lässt - und w2s() fragt pro Bild hundertfach danach.
+    // Cached, because every access to clientWidth forces a layout
+    // recalculation - and w2s() asks for it hundreds of times per frame.
     this._w = this.cv.clientWidth;
     this._h = this.cv.clientHeight;
     this.cv.width = Math.round(this._w * dpr);
@@ -96,11 +96,11 @@ export class MapView {
   get w() { return this._w; }
   get h() { return this._h; }
 
-  /** Volle Bildrate anfordern - Eingabe, neue Sicht, bewegte Kamera. */
+  /** Request the full frame rate - input, new view, moving camera. */
   poke(ms = 700) { this._activeUntil = performance.now() + ms; }
   get busy() { return performance.now() < this._activeUntil; }
 
-  /** Schlachten der letzten Runde an ihren Welten aufblitzen lassen. */
+  /** Let the battles of the last turn flash at their worlds. */
   playBattles(list, you) {
     this.battleFx.start(list, you);
     this.poke(this.battleFx.remaining() + 100);
@@ -116,7 +116,7 @@ export class MapView {
   fit(padding = 90) {
     if (!this.view) return;
     const g = this.view.galaxy;
-    // Grenzen statt Maße: die Karte wächst, Koordinaten können negativ werden.
+    // Bounds instead of dimensions: the map grows, coordinates can become negative.
     const x0 = g.minX ?? 0, y0 = g.minY ?? 0;
     const x1 = g.maxX ?? g.width, y1 = g.maxY ?? g.height;
     const zx = (this.w - padding * 2) / Math.max(1, x1 - x0);
@@ -127,16 +127,16 @@ export class MapView {
     this.poke();
   }
 
-  /** Blickpunkt auf eine Welt oder Flotte - in der Ebene zählt z nicht. */
+  /** Point of view on a world or fleet - in the plane z does not count. */
   /**
-   * Welt ins Bild holen. `frei` ist das sichtbare Rechteck {w, h}: liegt ein
-   * Blatt über der Karte, soll die Welt in der Mitte des *freien* Teils
-   * landen und nicht dahinter.
+   * Bring a world into view. `free` is the visible rectangle {w, h}: if a
+   * sheet lies over the map, the world should land in the center of the
+   * *free* part and not behind it.
    */
-  focus(p, frei) {
+  focus(p, free) {
     if (!p) return;
     this.centerOn(p.x, p.y);
-    const w = frei?.w ?? this.w, h = frei?.h ?? this.h;
+    const w = free?.w ?? this.w, h = free?.h ?? this.h;
     this.cam.x += (this.w - w) / 2 / this.cam.zoom;
     this.cam.y += (this.h - h) / 2 / this.cam.zoom;
     this.poke();
@@ -163,18 +163,18 @@ export class MapView {
     this.poke(900);
     if (first) {
       this.fit();
-      // Zuschauer haben keine Heimatwelt - für sie bleibt der Gesamtblick.
+      // Spectators have no homeworld - for them the overall view stays.
       const home = view.me ? view.planets.find(p => p.id === view.me.homeworld) : null;
       if (home) this.centerOn(home.x, home.y, Math.max(0.95, Math.min(1.4, this.cam.zoom * 3)));
     }
   }
 
-  /** Kachelstufe: je weiter herausgezoomt, desto größer die Kacheln. */
+  /** Tile level: the further zoomed out, the larger the tiles. */
   skyLevel() {
     return Math.max(0, Math.min(9, Math.round(Math.log2(0.9 / Math.max(0.01, this.cam.zoom)))));
   }
 
-  /** Sterne einer Kachel auf einer der drei Ebenen. */
+  /** Stars of a tile on one of the three layers. */
   skyTile(level, li, tx, ty) {
     const key = `s${level}|${li}|${tx}|${ty}`;
     const hit = this._tiles.get(key);
@@ -183,8 +183,8 @@ export class MapView {
     const rnd = tileRng(level, li + 1, tx, ty);
     const L = SKY_LAYERS[li];
     const stars = [];
-    // Doppelt vorhalten: wie viele davon gezeichnet werden, entscheidet der
-    // Zoom (siehe drawStars) - so bleibt die Dichte über alle Kachelstufen gleich.
+    // Keep twice as many: the zoom decides how many of them are drawn (see
+    // drawStars) - that keeps the density the same across all tile levels.
     for (let i = 0; i < L.n * 2; i++) {
       stars.push({
         x: (tx + rnd()) * size, y: (ty + rnd()) * size,
@@ -198,7 +198,7 @@ export class MapView {
     return stars;
   }
 
-  /** Nebel liegen fest in der Karte und wandern nicht mit. */
+  /** Nebulae are fixed in the map and do not drift along. */
   nebTile(level, tx, ty) {
     const key = `n${level}|${tx}|${ty}`;
     const hit = this._tiles.get(key);
@@ -215,7 +215,7 @@ export class MapView {
     return neb;
   }
 
-  /** Ruft fn für jede sichtbare Kachel auf (ohne Parallaxe). */
+  /** Calls fn for every visible tile (without parallax). */
   forSkyTiles(level, fn) {
     const size = SKY_TILE * (1 << level);
     const z = Math.max(0.0001, this.cam.zoom);
@@ -228,9 +228,9 @@ export class MapView {
   }
 
   /**
-   * Sternenhimmel: drei Ebenen, die gleichmäßig vorbeiziehen. Verschoben wird
-   * in Weltkoordinaten, damit die Kacheln mitwandern - auf dem Bildschirm
-   * ergibt das je Ebene ein anderes Tempo, vorn schneller als hinten.
+   * Starry sky: three layers drifting past evenly. The shift happens in world
+   * coordinates so the tiles move along - on screen that gives each layer a
+   * different pace, faster in front than at the back.
    */
   drawStars(ctx) {
     const level = this.skyLevel();
@@ -238,10 +238,10 @@ export class MapView {
     const z = this.cam.zoom;
     const cx = this.w / 2, cy = this.h / 2;
     const drift = (this.phase * DRIFT_PX) / Math.max(0.02, z);
-    // Die Kachelstufe springt in Zweierschritten, die Zahl der sichtbaren
-    // Kacheln also in Viererschritten. Dieser Anteil gleicht das aus.
+    // The tile level jumps in steps of two, so the number of visible tiles
+    // jumps in steps of four. This share compensates for that.
     const q = ((1 << level) * z) / 0.9;
-    const anteil = Math.max(0.1, Math.min(1, (q * q) / 2));
+    const share = Math.max(0.1, Math.min(1, (q * q) / 2));
     const buckets = this._buckets || (this._buckets = Array.from({ length: 12 }, () => []));
     for (const b of buckets) b.length = 0;
 
@@ -253,24 +253,24 @@ export class MapView {
       const y0 = Math.floor((camY - hh) / size), y1 = Math.floor((camY + hh) / size);
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
-          const kachel = this.skyTile(level, li, tx, ty);
-          const nimm = Math.max(1, Math.round(kachel.length * anteil));
-          for (let i = 0; i < nimm; i++) {
-            const s = kachel[i];
+          const tile = this.skyTile(level, li, tx, ty);
+          const take = Math.max(1, Math.round(tile.length * share));
+          for (let i = 0; i < take; i++) {
+            const s = tile[i];
             const px = (s.x - this.cam.x) * zl + cx;
             const py = (s.y - camY) * zl + cy;
             if (px < 0 || py < 0 || px > this.w || py > this.h) continue;
             const tw = 0.8 + 0.2 * Math.sin(this.phase * 1.4 + s.tw);
-            // Ganze Pixel: ohne Teilpixel entfällt das Glätten, und die Punkte
-            // sitzen so scharf wie in der Vorlage.
+            // Whole pixels: without subpixels there is no smoothing, and the
+            // dots are as sharp as in the original.
             buckets[Math.max(0, Math.min(11, Math.floor(s.a * tw * 12)))]
               .push(px | 0, py | 0, s.r);
           }
         }
       }
     }
-    // Ein Pfad je Helligkeitsstufe statt ein Aufruf je Stern - das spart dem
-    // Rasterer hunderte Einzelflächen pro Bild.
+    // One path per brightness level instead of one call per star - that saves
+    // the rasterizer hundreds of individual shapes per frame.
     for (let k = 0; k < 12; k++) {
       const arr = buckets[k];
       if (!arr.length) continue;
@@ -281,7 +281,7 @@ export class MapView {
     }
   }
 
-  // ------------------------------------------------------------ Zeichnen
+  // ------------------------------------------------------------- Drawing
   draw(dt) {
     this.phase += dt;
     const ctx = this.ctx;
@@ -291,14 +291,14 @@ export class MapView {
       ctx.fillRect(0, 0, this.w, this.h);
       return;
     }
-    // Deckender Himmel - löscht das Bild, ein clearRect erübrigt sich.
+    // Opaque sky - clears the image, so a clearRect is unnecessary.
     this.drawBackdrop();
     this.hit = [];
 
     const v = this.view;
     const colorOf = id => (v.players.find(p => p.id === id) || {}).color || '#889';
 
-    // Reichweitenkreise für die gewählte Flotte
+    // Range circles for the selected fleet
     const selFleet = this.selection?.type === 'fleet'
       ? v.fleets.find(f => f.id === this.selection.id) : null;
     if ((this.showRange || selFleet) && selFleet?.mine) {
@@ -309,17 +309,17 @@ export class MapView {
         if (p.owner !== v.you || !(p.pop > 0.5)) continue;
         const [sx, sy] = this.w2s(p.x, p.y);
         const rr = range * this.cam.zoom;
-        // Umriss statt Kreis: am schwarzen Loch reicht die Flotte weniger weit,
-        // weil sie herum muss. Ein voller Kreis würde Welten als erreichbar
-        // zeigen, die der Server dann ablehnt.
-        const umriss = this.reichweite(p, range);
+        // Outline instead of a circle: at the black hole the fleet reaches less
+        // far because it has to go around. A full circle would show worlds as
+        // reachable that the server then rejects.
+        const outline = this.reachArea(p, range);
         const g2 = ctx.createRadialGradient(sx, sy, rr * 0.75, sx, sy, rr);
         g2.addColorStop(0, 'rgba(60,110,190,0.02)');
         g2.addColorStop(0.92, 'rgba(90,150,230,0.07)');
         g2.addColorStop(1, 'rgba(120,190,255,0)');
         ctx.fillStyle = g2;
         ctx.beginPath();
-        umriss.forEach((q, i) => {
+        outline.forEach((q, i) => {
           const [qx, qy] = this.w2s(q.x, q.y);
           i === 0 ? ctx.moveTo(qx, qy) : ctx.lineTo(qx, qy);
         });
@@ -332,7 +332,7 @@ export class MapView {
       ctx.restore();
     }
 
-    // Kurslinien - um das schwarze Loch herum, so wie geflogen wird
+    // Course lines - around the black hole, the way it is flown
     const zone = holeZone(v.galaxy);
     for (const f of v.fleets) {
       if (f.dest == null) continue;
@@ -349,7 +349,7 @@ export class MapView {
       for (const w of route(f, target, zone)) { const [wx, wy] = this.w2s(w.x, w.y); ctx.lineTo(wx, wy); }
       ctx.stroke();
       ctx.restore();
-      // Zielmarkierung
+      // Target marker
       ctx.save();
       ctx.strokeStyle = 'rgba(255,216,119,.6)'; ctx.lineWidth = 1.2;
       const tr = planetRadius(target) * this.cam.zoom + 15;
@@ -357,7 +357,7 @@ export class MapView {
       ctx.restore();
     }
 
-    // Planeten
+    // Planets
     const z = this.cam.zoom;
     const labels = [];
     for (const p of v.planets) {
@@ -374,8 +374,8 @@ export class MapView {
       if (this.showNames) labels.push(...planetLabels(p, sx, sy, z, planetRadius(p) * z));
       this.hit.push({ type: 'planet', id: p.id, x: sx, y: sy, r: Math.max(12, r + 6) });
 
-      // Orbitale Verteidigung: wenige Satelliten kreisen einzeln, ab
-      // SHIELD_MIN schliessen sie sich zum Schild um die Welt.
+      // Orbital defense: a few satellites circle individually, from
+      // SHIELD_MIN on they close ranks into a shield around the world.
       if (p.defenses >= SHIELD_MIN) {
         drawHexShield(ctx, sx, sy, r * 1.14 + 20 * orbitScale(z), this.phase + p.id);
         this.badge(ctx, sx + r + 16, sy - r - 10, '×' + p.defenses, colorOf(p.owner));
@@ -394,7 +394,7 @@ export class MapView {
       }
     }
 
-    // Flotten
+    // Fleets
     for (const f of v.fleets) {
       const inOrbit = f.at !== null && f.at !== undefined;
       const col = colorOf(f.owner);
@@ -405,7 +405,7 @@ export class MapView {
         if (!p) continue;
         const [sx, sy] = this.w2s(p.x, p.y);
         const r = planetRadius(p) * z;
-        // Mehrere Flotten um denselben Planeten verteilen
+        // Spread several fleets around the same planet
         const idx = v.fleets.filter(g => g.at === f.at).indexOf(f);
         const a = -Math.PI / 2 + idx * 0.85 + (f.owner === v.you ? 0 : Math.PI);
         const orr = r + ORBIT_R * scale;
@@ -419,8 +419,8 @@ export class MapView {
         const [sx, sy] = this.w2s(f.x, f.y);
         let ang = 0;
         if (f.dest != null && v.planets[f.dest]) {
-          // Erstes Wegstueck, das lang genug ist - auf dem Bogen um das
-          // schwarze Loch fliegt die Flotte quer zum Ziel.
+          // First path segment that is long enough - on the arc around the
+          // black hole the fleet flies at an angle to the target.
           for (const w of route(f, v.planets[f.dest], zone)) {
             const dx = w.x - f.x, dy = w.y - f.y;
             if (dx * dx + dy * dy > 1e-6) { ang = Math.atan2(dy, dx); break; }
@@ -444,7 +444,7 @@ export class MapView {
         shieldR: planetRadius(p) * z * 1.14 + 20 * orbitScale(z), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
 
-    // Beschriftungen zuletzt, damit Schiffe im Orbit sie nicht verdecken
+    // Labels last, so ships in orbit do not cover them
     for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, z, l.size);
     const bh = v.galaxy.blackHole;
     if (bh && this.showNames) {
@@ -453,25 +453,25 @@ export class MapView {
       label(ctx, bh.name, bx, by + br * 1.5 + 11, '#9ec8f5', z, 12.5);
     }
 
-    // Kurs-Vorschau für gewählte Flotte
+    // Course preview for the selected fleet
     if (selFleet?.mine && this.hover?.type === 'planet') {
       const target = this.view.planets[this.hover.id];
       const src = selFleet.at != null ? this.view.planets[selFleet.at] : selFleet;
       if (target && src && target.id !== selFleet.at) {
         const [ax, ay] = this.w2s(src.x, src.y);
-        const weg = route(src, target, holeZone(this.view.galaxy));
+        const path = route(src, target, holeZone(this.view.galaxy));
         const speed = selFleet.stats.speed || 1;
-        const turns = Math.max(1, Math.ceil(routeLength(src, weg) / speed));
+        const turns = Math.max(1, Math.ceil(routeLength(src, path) / speed));
         ctx.save();
         ctx.strokeStyle = 'rgba(255,255,255,.35)';
         ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
         ctx.beginPath(); ctx.moveTo(ax, ay);
-        for (const w of weg) { const [wx, wy] = this.w2s(w.x, w.y); ctx.lineTo(wx, wy); }
+        for (const w of path) { const [wx, wy] = this.w2s(w.x, w.y); ctx.lineTo(wx, wy); }
         ctx.stroke();
         ctx.setLineDash([]);
-        // Marke auf die Mitte des Wegs, nicht auf die Mitte der Luftlinie
-        const mid = weg[Math.floor(weg.length / 2)];
-        const [mx, my] = weg.length > 1 ? this.w2s(mid.x, mid.y)
+        // Badge at the middle of the path, not at the middle of the straight line
+        const mid = path[Math.floor(path.length / 2)];
+        const [mx, my] = path.length > 1 ? this.w2s(mid.x, mid.y)
           : [(ax + this.w2s(target.x, target.y)[0]) / 2, (ay + this.w2s(target.x, target.y)[1]) / 2];
         this.badge(ctx, mx, my, t('word.turns', { n: turns, count: turns }), '#ffd877', true);
         ctx.restore();
@@ -482,20 +482,19 @@ export class MapView {
   }
 
   /**
-   * Der Himmel ändert sich nur, wenn die Kamera sich bewegt - also wird er in
-   * ein eigenes Canvas gezeichnet und sonst nur kopiert. Das Funkeln der
-   * Sterne bekommt dabei vier Stufen pro Sekunde; echte Sterne funkeln auch
-   * nicht gleichmäßig.
+   * The sky only changes when the camera moves - so it is drawn into its own
+   * canvas and otherwise only copied. The twinkling of the stars gets four
+   * steps per second; real stars do not twinkle evenly either.
    */
   /**
-   * Hintergrund in drei Lagen: Verlauf, Nebel und Gebiete liegen in einem
-   * Zwischencanvas und werden nur bei Kamerabewegung neu gebaut; darüber die
-   * ziehenden Sterne und zuletzt das schwarze Loch - das soll die Sterne
-   * verdecken, nicht umgekehrt.
+   * Background in three layers: gradient, nebulae and territories live in an
+   * intermediate canvas and are only rebuilt when the camera moves; above that
+   * the drifting stars and finally the black hole - it should cover the stars,
+   * not the other way round.
    *
-   * Reihenfolge wichtig fürs Tempo: ein deckender Blit plus ein paar hundert
-   * Sternpunkte kostet halb so viel wie Vollbildfüllung plus durchsichtiges
-   * Overlay, weil das Bild nur einmal komplett geschrieben wird.
+   * The order matters for speed: one opaque blit plus a few hundred star dots
+   * costs half as much as a full-screen fill plus a transparent overlay,
+   * because the image is only written completely once.
    */
   drawBackdrop() {
     const ctx = this.ctx;
@@ -544,9 +543,9 @@ export class MapView {
   }
 
   /**
-   * Dezente Einfärbung der Gebiete: je besiedelter Welt ein weicher Fleck in
-   * der Farbe ihres Reiches. Benachbarte Welten verschmelzen zu einer Fläche,
-   * sodass man auf einen Blick sieht, wem welche Ecke gehört.
+   * Subtle tinting of territories: a soft blob in its empire's color per
+   * settled world. Neighboring worlds merge into one area, so you can see at
+   * a glance who owns which corner.
    */
   drawTerritory(ctx) {
     if (!this.showTerritory || !this.view) return;
@@ -556,12 +555,12 @@ export class MapView {
     ctx.globalCompositeOperation = 'lighter';
     for (const p of v.planets) {
       if (!p.owner) continue;
-      // Großzügiger Radius, damit bei kleinem Zoom Flächen entstehen und
-      // nicht nur Höfe um einzelne Welten
+      // Generous radius so that at low zoom areas form and not just halos
+      // around individual worlds
       const r = (230 + Math.min(45, p.pop || 0) * 4.5) * z;
       const [sx, sy] = this.w2s(p.x, p.y);
       if (sx + r < 0 || sy + r < 0 || sx - r > this.w || sy - r > this.h) continue;
-      // Nur erinnerte Welten blasser - der Besitz ist dort womöglich veraltet
+      // Only remembered worlds paler - the ownership there may be outdated
       ctx.globalAlpha = p.known === 'memory' ? 0.45 : 1;
       ctx.drawImage(glowSprite(colors.get(p.owner) || '#8899aa'), sx - r, sy - r, r * 2, r * 2);
     }
@@ -569,18 +568,18 @@ export class MapView {
   }
 
   /**
-   * Umriss der erreichbaren Flaeche, gemerkt je Basis und Reichweite - die
-   * Halbierungssuche dahinter soll nicht in jedem Bild neu laufen.
+   * Outline of the reachable area, cached per base and range - the bisection
+   * search behind it should not run again every frame.
    */
-  reichweite(basis, range) {
+  reachArea(base, range) {
     const zone = holeZone(this.view.galaxy);
-    const key = `${basis.id}|${Math.round(range)}|${zone ? 1 : 0}`;
-    this._reich = this._reich || new Map();
-    let u = this._reich.get(key);
+    const key = `${base.id}|${Math.round(range)}|${zone ? 1 : 0}`;
+    this._reach = this._reach || new Map();
+    let u = this._reach.get(key);
     if (!u) {
-      u = reachOutline(basis, range, zone);
-      if (this._reich.size > 64) this._reich.clear();
-      this._reich.set(key, u);
+      u = reachOutline(base, range, zone);
+      if (this._reach.size > 64) this._reach.clear();
+      this._reach.set(key, u);
     }
     return u;
   }
@@ -650,7 +649,7 @@ export class MapView {
     ctx.restore();
   }
 
-  // --------------------------------------------------------------- Eingabe
+  // ---------------------------------------------------------------- Input
   pick(sx, sy) {
     for (let i = this.hit.length - 1; i >= 0; i--) {
       const h = this.hit[i];
@@ -663,12 +662,12 @@ export class MapView {
   _bind() {
     const cv = this.cv;
     let dragging = false, moved = false, last = null;
-    // Mehrfinger: zwei Finger zoomen (Abstand) und schieben (Mittelpunkt).
-    // Gespeichert wird je Zeiger, damit Maus und Finger denselben Weg gehen.
-    const zeiger = new Map();
+    // Multi-touch: two fingers zoom (distance) and pan (midpoint).
+    // Stored per pointer, so mouse and fingers take the same path.
+    const pointers = new Map();
     let pinch = null;
 
-    const mitte = () => {
+    const midpoint = () => {
       const p = [...zeiger.values()];
       return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2,
         d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
@@ -677,21 +676,21 @@ export class MapView {
     cv.addEventListener('pointerdown', (e) => {
       this.poke();
       cv.setPointerCapture(e.pointerId);
-      zeiger.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
-      if (zeiger.size === 2) { pinch = mitte(); moved = true; dragging = false; return; }
+      pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pointers.size === 2) { pinch = midpoint(); moved = true; dragging = false; return; }
       dragging = true; moved = false;
       last = { x: e.offsetX, y: e.offsetY };
     });
 
     cv.addEventListener('pointermove', (e) => {
       this.poke();
-      if (zeiger.has(e.pointerId)) zeiger.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
-      if (zeiger.size >= 2 && pinch) {
-        const jetzt = mitte();
-        if (pinch.d > 0 && jetzt.d > 0) this.zoomBy(jetzt.d / pinch.d, jetzt.x, jetzt.y);
-        this.cam.x -= (jetzt.x - pinch.x) / this.cam.zoom;
-        this.cam.y -= (jetzt.y - pinch.y) / this.cam.zoom;
-        pinch = jetzt;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pointers.size >= 2 && pinch) {
+        const now = midpoint();
+        if (pinch.d > 0 && now.d > 0) this.zoomBy(now.d / pinch.d, now.x, now.y);
+        this.cam.x -= (now.x - pinch.x) / this.cam.zoom;
+        this.cam.y -= (now.y - pinch.y) / this.cam.zoom;
+        pinch = now;
         return;
       }
       if (dragging) {
@@ -705,7 +704,7 @@ export class MapView {
         last = { x: e.offsetX, y: e.offsetY };
         return;
       }
-      // Beim Finger gibt es kein Schweben - der Tipp wählt gleich aus.
+      // With a finger there is no hover - the tap selects right away.
       if (e.pointerType === 'touch') return;
       const h = this.pick(e.offsetX, e.offsetY);
       const changed = JSON.stringify(h) !== JSON.stringify(this.hover);
@@ -714,22 +713,22 @@ export class MapView {
       cv.style.cursor = h ? 'pointer' : 'grab';
     });
 
-    const los = (e) => {
-      zeiger.delete(e.pointerId);
-      if (zeiger.size < 2) pinch = null;
-      if (zeiger.size === 1) {
+    const release = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 1) {
         const p = [...zeiger.values()][0];
         last = { x: p.x, y: p.y };
         dragging = true;
       }
     };
-    cv.addEventListener('pointercancel', (e) => { los(e); dragging = false; moved = true; });
+    cv.addEventListener('pointercancel', (e) => { release(e); dragging = false; moved = true; });
 
     cv.addEventListener('pointerup', (e) => {
       this.poke();
-      const warMehr = zeiger.size > 1;
-      los(e);
-      if (warMehr) { dragging = false; return; }
+      const wasMulti = pointers.size > 1;
+      release(e);
+      if (wasMulti) { dragging = false; return; }
       dragging = false;
       cv.classList.remove('dragging');
       if (moved) return;

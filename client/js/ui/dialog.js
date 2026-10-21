@@ -1,107 +1,107 @@
-// Verschiebbare Fenster: das Protokoll und das Dock oben links. Bewusst
-// allgemein gehalten: Leiste zum Ziehen, Griff unten rechts zum Aufziehen, Lage und
-// Groesse ueberdauern als localStorage-Eintrag den naechsten Start.
+// Movable windows: the log and the dock at the top left. Deliberately kept
+// generic: a bar for dragging, a grip at the bottom right for resizing, and
+// position and size survive as a localStorage entry until the next start.
 
-import { klein } from './viewport.js';
+import { compact } from './viewport.js';
 
-const TOP = 64;          // unter der Topbar bleiben
-const RAND = 8;          // Mindestabstand zum Bildschirmrand
+const TOP = 64;          // stay below the top bar
+const MARGIN = 8;        // minimum distance to the screen edge
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-// Reihenfolge der Fenster von hinten nach vorn. Die z-Werte bleiben in einem
-// festen Band (ab UNTEN) - ein Zaehler, der bei jedem Klick waechst, schob ein
-// Fenster sonst irgendwann ueber die Kopfleiste samt Haushalt und zuletzt
-// sogar ueber die Rueckfragen (.modal).
-const stapel = [];
-const UNTEN = 5;
+// Order of the windows from back to front. The z values stay within a fixed
+// band (from BASE_Z) - a counter that grows with every click would otherwise
+// at some point push a window above the top bar including the ledger, and
+// eventually even above the confirmations (.modal).
+const stack = [];
+const BASE_Z = 5;
 
-function nachVorn(el) {
-  stapel.splice(stapel.indexOf(el), 1);
-  stapel.push(el);
-  stapel.forEach((w, i) => { w.style.zIndex = String(UNTEN + i); });
+function bringToFront(el) {
+  stack.splice(stack.indexOf(el), 1);
+  stack.push(el);
+  stack.forEach((w, i) => { w.style.zIndex = String(BASE_Z + i); });
 }
 
 /**
- * @param {HTMLElement} el     das Fenster selbst
+ * @param {HTMLElement} el     the window itself
  * @param {object} o           { handle, grip, key, x, y, w, h, minW, minH }
- *   x/y: Startlage ohne gemerkte Geometrie; ohne y sitzt das Fenster unten
+ *   x/y: starting position without remembered geometry; without y the window sits at the bottom
  * @returns {{refresh: () => void}}
  */
 export function makeDialog(el, o) {
-  const schmal = klein;
+  const narrow = compact;
   const minW = o.minW || 320, minH = o.minH || 150;
   const geo = Object.assign({ x: o.x ?? 12, y: o.y ?? null, w: o.w || 460, h: o.h || 240 }, load(o.key));
-  // Auf kleinen Geraeten ist das Fenster ein Blatt: Lage und Groesse macht
-  // dort das Stylesheet, nicht dieses Modul. Die gemerkte Geometrie bleibt
-  // erhalten und gilt wieder, sobald wieder Platz ist.
+  // On small devices the window is a sheet: position and size are handled by
+  // the stylesheet there, not by this module. The remembered geometry is kept
+  // and applies again as soon as there is room again.
 
   function apply() {
-    if (schmal.matches) {
-      for (const eig of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
-        el.style.removeProperty(eig);
+    if (narrow.matches) {
+      for (const prop of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+        el.style.removeProperty(prop);
       }
       return;
     }
-    const zu = el.classList.contains('collapsed');
-    geo.w = clamp(geo.w, minW, Math.max(minW, innerWidth - 2 * RAND));
-    geo.h = clamp(geo.h, minH, Math.max(minH, innerHeight - TOP - RAND));
-    // Ohne gespeicherte Lage und ohne Vorgabe unten links starten, wo das
-    // Protokoll immer sass.
+    const collapsed = el.classList.contains('collapsed');
+    geo.w = clamp(geo.w, minW, Math.max(minW, innerWidth - 2 * MARGIN));
+    geo.h = clamp(geo.h, minH, Math.max(minH, innerHeight - TOP - MARGIN));
+    // Without a saved position and without a default, start at the bottom
+    // left, where the log always used to sit.
     if (geo.y == null) geo.y = innerHeight - geo.h - 12;
-    geo.x = clamp(geo.x, RAND, Math.max(RAND, innerWidth - geo.w - RAND));
-    // Eingeklappt ist nur die Leiste da - dann darf das Fenster tiefer stehen.
-    const hoch = zu ? (el.offsetHeight || 44) : geo.h;
-    geo.y = clamp(geo.y, TOP, Math.max(TOP, innerHeight - hoch - RAND));
+    geo.x = clamp(geo.x, MARGIN, Math.max(MARGIN, innerWidth - geo.w - MARGIN));
+    // When collapsed only the bar is there - then the window may sit lower.
+    const height = collapsed ? (el.offsetHeight || 44) : geo.h;
+    geo.y = clamp(geo.y, TOP, Math.max(TOP, innerHeight - height - MARGIN));
     el.style.left = geo.x + 'px';
     el.style.top = geo.y + 'px';
     el.style.right = 'auto';
     el.style.bottom = 'auto';
     el.style.width = geo.w + 'px';
-    el.style.height = zu ? '' : geo.h + 'px';
+    el.style.height = collapsed ? '' : geo.h + 'px';
   }
 
-  // Ziehen und Aufziehen laufen gleich ab, nur die Zuordnung unterscheidet sich.
-  function fassen(ziel, feld) {
-    if (!ziel) return;
-    ziel.addEventListener('pointerdown', (e) => {
-      if (schmal.matches) return;          // Blatt: nichts zu schieben
+  // Dragging and resizing work the same way, only the mapping differs.
+  function grab(target, mode) {
+    if (!target) return;
+    target.addEventListener('pointerdown', (e) => {
+      if (narrow.matches) return;          // sheet: nothing to move
       if (e.button !== 0 || e.target.closest('button, input')) return;
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY;
       const s = { x: geo.x, y: geo.y, w: geo.w, h: geo.h };
-      ziel.setPointerCapture(e.pointerId);
+      target.setPointerCapture(e.pointerId);
       el.classList.add('dlg-busy');
       const move = (ev) => {
         const dx = ev.clientX - sx, dy = ev.clientY - sy;
-        if (feld === 'move') { geo.x = s.x + dx; geo.y = s.y + dy; }
+        if (mode === 'move') { geo.x = s.x + dx; geo.y = s.y + dy; }
         else { geo.w = s.w + dx; geo.h = s.h + dy; }
         apply();
       };
       const up = () => {
-        ziel.removeEventListener('pointermove', move);
-        ziel.removeEventListener('pointerup', up);
-        ziel.removeEventListener('pointercancel', up);
+        target.removeEventListener('pointermove', move);
+        target.removeEventListener('pointerup', up);
+        target.removeEventListener('pointercancel', up);
         el.classList.remove('dlg-busy');
         save(o.key, geo);
       };
-      ziel.addEventListener('pointermove', move);
-      ziel.addEventListener('pointerup', up);
-      ziel.addEventListener('pointercancel', up);
+      target.addEventListener('pointermove', move);
+      target.addEventListener('pointerup', up);
+      target.addEventListener('pointercancel', up);
     });
   }
 
-  // Wer angefasst wird, kommt nach vorn - sonst verschwände ein Fenster, das
-  // man über ein anderes zieht, darunter.
-  // Auf dem Telefon sind es Blaetter mit eigener Ordnung (CSS) - dort nichts setzen.
-  stapel.push(el);
+  // Whatever is touched comes to the front - otherwise a window dragged over
+  // another one would disappear underneath it.
+  // On a phone these are sheets with their own order (CSS) - set nothing there.
+  stack.push(el);
   el.addEventListener('pointerdown', () => {
-    if (schmal.matches) el.style.zIndex = '';
-    else nachVorn(el);
+    if (narrow.matches) el.style.zIndex = '';
+    else bringToFront(el);
   }, true);
 
-  fassen(o.handle, 'move');
-  fassen(o.grip, 'size');
+  grab(o.handle, 'move');
+  grab(o.grip, 'size');
   addEventListener('resize', apply);
-  schmal.addEventListener('change', apply);
+  narrow.addEventListener('change', apply);
   apply();
   return { refresh: apply };
 }

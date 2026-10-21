@@ -66,6 +66,7 @@ docker exec ho node server/users.js list                       # wer darf mitspi
 docker exec ho node server/users.js passwd captain             # Passwort zurücksetzen
 docker exec ho node server/users.js name captain Captain       # Schreibweise des Kontonamens
 docker exec ho node server/users.js del captain                # Konto löschen
+docker exec ho node server/users.js admin captain              # zum Admin machen (… admin captain off)
 ```
 
 Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
@@ -77,6 +78,18 @@ Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
   nächsten abgewiesen, eine offene WebSocket binnen einer Sekunde getrennt. Das
   Profilbild des Kontos wird mit gelöscht. Ein zurückgesetztes Passwort beendet
   ebenso alle Sitzungen.
+- `admin` macht ein Konto zum **Admin** der Instanz. Admins spielen wie alle
+  anderen, bekommen im Startbildschirm aber ein zusätzliches Panel: alle Partien auf
+  dem Server (Stand, Runde, seit wann, wer mit welchem Konto spielt) und alle Konten
+  (online oder nicht, in welcher Partie). Dort kann ein Admin jeder laufenden
+  Partie **zusehen** – ohne Nebel und ohne ins Tempo einzugreifen; Partien mit
+  Menschen warten weiter auf ihre Spieler –, allen in einer
+  Partie eine **Nachricht** schicken – etwa um eine Downtime anzukündigen; sie
+  erscheint als Banner, das bestätigt werden muss – und jede Partie **beenden**
+  (zwei Klicks); alle Beteiligten landen mit einem Hinweis wieder im
+  Startbildschirm. Der Server prüft das Flag bei jeder
+  Anfrage – `admin … off` wirkt also ohne Abmelden. Ohne Anmeldung (`HO_AUTH=off`)
+  gibt es keine Admins.
 - Den **Anzeigenamen** im Spiel wählt jeder Spieler selbst (siehe
   [Spielen › Profil](playing.de.md#eine-partie-beginnen)); `name` ändert nur die
   Schreibweise des Kontonamens, etwa für die Zeile „Angemeldet als …“.

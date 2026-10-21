@@ -1,4 +1,4 @@
-// Startet den echten Server und lässt 16 WebSocket-Clients eine Partie spielen.
+// Starts the real server and lets 16 WebSocket clients play a game.
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 
@@ -10,16 +10,16 @@ const server = spawn(process.execPath, ['server/index.js'], {
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));
 await new Promise(r => server.stdout.once('data', r));
 
-// Die Seiten tragen die Version aus package.json, nie den Platzhalter.
+// The pages carry the version from package.json, never the placeholder.
 {
   const { readFile } = await import('node:fs/promises');
   const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  for (const seite of ['/', '/login.html']) {
-    const html = await (await fetch(`http://localhost:${PORT}${seite}`)).text();
-    check(!html.includes('__HO_VERSION__'), `${seite}: Versions-Platzhalter nicht ersetzt`);
-    check(html.includes('v' + version), `${seite}: Version ${version} fehlt`);
+  for (const page of ['/', '/login.html']) {
+    const html = await (await fetch(`http://localhost:${PORT}${page}`)).text();
+    check(!html.includes('__HO_VERSION__'), `${page}: version placeholder not replaced`);
+    check(html.includes('v' + version), `${page}: version ${version} missing`);
   }
-  console.log(`Version ${version} steht auf Start- und Anmeldeseite.`);
+  console.log(`Version ${version} appears on the start and sign-in pages.`);
 }
 
 const N = 16;
@@ -50,69 +50,69 @@ const until = async (fn, ms = 4000) => {
   return false;
 };
 
-// --- Lobby aufbauen
+// --- Set up the lobby
 const host = await makeClient('Host');
 send(host, { t: 'create', name: 'Host', settings: { planetsPerPlayer: 5, turnTimer: 0 } });
-check(await until(() => host.code), 'Host bekommt keinen Partiecode');
+check(await until(() => host.code), 'Host gets no game code');
 const code = host.code;
-console.log(`Partie ${code} eröffnet auf Port ${PORT}`);
+console.log(`Game ${code} opened on port ${PORT}`);
 
 for (let i = 1; i < N; i++) {
-  const c = await makeClient('Spieler ' + (i + 1));
-  send(c, { t: 'join', code, name: 'Spieler ' + (i + 1) });
+  const c = await makeClient('Player ' + (i + 1));
+  send(c, { t: 'join', code, name: 'Player ' + (i + 1) });
 }
-check(await until(() => host.lobby?.players.length === N), `Lobby füllt sich nicht (${host.lobby?.players.length}/${N})`);
-console.log(`${host.lobby.players.length} Spieler in der Lobby, Farben eindeutig: ${new Set(host.lobby.players.map(p => p.color)).size === N}`);
+check(await until(() => host.lobby?.players.length === N), `Lobby does not fill up (${host.lobby?.players.length}/${N})`);
+console.log(`${host.lobby.players.length} players in the lobby, colors unique: ${new Set(host.lobby.players.map(p => p.color)).size === N}`);
 
-// 17. Spieler muss abgewiesen werden
-const extra = await makeClient('Zuviel');
-send(extra, { t: 'join', code, name: 'Zuviel' });
-check(await until(() => extra.errors.length > 0), 'Der 17. Spieler wurde nicht abgewiesen');
+// The 17th player must be turned away
+const extra = await makeClient('TooMany');
+send(extra, { t: 'join', code, name: 'TooMany' });
+check(await until(() => extra.errors.length > 0), 'The 17th player was not turned away');
 check(extra.errors[0] === 'err.gameFull',
-  `Abweisung kam als '${extra.errors[0]}' statt als Schlüssel err.gameFull`);
-console.log('17. Spieler abgewiesen mit Schlüssel:', extra.errors[0]);
+  `Rejection came as '${extra.errors[0]}' instead of the key err.gameFull`);
+console.log('17th player turned away with key:', extra.errors[0]);
 
-// --- Farben frei waehlen: jede nur einmal, Tausch nur durch den Host
+// --- Free color choice: each only once, swapping only by the host
 {
-  const gast = clients[1], dritter = clients[2];
-  const farbe = (c) => host.lobby.players.find(p => p.id === c.id)?.color;
-  const hostFarbe = farbe(host), gastFarbe = farbe(gast);
-  gast.errors.length = 0;
-  send(gast, { t: 'color', color: hostFarbe });
-  check(await until(() => gast.errors.includes('lobby.colorTaken')), 'Gast nimmt dem Host ungefragt die Farbe');
-  check(farbe(host) === hostFarbe, 'Hostfarbe hat sich trotzdem geändert');
-  send(host, { t: 'color', color: gastFarbe });
-  check(await until(() => farbe(host) === gastFarbe && farbe(gast) === hostFarbe), 'Host kann nicht mit dem Gast tauschen');
-  send(dritter, { t: 'color', color: '#123456' });
+  const guest = clients[1], third = clients[2];
+  const color = (c) => host.lobby.players.find(p => p.id === c.id)?.color;
+  const hostColor = color(host), guestColor = color(guest);
+  guest.errors.length = 0;
+  send(guest, { t: 'color', color: hostColor });
+  check(await until(() => guest.errors.includes('lobby.colorTaken')), 'Guest takes the host\'s color without asking');
+  check(color(host) === hostColor, 'Host color changed anyway');
+  send(host, { t: 'color', color: guestColor });
+  check(await until(() => color(host) === guestColor && color(guest) === hostColor), 'Host cannot swap with the guest');
+  send(third, { t: 'color', color: '#123456' });
   await wait(100);
-  check(!host.lobby.players.some(p => p.color === '#123456'), 'Farbe ausserhalb der Palette angenommen');
-  check(new Set(host.lobby.players.map(p => p.color)).size === N, 'Farben nach dem Tausch nicht mehr eindeutig');
-  // Gleicher Name in derselben Partie bekommt eine Nummer
-  send(dritter, { t: 'profile', name: 'Host' });
-  check(await until(() => host.lobby.players.find(p => p.id === dritter.id)?.name === 'Host 2'),
-    `Doppelter Name nicht nummeriert (${host.lobby.players.find(p => p.id === dritter.id)?.name})`);
-  console.log('Farbwahl: eindeutig, Tausch nur durch den Host; doppelte Namen werden nummeriert.');
+  check(!host.lobby.players.some(p => p.color === '#123456'), 'Color outside the palette accepted');
+  check(new Set(host.lobby.players.map(p => p.color)).size === N, 'Colors no longer unique after the swap');
+  // The same name within the same game gets a number
+  send(third, { t: 'profile', name: 'Host' });
+  check(await until(() => host.lobby.players.find(p => p.id === third.id)?.name === 'Host 2'),
+    `Duplicate name not numbered (${host.lobby.players.find(p => p.id === third.id)?.name})`);
+  console.log('Color choice: unique, swapping only by the host; duplicate names get numbered.');
 }
 
 // --- Start
 send(host, { t: 'start' });
-check(await until(() => clients.every(c => c === extra || c.views.length > 0), 6000), 'Nicht alle Clients haben die Startsicht erhalten');
+check(await until(() => clients.every(c => c === extra || c.views.length > 0), 6000), 'Not all clients received the starting view');
 const v0 = host.views.at(-1);
-console.log(`Partie gestartet: Runde ${v0.turn}, ${v0.planets.length} Welten, ${v0.players.length} Reiche`);
+console.log(`Game started: turn ${v0.turn}, ${v0.planets.length} worlds, ${v0.players.length} empires`);
 
-// Jeder sieht nur seine eigene Heimatwelt
+// Everyone sees only their own homeworld
 for (const c of clients) {
   if (c === extra) continue;
   const v = c.views.at(-1);
   const own = v.planets.filter(p => p.owner === v.you);
-  check(own.length === 1, `${c.name} startet nicht mit genau einer Welt (${own.length})`);
-  check(v.me.id === c.id, 'Sicht gehoert zum falschen Spieler');
+  check(own.length === 1, `${c.name} does not start with exactly one world (${own.length})`);
+  check(v.me.id === c.id, 'View belongs to the wrong player');
   const foreignDetail = v.fleets.filter(f => !f.mine && f.ships.some(s => s.hp !== undefined));
-  check(foreignDetail.length === 0, 'Fremde Flottendetails sichtbar');
+  check(foreignDetail.length === 0, 'Foreign fleet details visible');
 }
-console.log('Jeder Spieler sieht genau seine eigene Startwelt; keine fremden Schiffsdetails.');
+console.log('Every player sees exactly their own starting world; no foreign ship details.');
 
-// --- Simultanzug: der Zug darf erst wechseln, wenn alle fertig sind
+// --- Simultaneous turns: the turn may only change once everyone is done
 const turnBefore = host.views.at(-1).turn;
 for (const c of clients.slice(0, N - 1)) {
   if (c === extra) continue;
@@ -120,14 +120,14 @@ for (const c of clients.slice(0, N - 1)) {
   send(c, { t: 'ready', value: true });
 }
 await wait(500);
-check(host.views.at(-1).turn === turnBefore, 'Runde wurde ausgewertet, obwohl ein Spieler noch nicht fertig war');
-console.log('Runde wartet korrekt auf den letzten Spieler.');
+check(host.views.at(-1).turn === turnBefore, 'Turn was resolved although one player was not done yet');
+console.log('Turn correctly waits for the last player.');
 
 send(clients[N - 1], { t: 'ready', value: true });
-check(await until(() => host.views.at(-1).turn === turnBefore + 1, 4000), 'Runde wurde nach dem letzten Spieler nicht ausgewertet');
-console.log('Nach dem letzten Spieler wurde die Runde ausgewertet.');
+check(await until(() => host.views.at(-1).turn === turnBefore + 1, 4000), 'Turn was not resolved after the last player');
+console.log('The turn was resolved after the last player.');
 
-// --- Ein paar Runden mit Befehlen durchspielen
+// --- Play a few turns with orders
 for (let t = 0; t < 8; t++) {
   for (const c of clients) {
     if (c === extra) continue;
@@ -141,41 +141,41 @@ for (let t = 0; t < 8; t++) {
     send(c, { t: 'ready', value: true });
   }
   const want = host.views.at(-1).turn + 1;
-  check(await until(() => host.views.at(-1).turn >= want, 5000), `Runde ${want} kam nicht zustande`);
+  check(await until(() => host.views.at(-1).turn >= want, 5000), `Turn ${want} did not happen`);
 }
 const vEnd = host.views.at(-1);
-console.log(`8 weitere Runden gespielt (jetzt Runde ${vEnd.turn}).`);
+console.log(`Played 8 more turns (now turn ${vEnd.turn}).`);
 
-// --- Verbindungsabbruch und Wiedereinstieg
+// --- Disconnect and rejoin
 const victim = clients[5];
 const token = victim.token;
-console.log(`Trenne ${victim.name} …`);
+console.log(`Disconnecting ${victim.name} …`);
 victim.ws.close();
 await wait(400);
 const vAfter = host.views.at(-1);
-check(vAfter.players.find(p => p.id === victim.id).connected === false, 'Trennung wird nicht angezeigt');
-console.log('Trennung wird den anderen Spielern angezeigt.');
+check(vAfter.players.find(p => p.id === victim.id).connected === false, 'Disconnect is not shown');
+console.log('The disconnect is shown to the other players.');
 
-// --- Chat erreicht alle
+// --- Chat reaches everyone
 let chatSeen = 0;
 for (const c of clients) {
   if (c === extra || c === victim) continue;
-  c.ws.on('message', raw => { const m = JSON.parse(raw.toString()); if (m.t === 'chat' && m.text === 'Hallo Galaxis') chatSeen++; });
+  c.ws.on('message', raw => { const m = JSON.parse(raw.toString()); if (m.t === 'chat' && m.text === 'Hello galaxy') chatSeen++; });
 }
-send(host, { t: 'chat', text: 'Hallo Galaxis' });
-check(await until(() => chatSeen >= N - 2), `Chat erreichte nur ${chatSeen} von ${N - 2} Spielern`);
-console.log(`Chat erreichte ${chatSeen} Spieler.`);
+send(host, { t: 'chat', text: 'Hello galaxy' });
+check(await until(() => chatSeen >= N - 2), `Chat reached only ${chatSeen} of ${N - 2} players`);
+console.log(`Chat reached ${chatSeen} players.`);
 
-// Sichtgröße im Blick behalten
+// Keep an eye on the view size
 const size = Buffer.byteLength(JSON.stringify(vEnd));
-console.log(`Sichtpaket pro Spieler: ${(size / 1024).toFixed(1)} kB`);
-check(size < 400 * 1024, 'Sichtpaket zu groß');
+console.log(`View package per player: ${(size / 1024).toFixed(1)} kB`);
+check(size < 400 * 1024, 'View package too large');
 
-console.log('\nAlle Mehrspieler-Prüfungen bestanden.');
+console.log('\nAll multiplayer checks passed.');
 cleanup(0);
 
 function check(cond, msg) {
-  if (!cond) { console.error('FEHLER: ' + msg); failed = msg; cleanup(1); }
+  if (!cond) { console.error('ERROR: ' + msg); failed = msg; cleanup(1); }
 }
 function cleanup(code) {
   for (const c of clients) { try { c.ws.close(); } catch {} }

@@ -1,12 +1,12 @@
-// Räumliche Sternkarte. Dieselbe Partie wie in der Klassik-Ansicht, nur mit
-// Höhe: die Welten liegen in einer Linse, die Kamera kreist frei darum.
+// 3D star map. The same game as in the classic view, just with height: the
+// worlds lie in a lens, and the camera orbits freely around it.
 //
-// Projiziert wird von Hand auf dasselbe 2D-Canvas - keine Bibliothek, kein
-// Build-Schritt. Welten und Schiffe bleiben die gewohnten Sprites und zeigen
-// immer zur Kamera; lesbar wird der Raum durch drei Hilfen:
-//   - ein Gitter in der Mittelebene der Galaxie,
-//   - ein Lot von jeder Welt auf diese Ebene (zeigt die Höhe),
-//   - Größe und Helligkeit nach Entfernung.
+// Projection is done by hand onto the same 2D canvas - no library, no build
+// step. Worlds and ships remain the familiar sprites and always face the
+// camera; the space becomes readable through three aids:
+//   - a grid in the galaxy's mid-plane,
+//   - a plumb line from every world to that plane (shows the height),
+//   - size and brightness by distance.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, holeZone, route, reachOutline } from '../../shared/rules.js';
@@ -19,21 +19,21 @@ import { BattleFx } from './battlefx.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
-const PITCH_MAX = 1.5;           // knapp 86°, sonst kippt die Basis um
+const PITCH_MAX = 1.5;           // just under 86°, otherwise the basis flips
 const ORBIT_R = 20;
-// Drei Sterngrößen wie in der flachen Karte. Statt zu driften dreht sich der
-// Himmel langsam - je größer (also näher gedacht), desto schneller.
+// Three star sizes as on the flat map. Instead of drifting, the sky rotates
+// slowly - the larger (i.e. imagined closer), the faster.
 const SKY_CLASSES = [
-  { r: 1, dreh: 0.0045 },
-  { r: 2, dreh: 0.007 },
-  { r: 3, dreh: 0.01 }
+  { r: 1, spin: 0.0045 },
+  { r: 2, spin: 0.007 },
+  { r: 3, spin: 0.01 }
 ];
 
 export class SpaceView {
   constructor(canvas) {
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
-    // Blickpunkt, Blickrichtung und Abstand - mehr braucht die Kamera nicht.
+    // Target point, view direction and distance - the camera needs nothing more.
     this.cam = { tx: 0, ty: 0, tz: 0, yaw: -0.9, pitch: 0.62, dist: 2600 };
     this.view = null;
     this.hit = [];
@@ -54,7 +54,7 @@ export class SpaceView {
     this.resize();
   }
 
-  // --------------------------------------------------------------- Kamera
+  // --------------------------------------------------------------- Camera
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     this._w = this.cv.clientWidth;
@@ -70,13 +70,13 @@ export class SpaceView {
   poke(ms = 700) { this._activeUntil = performance.now() + ms; }
   get busy() { return performance.now() < this._activeUntil; }
 
-  /** Schlachten der letzten Runde an ihren Welten aufblitzen lassen. */
+  /** Let the battles of the last turn flash at their worlds. */
   playBattles(list, you) {
     this.battleFx.start(list, you);
     this.poke(this.battleFx.remaining() + 100);
   }
 
-  /** Rechtshändige Basis aus Blickrichtung, Rechts und Oben. */
+  /** Right-handed basis from view direction, right and up. */
   basis() {
     const cp = Math.cos(this.cam.pitch), sp = Math.sin(this.cam.pitch);
     const f = [cp * Math.cos(this.cam.yaw), cp * Math.sin(this.cam.yaw), -sp];
@@ -90,7 +90,7 @@ export class SpaceView {
     return [c.tx - b.f[0] * c.dist, c.ty - b.f[1] * c.dist, c.tz - b.f[2] * c.dist];
   }
 
-  /** Weltpunkt in Kamerakoordinaten: [rechts, oben, vorwärts]. */
+  /** World point in camera coordinates: [right, up, forward]. */
   toCam(x, y, z) {
     const b = this._b, e = this._eye;
     const dx = x - e[0], dy = y - e[1], dz = (z || 0) - e[2];
@@ -101,7 +101,7 @@ export class SpaceView {
     ];
   }
 
-  /** Bildpunkt samt Maßstab, oder null hinter der Kamera. */
+  /** Screen point including scale, or null behind the camera. */
   project(x, y, z) {
     const c = this.toCam(x, y, z);
     if (c[2] <= NEAR) return null;
@@ -109,7 +109,7 @@ export class SpaceView {
     return { x: this.w / 2 + c[0] * s, y: this.h / 2 - c[1] * s, s, depth: c[2] };
   }
 
-  /** Für die Tonortung: nur die Bildposition. */
+  /** For sound positioning: only the screen position. */
   w2s(x, y, z) {
     this._prep();
     const p = this.project(x, y, z);
@@ -117,8 +117,8 @@ export class SpaceView {
   }
 
   /**
-   * Abstand so wählen, dass der Quader aller Welten gerade ins Bild passt -
-   * eine Kugel würde bei der flachen Linse viel Luft verschenken.
+   * Choose the distance so that the box of all worlds just fits into the
+   * picture - a sphere would waste a lot of space with the flat lens.
    */
   fit(margin = 0.88) {
     if (!this.view?.planets?.length) return;
@@ -138,19 +138,19 @@ export class SpaceView {
     this.poke();
   }
 
-  /** Blickpunkt auf eine Welt oder Flotte setzen, Blickwinkel behalten. */
+  /** Set the target point to a world or fleet, keep the view angle. */
   /**
-   * Welt ins Bild holen. `frei` ist das sichtbare Rechteck {w, h} - liegt ein
-   * Blatt über der Karte, wird der Blickpunkt so weit versetzt, dass die Welt
-   * im freien Teil steht.
+   * Bring a world into view. `free` is the visible rectangle {w, h} - if a
+   * sheet lies over the map, the target point is shifted far enough for the
+   * world to stand in the free part.
    */
-  focus(p, frei) {
+  focus(p, free) {
     if (!p) return;
     this.cam.tx = p.x; this.cam.ty = p.y; this.cam.tz = p.z || 0;
     this.cam.dist = Math.min(this.cam.dist, 1400);
     this._prep();
-    const w = frei?.w ?? this.w, h = frei?.h ?? this.h;
-    if (w < this.w || h < this.h) this.schiebe((this.w - w) / 2, -(this.h - h) / 2);
+    const w = free?.w ?? this.w, h = free?.h ?? this.h;
+    if (w < this.w || h < this.h) this.pan((this.w - w) / 2, -(this.h - h) / 2);
     this.poke();
   }
 
@@ -161,7 +161,7 @@ export class SpaceView {
     this.poke();
   }
 
-  /** Draufsicht - entspricht der Klassik-Ansicht. */
+  /** Top-down view - matches the classic view. */
   topView() { this.cam.pitch = PITCH_MAX; this.cam.yaw = -Math.PI / 2; this.poke(); }
 
   setView(view) {
@@ -175,7 +175,7 @@ export class SpaceView {
     }
   }
 
-  // ------------------------------------------------------------ Zeichnen
+  // ------------------------------------------------------------- Drawing
   _prep() {
     this.focal = (this.h / 2) / Math.tan(FOV / 2);
     this._b = this.basis();
@@ -201,8 +201,8 @@ export class SpaceView {
     this.drawCourses(ctx);
     if (this.showRange) this.drawRange(ctx);
 
-    // Alles Räumliche von hinten nach vorn - der Maler-Algorithmus ersetzt
-    // den Tiefenpuffer, den ein 2D-Canvas nicht hat.
+    // Everything spatial from back to front - the painter's algorithm replaces
+    // the depth buffer that a 2D canvas does not have.
     const items = [];
     for (const p of v.planets) {
       const pr = this.project(p.x, p.y, p.z);
@@ -224,9 +224,9 @@ export class SpaceView {
     }
     items.sort((a, b) => b.depth - a.depth);
 
-    // Namen gehören in dieselbe Reihenfolge wie ihre Welt: gesammelt und zum
-    // Schluss gezeichnet, läge der Name einer fernen Welt über allem, was
-    // davor steht.
+    // Names belong in the same order as their world: collected and drawn at
+    // the end, the name of a distant world would lie above everything standing
+    // in front of it.
     for (const it of items) {
       const labels = [];
       if (it.kind === 'planet') this.drawWorld(ctx, it, colorOf, labels);
@@ -234,7 +234,7 @@ export class SpaceView {
       else this.drawFleet(ctx, it, colorOf);
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
     }
-    // Schlachten obenauf - sie sollen auffallen, auch hinter einer nahen Welt.
+    // Battles on top - they should stand out, even behind a nearby world.
     this.battleFx.draw(ctx, performance.now(), (id) => {
       const p = v.planets[id];
       const pr = p && this.project(p.x, p.y, p.z);
@@ -247,9 +247,9 @@ export class SpaceView {
   }
 
   /**
-   * Sterne, Gitter und Gebietsfarben ändern sich nur, wenn sich die Kamera
-   * bewegt oder eine Runde vergeht - also einmal in ein Zwischencanvas und
-   * danach nur noch kopieren.
+   * Stars, grid and territory colors only change when the camera moves or a
+   * turn passes - so draw them once into an intermediate canvas and only copy
+   * afterwards.
    */
   drawBackdrop(ctx, colorOf) {
     const c = this.cam;
@@ -261,7 +261,7 @@ export class SpaceView {
       this.renderBackdrop(colorOf);
     }
     ctx.drawImage(this._sky, 0, 0, this.w, this.h);
-    if (this.showStars) this.drawSky(ctx);    // live, dreht sich ständig weiter
+    if (this.showStars) this.drawSky(ctx);    // live, keeps rotating
   }
 
   renderBackdrop(colorOf) {
@@ -277,18 +277,18 @@ export class SpaceView {
     if (this.showTerritory) this.drawTerritory(ctx, colorOf);
   }
 
-  /** Sterne liegen weit weg: nur die Drehung zählt - und die ist je
-   *  Größenklasse etwas anders, das gibt dem Himmel Tiefe. */
+  /** Stars are far away: only the rotation counts - and it differs a little
+   *  per size class, which gives the sky depth. */
   drawSky(ctx) {
     const b = this._b;
-    const dreh = SKY_CLASSES.map(c => {
-      const a = this.phase * c.dreh;
+    const spin = SKY_CLASSES.map(c => {
+      const a = this.phase * c.spin;
       return [Math.cos(a), Math.sin(a)];
     });
     const buckets = this._buckets || (this._buckets = Array.from({ length: 12 }, () => []));
     for (const bk of buckets) bk.length = 0;
     for (const s of this.stars) {
-      const [co, si] = dreh[s.li];
+      const [co, si] = spin[s.li];
       const vx = s.v[0] * co - s.v[1] * si;
       const vy = s.v[0] * si + s.v[1] * co;
       const vz = s.v[2];
@@ -301,8 +301,8 @@ export class SpaceView {
       const tw = 0.8 + 0.2 * Math.sin(this.phase * 1.4 + s.tw);
       buckets[Math.max(0, Math.min(11, Math.floor(s.a * tw * 12)))].push(sx | 0, sy | 0, s.r);
     }
-    // Ein Pfad je Helligkeitsstufe statt ein Aufruf je Stern - das spart dem
-    // Rasterer hunderte Einzelflächen pro Bild.
+    // One path per brightness level instead of one call per star - that saves
+    // the rasterizer hundreds of individual shapes per frame.
     for (let k = 0; k < 12; k++) {
       const arr = buckets[k];
       if (!arr.length) continue;
@@ -313,7 +313,7 @@ export class SpaceView {
     }
   }
 
-  /** Gitter in der Mittelebene - ohne Boden schwebt alles im Nichts. */
+  /** Grid in the mid-plane - without a floor everything floats in nothingness. */
   drawGrid(ctx) {
     const g = this.view.galaxy;
     const x0 = g.minX ?? 0, y0 = g.minY ?? 0;
@@ -326,7 +326,7 @@ export class SpaceView {
     for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) this.seg(ctx, [x, y0, 0], [x, y1, 0]);
     for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) this.seg(ctx, [x0, y, 0], [x1, y, 0]);
     ctx.stroke();
-    // Rand der Karte etwas kräftiger
+    // Map border a little stronger
     ctx.strokeStyle = 'rgba(140,180,240,0.22)';
     ctx.beginPath();
     this.seg(ctx, [x0, y0, 0], [x1, y0, 0]);
@@ -337,7 +337,7 @@ export class SpaceView {
     ctx.restore();
   }
 
-  /** Eine Strecke im Raum, am vorderen Rand abgeschnitten. */
+  /** A segment in space, clipped at the near plane. */
   seg(ctx, a, b) {
     let A = this.toCam(a[0], a[1], a[2]);
     let B = this.toCam(b[0], b[1], b[2]);
@@ -362,8 +362,8 @@ export class SpaceView {
       if (!p.owner) continue;
       const pr = this.project(p.x, p.y, p.z);
       if (!pr) continue;
-      // Nah an der Welt deckelt die Obergrenze die Füllfläche - sonst malt
-      // eine einzige Welt den halben Bildschirm aus.
+      // Close to the world the upper limit caps the filled area - otherwise a
+      // single world paints half the screen.
       const r = Math.min(480, (230 + Math.min(45, p.pop || 0) * 4.5) * pr.s);
       if (pr.x + r < 0 || pr.y + r < 0 || pr.x - r > this.w || pr.y - r > this.h) continue;
       ctx.globalAlpha = p.known === 'memory' ? 0.45 : 1;
@@ -378,7 +378,7 @@ export class SpaceView {
     ctx.lineWidth = 1.4;
     ctx.setLineDash([6, 5]);
     ctx.lineDashOffset = -this.phase * 22;
-    // Der Kurs folgt dem Weg um das schwarze Loch, nicht der Luftlinie.
+    // The course follows the path around the black hole, not the straight line.
     const zone = holeZone(v.galaxy);
     for (const f of v.fleets) {
       if (f.dest == null) continue;
@@ -397,7 +397,7 @@ export class SpaceView {
     ctx.restore();
   }
 
-  /** Reichweite als Kreis in der Höhe der Welt - eine Kugel wäre unlesbar. */
+  /** Range as a circle at the world's height - a sphere would be unreadable. */
   drawRange(ctx) {
     const v = this.view;
     const sel = this.selection?.type === 'fleet' ? v.fleets.find(f => f.id === this.selection.id) : null;
@@ -408,17 +408,17 @@ export class SpaceView {
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 6]);
     const zone = holeZone(v.galaxy);
-    this._reich = this._reich || new Map();
+    this._reach = this._reach || new Map();
     for (const p of v.planets) {
       if (p.owner !== v.you || !(p.pop > 0.5)) continue;
-      // Kein Kreis, sondern der wirklich erreichbare Umriss - am schwarzen
-      // Loch hat er eine Delle (siehe reachOutline in shared/rules.js).
+      // Not a circle but the actually reachable outline - at the black hole
+      // it has a dent (see reachOutline in shared/rules.js).
       const key = `${p.id}|${Math.round(range)}|${zone ? 1 : 0}`;
-      let u = this._reich.get(key);
+      let u = this._reach.get(key);
       if (!u) {
         u = reachOutline(p, range, zone, 48);
-        if (this._reich.size > 64) this._reich.clear();
-        this._reich.set(key, u);
+        if (this._reach.size > 64) this._reach.clear();
+        this._reach.set(key, u);
       }
       ctx.beginPath();
       for (let i = 0; i < u.length; i++) {
@@ -433,11 +433,11 @@ export class SpaceView {
   drawWorld(ctx, it, colorOf, labels) {
     const { p, pr } = it;
     const ctxAlpha = depthFade(pr.depth, this.cam.dist);
-    // Lot auf die Mittelebene: erst daran sieht man, wie hoch die Welt liegt
+    // Plumb line to the mid-plane: only that shows how high the world lies
     if (Math.abs(p.z || 0) > 1) {
       const foot = this.project(p.x, p.y, 0);
       ctx.save();
-      // Unerforschte Welten treten zurück, sonst ist das Bild ein Nadelwald
+      // Unexplored worlds recede, otherwise the picture is a forest of needles
       ctx.globalAlpha = (p.known === 'unknown' ? 0.15 : 0.33) * ctxAlpha;
       ctx.strokeStyle = p.owner ? colorOf(p.owner) : '#7d8aa5';
       ctx.lineWidth = 1;
@@ -451,8 +451,8 @@ export class SpaceView {
       ctx.restore();
     }
 
-    // focal/Tiefe ist genau das, was in der flachen Karte der Zoom ist:
-    // ein Weltmaß mal diesem Faktor ergibt Bildpunkte.
+    // focal/depth is exactly what the zoom is on the flat map:
+    // a world dimension times this factor gives pixels.
     const scale = pr.s;
     ctx.save();
     ctx.globalAlpha = ctxAlpha;
@@ -466,9 +466,9 @@ export class SpaceView {
     ctx.restore();
     const r = planetRadius(p) * scale;
 
-    // Orbitale Verteidigung: dieselbe Kreisbahn wie in der flachen Karte, nur
-    // mit der projizierten Größe. Die Satelliten bleiben immer zuhause, also
-    // gehören sie zur Welt und nicht zu den Flotten.
+    // Orbital defense: the same circular orbit as on the flat map, just with
+    // the projected size. The satellites always stay at home, so they belong
+    // to the world and not to the fleets.
     if (p.defenses >= SHIELD_MIN) {
       ctx.save();
       ctx.globalAlpha = ctxAlpha;
@@ -492,24 +492,25 @@ export class SpaceView {
       ctx.restore();
     }
 
-    // Namen blenden sich mit der Größe aus wie in der flachen Karte - in der
-    // Tiefe heißt das: nahe Welten sind beschriftet, ferne nicht.
+    // Names fade out with size as on the flat map - in depth that means:
+    // near worlds are labeled, distant ones are not.
     if (this.showNames) labels.push(...planetLabels(p, pr.x, pr.y, scale, r));
     this.hit.push({ type: 'planet', id: p.id, x: pr.x, y: pr.y, r: Math.max(10, r + 5) });
   }
 
   /**
-   * Richtung, in die das Schiffssymbol zeigt - auf dem Bildschirm, nicht in
-   * der Welt: im Raum kippt die Kamera, eine Weltrichtung waere hier falsch.
-   * Genommen wird das erste Stueck des Wegs (auf dem Bogen um das schwarze
-   * Loch fliegt die Flotte quer zum Ziel), und zwar das erste, das projiziert
-   * lang genug ist - sonst zittert die Nase bei fast erreichten Wegpunkten.
+   * Direction the ship icon points in - on screen, not in the world: in 3D
+   * the camera tilts, so a world direction would be wrong here. The first
+   * piece of the path is used (on the arc around the black hole the fleet
+   * flies at an angle to the target), namely the first one that is long
+   * enough when projected - otherwise the nose jitters at nearly reached
+   * waypoints.
    */
-  kurswinkel(f, x, y) {
+  headingAngle(f, x, y) {
     const v = this.view;
-    const ziel = f.dest != null ? v.planets[f.dest] : null;
-    if (!ziel) return null;
-    for (const w of route(f, ziel, holeZone(v.galaxy))) {
+    const target = f.dest != null ? v.planets[f.dest] : null;
+    if (!target) return null;
+    for (const w of route(f, target, holeZone(v.galaxy))) {
       const t = this.project(w.x, w.y, w.z || 0);
       if (!t) continue;
       const dx = t.x - x, dy = t.y - y;
@@ -535,7 +536,7 @@ export class SpaceView {
       y += Math.sin(a) * rr;
       drawShip(ctx, { type: lead, x, y, angle: a + Math.PI / 2, len: 24 * scale, color: col, phase: this.phase + idx });
     } else {
-      const ang = this.kurswinkel(f, x, y) ?? 0;
+      const ang = this.headingAngle(f, x, y) ?? 0;
       drawTrail(ctx, x, y, ang, 46 * scale, col);
       drawShip(ctx, { type: lead, x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase });
     }
@@ -547,33 +548,33 @@ export class SpaceView {
   }
 
   /**
-   * Schwarzes Loch mit Strudel. Die Arme liegen in der Galaxienebene, nicht
-   * auf einer der Kamera zugewandten Scheibe - deshalb stimmt die Perspektive,
-   * und die hintere Hälfte verschwindet hinter dem Schlund.
+   * Black hole with swirl. The arms lie in the galactic plane, not on a disc
+   * facing the camera - that is why the perspective is right, and the rear
+   * half disappears behind the maw.
    */
   drawHole(ctx, it, labels) {
     const { bh, pr } = it;
     const r = Math.max(HOLE_MIN_PX, bh.r * pr.s * HOLE_SCALE);
-    const R = bh.r * HOLE_SCALE;                 // Weltmaß für die Arme
+    const R = bh.r * HOLE_SCALE;                 // world dimension for the arms
     const z = bh.z || 0;
-    const stuecke = Math.max(6, Math.min(18, Math.round(r / 5)));
+    const pieces = Math.max(6, Math.min(18, Math.round(r / 5)));
 
-    const hinten = [], vorn = [];
-    for (let k = 0; k < SWIRL.arme; k++) {
+    const behind = [], inFront = [];
+    for (let k = 0; k < SWIRL.arms; k++) {
       let prev = null;
-      for (let i = 0; i <= stuecke; i++) {
-        const t = i / stuecke;
+      for (let i = 0; i <= pieces; i++) {
+        const t = i / pieces;
         const [dx, dy] = swirlPoint(R, this.phase, k, t);
         const p = [bh.x + dx, bh.y + dy, z];
         if (prev) {
-          const mitte = this.toCam((prev[0] + p[0]) / 2, (prev[1] + p[1]) / 2, z);
-          (mitte[2] > pr.depth ? hinten : vorn).push([prev, p, t]);
+          const mid = this.toCam((prev[0] + p[0]) / 2, (prev[1] + p[1]) / 2, z);
+          (mid[2] > pr.depth ? behind : inFront).push([prev, p, t]);
         }
         prev = p;
       }
     }
-    const malen = (liste) => {
-      for (const [a, b, t] of liste) {
+    const paintArms = (list) => {
+      for (const [a, b, t] of list) {
         swirlStroke(ctx, r, t);
         ctx.beginPath();
         this.seg(ctx, a, b);
@@ -581,11 +582,11 @@ export class SpaceView {
       }
     };
     ctx.save();
-    malen(hinten);
+    paintArms(behind);
     drawHoleCore(ctx, pr.x, pr.y, r);
-    malen(vorn);
-    // Grenze der Sperrzone, in der Galaxienebene - sonst sieht der Umweg der
-    // Flotten wie ein Fehler aus.
+    paintArms(inFront);
+    // Border of the exclusion zone, in the galactic plane - otherwise the
+    // fleets' detour looks like a bug.
     const zr = holeZone(this.view.galaxy).r;
     ctx.strokeStyle = 'rgba(150,190,255,.26)';
     ctx.lineWidth = 1;
@@ -672,7 +673,7 @@ export class SpaceView {
     ctx.restore();
   }
 
-  // --------------------------------------------------------------- Eingabe
+  // ---------------------------------------------------------------- Input
   pick(sx, sy) {
     for (let i = this.hit.length - 1; i >= 0; i--) {
       const h = this.hit[i];
@@ -682,8 +683,8 @@ export class SpaceView {
     return null;
   }
 
-  /** Blickpunkt in der Bildebene schieben - Schrittweite nach Abstand. */
-  schiebe(dx, dy) {
+  /** Move the target point in the image plane - step size by distance. */
+  pan(dx, dy) {
     const k = this.cam.dist / this.focal;
     const b = this._b || this.basis();
     this.cam.tx -= (b.r[0] * dx - b.u[0] * dy) * k;
@@ -694,12 +695,13 @@ export class SpaceView {
   _bind() {
     const cv = this.cv;
     let dragging = false, moved = false, panning = false, last = null;
-    // Zwei Finger: Abstand zoomt, Mittelpunkt schiebt den Blickpunkt. Drehen
-    // bleibt der einzelne Finger - sonst wäre im Raum kein Kurs zu halten.
-    const zeiger = new Map();
+    // Two fingers: distance zooms, the midpoint moves the target point.
+    // Rotating stays with the single finger - otherwise no course could be
+    // held in 3D.
+    const pointers = new Map();
     let pinch = null;
 
-    const mitte = () => {
+    const midpoint = () => {
       const p = [...zeiger.values()];
       return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2,
         d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
@@ -708,8 +710,8 @@ export class SpaceView {
     cv.addEventListener('pointerdown', (e) => {
       this.poke();
       cv.setPointerCapture(e.pointerId);
-      zeiger.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
-      if (zeiger.size === 2) { pinch = mitte(); moved = true; dragging = false; return; }
+      pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pointers.size === 2) { pinch = midpoint(); moved = true; dragging = false; return; }
       dragging = true; moved = false;
       panning = e.shiftKey || e.button === 1;
       last = { x: e.offsetX, y: e.offsetY };
@@ -717,12 +719,12 @@ export class SpaceView {
 
     cv.addEventListener('pointermove', (e) => {
       this.poke();
-      if (zeiger.has(e.pointerId)) zeiger.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
-      if (zeiger.size >= 2 && pinch) {
-        const jetzt = mitte();
-        if (pinch.d > 0 && jetzt.d > 0) this.zoomBy(jetzt.d / pinch.d);
-        this.schiebe(jetzt.x - pinch.x, jetzt.y - pinch.y);
-        pinch = jetzt;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pointers.size >= 2 && pinch) {
+        const now = midpoint();
+        if (pinch.d > 0 && now.d > 0) this.zoomBy(now.d / pinch.d);
+        this.pan(now.x - pinch.x, now.y - pinch.y);
+        pinch = now;
         return;
       }
       if (dragging) {
@@ -730,7 +732,7 @@ export class SpaceView {
         if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
         if (moved) {
           if (panning) {
-            this.schiebe(dx, dy);
+            this.pan(dx, dy);
           } else {
             this.cam.yaw -= dx * 0.006;
             this.cam.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, this.cam.pitch + dy * 0.006));
@@ -740,7 +742,7 @@ export class SpaceView {
         last = { x: e.offsetX, y: e.offsetY };
         return;
       }
-      // Beim Finger gibt es kein Schweben - der Tipp wählt gleich aus.
+      // With a finger there is no hover - the tap selects right away.
       if (e.pointerType === 'touch') return;
       const h = this.pick(e.offsetX, e.offsetY);
       const changed = JSON.stringify(h) !== JSON.stringify(this.hover);
@@ -749,21 +751,21 @@ export class SpaceView {
       cv.style.cursor = h ? 'pointer' : 'grab';
     });
 
-    const los = (e) => {
-      zeiger.delete(e.pointerId);
-      if (zeiger.size < 2) pinch = null;
-      if (zeiger.size === 1) {
+    const release = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 1) {
         const p = [...zeiger.values()][0];
         last = { x: p.x, y: p.y };
         dragging = true;
       }
     };
-    cv.addEventListener('pointercancel', (e) => { los(e); dragging = false; moved = true; });
+    cv.addEventListener('pointercancel', (e) => { release(e); dragging = false; moved = true; });
 
     cv.addEventListener('pointerup', (e) => {
-      const warMehr = zeiger.size > 1;
-      los(e);
-      if (warMehr) { dragging = false; return; }
+      const wasMulti = pointers.size > 1;
+      release(e);
+      if (wasMulti) { dragging = false; return; }
       dragging = false;
       cv.classList.remove('dragging');
       if (moved) return;
@@ -788,7 +790,7 @@ export class SpaceView {
   }
 }
 
-// ------------------------------------------------------------- Werkzeug
+// ---------------------------------------------------------------- Tools
 function cross(a, b) {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
@@ -811,13 +813,13 @@ function bounds(planets) {
   }
   return { x0, y0, z0, x1, y1, z1 };
 }
-/** Weit entfernte Welten treten zurück - sonst ist vorn und hinten gleich laut. */
+/** Distant worlds recede - otherwise front and back are equally loud. */
 /**
- * Tiefenwirkung: Was hinter dem Blickpunkt liegt, tritt zurueck - alles davor
- * bleibt deckend. Die alte Kurve verblasste schon den Vordergrund (in der
- * eingepassten Ansicht war keine Welt mehr volldeckend): Sterne und Gitter
- * schienen durch die Planeten, und der Maler-Algorithmus verlor genau die
- * Verdeckung, fuer die er da ist.
+ * Depth effect: whatever lies behind the target point recedes - everything in
+ * front of it stays opaque. The old curve already faded the foreground (in the
+ * fitted view no world was fully opaque anymore): stars and grid shone through
+ * the planets, and the painter's algorithm lost exactly the occlusion it is
+ * there for.
  */
 function depthFade(depth, camDist) {
   const t = depth / Math.max(1, camDist);
@@ -836,10 +838,10 @@ function makeStars(n) {
   };
   const stars = [];
   for (let i = 0; i < n; i++) {
-    // gleichmäßig auf der Kugel
+    // evenly distributed on the sphere
     const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, s = Math.sqrt(1 - u * u);
     const w = rnd();
-    const li = w < 0.72 ? 0 : w < 0.93 ? 1 : 2;     // viele kleine, wenige große
+    const li = w < 0.72 ? 0 : w < 0.93 ? 1 : 2;     // many small, few large
     stars.push({
       v: [s * Math.cos(a), s * Math.sin(a), u],
       li,

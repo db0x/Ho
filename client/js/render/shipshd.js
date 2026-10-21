@@ -1,12 +1,11 @@
-// Ausführliche Schiffsgrafik für große Darstellungen (Steckbrief). Gleiche
-// Silhouetten wie ships.js, aber mit Lichtkanten, Panellinien, Nieten,
-// Düsen, Positionslichtern und Abgasflammen. Gezeichnet wird nach rechts
-// zeigend in einem Raster von 100 Einheiten Schiffslänge; der Aufrufer
-// rotiert.
+// Detailed ship graphics for large displays (ship profile). Same silhouettes
+// as ships.js, but with light edges, panel lines, rivets, nozzles, navigation
+// lights and exhaust flames. Drawn pointing to the right on a grid of 100
+// units of ship length; the caller rotates.
 
 const TAU = Math.PI * 2;
 
-/* ------------------------------------------------------------- Helfer */
+/* ------------------------------------------------------------ Helpers */
 
 function hexRgb(hex) {
   const h = hex.replace('#', '');
@@ -14,13 +13,13 @@ function hexRgb(hex) {
   return [0, 2, 4].map(i => parseInt(v.slice(i, i + 2), 16));
 }
 const rgba = (hex, a) => { const [r, g, b] = hexRgb(hex); return `rgba(${r},${g},${b},${a})`; };
-/** Farbe heller (f > 0) oder dunkler (f < 0). */
+/** Color lighter (f > 0) or darker (f < 0). */
 function tone(hex, f) {
   const c = hexRgb(hex).map(v => Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f)));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
-/** Spiegelbildlicher Umriss: Punkte der oberen Hälfte von vorn nach hinten. */
+/** Mirror-symmetric outline: points of the upper half from front to back. */
 function sym(ctx, pts) {
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
@@ -39,7 +38,7 @@ function poly(ctx, pts) {
   ctx.closePath();
 }
 
-/** Metall quer zur Längsachse: oben angestrahlt, unten im Schatten. */
+/** Metal across the longitudinal axis: lit from above, shadowed below. */
 function metal(ctx, y0, y1, base = '#9aa6bb') {
   const g = ctx.createLinearGradient(0, y0, 0, y1);
   g.addColorStop(0, tone(base, 0.75));
@@ -50,7 +49,7 @@ function metal(ctx, y0, y1, base = '#9aa6bb') {
   return g;
 }
 
-/** Füllt den aktuellen Pfad mit Schlagschatten auf das, was darunter liegt. */
+/** Fills the current path with a drop shadow onto whatever lies beneath. */
 function fillShadowed(ctx, style, S) {
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,.55)';
@@ -62,8 +61,8 @@ function fillShadowed(ctx, style, S) {
 }
 
 /**
- * Lichtkante und Kontur: innen eine helle Linie an der Oberkante, eine dunkle
- * an der Unterkante, außen ein feiner dunkler Rand.
+ * Light edge and contour: inside a bright line along the top edge, a dark one
+ * along the bottom edge, outside a fine dark rim.
  */
 function bevel(ctx, pathFn, w = 0.9) {
   ctx.save();
@@ -80,12 +79,12 @@ function bevel(ctx, pathFn, w = 0.9) {
   ctx.stroke();
 }
 
-/** Innerhalb des Pfades zeichnen. */
+/** Draw inside the path. */
 function inside(ctx, pathFn, fn) {
   ctx.save(); pathFn(); ctx.clip(); fn(); ctx.restore();
 }
 
-/** Panellinie: dunkle Fuge mit heller Kante daneben. */
+/** Panel line: a dark seam with a bright edge next to it. */
 function seam(ctx, x0, y0, x1, y1, w = 0.35) {
   ctx.lineCap = 'round';
   ctx.lineWidth = w;
@@ -105,7 +104,7 @@ function rivets(ctx, x0, x1, y, n, r = 0.38) {
   }
 }
 
-/** Lüftungsschlitze. */
+/** Vent slots. */
 function vents(ctx, x, y, n, len = 4, gap = 1.4) {
   for (let i = 0; i < n; i++) {
     ctx.fillStyle = 'rgba(8,12,22,.75)';
@@ -115,7 +114,7 @@ function vents(ctx, x, y, n, len = 4, gap = 1.4) {
   }
 }
 
-/** Glas mit Tiefe und Spiegelung. */
+/** Glass with depth and reflection. */
 function glass(ctx, pathFn, x0, x1, y0, y1, tint = '#5fd2ff', S = 1) {
   ctx.save();
   pathFn();
@@ -125,13 +124,13 @@ function glass(ctx, pathFn, x0, x1, y0, y1, tint = '#5fd2ff', S = 1) {
   g.addColorStop(1, tone(tint, -0.7));
   fillShadowed(ctx, g, S * 0.4);
   inside(ctx, pathFn, () => {
-    // Innenleben: dunkler Kern, damit es nach Tiefe aussieht
+    // Interior: a dark core so it looks deep
     const k = ctx.createRadialGradient((x0 + x1) / 2, (y0 + y1) / 2 + (y1 - y0) * 0.2, 0,
       (x0 + x1) / 2, (y0 + y1) / 2, Math.max(x1 - x0, y1 - y0) * 0.6);
     k.addColorStop(0, 'rgba(0,20,40,.0)');
     k.addColorStop(1, 'rgba(0,10,30,.45)');
     ctx.fillStyle = k; ctx.fillRect(x0 - 2, y0 - 2, x1 - x0 + 4, y1 - y0 + 4);
-    // Spiegelstreifen
+    // Reflection stripe
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     ctx.beginPath();
     ctx.ellipse(x0 + (x1 - x0) * 0.55, y0 + (y1 - y0) * 0.24, (x1 - x0) * 0.32, (y1 - y0) * 0.09, -0.08, 0, TAU);
@@ -145,7 +144,7 @@ function glass(ctx, pathFn, x0, x1, y0, y1, tint = '#5fd2ff', S = 1) {
   ctx.restore();
 }
 
-/** Düse: Glocke mit Heißring, zeigt nach hinten (-x). */
+/** Nozzle: bell with a hot ring, pointing backwards (-x). */
 function nozzle(ctx, x, y, r, len = r * 1.1) {
   const p = () => {
     ctx.beginPath();
@@ -162,7 +161,7 @@ function nozzle(ctx, x, y, r, len = r * 1.1) {
     for (let i = 1; i <= 3; i++) seam(ctx, x + len * i / 4, y - r, x + len * i / 4, y + r, 0.25);
   });
   bevel(ctx, p, 0.5);
-  // Öffnung mit Glut
+  // Opening with glow
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, '#fff3d6');
   g.addColorStop(0.45, '#ff9a4a');
@@ -172,7 +171,7 @@ function nozzle(ctx, x, y, r, len = r * 1.1) {
   ctx.lineWidth = 0.35; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.stroke();
 }
 
-/** Raketenartiger Anbau: Waffe, Sensor, Tank. */
+/** Rocket-like attachment: weapon, sensor, tank. */
 function capsule(ctx, x0, x1, y, h, base, S) {
   const p = () => { ctx.beginPath(); ctx.roundRect(x0, y - h, x1 - x0, h * 2, h); };
   p(); fillShadowed(ctx, metal(ctx, y - h, y + h, base), S);
@@ -180,21 +179,21 @@ function capsule(ctx, x0, x1, y, h, base, S) {
   return p;
 }
 
-/* ------------------------------------------------- Bewegte Teile */
+/* ------------------------------------------------- Moving parts */
 
-/** Abgasflamme hinter einer Düse bei (x, y), Radius r. */
+/** Exhaust flame behind a nozzle at (x, y), radius r. */
 function plume(ctx, x, y, r, color, t, seed) {
   const f = 0.86 + 0.1 * Math.sin(t * 9.3 + seed) + 0.05 * Math.sin(t * 23.7 + seed * 2.1);
   const len = r * 4.2 * f;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // weicher Schein um die Düse
+  // soft glow around the nozzle
   const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 2.4);
   halo.addColorStop(0, rgba(color, 0.5 * f));
   halo.addColorStop(1, rgba(color, 0));
   ctx.fillStyle = halo;
   ctx.beginPath(); ctx.arc(x, y, r * 2.4, 0, TAU); ctx.fill();
-  // Flamme: außen farbig, innen weiß
+  // Flame: colored outside, white inside
   for (const [w, l, a, c] of [[1, 1, 0.75, color], [0.55, 0.62, 0.95, '#ffffff']]) {
     const g = ctx.createLinearGradient(x, 0, x - len * l, 0);
     g.addColorStop(0, rgba(c, a));
@@ -208,7 +207,7 @@ function plume(ctx, x, y, r, color, t, seed) {
     ctx.closePath();
     ctx.fill();
   }
-  // Schockdiamanten
+  // Shock diamonds
   for (let i = 1; i <= 3; i++) {
     const dx = x - len * 0.16 * i - Math.sin(t * 5 + i) * 0.4;
     ctx.fillStyle = `rgba(255,255,255,${0.32 / i})`;
@@ -217,7 +216,7 @@ function plume(ctx, x, y, r, color, t, seed) {
   ctx.restore();
 }
 
-/** Positionslicht; `strobe` blitzt kurz, sonst pulsiert es sanft. */
+/** Navigation light; `strobe` flashes briefly, otherwise it pulses gently. */
 function light(ctx, x, y, r, color, t, off, strobe) {
   const a = strobe
     ? Math.pow(Math.max(0, Math.sin(t * 2.6 + off)), 14)
@@ -237,7 +236,7 @@ function light(ctx, x, y, r, color, t, off, strobe) {
 
 const RED = '#ff4a3d', GREEN = '#3dff8a', WHITE = '#ffffff';
 
-/* --------------------------------------------------------------- Späher */
+/* ---------------------------------------------------------------- Scout */
 const scout = {
   r: 58,
   engines: [{ x: -50, y: 0, r: 5.2, color: '#7fd8ff' }],
@@ -248,7 +247,7 @@ const scout = {
   ],
   body(ctx, color, S) {
     nozzle(ctx, -50, 0, 5.2, 6);
-    // Flügel
+    // Wings
     for (const s of [-1, 1]) {
       const w = () => poly(ctx, [[-6, s * 5], [-30, s * 29], [-38, s * 31], [-40, s * 28], [-30, s * 7]]);
       w();
@@ -261,12 +260,12 @@ const scout = {
         seam(ctx, -20, s * 6, -24, s * 17);
         ctx.fillStyle = 'rgba(255,255,255,.12)';
         poly(ctx, [[-6, s * 5], [-30, s * 29], [-31, s * 27], [-9, s * 6]]); ctx.fill();
-        // Warnstreifen an der Spitze
+        // Warning stripes at the tip
         ctx.fillStyle = 'rgba(20,24,34,.7)';
         for (let i = 0; i < 3; i++) { poly(ctx, [[-33 - i * 2.4, s * 25], [-31.6 - i * 2.4, s * 25], [-34.6 - i * 2.4, s * 31], [-36 - i * 2.4, s * 31]]); ctx.fill(); }
       });
       bevel(ctx, w, 0.7);
-      // Flügelspitzen-Pod
+      // Wing tip pod
       capsule(ctx, -40, -28, s * 30, 1.6, '#8a96aa', S);
     }
     // Canards
@@ -274,35 +273,35 @@ const scout = {
       const c = () => poly(ctx, [[30, s * 4], [22, s * 10.5], [19, s * 10], [22, s * 4]]);
       c(); fillShadowed(ctx, tone(color, -0.1), S * 0.5); bevel(ctx, c, 0.5);
     }
-    // Rumpf
+    // Hull
     const hull = () => sym(ctx, [[56, 0], [44, -2.6], [26, -5.6], [4, -7.6], [-30, -7.2], [-46, -5.6], [-48, 0]]);
     hull(); fillShadowed(ctx, metal(ctx, -8, 8), S);
     inside(ctx, hull, () => {
       seam(ctx, 34, -8, 34, 8); seam(ctx, 8, -8, 8, 8); seam(ctx, -16, -8, -16, 8); seam(ctx, -36, -8, -36, 8);
       seam(ctx, -36, -3.6, 8, -3.6, 0.3);
-      // Kennstreifen
+      // Identification stripe
       ctx.fillStyle = color;
       ctx.fillRect(-34, 3.2, 40, 1.5);
       ctx.fillStyle = tone(color, -0.4); ctx.fillRect(-34, 4.7, 40, 0.5);
       vents(ctx, -30, -1.2, 6, 2.6, 1.6);
       rivets(ctx, -14, 6, -5.6, 7, 0.3);
       rivets(ctx, -14, 6, 5.6, 7, 0.3);
-      // Sensorspitze
+      // Sensor tip
       ctx.fillStyle = 'rgba(30,36,50,.85)';
       sym(ctx, [[56, 0], [48, -1.8], [46, 0]]); ctx.fill();
     });
     bevel(ctx, hull, 0.9);
-    // Kanzel
+    // Canopy
     const cab = () => { ctx.beginPath(); ctx.ellipse(24, 0, 12, 3.4, 0, 0, TAU); };
     glass(ctx, cab, 12, 36, -3.4, 3.4, '#58d4ff', S);
-    // Antenne
+    // Antenna
     ctx.strokeStyle = '#c8d2e4'; ctx.lineWidth = 0.4;
     ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(-36, -2.5); ctx.stroke();
     ctx.fillStyle = '#e8eef8'; ctx.beginPath(); ctx.arc(-36, -2.5, 0.6, 0, TAU); ctx.fill();
   }
 };
 
-/* ---------------------------------------------------------------- Jäger */
+/* -------------------------------------------------------------- Fighter */
 const fighter = {
   r: 62,
   engines: [
@@ -316,7 +315,7 @@ const fighter = {
   ],
   body(ctx, color, S) {
     for (const s of [-1, 1]) nozzle(ctx, -50, s * 13, 5.6, 6);
-    // Deltaflügel
+    // Delta wing
     for (const s of [-1, 1]) {
       const w = () => poly(ctx, [[28, s * 6], [-20, s * 45], [-30, s * 46], [-42, s * 40], [-36, s * 16]]);
       w();
@@ -325,34 +324,34 @@ const fighter = {
       g.addColorStop(1, tone(color, s < 0 ? -0.2 : -0.5));
       fillShadowed(ctx, g, S);
       inside(ctx, w, () => {
-        // dunkles Innenfeld
+        // dark inner panel
         ctx.fillStyle = 'rgba(20,26,40,.45)';
         poly(ctx, [[10, s * 14], [-18, s * 36], [-32, s * 36], [-30, s * 18]]); ctx.fill();
         seam(ctx, 10, s * 14, -18, s * 36); seam(ctx, -18, s * 36, -32, s * 36); seam(ctx, -30, s * 18, -32, s * 36);
         seam(ctx, 0, s * 12, -36, s * 30, 0.3);
-        // Klappen an der Hinterkante
+        // Flaps at the trailing edge
         seam(ctx, -39, s * 30, -34, s * 18, 0.3);
-        // Winkel als Abzeichen
+        // Chevron as insignia
         ctx.fillStyle = 'rgba(255,255,255,.7)';
         poly(ctx, [[-8, s * 25], [-14, s * 30], [-16, s * 30], [-10, s * 25], [-16, s * 20], [-14, s * 20]]); ctx.fill();
-        // Vorderkante glänzt
+        // Leading edge shines
         ctx.fillStyle = 'rgba(255,255,255,.14)';
         poly(ctx, [[28, s * 6], [-20, s * 45], [-21, s * 43], [25, s * 7]]); ctx.fill();
         rivets(ctx, -4, -26, s * 32, 5, 0.3);
       });
       bevel(ctx, w, 0.8);
-      // Lenkflugkörper unter dem Flügel
+      // Guided missile under the wing
       for (const [yy, x0] of [[30, -16], [38, -22]]) {
         const m = capsule(ctx, x0, x0 + 14, s * yy, 1.3, '#c9d0dc', S * 0.6);
         inside(ctx, m, () => { ctx.fillStyle = '#e04a3a'; ctx.fillRect(x0 + 11.5, s * yy - 2, 3, 4); });
         ctx.fillStyle = '#3a4152'; poly(ctx, [[x0, s * yy - 2.2], [x0 + 2.5, s * yy - 1], [x0 + 2.5, s * yy + 1], [x0, s * yy + 2.2]]); ctx.fill();
       }
-      // Kanonenpod
+      // Cannon pod
       const pod = capsule(ctx, -6, 26, s * 22, 2.6, '#5d6578', S);
       inside(ctx, pod, () => { seam(ctx, 6, s * 22 - 3, 6, s * 22 + 3, 0.3); vents(ctx, -3, s * 22, 4, 2, 1.3); });
       ctx.fillStyle = '#2a303d'; ctx.fillRect(26, s * 22 - 0.8, 12, 1.6);
       ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(38.4, s * 22, 1, 0, TAU); ctx.fill();
-      // Triebwerksgondel
+      // Engine nacelle
       const nac = () => { ctx.beginPath(); ctx.roundRect(-46, s * 13 - 6, 32, 12, 4); };
       nac(); fillShadowed(ctx, metal(ctx, s * 13 - 6, s * 13 + 6, '#8893a8'), S);
       inside(ctx, nac, () => {
@@ -362,13 +361,13 @@ const fighter = {
       });
       bevel(ctx, nac, 0.7);
     }
-    // Rumpf
+    // Hull
     const hull = () => sym(ctx, [[60, 0], [46, -3.4], [24, -8.6], [-8, -11.4], [-40, -10.4], [-48, -8], [-48, 0]]);
     hull(); fillShadowed(ctx, metal(ctx, -12, 12), S);
     inside(ctx, hull, () => {
       for (const x of [40, 14, -12, -32]) seam(ctx, x, -12, x, 12);
       seam(ctx, -44, -5, 14, -5, 0.3); seam(ctx, -44, 5, 14, 5, 0.3);
-      // Rückenstreifen in Reichsfarbe
+      // Dorsal stripe in the empire color
       ctx.fillStyle = color; ctx.fillRect(-44, -2, 50, 4);
       ctx.fillStyle = tone(color, 0.45); ctx.fillRect(-44, -2, 50, 0.6);
       ctx.fillStyle = tone(color, -0.45); ctx.fillRect(-44, 1.4, 50, 0.6);
@@ -379,7 +378,7 @@ const fighter = {
       sym(ctx, [[60, 0], [52, -2.2], [50, 0]]); ctx.fill();
     });
     bevel(ctx, hull, 1);
-    // Kanzel mit Rahmen
+    // Canopy with frame
     const cab = () => sym(ctx, [[42, 0], [34, -3.2], [20, -5.4], [10, -4.6], [8, 0]]);
     glass(ctx, cab, 8, 42, -5.4, 5.4, '#5fd2ff', S);
     ctx.strokeStyle = 'rgba(40,46,60,.9)'; ctx.lineWidth = 0.8;
@@ -387,7 +386,7 @@ const fighter = {
   }
 };
 
-/* -------------------------------------------------------------- Satellit */
+/* ------------------------------------------------------------ Satellite */
 const satellite = {
   r: 60,
   engines: [],
@@ -397,7 +396,7 @@ const satellite = {
     { x: 0, y: -27, r: 0.9, color: WHITE, off: 0.3, strobe: true }
   ],
   body(ctx, color, S) {
-    // Gitterträger
+    // Lattice girder
     for (const s of [-1, 1]) {
       ctx.strokeStyle = '#8a95aa'; ctx.lineWidth = 0.9;
       ctx.beginPath(); ctx.moveTo(s * 14, -2.4); ctx.lineTo(s * 24, -2.4); ctx.moveTo(s * 14, 2.4); ctx.lineTo(s * 24, 2.4); ctx.stroke();
@@ -405,7 +404,7 @@ const satellite = {
       for (let i = 0; i < 5; i++) { ctx.moveTo(s * (14 + i * 2), i % 2 ? 2.4 : -2.4); ctx.lineTo(s * (16 + i * 2), i % 2 ? -2.4 : 2.4); }
       ctx.stroke();
     }
-    // Solarflügel
+    // Solar wings
     for (const s of [-1, 1]) {
       const x0 = s < 0 ? -54 : 24, wdt = 30, h = 26;
       const frame = () => { ctx.beginPath(); ctx.rect(x0, -h, wdt, h * 2); };
@@ -422,7 +421,7 @@ const satellite = {
         ctx.stroke();
       }
       inside(ctx, frame, () => {
-        // Glanz quer über das Panel
+        // Gloss across the panel
         const sh = ctx.createLinearGradient(x0, -h, x0 + wdt, h);
         sh.addColorStop(0.3, 'rgba(255,255,255,0)');
         sh.addColorStop(0.45, 'rgba(200,230,255,.28)');
@@ -430,15 +429,15 @@ const satellite = {
         ctx.fillStyle = sh; ctx.fillRect(x0, -h, wdt, h * 2);
       });
       ctx.strokeStyle = '#aeb8cc'; ctx.lineWidth = 0.8; frame(); ctx.stroke();
-      // Gelenk
+      // Joint
       capsule(ctx, s < 0 ? -26 : 22, s < 0 ? -22 : 26, 0, 3.2, '#7a8599', S * 0.5);
     }
-    // Radiatorrippen
+    // Radiator fins
     for (const s of [-1, 1]) for (let i = -2; i <= 2; i++) {
       const f = () => { ctx.beginPath(); ctx.rect(i * 4 - 1.2, s < 0 ? -30 : 18, 2.4, 12); };
       f(); fillShadowed(ctx, metal(ctx, -2, 2, '#c3cad6'), S * 0.4); bevel(ctx, f, 0.4);
     }
-    // Kern: Achteck
+    // Core: octagon
     const core = () => {
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
@@ -459,14 +458,14 @@ const satellite = {
         const a = i / 16 * TAU;
         rivets(ctx, Math.cos(a) * 15.2, Math.cos(a) * 15.2, Math.sin(a) * 15.2, 1, 0.3);
       }
-      // Warnstreifen
+      // Warning stripes
       ctx.fillStyle = '#e8c547';
       ctx.fillRect(-16, 9, 6, 2);
       ctx.fillStyle = '#1e2230';
       for (let i = 0; i < 3; i++) ctx.fillRect(-16 + i * 2, 9, 1, 2);
     });
     bevel(ctx, core, 0.9);
-    // Sensorschüssel
+    // Sensor dish
     ctx.save();
     ctx.translate(-9, -11);
     const dish = () => { ctx.beginPath(); ctx.ellipse(0, 0, 4.4, 3, -0.6, 0, TAU); };
@@ -476,7 +475,7 @@ const satellite = {
     fillShadowed(ctx, dg, S * 0.5); bevel(ctx, dish, 0.4);
     ctx.strokeStyle = '#3a4152'; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(2.2, -1.6); ctx.stroke();
     ctx.restore();
-    // Geschützturm mit Zwillingsrohr
+    // Turret with twin barrels
     for (const s of [-1, 1]) {
       const b = () => { ctx.beginPath(); ctx.roundRect(4, s * 2.6 - 1.1, 22, 2.2, 0.8); };
       b(); fillShadowed(ctx, metal(ctx, s * 2.6 - 1.1, s * 2.6 + 1.1, '#5a6276'), S * 0.6); bevel(ctx, b, 0.4);
@@ -495,10 +494,10 @@ const satellite = {
   }
 };
 
-/* -------------------------------------------------------- Kolonieschiff */
-// Groesse einer Wohnkuppel relativ zur gezeichneten Kuppel (Radius 15).
-// Bei 1 ragt sie deutlich ueber den Traeger (halbe Breite 10,5).
-const KUPPEL = 1;
+/* ---------------------------------------------------------- Colony ship */
+// Size of a habitat dome relative to the drawn dome (radius 15).
+// At 1 it clearly protrudes over the girder (half width 10.5).
+const DOME_SCALE = 1;
 
 const colony = {
   r: 58,
@@ -515,14 +514,14 @@ const colony = {
   body(ctx, color, S) {
     nozzle(ctx, -52, 0, 6.5, 6.5);
     for (const s of [-1, 1]) nozzle(ctx, -46, s * 10.5, 3.2, 4);
-    // Streben zu den Frachtmodulen
+    // Struts to the cargo modules
     for (const s of [-1, 1]) for (const x of [-22, 4]) {
       const st = () => { ctx.beginPath(); ctx.rect(x - 1.6, s < 0 ? -26 : 12, 3.2, 14); };
       st(); fillShadowed(ctx, metal(ctx, -2, 2, '#7d889c'), S * 0.5); bevel(ctx, st, 0.4);
       ctx.strokeStyle = 'rgba(10,14,24,.5)'; ctx.lineWidth = 0.3;
       ctx.beginPath(); ctx.moveTo(x - 1.6, s * 13); ctx.lineTo(x + 1.6, s * 25); ctx.stroke();
     }
-    // Frachtmodule
+    // Cargo modules
     for (const s of [-1, 1]) {
       const pod = capsule(ctx, -36, 16, s * 31, 8.5, '#8994a8', S);
       inside(ctx, pod, () => {
@@ -532,14 +531,14 @@ const colony = {
         }
         ctx.fillStyle = color; ctx.fillRect(-35, s * 31 - 9, 5, 18);
         ctx.fillStyle = tone(color, -0.4); ctx.fillRect(-30.4, s * 31 - 9, 0.6, 18);
-        // Luke
+        // Hatch
         ctx.fillStyle = 'rgba(20,26,38,.7)'; ctx.beginPath(); ctx.arc(11, s * 31, 3, 0, TAU); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 0.3; ctx.stroke();
         rivets(ctx, -24, 4, s * 31 - s * 6.2, 6, 0.3);
       });
     }
-    // Rumpf
-    // Schmaler Traeger: die drei Kuppeln sollen links und rechts ueberstehen.
+    // Hull
+    // Narrow girder: the three domes should stick out on the left and right.
     const hull = () => sym(ctx, [[50, 0], [44, -5.5], [34, -10], [-30, -10.5], [-44, -8.5], [-50, -4.5], [-50, 0]]);
     hull(); fillShadowed(ctx, metal(ctx, -11, 11), S);
     inside(ctx, hull, () => {
@@ -548,25 +547,25 @@ const colony = {
       rivets(ctx, 38, 44, -3.5, 3, 0.3); rivets(ctx, 38, 44, 3.5, 3, 0.3);
     });
     bevel(ctx, hull, 1);
-    // Brücke
+    // Bridge
     const br = () => sym(ctx, [[47, 0], [43, -3.6], [37, -4.4], [36, 0]]);
     glass(ctx, br, 36, 47, -4.4, 4.4, '#7fe0ff', S);
-    // Drei grosse Wohnkuppeln mit Park - das Kennzeichen des Siedlerschiffs.
-    // Der Park ist je etwas gedreht, damit sie nicht wie kopiert aussehen.
-    // Von hinten nach vorn: die vordere liegt jeweils obenauf.
+    // Three large habitat domes with a park - the hallmark of the settler ship.
+    // Each park is rotated a little so they do not look copied.
+    // From back to front: the front one always lies on top.
     for (const [x, dreh] of [[-33, 2.1], [-7, -0.9], [19, 0.5]]) {
       ctx.save();
-      ctx.translate(x, 0); ctx.scale(KUPPEL, KUPPEL); ctx.translate(-4, 0);
+      ctx.translate(x, 0); ctx.scale(DOME_SCALE, DOME_SCALE); ctx.translate(-4, 0);
       const dome = () => { ctx.beginPath(); ctx.arc(4, 0, 15, 0, TAU); };
       ctx.save();
       dome(); fillShadowed(ctx, '#173a2c', S);
       inside(ctx, dome, () => {
-        // Nur der Park dreht sich - Glas und Spiegelung behalten ihr Licht von oben.
+        // Only the park rotates - glass and reflection keep their light from above.
         ctx.save(); ctx.translate(4, 0); ctx.rotate(dreh); ctx.translate(-4, 0);
         const lawn = ctx.createRadialGradient(4, 0, 0, 4, 0, 15);
         lawn.addColorStop(0, '#4fae5e'); lawn.addColorStop(1, '#1d5a35');
         ctx.fillStyle = lawn; ctx.fillRect(-12, -16, 32, 32);
-        // Wasser, Wege, Bäume, Häuser
+        // Water, paths, trees, houses
         ctx.fillStyle = '#3a8fc7'; ctx.beginPath(); ctx.ellipse(8, 4, 4.2, 2.6, 0.4, 0, TAU); ctx.fill();
         ctx.strokeStyle = 'rgba(230,220,180,.6)'; ctx.lineWidth = 0.6;
         ctx.beginPath(); ctx.moveTo(-10, -4); ctx.quadraticCurveTo(2, -1, 16, -6); ctx.moveTo(4, -14); ctx.lineTo(4, 14); ctx.stroke();
@@ -580,7 +579,7 @@ const colony = {
           ctx.fillStyle = '#ffd77a'; ctx.fillRect(x + 0.5, y + 0.5, 0.6, 0.6);
         }
         ctx.restore();
-        // Glaswölbung: Rippen, Spiegelung, Randschatten
+        // Glass vault: ribs, reflection, rim shadow
         ctx.strokeStyle = 'rgba(210,240,255,.35)'; ctx.lineWidth = 0.35;
         for (let i = 0; i < 6; i++) {
           const a = i / 6 * Math.PI;
@@ -617,7 +616,7 @@ const tanker = {
   body(ctx, color, S) {
     nozzle(ctx, -54, 0, 5.6, 6);
     for (const s of [-1, 1]) nozzle(ctx, -44, s * 22, 2.6, 3);
-    // Leitungen zwischen Tanks und Rückgrat
+    // Pipes between the tanks and the spine
     for (const s of [-1, 1]) for (const x of [-22, 4, 24]) {
       const p = () => { ctx.beginPath(); ctx.rect(x - 1.4, s < 0 ? -12 : 5, 2.8, 7); };
       p(); fillShadowed(ctx, metal(ctx, -2, 2, '#b6becc'), S * 0.4); bevel(ctx, p, 0.35);
@@ -633,7 +632,7 @@ const tanker = {
       g.addColorStop(0.75, '#626c80'); g.addColorStop(1, '#2f3646');
       fillShadowed(ctx, g, S);
       inside(ctx, tk, () => {
-        // Spannbänder
+        // Tension straps
         for (let x = -30; x <= 28; x += 11.6) {
           const b = ctx.createLinearGradient(0, y - 12, 0, y + 12);
           b.addColorStop(0, '#c7cfdc'); b.addColorStop(0.5, '#6a7488'); b.addColorStop(1, '#262c3a');
@@ -642,7 +641,7 @@ const tanker = {
           rivets(ctx, x + 1.1, x + 1.1, y - 7, 1, 0.3);
           rivets(ctx, x + 1.1, x + 1.1, y + 7, 1, 0.3);
         }
-        // Reichsfarbe und Warnfeld
+        // Empire color and warning field
         ctx.fillStyle = color; ctx.fillRect(-38, y - 12, 6, 24);
         ctx.fillStyle = tone(color, 0.4); ctx.fillRect(-38, y - 12, 6, 2);
         ctx.save();
@@ -651,34 +650,34 @@ const tanker = {
         ctx.fillStyle = '#1f2330';
         for (let k = -4; k < 8; k++) poly(ctx, [[22, y - 12 + k * 4], [28, y - 18 + k * 4], [28, y - 16 + k * 4], [22, y - 10 + k * 4]]), ctx.fill();
         ctx.restore();
-        // breiter Glanz längs
+        // wide gloss lengthwise
         ctx.fillStyle = 'rgba(255,255,255,.35)';
         ctx.beginPath(); ctx.roundRect(-36, y - 9.5, 70, 2.6, 1.3); ctx.fill();
-        // Schrift-Andeutung
+        // Hint of lettering
         ctx.fillStyle = 'rgba(30,36,50,.55)';
         for (let i = 0; i < 4; i++) ctx.fillRect(-12 + i * 3.2, y + 3, 2.2, 3);
       });
       bevel(ctx, tk, 0.8);
-      // Ventilkappen
+      // Valve caps
       for (const x of [-43, 37]) {
         const v = () => { ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); };
         v(); fillShadowed(ctx, metal(ctx, y - 3, y + 3, '#7f8a9e'), S * 0.4); bevel(ctx, v, 0.35);
         ctx.fillStyle = '#d54a3a'; ctx.beginPath(); ctx.arc(x, y, 1.2, 0, TAU); ctx.fill();
       }
     }
-    // Rückgrat
+    // Spine
     const sp = () => sym(ctx, [[50, 0], [44, -4], [34, -6.2], [-48, -5.6], [-54, -4], [-54, 0]]);
     sp(); fillShadowed(ctx, metal(ctx, -6.5, 6.5), S);
     inside(ctx, sp, () => {
       for (const x of [30, 10, -10, -30]) seam(ctx, x, -7, x, 7);
-      // Rohrleitung oben auf dem Rückgrat
+      // Pipeline on top of the spine
       ctx.fillStyle = '#c8cfdb'; ctx.fillRect(-44, -3.2, 70, 1.4);
       ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(-44, -1.8, 70, 0.4);
       for (let x = -40; x < 26; x += 8) { ctx.fillStyle = '#6b7488'; ctx.fillRect(x, -3.6, 1, 2.2); }
       vents(ctx, -48, 2.2, 5, 2.4, 1.4);
     });
     bevel(ctx, sp, 0.9);
-    // Brücke
+    // Bridge
     const br = () => sym(ctx, [[48, 0], [42, -3.4], [34, -4], [32, 0]]);
     glass(ctx, br, 32, 48, -4, 4, '#7fd2ff', S);
   }
@@ -686,11 +685,11 @@ const tanker = {
 
 const TYPES = { scout, fighter, satellite, colony, tanker };
 
-/* ------------------------------------------------------------ Ausgabe */
+/* ------------------------------------------------------------- Output */
 
 const cache = new Map();
 
-/** Standbild eines Typs in Gerätepixeln, einmal gezeichnet. */
+/** Still image of a type in device pixels, drawn once. */
 function sprite(type, len, color) {
   const key = `${type}|${len}|${color}`;
   const hit = cache.get(key);
@@ -711,10 +710,10 @@ function sprite(type, len, color) {
 }
 
 /**
- * Zeichnet ein Schiff in voller Ausführung.
+ * Draws a ship in full detail.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{type:string,x:number,y:number,angle?:number,len:number,color?:string,phase?:number}} o
- *   phase in Sekunden - treibt Flammen und Lichter
+ *   phase in seconds - drives flames and lights
  */
 export function drawShipHD(ctx, o) {
   const def = TYPES[o.type] || fighter;

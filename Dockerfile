@@ -1,11 +1,11 @@
-# Ho!! - HTTP + WebSocket-Server, keine Build-Schritte, eine Abhaengigkeit (ws).
+# Ho!! - HTTP + WebSocket server, no build steps, one dependency (ws).
 FROM node:22-alpine
 
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Erst nur die Manifeste: so bleibt der npm-Layer im Cache, solange sich die
-# Abhaengigkeiten nicht aendern.
+# Manifests first: this keeps the npm layer cached as long as the
+# dependencies do not change.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
@@ -14,9 +14,9 @@ COPY server ./server
 COPY client ./client
 COPY test ./test
 
-# Die Konten liegen ausserhalb des Images, damit ein neues Abbild sie nicht
-# mitnimmt. Das Verzeichnis gehoert dem Benutzer node - sonst koennte
-# "docker exec node server/users.js add ..." nicht schreiben.
+# Accounts live outside the image so a new image does not take them
+# along. The directory belongs to the node user - otherwise
+# "docker exec node server/users.js add ..." could not write to it.
 ENV HO_USERS_FILE=/data/users.json
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data

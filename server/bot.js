@@ -1,396 +1,395 @@
-// KI-Reiche mit Charakter. Sie spielen nach den gleichen Regeln wie Menschen
-// und benutzen nur Welten, die sie selbst erkundet haben. Was sie
-// unterscheidet, ist die Persönlichkeit: Sie bestimmt, wohin das Geld geht,
-// wen das Reich angreift und wie es antwortet, wenn es selbst getroffen wird.
-// Dazu kommt eine Prise Streuung je Reich, damit zwei Eroberer nicht wie
-// Zwillinge spielen.
+// AI empires with character. They play by the same rules as humans and only
+// use worlds they have explored themselves. What sets them apart is their
+// personality: it decides where the money goes, whom the empire attacks and
+// how it answers when it gets hit itself. On top of that comes a pinch of
+// variance per empire, so two conquerors do not play like twins.
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
   holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById } from './game.js';
 
-// Anteil der Feuerkraft, der in zwölf Kampfrunden wirklich ankommt - der Rest
-// geht durch eigene Verluste und Überschuss auf schon zerstörte Ziele verloren.
-// An der Simulation geeicht: 25 Jäger knacken eine Heimatwelt mit 50 Mio.
-const TREFFERQUOTE = 0.72;
-// Ab wie wenigen bekannten Welten ein Reich als angeschlagen gilt. Gegen so
-// ein Reich lohnt der Gnadenstoß - bei mehr Welten schlüpft es durch
-// Neukolonien immer wieder heraus.
-const ANGESCHLAGEN = 3;
+// Share of the firepower that really lands over twelve combat rounds - the
+// rest is lost to own casualties and overkill on targets already destroyed.
+// Calibrated against the simulation: 25 fighters crack a homeworld with 50 million.
+const HIT_RATE = 0.72;
+// With how few known worlds an empire counts as battered. Against such an
+// empire the coup de grâce pays off - with more worlds it keeps slipping
+// away through new colonies.
+const BATTERED = 3;
 
 /*
- * Die Persönlichkeiten. Die Zahlen sind Neigungen, keine Gesetze - der
- * Endspieldruck schiebt sie im Lauf der Partie alle Richtung Angriff.
+ * The personalities. The numbers are inclinations, not laws - endgame
+ * pressure pushes all of them towards attack over the course of the game.
  *
- *   forschung  Anteil der Kasse für Forschung, früh / spät (Prozent)
- *   gewichte   Forschungsschwerpunkte, früh / spät
- *   bau        Anteil des Rests, der in Schiffe geht
- *   terra      Anteil des Rests für Terraforming
- *   siedler    Kolonieschiffe, die gleichzeitig unterwegs sein dürfen
- *   flotte     wie schnell die Flotte mit den Runden wachsen darf
- *   jaeger     Jäger je Runde
- *   satelliten Lust auf Satelliten an bedrohten Welten
- *   feldzug    'immer' | 'vergeltung' (nur wer zuschlägt, bekommt es zurück)
- *              | 'druck' (erst, wenn es sich festgefahren hat)
- *   ab         frühestens ab dieser Runde Feldzüge
- *   marge      wie viel Übermacht vor dem Losschlagen beisammen sein muss
- *   einzeln    was eine Flotte auf eigene Faust angreift: 'beute' (alles,
- *              was sie knacken kann), 'nah' (nur an der eigenen Grenze),
- *              'aas' (nur Geschwächtes), 'nie'
- *   vergeltung wie nachtragend
- *   gegenFuehrer  wie sehr es den Spitzenreiter klein halten will
- *   garnison   bleibt bei Bedrohung zu Hause (ab 0,3)
+ *   research    share of the treasury for research, early / late (percent)
+ *   weights     research priorities, early / late
+ *   build       share of the rest that goes into ships
+ *   terra       share of the rest for terraforming
+ *   settlers    colony ships allowed to be under way at the same time
+ *   fleet       how fast the fleet may grow with the turns
+ *   fighters    fighters per turn
+ *   satellites  appetite for satellites at threatened worlds
+ *   campaign    'always' | 'retaliation' (only whoever strikes gets it back)
+ *               | 'pressure' (only once it has got stuck)
+ *   from        campaigns no earlier than this turn
+ *   margin      how much superiority must be assembled before striking
+ *   solo        what a fleet attacks on its own: 'prey' (anything it can
+ *               crack), 'near' (only at its own border),
+ *               'carrion' (only the weakened), 'never'
+ *   vengeance   how resentful
+ *   vsLeader    how much it wants to keep the front-runner small
+ *   garrison    stays home when threatened (from 0.3)
  */
 const PERSONAS = {
-  // Sucht sich einen Nachbarn als Rivalen und rollt ihn Welt für Welt auf.
+  // Picks a neighbor as rival and rolls it up world by world.
   conqueror: {
-    forschung: [32, 25],
-    gewichte: [{ range: 3, speed: 2, weapons: 3, shields: 2, mini: 2, radical: 1 },
-               { range: 2, speed: 2, weapons: 4, shields: 3, mini: 2, radical: 1 }],
-    bau: 0.72, terra: 0.25, siedler: 3, flotte: 1.5, jaeger: 6, satelliten: 2,
-    feldzug: 'immer', ab: 15, marge: 1.15, einzeln: 'beute',
-    vergeltung: 1.5, gegenFuehrer: 0.4, garnison: 0
+    research: [32, 25],
+    weights: [{ range: 3, speed: 2, weapons: 3, shields: 2, mini: 2, radical: 1 },
+              { range: 2, speed: 2, weapons: 4, shields: 3, mini: 2, radical: 1 }],
+    build: 0.72, terra: 0.25, settlers: 3, fleet: 1.5, fighters: 6, satellites: 2,
+    campaign: 'always', from: 15, margin: 1.15, solo: 'prey',
+    vengeance: 1.5, vsLeader: 0.4, garrison: 0
   },
-  // Breitet sich aus, terraformt und wehrt sich - Krieg nur als Antwort.
+  // Spreads out, terraforms and defends itself - war only as an answer.
   settler: {
-    forschung: [36, 32],
-    gewichte: [{ range: 4, speed: 2, weapons: 1, shields: 1, mini: 2, radical: 4 },
-               { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3 }],
-    bau: 0.6, terra: 0.45, siedler: 5, flotte: 0.8, jaeger: 3, satelliten: 2,
-    feldzug: 'vergeltung', ab: 45, marge: 1.4, einzeln: 'nah',
-    vergeltung: 0.8, gegenFuehrer: 0.3, garnison: 0.4
+    research: [36, 32],
+    weights: [{ range: 4, speed: 2, weapons: 1, shields: 1, mini: 2, radical: 4 },
+              { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3 }],
+    build: 0.6, terra: 0.45, settlers: 5, fleet: 0.8, fighters: 3, satellites: 2,
+    campaign: 'retaliation', from: 45, margin: 1.4, solo: 'near',
+    vengeance: 0.8, vsLeader: 0.3, garrison: 0.4
   },
-  // Forscht viel, baut wenig, rüstet um - und schlägt dann mit Qualität zu.
+  // Researches a lot, builds little, refits - and then strikes with quality.
   technocrat: {
-    forschung: [50, 40],
-    gewichte: [{ range: 2, speed: 2, weapons: 3, shields: 3, mini: 3, radical: 2 },
-               { range: 2, speed: 2, weapons: 4, shields: 4, mini: 3, radical: 1 }],
-    bau: 0.65, terra: 0.3, siedler: 3, flotte: 0.8, jaeger: 4, satelliten: 1,
-    feldzug: 'immer', ab: 70, marge: 1.3, einzeln: 'nie',
-    vergeltung: 1.0, gegenFuehrer: 1.0, garnison: 0.2, umruesten: true
+    research: [50, 40],
+    weights: [{ range: 2, speed: 2, weapons: 3, shields: 3, mini: 3, radical: 2 },
+              { range: 2, speed: 2, weapons: 4, shields: 4, mini: 3, radical: 1 }],
+    build: 0.65, terra: 0.3, settlers: 3, fleet: 0.8, fighters: 4, satellites: 1,
+    campaign: 'always', from: 70, margin: 1.3, solo: 'never',
+    vengeance: 1.0, vsLeader: 1.0, garrison: 0.2, refits: true
   },
-  // Schnelle Rudel, die schwach verteidigte Kolonien überall auf der Karte
-  // überfallen. Große Welten meidet er, bis es nichts anderes mehr gibt.
+  // Fast packs that raid weakly defended colonies all over the map. It avoids
+  // big worlds until there is nothing else left.
   raider: {
-    forschung: [30, 26],
-    gewichte: [{ range: 3, speed: 4, weapons: 2, shields: 1, mini: 2, radical: 1 },
-               { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1 }],
-    bau: 0.75, terra: 0.2, siedler: 2, flotte: 1.4, jaeger: 5, satelliten: 0,
-    feldzug: 'druck', ab: 8, marge: 1.0, einzeln: 'beute',
-    vergeltung: 1.2, gegenFuehrer: 1.0, garnison: 0, rudel: true, spaeher: 5
+    research: [30, 26],
+    weights: [{ range: 3, speed: 4, weapons: 2, shields: 1, mini: 2, radical: 1 },
+              { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1 }],
+    build: 0.75, terra: 0.2, settlers: 2, fleet: 1.4, fighters: 5, satellites: 0,
+    campaign: 'pressure', from: 8, margin: 1.0, solo: 'prey',
+    vengeance: 1.2, vsLeader: 1.0, garrison: 0, packs: true, scouts: 5
   },
-  // Satelliten an jeder Grenze. Aber kein ewiger Igel: Ist der Wall dicht,
-  // bricht er mit einer großen Flotte aus.
+  // Satellites at every border. But not an eternal hedgehog: once the wall
+  // is tight, it breaks out with a big fleet.
   bulwark: {
-    forschung: [38, 32],
-    gewichte: [{ range: 2, speed: 1, weapons: 2, shields: 4, mini: 2, radical: 3 },
-               { range: 2, speed: 2, weapons: 3, shields: 4, mini: 2, radical: 2 }],
-    bau: 0.6, terra: 0.45, siedler: 3, flotte: 0.9, jaeger: 3, satelliten: 3,
-    feldzug: 'immer', ab: 100, marge: 1.25, einzeln: 'nah',
-    vergeltung: 1.0, gegenFuehrer: 0.5, garnison: 0.5, umruesten: true
+    research: [38, 32],
+    weights: [{ range: 2, speed: 1, weapons: 2, shields: 4, mini: 2, radical: 3 },
+              { range: 2, speed: 2, weapons: 3, shields: 4, mini: 2, radical: 2 }],
+    build: 0.6, terra: 0.45, settlers: 3, fleet: 0.9, fighters: 3, satellites: 3,
+    campaign: 'always', from: 100, margin: 1.25, solo: 'near',
+    vengeance: 1.0, vsLeader: 0.5, garrison: 0.5, refits: true
   },
-  // Wartet, bis andere sich zerfleischen, und holt sich, was übrig bleibt:
-  // frisch eroberte Welten, gebrochene Batterien, Reiche am Boden.
+  // Waits until others tear each other apart and takes what is left:
+  // freshly conquered worlds, broken batteries, empires on the ground.
   vulture: {
-    forschung: [32, 28],
-    gewichte: [{ range: 3, speed: 3, weapons: 2, shields: 2, mini: 2, radical: 2 },
-               { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1 }],
-    bau: 0.7, terra: 0.3, siedler: 2, flotte: 1.2, jaeger: 4, satelliten: 1,
-    feldzug: 'immer', ab: 25, marge: 1.0, einzeln: 'aas',
-    vergeltung: 0.5, gegenFuehrer: 0.8, garnison: 0.1, aas: true, spaeher: 5
+    research: [32, 28],
+    weights: [{ range: 3, speed: 3, weapons: 2, shields: 2, mini: 2, radical: 2 },
+              { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1 }],
+    build: 0.7, terra: 0.3, settlers: 2, fleet: 1.2, fighters: 4, satellites: 1,
+    campaign: 'always', from: 25, margin: 1.0, solo: 'carrion',
+    vengeance: 0.5, vsLeader: 0.8, garrison: 0.1, carrion: true, scouts: 5
   }
 };
 
 export function runBot(game, bot) {
-  const ai = gedaechtnis(game, bot);
+  const ai = memory(game, bot);
   const P = ai.p;
   const planets = game.galaxy.planets;
   const zone = holeZone(game.galaxy);
-  // Mitte der Karte - von hier aus gemessen liegt der Rand, an dem sie wächst.
+  // Center of the map - the edge where it grows is measured from here.
   const g = game.galaxy;
-  const mitte = g.field ? { x: g.field.cx, y: g.field.cy, z: 0 }
+  const center = g.field ? { x: g.field.cx, y: g.field.cy, z: 0 }
     : { x: (g.minX + g.maxX) / 2, y: (g.minY + g.maxY) / 2, z: 0 };
-  // Ohne Rundenlimit wächst der Endspieldruck so, als wären es 300 Runden -
-  // sonst gäbe es dort nichts, was das Einigeln aufbricht.
+  // Without a turn limit, endgame pressure grows as if there were 300 turns -
+  // otherwise there would be nothing to break up turtling there.
   const maxTurns = game.settings.maxTurns || 300;
-  // Einmal durchzählen statt fünfmal - bei tausend Welten und hunderten
-  // Flotten je Runde macht das den Unterschied.
-  const meineFlotten = game.fleets.filter(f => f.owner === bot.id);
+  // Count once instead of five times - with a thousand worlds and hundreds
+  // of fleets per turn that makes the difference.
+  const myFleets = game.fleets.filter(f => f.owner === bot.id);
   const mine = planets.filter(p => p.owner === bot.id);
   const known = planets.filter(p => bot.explored.has(p.id));
   const openWorlds = known.filter(p => !p.owner);
   const enemyWorlds = known.filter(p => p.owner && p.owner !== bot.id);
   const early = game.turn < 30;
 
-  const bedroht = wahrnehmen(game, bot, ai, mine, enemyWorlds);
-  const getroffen = game.turn - ai.zuletztGetroffen < 8;
+  const threatened = perceive(game, bot, ai, mine, enemyWorlds);
+  const hit = game.turn - ai.lastHit < 8;
 
-  // --- Endspieldruck: je später, desto weniger Geduld. Wer sich lange nicht
-  // bewegt hat, verliert sie schneller - das bricht das Einigeln auf.
-  let druck = clamp((game.turn / maxTurns - 0.35) / 0.35, 0, 1);
-  const ruheAb = Math.max(ai.ruheSeit, maxTurns * 0.3);
-  if (game.turn > ruheAb + 20) druck = Math.min(1, druck + clamp((game.turn - ruheAb - 20) / 40, 0, 0.6));
-  const marge = P.marge * (1 - 0.3 * druck);
-  // Spät in der Partie wird auch der Vorsichtigste angriffslustig: Wer nur
-  // an der Grenze zuschlug, nimmt jetzt jede Beute, und die Garnison zieht aus.
-  const einzeln = druck > 0.5 && P.einzeln !== 'aas' ? 'beute' : P.einzeln;
-  const garnison = P.garnison * (1 - druck);
+  // --- Endgame pressure: the later, the less patience. Whoever has not moved
+  // for a long time loses it faster - this breaks up turtling.
+  let pressure = clamp((game.turn / maxTurns - 0.35) / 0.35, 0, 1);
+  const quietFrom = Math.max(ai.quietSince, maxTurns * 0.3);
+  if (game.turn > quietFrom + 20) pressure = Math.min(1, pressure + clamp((game.turn - quietFrom - 20) / 40, 0, 0.6));
+  const margin = P.margin * (1 - 0.3 * pressure);
+  // Late in the game even the most cautious one turns aggressive: whoever only
+  // struck at the border now takes any prey, and the garrison moves out.
+  const solo = pressure > 0.5 && P.solo !== 'carrion' ? 'prey' : P.solo;
+  const garrison = P.garrison * (1 - pressure);
 
-  // --- Forschung: Schwerpunkt wandert mit dem Spielverlauf und der Lage
-  let forschung = (early ? P.forschung[0] : P.forschung[1]) * (1 - 0.35 * druck);
-  const weights = { ...P.gewichte[early ? 0 : 1] };
+  // --- Research: the focus shifts with the course of the game and the situation
+  let research = (early ? P.research[0] : P.research[1]) * (1 - 0.35 * pressure);
+  const weights = { ...P.weights[early ? 0 : 1] };
 
-  // Freie Welten: welche erreichen die Kolonieschiffe, und welche kennt man
-  // zwar, kommt aber nicht hin? Für die zweiten wird Reichweite erforscht.
-  const kolonieReich = shipStats('colony', bot.tech).range;
-  const heimat = mine.filter(p => p.pop > 0.5);
-  const siedelbar = openWorlds.filter(p => planetCapacity(p) >= 1);
-  const inReichweite = siedelbar.filter(p => supplyDistance(heimat, p, zone) <= kolonieReich);
-  if (siedelbar.length > inReichweite.length && inReichweite.length < 2) weights.range += 3;
-  // Erz ist die harte Grenze: ist es knapp, gehen die letzten Brocken in
-  // Kolonien auf erzreichen Welten statt in Kriegsschiffe.
-  const erzKnapp = bot.metal < shipCost('colony', bot.tech).metal * 4;
-  if (getroffen && P.umruesten) {
-    // Getroffen? Dann wird aufgerüstet, nicht nachgebaut.
-    forschung += 8; weights.weapons += 2; weights.shields += 2;
+  // Free worlds: which ones can the colony ships reach, and which ones are
+  // known but out of reach? For the latter, range gets researched.
+  const colonyRange = shipStats('colony', bot.tech).range;
+  const home = mine.filter(p => p.pop > 0.5);
+  const settleable = openWorlds.filter(p => planetCapacity(p) >= 1);
+  const inRange = settleable.filter(p => supplyDistance(home, p, zone) <= colonyRange);
+  if (settleable.length > inRange.length && inRange.length < 2) weights.range += 3;
+  // Ore is the hard limit: when it is scarce, the last chunks go into colonies
+  // on ore-rich worlds instead of warships.
+  const oreScarce = bot.metal < shipCost('colony', bot.tech).metal * 4;
+  if (hit && P.refits) {
+    // Got hit? Then upgrade, do not rebuild.
+    research += 8; weights.weapons += 2; weights.shields += 2;
   }
-  // Ausgereizte Felder bekommen nichts mehr - und ist alles ausgereizt,
-  // fließt das Geld ganz in Schiffe statt in Forschung, die nichts mehr bringt.
+  // Maxed-out fields get nothing more - and if everything is maxed out, the
+  // money goes entirely into ships instead of research that yields nothing.
   for (const f of TECH_FIELDS) if (bot.tech[f] >= TECH_MAX_LEVEL) weights[f] = 0;
-  const offen = TECH_FIELDS.some(f => weights[f] > 0);
-  forschung = offen ? Math.round(clamp(forschung, 10, 60)) : 0;
-  setOrders(game, bot, { research: { budgetPct: forschung, weights } });
-  const kasse = bot.money * (1 - forschung / 100);
+  const open = TECH_FIELDS.some(f => weights[f] > 0);
+  research = open ? Math.round(clamp(research, 10, 60)) : 0;
+  setOrders(game, bot, { research: { budgetPct: research, weights } });
+  const treasury = bot.money * (1 - research / 100);
 
-  // --- Lagebild: Was kostet welche Feindwelt, und wer liegt am Boden?
-  // Die Abwehrbatterie wird jede Runde neu aus der Bevölkerung aufgebaut -
-  // belagern bringt nichts, man muss sie in einem Zug brechen.
-  const heimflotte = new Map();
+  // --- Situation report: what does each enemy world cost, and who is down?
+  // The defense battery is rebuilt from the population every turn -
+  // sieging is pointless, it has to be broken in one move.
+  const homeFleet = new Map();
   for (const f of game.fleets) {
     if (f.at === null || f.at === undefined) continue;
     const pl = planets[f.at];
     if (!pl || pl.owner !== f.owner) continue;
-    heimflotte.set(f.at, (heimflotte.get(f.at) || 0) + f.ships.reduce((a, s) => a + s.maxHp, 0));
+    homeFleet.set(f.at, (homeFleet.get(f.at) || 0) + f.ships.reduce((a, s) => a + s.maxHp, 0));
   }
-  const wehrkraft = new Map();     // Welt -> Trefferpunkte, die wegmüssen
-  const restWelten = new Map();    // Reich -> wie viele seiner Welten die KI kennt
+  const defense = new Map();       // world -> hit points that have to go
+  const worldsLeft = new Map();    // empire -> how many of its worlds the AI knows
   for (const p of enemyWorlds) {
-    const halter = playerById(game, p.owner);
-    const bs = halter ? batteryStats(p.pop, halter.tech) : null;
+    const holder = playerById(game, p.owner);
+    const bs = holder ? batteryStats(p.pop, holder.tech) : null;
     let hp = bs ? bs.hp : 0;
     if (p.defenses) for (const s of p.defenses) hp += s.maxHp;
-    wehrkraft.set(p.id, hp + (heimflotte.get(p.id) || 0));
-    restWelten.set(p.owner, (restWelten.get(p.owner) || 0) + 1);
+    defense.set(p.id, hp + (homeFleet.get(p.id) || 0));
+    worldsLeft.set(p.owner, (worldsLeft.get(p.owner) || 0) + 1);
   }
 
-  // Wie weit liegt jede Feindwelt von der nächsten eigenen Basis entfernt?
-  const basen = mine.filter(p => p.pop >= 0.5);
-  const abstand = new Map();
+  // How far is each enemy world from the nearest own base?
+  const bases = mine.filter(p => p.pop >= 0.5);
+  const distance = new Map();
   for (const p of enemyWorlds) {
     let d = Infinity;
-    for (const b of basen) { const e = dist(b, p); if (e < d) d = e; }
-    abstand.set(p.id, d);
+    for (const b of bases) { const e = dist(b, p); if (e < d) d = e; }
+    distance.set(p.id, d);
   }
 
-  // Wer führt? Die Bilanz jedes Reichs steht für alle sichtbar in der Liste.
-  const lebende = game.players.filter(p => p.alive);
-  const gesamtPop = lebende.reduce((a, p) => a + p.stats.pop, 0) || 1;
-  const spitze = lebende.slice().sort((a, b) => b.stats.pop - a.stats.pop)[0];
-  const fuehrer = spitze && spitze.id !== bot.id && spitze.stats.pop / gesamtPop > 0.25 && lebende.length > 2
-    ? spitze.id : null;
+  // Who leads? Every empire's tally is visible to everyone in the list.
+  const living = game.players.filter(p => p.alive);
+  const totalPop = living.reduce((a, p) => a + p.stats.pop, 0) || 1;
+  const top = living.slice().sort((a, b) => b.stats.pop - a.stats.pop)[0];
+  const leader = top && top.id !== bot.id && top.stats.pop / totalPop > 0.25 && living.length > 2
+    ? top.id : null;
 
-  ai.rivale = rivaleWaehlen(ai, P, enemyWorlds, abstand, fuehrer);
+  ai.rival = chooseRival(ai, P, enemyWorlds, distance, leader);
 
-  // Was ist eine Feindwelt wert - aus Sicht genau dieses Reichs?
-  const wert = p => {
+  // What is an enemy world worth - from the point of view of exactly this empire?
+  const value = p => {
     const o = p.owner;
     let w = p.pop * 1.5 + planetCapacity(p) * 0.5 + 5;
-    w *= 1 + Math.min(3, (ai.groll[o] || 0) * 0.08 * P.vergeltung);
-    if (o === ai.rivale) w *= 1.6;
-    if (o === fuehrer) w *= 1 + P.gegenFuehrer;
-    if ((restWelten.get(o) || 99) <= ANGESCHLAGEN) w *= 1.8;
-    if (P.aas && ai.frisch.has(p.id)) w *= 2.5;
+    w *= 1 + Math.min(3, (ai.grudge[o] || 0) * 0.08 * P.vengeance);
+    if (o === ai.rival) w *= 1.6;
+    if (o === leader) w *= 1 + P.vsLeader;
+    if ((worldsLeft.get(o) || 99) <= BATTERED) w *= 1.8;
+    if (P.carrion && ai.fresh.has(p.id)) w *= 2.5;
     return w;
   };
 
-  // --- Feuerkraft: was steht da, was kommt nach?
-  const jaeger = shipStats('fighter', bot.tech);
-  const jaegerKosten = shipCost('fighter', bot.tech);
-  const jaegerSchlag = jaeger.attack * COMBAT_ROUNDS * TREFFERQUOTE;
-  const schlagkraft = f => f.ships.reduce((a, s) => a + s.attack, 0) * COMBAT_ROUNDS * TREFFERQUOTE;
-  const macht = meineFlotten.reduce((a, f) => a + (fleetStats(f).speed > 0 ? schlagkraft(f) : 0), 0);
-  const nachschub = Math.max(0, kasse * P.bau / jaegerKosten.money) * jaegerSchlag * 3;
+  // --- Firepower: what is there, what is coming?
+  const fighter = shipStats('fighter', bot.tech);
+  const fighterCost = shipCost('fighter', bot.tech);
+  const fighterStrike = fighter.attack * COMBAT_ROUNDS * HIT_RATE;
+  const strikePower = f => f.ships.reduce((a, s) => a + s.attack, 0) * COMBAT_ROUNDS * HIT_RATE;
+  const power = myFleets.reduce((a, f) => a + (fleetStats(f).speed > 0 ? strikePower(f) : 0), 0);
+  const reinforcements = Math.max(0, treasury * P.build / fighterCost.money) * fighterStrike * 3;
 
-  const fz = feldzugPlanen();
+  const camp = planCampaign();
 
-  // --- Terraforming: zuerst die billigsten Verbesserungen
+  // --- Terraforming: the cheapest improvements first
   const candidates = mine
     .map(p => ({ p, cost: terraformFullCost(p, bot.tech.radical) }))
     .sort((a, b) => a.cost - b.cost);
-  let left = kasse * P.terra * (early ? 0.8 : 1) * (1 - 0.5 * druck);
+  let left = treasury * P.terra * (early ? 0.8 : 1) * (1 - 0.5 * pressure);
   for (const c of candidates) {
     const give = c.cost > 0 ? Math.min(left, c.cost) : 0;
     setOrders(game, bot, { terraform: { planetId: c.p.id, budget: Math.round(give) } });
     left = Math.max(0, left - give);
   }
 
-  // --- Bau
+  // --- Building
   const yards = mine.filter(p => p.pop >= 1).sort((a, b) => b.pop - a.pop);
   const yard = yards[0];
-  const front = frontwelt();
-  // Ein Sammelpunkt für alles: Gebaut wird, wo gesammelt wird - sonst zieht
-  // jede Runde ein neuer Strom frischer Jäger von der Werft zur Front.
-  const sammelpunkt = (fz && fz.sammel) || (P.einzeln === 'beute' || P.aas ? front : yard);
-  // Wache: Verteidiger halten an einer bedrohten Welt ein paar Runden aus,
-  // statt jedem vorbeiziehenden Feind hinterherzufliegen und zurück.
-  let wache = ai.wache && planetById(game, ai.wache.id);
-  if (!wache || wache.owner !== bot.id || game.turn > ai.wache.bis) {
-    wache = null; ai.wache = null;
-    const ernst = [...bedroht.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (ernst) { ai.wache = { id: ernst[0], bis: game.turn + 6 }; wache = planetById(game, ernst[0]); }
+  const front = frontWorld();
+  // One rally point for everything: build where the fleet gathers - otherwise
+  // every turn a new stream of fresh fighters moves from the yard to the front.
+  const rallyPoint = (camp && camp.rally) || (P.solo === 'prey' || P.carrion ? front : yard);
+  // Guard: defenders hold out at a threatened world for a few turns instead
+  // of chasing every passing enemy and back.
+  let guard = ai.guard && planetById(game, ai.guard.id);
+  if (!guard || guard.owner !== bot.id || game.turn > ai.guard.until) {
+    guard = null; ai.guard = null;
+    const worst = [...threatened.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (worst) { ai.guard = { id: worst[0], until: game.turn + 6 }; guard = planetById(game, worst[0]); }
   }
-  if (yard) bauen();
+  if (yard) build();
 
-  // --- Flotten vor dem Angriff bündeln
-  const warten = new Map();
-  for (const f of meineFlotten) {
+  // --- Bundle fleets before the attack
+  const waiting = new Map();
+  for (const f of myFleets) {
     if (f.at === null || f.at === undefined || f.dest != null) continue;
-    warten.set(f.at, (warten.get(f.at) || 0) + 1);
+    waiting.set(f.at, (waiting.get(f.at) || 0) + 1);
   }
   for (const p of mine) {
-    if ((warten.get(p.id) || 0) > 1) setOrders(game, bot, { merge: { planetId: p.id } });
+    if ((waiting.get(p.id) || 0) > 1) setOrders(game, bot, { merge: { planetId: p.id } });
   }
-  // ... und wieder sortieren: Siedler und Späher fliegen eigene Wege, sonst
-  // zieht das Kolonieschiff die ganze Kampfflotte hinter sich her.
+  // ... and sort them out again: settlers and scouts go their own ways,
+  // otherwise the colony ship drags the whole battle fleet behind it.
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
-    const siedler = f.ships.filter(s => s.colonists > 0).map(s => s.id);
-    if (siedler.length && siedler.length < f.ships.length) {
-      setOrders(game, bot, { split: { fleetId: f.id, ships: siedler } });
+    const settlers = f.ships.filter(s => s.colonists > 0).map(s => s.id);
+    if (settlers.length && settlers.length < f.ships.length) {
+      setOrders(game, bot, { split: { fleetId: f.id, ships: settlers } });
     }
-    const bewaffnet = f.ships.filter(s => s.attack > 0);
+    const armed = f.ships.filter(s => s.attack > 0);
     const rest = f.ships.filter(s => s.attack <= 0).map(s => s.id);
-    if (bewaffnet.length && rest.length) setOrders(game, bot, { split: { fleetId: f.id, ships: rest } });
+    if (armed.length && rest.length) setOrders(game, bot, { split: { fleetId: f.id, ships: rest } });
   }
-  // Späher fliegen allein - im Pulk erkunden sie nur eine Welt statt mehrerer.
+  // Scouts fly alone - in a bunch they only explore one world instead of several.
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
     if (f.ships.length < 2 || !f.ships.every(s => s.type === 'scout')) continue;
     for (const s of f.ships.slice(1)) setOrders(game, bot, { split: { fleetId: f.id, ships: [s.id] } });
   }
-  if (P.rudel) rudelBilden();
+  if (P.packs) formPacks();
 
-  // --- Flottenbefehle
-  // Welten, die schon ein eigenes Kolonieschiff ansteuert - eins genügt, sonst
-  // fliegen alle zur selben Welt, und die übrigen irren danach umher.
-  const besetzt = new Set(meineFlotten
+  // --- Fleet orders
+  // Worlds an own colony ship is already heading for - one is enough, otherwise
+  // they all fly to the same world and the rest wander around afterwards.
+  const claimed = new Set(myFleets
     .filter(f => f.dest != null && f.ships.some(s => s.colonists > 0)).map(f => f.dest));
   for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.length)) {
     const st = fleetStats(fleet);
     if (st.speed <= 0) continue;
     const here = fleet.at !== null ? planetById(game, fleet.at) : fleet;
-    // Entfernung heisst fuer die KI: der Weg, den sie wirklich fliegen muss.
-    const weit = p => travelDistance(here, p, zone);
+    // Distance for the AI means: the path it really has to fly.
+    const far = p => travelDistance(here, p, zone);
     const hasColonist = fleet.ships.some(s => s.colonists > 0);
     const armed = st.attack > 0;
     let target = null;
 
     if (hasColonist) {
-      // Siedler: möglichst gute, freie Welt. Wer siedeln will, nimmt auch
-      // weite Wege für eine gute Welt in Kauf.
-      const gier = P.siedler >= 4 ? 10 : 8;
-      target = reachable(game, fleet, siedelbar.filter(p => p.id !== fleet.at && !besetzt.has(p.id)),
-        p => planetCapacity(p) * gier - weit(p) * 0.1
-          + (erzKnapp ? Math.min(p.metalReserve, 2000) * 0.05 : 0));
+      // Settlers: the best possible free world. Whoever wants to settle also
+      // accepts long trips for a good world.
+      const greed = P.settlers >= 4 ? 10 : 8;
+      target = reachable(game, fleet, settleable.filter(p => p.id !== fleet.at && !claimed.has(p.id)),
+        p => planetCapacity(p) * greed - far(p) * 0.1
+          + (oreScarce ? Math.min(p.metalReserve, 2000) * 0.05 : 0));
     } else if (!armed) {
-      // Späher: nächste unerkundete Welt. Ist ringsum alles bekannt, geht es
-      // an den Rand - nur dort wächst die Karte, und mit ihr das Erz.
-      // Fremde Welten erst zuletzt: deren Abwehr schießt einen Späher ab. Er
-      // deckt die Welt beim Eintreffen aber noch auf - wer nur kennt, was vor
-      // der eigenen Haustür liegt, findet im Spätspiel keine Ziele mehr.
-      const sicher = p => !p.owner || p.owner === bot.id;
-      const unbekannt = planets.filter(p => !bot.explored.has(p.id));
-      target = reachable(game, fleet, unbekannt.filter(sicher), p => -weit(p));
-      if (!target) target = reachable(game, fleet, unbekannt, p => -weit(p));
+      // Scouts: nearest unexplored world. If everything around is known, they
+      // head for the edge - only there does the map grow, and the ore with it.
+      // Foreign worlds come last: their defenses shoot a scout down. But it
+      // still reveals the world on arrival - whoever only knows what lies on
+      // their own doorstep finds no targets in the late game.
+      const safe = p => !p.owner || p.owner === bot.id;
+      const unknown = planets.filter(p => !bot.explored.has(p.id));
+      target = reachable(game, fleet, unknown.filter(safe), p => -far(p));
+      if (!target) target = reachable(game, fleet, unknown, p => -far(p));
       if (!target && game.settings.expanding !== false) {
-        target = reachable(game, fleet, planets.filter(sicher), p => dist(p, mitte));
+        target = reachable(game, fleet, planets.filter(safe), p => dist(p, center));
       }
     } else {
-      target = kampfziel(fleet, st, weit);
+      target = combatTarget(fleet, st, far);
     }
     if (target && target.id !== fleet.at) {
-      if (hasColonist) besetzt.add(target.id);
+      if (hasColonist) claimed.add(target.id);
       setOrders(game, bot, { move: { fleetId: fleet.id, planetId: target.id } });
     }
   }
 
-  umruesten();
+  refit();
 
   bot.ready = true;
 
-  // ------------------------------------------------------------ Hilfen
+  // ------------------------------------------------------------ Helpers
 
-  /** Ein Feldzug: ein Ziel, ein Sammelpunkt, und erst los, wenn es reicht. */
-  function feldzugPlanen() {
-    let plan = ai.feldzug;
+  /** A campaign: one target, one rally point, and only go once it is enough. */
+  function planCampaign() {
+    let plan = ai.campaign;
     if (plan) {
-      const z = planetById(game, plan.zielId);
-      const offen = z && z.owner && z.owner !== bot.id && bot.explored.has(z.id);
-      // Zu lange gewartet, oder das Ziel rüstet schneller auf, als wir
-      // nachbauen: fallen lassen und eine Weile meiden.
-      const zuTeuer = offen && (wehrkraft.get(z.id) || 0) * marge > (macht + nachschub) * 1.5;
-      if (!offen || zuTeuer || game.turn - plan.seit > 35) {
-        if (offen) ai.gemieden[z.id] = game.turn + 25;
+      const z = planetById(game, plan.targetId);
+      const open = z && z.owner && z.owner !== bot.id && bot.explored.has(z.id);
+      // Waited too long, or the target arms faster than we can rebuild:
+      // drop it and avoid it for a while.
+      const tooCostly = open && (defense.get(z.id) || 0) * margin > (power + reinforcements) * 1.5;
+      if (!open || tooCostly || game.turn - plan.since > 35) {
+        if (open) ai.avoided[z.id] = game.turn + 25;
         plan = null;
       }
     }
-    const darf = (game.turn >= P.ab * (1 - druck) && (
-        P.feldzug === 'immer'
-        || (P.feldzug === 'vergeltung' && (getroffen || druck >= 0.5))
-        || (P.feldzug === 'druck' && druck >= 0.4)))
-      // Nachtragende schlagen auch früher zurück
-      || (getroffen && P.vergeltung >= 1 && game.turn >= 10);
-    if (!darf || !basen.length) { ai.feldzug = null; return null; }
+    const allowed = (game.turn >= P.from * (1 - pressure) && (
+        P.campaign === 'always'
+        || (P.campaign === 'retaliation' && (hit || pressure >= 0.5))
+        || (P.campaign === 'pressure' && pressure >= 0.4)))
+      // The resentful strike back earlier too
+      || (hit && P.vengeance >= 1 && game.turn >= 10);
+    if (!allowed || !bases.length) { ai.campaign = null; return null; }
 
     if (!plan) {
-      const reich = jaeger.range;
-      const potenzial = macht + nachschub;
-      const nurRache = P.feldzug === 'vergeltung' && druck < 0.5;
-      // Wie sehr der Preis zählt: Ein armes Reich nimmt, was billig ist; ein
-      // reiches leistet sich die wertvollen Kernwelten - sonst knabbern im
-      // Spätspiel alle nur noch an Randkolonien, und der Kern bleibt starr.
-      const kostenSkala = Math.max(60, potenzial / 25);
-      let best = null, billigst = null;
+      const reach = fighter.range;
+      const potential = power + reinforcements;
+      const revengeOnly = P.campaign === 'retaliation' && pressure < 0.5;
+      // How much the price counts: a poor empire takes what is cheap; a rich
+      // one can afford the valuable core worlds - otherwise in the late game
+      // everyone only nibbles at fringe colonies and the core stays rigid.
+      const costScale = Math.max(60, potential / 25);
+      let best = null, cheapest = null;
       for (const p of enemyWorlds) {
-        const d0 = abstand.get(p.id);
-        if (d0 > reich || (ai.gemieden[p.id] || 0) > game.turn) continue;
-        if (nurRache && (ai.groll[p.owner] || 0) < 2) continue;
-        const kosten = wehrkraft.get(p.id) || 0;
-        if (!billigst || kosten < billigst.kosten) billigst = { p, kosten };
-        if (kosten * marge > potenzial) continue;
-        const s = wert(p) / (kosten / kostenSkala + 5) * (1 - d0 / (reich * 1.6));
+        const d0 = distance.get(p.id);
+        if (d0 > reach || (ai.avoided[p.id] || 0) > game.turn) continue;
+        if (revengeOnly && (ai.grudge[p.owner] || 0) < 2) continue;
+        const cost = defense.get(p.id) || 0;
+        if (!cheapest || cost < cheapest.cost) cheapest = { p, cost };
+        if (cost * margin > potential) continue;
+        const s = value(p) / (cost / costScale + 5) * (1 - d0 / (reach * 1.6));
         if (!best || s > best.s) best = { p, s };
       }
-      // Unter Druck lieber das Billigste angehen als gar nichts.
-      const wahl = best ? best.p : (druck > 0.6 && billigst ? billigst.p : null);
-      if (!wahl) { ai.feldzug = null; return null; }
-      plan = { zielId: wahl.id, seit: game.turn };
+      // Under pressure, rather go for the cheapest than nothing at all.
+      const choice = best ? best.p : (pressure > 0.6 && cheapest ? cheapest.p : null);
+      if (!choice) { ai.campaign = null; return null; }
+      plan = { targetId: choice.id, since: game.turn };
     }
-    const ziel = planetById(game, plan.zielId);
-    plan.kosten = wehrkraft.get(ziel.id) || 0;
-    plan.sammel = mine.filter(p => p.pop >= 1)
-      .sort((a, b) => travelDistance(a, ziel, zone) - travelDistance(b, ziel, zone))[0] || null;
-    plan.ziel = ziel;
-    ai.feldzug = plan;
+    const target = planetById(game, plan.targetId);
+    plan.cost = defense.get(target.id) || 0;
+    plan.rally = mine.filter(p => p.pop >= 1)
+      .sort((a, b) => travelDistance(a, target, zone) - travelDistance(b, target, zone))[0] || null;
+    plan.target = target;
+    ai.campaign = plan;
     return plan;
   }
 
-  /** Eigene Welt, die dem Rivalen oder dem nächsten Feind am nächsten liegt. */
-  function frontwelt() {
-    const feinde = enemyWorlds.filter(p => !ai.rivale || p.owner === ai.rivale);
-    if (!feinde.length || !yards.length) return yard;
+  /** Own world closest to the rival or to the nearest enemy. */
+  function frontWorld() {
+    const enemies = enemyWorlds.filter(p => !ai.rival || p.owner === ai.rival);
+    if (!enemies.length || !yards.length) return yard;
     let best = null, bd = Infinity;
     for (const y of yards.slice(0, 20)) {
-      for (const e of feinde) {
+      for (const e of enemies) {
         const d = dist(y, e);
         if (d < bd) { bd = d; best = y; }
       }
@@ -398,269 +397,268 @@ export function runBot(game, bot) {
     return best || yard;
   }
 
-  function bauen() {
-    const budget = kasse * P.bau;
-    const myColonyShips = meineFlotten
+  function build() {
+    const budget = treasury * P.build;
+    const myColonyShips = myFleets
       .reduce((a, f) => a + f.ships.filter(s => s.colonists > 0).length, 0);
-    // Nur so viele Kolonieschiffe, wie es erreichbare Ziele gibt - sonst
-    // stehen sie herum und haben das knappe Erz gebunden.
-    const wantColony = Math.max(0, Math.min(P.siedler, inReichweite.length - myColonyShips));
-    const myShips = meineFlotten.reduce((a, f) => a + f.ships.length, 0);
-    let deckel = (10 + game.turn * 0.6 * P.flotte + mine.length * 1.5) * (1 + druck);
-    // Ein Feldzug, dem die Feuerkraft fehlt, darf den Deckel sprengen.
-    if (fz && macht < fz.kosten * marge) {
-      deckel = Math.max(deckel, myShips + Math.ceil((fz.kosten * marge - macht) / jaegerSchlag));
+    // Only as many colony ships as there are reachable targets - otherwise
+    // they stand around with the scarce ore tied up in them.
+    const wantColony = Math.max(0, Math.min(P.settlers, inRange.length - myColonyShips));
+    const myShips = myFleets.reduce((a, f) => a + f.ships.length, 0);
+    let cap = (10 + game.turn * 0.6 * P.fleet + mine.length * 1.5) * (1 + pressure);
+    // A campaign lacking firepower may break the cap.
+    if (camp && power < camp.cost * margin) {
+      cap = Math.max(cap, myShips + Math.ceil((camp.cost * margin - power) / fighterStrike));
     }
-    const krieg = enemyWorlds.length > 0 || bedroht.size > 0;
-    const werft = sammelpunkt || yard;
+    const war = enemyWorlds.length > 0 || threatened.size > 0;
+    const shipyard = rallyPoint || yard;
 
     const order = [];
-    const spaeher = () => {
-      // Ein paar Späher sind immer unterwegs, solange es etwas zu entdecken
-      // gibt oder die Karte wachsen kann.
-      // Gezählt werden nur Späher, die mit dem heutigen Stand mithalten.
-      const weitGenug = shipStats('scout', bot.tech).range * 0.75;
-      const unterwegs = meineFlotten.reduce((a, f) => a + f.ships.filter(s => s.type === 'scout' && s.range >= weitGenug).length, 0);
-      const soll = known.length < planets.length || game.settings.expanding !== false
-        ? (P.spaeher ? 3 : 2) : 0;
+    const scouts = () => {
+      // A few scouts are always under way, as long as there is something to
+      // discover or the map can grow.
+      // Only scouts that keep up with today's levels are counted.
+      const farEnough = shipStats('scout', bot.tech).range * 0.75;
+      const underway = myFleets.reduce((a, f) => a + f.ships.filter(s => s.type === 'scout' && s.range >= farEnough).length, 0);
+      const wanted = known.length < planets.length || game.settings.expanding !== false
+        ? (P.scouts ? 3 : 2) : 0;
       if (game.turn < 6) order.push([yard, 'scout', 2]);
-      else if (unterwegs < soll && game.turn % 3 === 0) order.push([yard, 'scout', 1]);
+      else if (underway < wanted && game.turn % 3 === 0) order.push([yard, 'scout', 1]);
     };
-    const kolonien = () => { if (wantColony > 0) order.push([yard, 'colony', wantColony]); };
-    const satelliten = () => {
-      if (!P.satelliten) return;
-      // Bedrohte Welten zuerst, die am schwersten bedrohten vorn.
-      const ziele = [...bedroht.entries()]
+    const colonies = () => { if (wantColony > 0) order.push([yard, 'colony', wantColony]); };
+    const satellites = () => {
+      if (!P.satellites) return;
+      // Threatened worlds first, the most heavily threatened in front.
+      const targets = [...threatened.entries()]
         .map(([id, a]) => ({ p: planetById(game, id), a }))
         .filter(x => x.p.pop >= 1)
         .sort((x, y) => y.a - x.a);
-      // Das Bollwerk baut seinen Wall auch ohne akute Gefahr.
-      if (P.satelliten >= 3) {
+      // The bulwark builds its wall even without acute danger.
+      if (P.satellites >= 3) {
         for (const p of yards) {
-          if (ziele.length >= 4) break;
-          if (bedroht.has(p.id)) continue;
-          if (enemyWorlds.some(e => dist(e, p) < 380)) ziele.push({ p, a: 0 });
+          if (targets.length >= 4) break;
+          if (threatened.has(p.id)) continue;
+          if (enemyWorlds.some(e => dist(e, p) < 380)) targets.push({ p, a: 0 });
         }
       }
-      for (const { p } of ziele.slice(0, 4)) {
-        const da = p.defenses ? p.defenses.length : 0;
-        const platz = Math.ceil(2 + p.pop / 6 * P.satelliten) - da;
-        const n = Math.min(platz, P.satelliten + (getroffen ? 1 : 0));
+      for (const { p } of targets.slice(0, 4)) {
+        const present = p.defenses ? p.defenses.length : 0;
+        const room = Math.ceil(2 + p.pop / 6 * P.satellites) - present;
+        const n = Math.min(room, P.satellites + (hit ? 1 : 0));
         if (n > 0) order.push([p, 'satellite', n]);
       }
     };
-    const kampfschiffe = () => {
-      // Liegt viel Geld herum, wird es in Schiffe gesteckt statt gehortet.
-      const hort = Math.floor(Math.max(0, budget - 10 * jaegerKosten.money) / jaegerKosten.money * 0.4);
-      const n = Math.min(P.jaeger + (fz ? 2 : 0) + hort, Math.ceil(deckel - myShips));
-      if (krieg && n > 0) order.push([werft, 'fighter', n]);
-      else if (bedroht.size) order.push([werft, 'fighter', 2]);
+    const warships = () => {
+      // If a lot of money is lying around, it goes into ships instead of being hoarded.
+      const hoard = Math.floor(Math.max(0, budget - 10 * fighterCost.money) / fighterCost.money * 0.4);
+      const n = Math.min(P.fighters + (camp ? 2 : 0) + hoard, Math.ceil(cap - myShips));
+      if (war && n > 0) order.push([shipyard, 'fighter', n]);
+      else if (threatened.size) order.push([shipyard, 'fighter', 2]);
     };
 
-    spaeher();
-    if (getroffen) satelliten();
-    // Kriegerische Reiche rüsten nach dem Start zuerst, dann wird gesiedelt.
-    if (P.einzeln === 'beute' && game.turn >= 35 && !erzKnapp) { kampfschiffe(); kolonien(); }
-    else { kolonien(); kampfschiffe(); }
-    if (!getroffen) satelliten();
+    scouts();
+    if (hit) satellites();
+    // Warlike empires arm first after the start, then they settle.
+    if (P.solo === 'prey' && game.turn >= 35 && !oreScarce) { warships(); colonies(); }
+    else { colonies(); warships(); }
+    if (!hit) satellites();
 
-    // Erz ist knapper als Geld: Solange noch gesiedelt werden soll, bleibt
-    // für die Kolonieschiffe der nächsten Runden etwas übrig.
-    const erzReserve = wantColony > 0 ? shipCost('colony', bot.tech).metal * 2 : 0;
+    // Ore is scarcer than money: as long as settling is still planned,
+    // something is kept for the colony ships of the next turns.
+    const oreReserve = wantColony > 0 ? shipCost('colony', bot.tech).metal * 2 : 0;
     let spentMoney = 0, spentMetal = 0;
     for (const [pl, type, n] of order) {
       const c = shipCost(type, bot.tech);
-      const erz = type === 'colony' || type === 'scout' ? bot.metal : bot.metal - erzReserve;
+      const ore = type === 'colony' || type === 'scout' ? bot.metal : bot.metal - oreReserve;
       let k = 0;
       while (k < n
         && spentMoney + c.money <= budget
-        && spentMetal + c.metal <= erz) {
+        && spentMetal + c.metal <= ore) {
         k++; spentMoney += c.money; spentMetal += c.metal;
       }
       if (k > 0) setOrders(game, bot, { build: { planetId: pl.id, type, count: k } });
     }
   }
 
-  /** Der Pirat teilt große Haufen in Rudel, die einzeln auf Beute gehen. */
-  function rudelBilden() {
-    const groesse = Math.max(3, Math.round(3 + game.turn / 25));
-    const beute = enemyWorlds.filter(p => (wehrkraft.get(p.id) || 0) <= groesse * jaegerSchlag).length;
-    if (beute < 2) return;
+  /** The raider splits big clusters into packs that go hunting on their own. */
+  function formPacks() {
+    const size = Math.max(3, Math.round(3 + game.turn / 25));
+    const prey = enemyWorlds.filter(p => (defense.get(p.id) || 0) <= size * fighterStrike).length;
+    if (prey < 2) return;
     for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
-      const jaegerIds = f.ships.filter(s => s.attack > 0).map(s => s.id);
-      let rudel = Math.min(Math.floor(jaegerIds.length / groesse) - 1, beute - 1, 4);
-      while (rudel-- > 0) {
-        setOrders(game, bot, { split: { fleetId: f.id, ships: jaegerIds.splice(0, groesse) } });
+      const fighterIds = f.ships.filter(s => s.attack > 0).map(s => s.id);
+      let packs = Math.min(Math.floor(fighterIds.length / size) - 1, prey - 1, 4);
+      while (packs-- > 0) {
+        setOrders(game, bot, { split: { fleetId: f.id, ships: fighterIds.splice(0, size) } });
       }
     }
   }
 
-  function kampfziel(fleet, st, weit) {
-    const schlag = st.attack * COMBAT_ROUNDS * TREFFERQUOTE;
-    // Garnison: Wer zu Hause bedroht wird, bleibt, wo er gebraucht wird.
-    if (garnison >= 0.3 && fleet.at != null && bedroht.has(fleet.at)) return null;
-    // Die Hauptstadt gibt niemand preis - mit ihr bräche die halbe Wirtschaft weg.
-    if (yard && fleet.at === yard.id && bedroht.has(yard.id)) return null;
+  function combatTarget(fleet, st, far) {
+    const strike = st.attack * COMBAT_ROUNDS * HIT_RATE;
+    // Garrison: whoever is threatened at home stays where they are needed.
+    if (garrison >= 0.3 && fleet.at != null && threatened.has(fleet.at)) return null;
+    // Nobody gives up the capital - half the economy would collapse with it.
+    if (yard && fleet.at === yard.id && threatened.has(yard.id)) return null;
 
-    if (fz && schlag >= fz.kosten * marge && canReach(game, fleet, fz.ziel).ok) return fz.ziel;
+    if (camp && strike >= camp.cost * margin && canReach(game, fleet, camp.target).ok) return camp.target;
 
-    // Auf eigene Faust: nur Ziele, die diese Flotte in einem Zug knackt -
-    // die Abwehrbatterie steht in der nächsten Runde wieder voll da.
-    const knackbar = p => (wehrkraft.get(p.id) || 0) * marge <= schlag;
-    let beute = [];
-    if (einzeln === 'beute') beute = enemyWorlds.filter(knackbar);
-    else if (einzeln === 'nah') beute = enemyWorlds.filter(p => knackbar(p) && abstand.get(p.id) < 260);
-    else if (einzeln === 'aas') {
-      beute = enemyWorlds.filter(p => knackbar(p)
-        && (ai.frisch.has(p.id) || (restWelten.get(p.owner) || 99) <= ANGESCHLAGEN));
+    // On its own: only targets this fleet cracks in one move - the defense
+    // battery is back at full strength next turn.
+    const crackable = p => (defense.get(p.id) || 0) * margin <= strike;
+    let prey = [];
+    if (solo === 'prey') prey = enemyWorlds.filter(crackable);
+    else if (solo === 'near') prey = enemyWorlds.filter(p => crackable(p) && distance.get(p.id) < 260);
+    else if (solo === 'carrion') {
+      prey = enemyWorlds.filter(p => crackable(p)
+        && (ai.fresh.has(p.id) || (worldsLeft.get(p.owner) || 99) <= BATTERED));
     }
-    if (beute.length) {
-      const t = reachable(game, fleet, beute,
-        p => wert(p) / ((wehrkraft.get(p.id) || 0) / 100 + 5) - weit(p) * 0.03);
+    if (prey.length) {
+      const t = reachable(game, fleet, prey,
+        p => value(p) / ((defense.get(p.id) || 0) / 100 + 5) - far(p) * 0.03);
       if (t) return t;
     }
 
-    // Nichts zu holen: sammeln - am Feldzug, an der Grenze oder zu Hause.
-    let sammel = fz ? fz.sammel : null;
-    if (!sammel && garnison >= 0.3) sammel = wache;
-    if (!sammel) sammel = sammelpunkt;
-    if (sammel && sammel.id !== fleet.at && canReach(game, fleet, sammel).ok) return sammel;
+    // Nothing to gain: gather - at the campaign, at the border or at home.
+    let rally = camp ? camp.rally : null;
+    if (!rally && garrison >= 0.3) rally = guard;
+    if (!rally) rally = rallyPoint;
+    if (rally && rally.id !== fleet.at && canReach(game, fleet, rally).ok) return rally;
     return null;
   }
 
-  /** Veraltete Schiffe und Satelliten nachrüsten, wenn das Geld reicht. */
-  function umruesten() {
-    // Wer aufs Umrüsten setzt, tut es bei jeder Verbesserung. Alle anderen
-    // erst, wenn Reichweite oder Feuerkraft um ein Viertel zurückliegen -
-    // sonst stehen alte Späher und Jäger herum, die nirgends mehr hinkommen.
-    let frei = bot.money * (P.umruesten ? 0.25 : 0.15);
-    const veraltet = s => {
-      const neu = shipStats(s.type, bot.tech);
-      return P.umruesten || neu.range > s.range * 1.25 || neu.attack > s.attack * 1.25;
+  /** Refit outdated ships and satellites if the money suffices. */
+  function refit() {
+    // Whoever relies on refits does it with every improvement. Everyone else
+    // only once range or firepower lag behind by a quarter - otherwise old
+    // scouts and fighters stand around that cannot get anywhere anymore.
+    let free = bot.money * (P.refits ? 0.25 : 0.15);
+    const outdated = s => {
+      const now = shipStats(s.type, bot.tech);
+      return P.refits || now.range > s.range * 1.25 || now.attack > s.attack * 1.25;
     };
     for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
       const pl = planetById(game, f.at);
       if (!pl || pl.owner !== bot.id || pl.pop < 1 || f.ships.some(s => s.colonists > 0)) continue;
-      if (!f.ships.some(veraltet)) continue;
+      if (!f.ships.some(outdated)) continue;
       const k = refitTotal(f.ships, bot.tech);
-      if (!k.count || k.count < f.ships.length / 2 || k.money > frei) continue;
+      if (!k.count || k.count < f.ships.length / 2 || k.money > free) continue;
       setOrders(game, bot, { refit: { fleetId: f.id } });
-      frei -= k.money;
+      free -= k.money;
     }
     for (const pl of mine) {
-      if (!P.umruesten || !pl.defenses || pl.defenses.length < 2 || pl.pop < 1) continue;
+      if (!P.refits || !pl.defenses || pl.defenses.length < 2 || pl.pop < 1) continue;
       const k = refitTotal(pl.defenses, bot.tech);
-      if (k.count < pl.defenses.length / 2 || k.money > frei) continue;
+      if (k.count < pl.defenses.length / 2 || k.money > free) continue;
       setOrders(game, bot, { refit: { planetId: pl.id } });
-      frei -= k.money;
+      free -= k.money;
     }
   }
 }
 
 /**
- * Das Gedächtnis eines KI-Reichs - es entsteht beim ersten Zug. Die Streuung
- * hängt am Seed und am Reich, damit eine Partie mit gleichem Seed gleich
- * verläuft.
+ * The memory of an AI empire - it is created on the first move. The variance
+ * depends on the seed and the empire, so a game with the same seed plays out
+ * the same way.
  */
-function gedaechtnis(game, bot) {
+function memory(game, bot) {
   if (bot.ai) return bot.ai;
-  const vorlage = PERSONAS[bot.persona] || PERSONAS.conqueror;
+  const template = PERSONAS[bot.persona] || PERSONAS.conqueror;
   let s = 1;
   for (const ch of `${game.settings.seed}:${bot.id}:${bot.name}`) s = (s * 31 + ch.charCodeAt(0)) % 2147483647;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  const streu = (v, f) => v * (1 + (rnd() * 2 - 1) * f);
+  const vary = (v, f) => v * (1 + (rnd() * 2 - 1) * f);
   bot.ai = {
     p: {
-      ...vorlage,
-      bau: streu(vorlage.bau, 0.1), terra: streu(vorlage.terra, 0.2),
-      flotte: streu(vorlage.flotte, 0.15), marge: streu(vorlage.marge, 0.1),
-      ab: Math.round(streu(vorlage.ab, 0.3)), vergeltung: streu(vorlage.vergeltung, 0.3)
+      ...template,
+      build: vary(template.build, 0.1), terra: vary(template.terra, 0.2),
+      fleet: vary(template.fleet, 0.15), margin: vary(template.margin, 0.1),
+      from: Math.round(vary(template.from, 0.3)), vengeance: vary(template.vengeance, 0.3)
     },
-    groll: {},              // Reich -> wie sehr es uns zugesetzt hat
-    rivale: null,
-    feldzug: null,
-    gemieden: {},           // Welt -> bis zu welcher Runde sie kein Feldzugziel ist
-    meine: new Set(),
-    besitz: new Map(),      // bekannte Feindwelt -> Besitzer und Bevölkerung der Vorrunde
-    frisch: new Map(),      // Welt -> Runde, in der sie den Besitzer wechselte oder einbrach
-    zuletztGetroffen: -99,
-    ruheSeit: game.turn,    // letzte Runde, in der eine Welt den Besitzer wechselte
-    wache: null             // bedrohte Welt, die die Verteidiger gerade halten
+    grudge: {},             // empire -> how badly it has hurt us
+    rival: null,
+    campaign: null,
+    avoided: {},            // world -> until which turn it is no campaign target
+    owned: new Set(),
+    holdings: new Map(),    // known enemy world -> owner and population of the previous turn
+    fresh: new Map(),       // world -> turn in which it changed owner or collapsed
+    lastHit: -99,
+    quietSince: game.turn,  // last turn in which a world changed owner
+    guard: null             // threatened world the defenders are currently holding
   };
   return bot.ai;
 }
 
 /**
- * Was hat sich seit dem letzten Zug getan? Verlorene Welten wecken Groll
- * gegen den neuen Besitzer, anfliegende Kampfflotten auch ein wenig.
- * Zurück kommen die bedrohten eigenen Welten mit der Feuerkraft, die auf sie
- * zuhält.
+ * What has happened since the last move? Lost worlds stir up a grudge
+ * against the new owner, approaching battle fleets a little too.
+ * Returns the threatened own worlds with the firepower heading for them.
  */
-function wahrnehmen(game, bot, ai, mine, enemyWorlds) {
-  const jetzt = new Set(mine.map(p => p.id));
-  for (const id of ai.meine) {
-    if (jetzt.has(id)) continue;
+function perceive(game, bot, ai, mine, enemyWorlds) {
+  const now = new Set(mine.map(p => p.id));
+  for (const id of ai.owned) {
+    if (now.has(id)) continue;
     const pl = planetById(game, id);
     if (!pl.owner || pl.owner === bot.id) continue;
-    ai.groll[pl.owner] = (ai.groll[pl.owner] || 0) + 4 + pl.pop / 4;
-    ai.zuletztGetroffen = game.turn;
-    ai.ruheSeit = game.turn;
+    ai.grudge[pl.owner] = (ai.grudge[pl.owner] || 0) + 4 + pl.pop / 4;
+    ai.lastHit = game.turn;
+    ai.quietSince = game.turn;
   }
-  for (const id of jetzt) {
-    const vorher = ai.besitz.get(id);
-    if (!ai.meine.has(id) && vorher && vorher.owner !== bot.id) ai.ruheSeit = game.turn;
+  for (const id of now) {
+    const before = ai.holdings.get(id);
+    if (!ai.owned.has(id) && before && before.owner !== bot.id) ai.quietSince = game.turn;
   }
-  ai.meine = jetzt;
+  ai.owned = now;
 
-  const bedroht = new Map();
+  const threatened = new Map();
   for (const f of game.fleets) {
     if (f.owner === bot.id) continue;
-    const ziel = f.dest != null ? f.dest : f.at;
-    if (ziel == null || !jetzt.has(ziel)) continue;
-    const feuer = f.ships.reduce((a, s) => a + s.attack, 0);
-    if (feuer <= 0) continue;
-    bedroht.set(ziel, (bedroht.get(ziel) || 0) + feuer);
-    ai.groll[f.owner] = (ai.groll[f.owner] || 0) + 0.3;
+    const target = f.dest != null ? f.dest : f.at;
+    if (target == null || !now.has(target)) continue;
+    const fire = f.ships.reduce((a, s) => a + s.attack, 0);
+    if (fire <= 0) continue;
+    threatened.set(target, (threatened.get(target) || 0) + fire);
+    ai.grudge[f.owner] = (ai.grudge[f.owner] || 0) + 0.3;
   }
-  for (const k of Object.keys(ai.groll)) {
-    ai.groll[k] *= 0.97;
-    if (ai.groll[k] < 0.2) delete ai.groll[k];
+  for (const k of Object.keys(ai.grudge)) {
+    ai.grudge[k] *= 0.97;
+    if (ai.grudge[k] < 0.2) delete ai.grudge[k];
   }
 
-  // Bei den Nachbarn: Besitzwechsel und eingebrochene Bevölkerung - beides
-  // heisst, dass dort gerade gekämpft wurde.
+  // At the neighbors: changes of ownership and collapsed population - both
+  // mean that there has just been fighting there.
   for (const p of enemyWorlds) {
-    const alt = ai.besitz.get(p.id);
-    if (alt && (alt.owner !== p.owner || p.pop < alt.pop * 0.8)) {
-      ai.frisch.set(p.id, game.turn);
-      if (alt.owner !== p.owner) ai.ruheSeit = Math.max(ai.ruheSeit, game.turn - 10);
+    const old = ai.holdings.get(p.id);
+    if (old && (old.owner !== p.owner || p.pop < old.pop * 0.8)) {
+      ai.fresh.set(p.id, game.turn);
+      if (old.owner !== p.owner) ai.quietSince = Math.max(ai.quietSince, game.turn - 10);
     }
-    ai.besitz.set(p.id, { owner: p.owner, pop: p.pop });
+    ai.holdings.set(p.id, { owner: p.owner, pop: p.pop });
   }
-  for (const [id, t] of ai.frisch) if (game.turn - t > 6) ai.frisch.delete(id);
-  return bedroht;
+  for (const [id, t] of ai.fresh) if (game.turn - t > 6) ai.fresh.delete(id);
+  return threatened;
 }
 
 /**
- * Der Rivale: wer nah ist, wer uns zugesetzt hat, wer zu groß wird. Einmal
- * gewählt, bleibt er es eine Weile - sonst wechselt das Reich ständig die
- * Front und sammelt nie genug.
+ * The rival: whoever is close, whoever has hurt us, whoever grows too big. Once
+ * chosen, it stays the rival for a while - otherwise the empire keeps switching
+ * fronts and never gathers enough.
  */
-function rivaleWaehlen(ai, P, enemyWorlds, abstand, fuehrer) {
-  const punkte = {};
+function chooseRival(ai, P, enemyWorlds, distance, leader) {
+  const points = {};
   for (const p of enemyWorlds) {
-    const d = abstand.get(p.id);
-    if (d < 600) punkte[p.owner] = (punkte[p.owner] || 0) + (600 - d) / 600;
+    const d = distance.get(p.id);
+    if (d < 600) points[p.owner] = (points[p.owner] || 0) + (600 - d) / 600;
   }
-  for (const [o, g] of Object.entries(ai.groll)) punkte[o] = (punkte[o] || 0) + g * P.vergeltung;
-  if (fuehrer) punkte[fuehrer] = (punkte[fuehrer] || 0) + 3 * P.gegenFuehrer;
-  if (ai.rivale && punkte[ai.rivale] != null) punkte[ai.rivale] += 2;
+  for (const [o, g] of Object.entries(ai.grudge)) points[o] = (points[o] || 0) + g * P.vengeance;
+  if (leader) points[leader] = (points[leader] || 0) + 3 * P.vsLeader;
+  if (ai.rival && points[ai.rival] != null) points[ai.rival] += 2;
   let best = null;
-  for (const [o, s] of Object.entries(punkte)) if (!best || s > best.s) best = { o, s };
+  for (const [o, s] of Object.entries(points)) if (!best || s > best.s) best = { o, s };
   return best ? best.o : null;
 }
 
-/** Bestes Ziel, das die Flotte auch erreichen kann. */
+/** Best target that the fleet can actually reach. */
 function reachable(game, fleet, arr, score) {
   const sorted = arr.slice().sort((a, b) => score(b) - score(a));
   for (const p of sorted.slice(0, 12)) {

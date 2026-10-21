@@ -1,9 +1,9 @@
-// Gemeinsame Spielregeln - wird vom Server und vom Browser-Client importiert.
-// Alles hier ist rein funktional und ohne Seiteneffekte.
+// Shared game rules - imported by the server and by the browser client.
+// Everything here is purely functional and free of side effects.
 
 export const MAX_PLAYERS = 16;
 
-/** Ideale Lebensbedingungen - für alle Rassen gleich (wie im Klassiker). */
+/** Ideal living conditions - the same for every race (as in the classic). */
 export const IDEAL = { temp: 20, grav: 1.0 };
 
 export const TEMP_RANGE = { min: -180, max: 220 };
@@ -16,40 +16,40 @@ export const PLAYER_COLORS = [
 ];
 
 export const PLAYER_EMBLEMS = [
-  'Stern', 'Komet', 'Krone', 'Anker', 'Klinge', 'Auge', 'Welle', 'Blitz',
-  'Mond', 'Ring', 'Speer', 'Rad', 'Flamme', 'Pfeil', 'Schild', 'Hut'
+  'Star', 'Comet', 'Crown', 'Anchor', 'Blade', 'Eye', 'Wave', 'Bolt',
+  'Moon', 'Ring', 'Spear', 'Wheel', 'Flame', 'Arrow', 'Shield', 'Hat'
 ];
 
 /**
- * Persönlichkeiten der KI-Reiche. Wie sie spielen, steht in server/bot.js;
- * Name und Beschreibung im Katalog unter persona.<key> / persona.<key>.desc.
+ * Personalities of the AI empires. How they play is in server/bot.js;
+ * name and description are in the catalog under persona.<key> / persona.<key>.desc.
  */
 export const AI_PERSONAS = ['conqueror', 'settler', 'technocrat', 'raider', 'bulwark', 'vulture'];
 
-// ---------------------------------------------------------------- Technologie
+// ----------------------------------------------------------------- Technology
 
 export const TECH_FIELDS = ['range', 'speed', 'weapons', 'shields', 'mini', 'radical'];
 
-// Namen, Kuerzel und Beschreibungen der Techfelder stehen in den Katalogen
-// (client/i18n/*.js) unter tech.<feld>.name / .short / .desc - hier bleibt nur,
-// was keine Sprache hat.
-export const techKey = (feld, teil = 'name') => `tech.${feld}.${teil}`;
+// Names, abbreviations and descriptions of the tech fields live in the catalogs
+// (client/i18n/*.js) under tech.<field>.name / .short / .desc - only what has
+// no language stays here.
+export const techKey = (field, part = 'name') => `tech.${field}.${part}`;
 
 export const TECH_START_LEVEL = 1;
 export const TECH_MAX_LEVEL = 40;
 
-/** Forschungspunkte, um von `level` auf `level + 1` zu kommen. */
+/** Research points needed to get from `level` to `level + 1`. */
 export function techCostToNext(level) {
   return Math.round(40 * Math.pow(level, 1.8));
 }
 
-// ------------------------------------------------------------------- Schiffe
+// --------------------------------------------------------------------- Ships
 
 export const SHIP_TYPES = ['scout', 'fighter', 'satellite', 'colony', 'tanker'];
 
-// Schiffsnamen und -beschreibungen stehen in den Katalogen unter
-// ship.<typ>.name / .desc; hier stehen nur Werte, die in jeder Sprache gelten.
-export const shipKey = (typ, teil = 'name') => `ship.${typ}.${teil}`;
+// Ship names and descriptions live in the catalogs under
+// ship.<type>.name / .desc; only values that hold in every language are here.
+export const shipKey = (type, part = 'name') => `ship.${type}.${part}`;
 
 export const SHIP_DEFS = {
   scout: {
@@ -86,18 +86,18 @@ export const SHIP_DEFS = {
   }
 };
 
-/** Technologie-Aufschlag auf den Preis: hohe Stufen sind teuer. */
+/** Technology surcharge on the price: high levels are expensive. */
 function techSurcharge(level) {
   return 2.6 * Math.pow(Math.max(0, level - 1), 1.45);
 }
 
-/** Miniaturisierung verbilligt alles. */
+/** Miniaturization makes everything cheaper. */
 export function miniFactor(miniLevel) {
   return 1 / (1 + 0.11 * (miniLevel - 1));
 }
 
 /**
- * Kosten eines Schiffs, gebaut mit dem übergebenen Technologiestand.
+ * Cost of a ship built with the given technology levels.
  * @param {string} type
  * @param {Record<string, number>} tech
  */
@@ -112,15 +112,15 @@ export function shipCost(type, tech) {
   };
 }
 
-/** Aufschlag der Werft beim Umrüsten - teurer als gleich richtig bauen. */
+/** Shipyard fee for refits - more expensive than building it right in the first place. */
 export const REFIT_FEE = 1.25;
 
 /**
- * Umrüstung eines bestehenden Schiffs auf den aktuellen Stand: nur die
- * Technik, die der Typ überhaupt eingebaut hat, und nur nach oben. Bezahlt
- * wird der Aufpreis der neuen Stufen samt Werftzuschlag; der Rumpf bleibt.
+ * Refit of an existing ship to the current levels: only the tech the type
+ * has built in at all, and only upwards. The price is the surcharge of the
+ * new levels plus the shipyard fee; the hull stays.
  * @returns {{tech: Record<string, number>, money: number, metal: number} | null}
- *   null, wenn es nichts zu verbessern gibt
+ *   null if there is nothing to improve
  */
 export function refitCost(type, shipTech, tech) {
   const def = SHIP_DEFS[type];
@@ -128,10 +128,10 @@ export function refitCost(type, shipTech, tech) {
   const next = { ...shipTech };
   let extra = 0;
   for (const f of def.techs) {
-    const alt = shipTech[f] || 1, neu = tech[f] || 1;
-    if (neu <= alt) continue;
-    next[f] = neu;
-    extra += techSurcharge(neu) - techSurcharge(alt);
+    const old = shipTech[f] || 1, current = tech[f] || 1;
+    if (current <= old) continue;
+    next[f] = current;
+    extra += techSurcharge(current) - techSurcharge(old);
   }
   if (extra <= 0) return null;
   const mf = miniFactor(tech.mini || 1) * REFIT_FEE;
@@ -142,7 +142,7 @@ export function refitCost(type, shipTech, tech) {
   };
 }
 
-/** Summe über mehrere Schiffe; `count` = wie viele davon veraltet sind. */
+/** Sum over several ships; `count` = how many of them are outdated. */
 export function refitTotal(ships, tech) {
   let money = 0, metal = 0, count = 0;
   for (const s of ships) {
@@ -153,7 +153,7 @@ export function refitTotal(ships, tech) {
   return { money, metal, count };
 }
 
-/** Kampf- und Flugwerte eines Schiffs anhand seines eingebauten Techstands. */
+/** Combat and flight stats of a ship based on its built-in tech levels. */
 export function shipStats(type, tech) {
   const def = SHIP_DEFS[type];
   const speedL = tech.speed || 1, rangeL = tech.range || 1;
@@ -169,16 +169,16 @@ export function shipStats(type, tech) {
   };
 }
 
-// -------------------------------------------------------------------- Planeten
+// --------------------------------------------------------------------- Planets
 
-/** 0 = tödlich, 1 = paradiesisch. */
+/** 0 = deadly, 1 = paradise. */
 export function habitability(planet) {
   const dT = Math.abs(planet.temp - IDEAL.temp) / 100;
   const dG = Math.abs(planet.grav - IDEAL.grav) / 1.5;
   return clamp(1 - dT - dG, 0, 1);
 }
 
-/** Maximale Bevölkerung in Mio. */
+/** Maximum population in millions. */
 export function planetCapacity(planet) {
   const hab = habitability(planet);
   return Math.round((1.5 + 44 * Math.pow(hab, 1.25)) * (0.75 + 0.5 * planet.sizeFactor));
@@ -188,19 +188,19 @@ export const POP_GROWTH = 0.12;
 export const INCOME_PER_POP = 1.6;
 export const MINE_PER_POP = 0.5;
 
-/** Einkommen eines Planeten pro Runde. */
+/** Income of a planet per turn. */
 export function planetIncome(planet) {
   return planet.pop * INCOME_PER_POP * (0.55 + 0.45 * habitability(planet));
 }
 
 /**
- * Tiefbau: Ist der Vorrat erschöpft, fördert eine Welt noch diesen Anteil.
- * Ohne ihn friert jede lange Partie ein, sobald überall das Erz verbraucht
- * ist - dann lassen sich keine Schiffe mehr bauen, auch keine Kolonieschiffe.
+ * Deep mining: once the reserve is exhausted, a world still mines this share.
+ * Without it every long game freezes as soon as the ore is used up everywhere -
+ * then no more ships can be built, not even colony ships.
  */
 export const DEEP_MINING = 0.1;
 
-/** Metallabbau pro Runde: aus dem Vorrat, danach im Tiefbau. */
+/** Metal mined per turn: from the reserve, afterwards by deep mining. */
 export function planetMining(planet) {
   const rate = planet.pop * MINE_PER_POP * planet.metalRichness;
   return Math.max(Math.min(planet.metalReserve, rate), rate * DEEP_MINING);
@@ -217,7 +217,7 @@ export function terraLimits(radicalLevel) {
   };
 }
 
-/** Kann der Planet mit diesem Radikal-Level überhaupt angefasst werden? */
+/** Can the planet be touched at all with this radical level? */
 export function terraformable(planet, radicalLevel) {
   const lim = terraLimits(radicalLevel);
   return {
@@ -226,7 +226,7 @@ export function terraformable(planet, radicalLevel) {
   };
 }
 
-/** Was würde es kosten, diesen Planeten komplett ins Ideal zu bringen? */
+/** What would it cost to bring this planet fully to the ideal? */
 export function terraformFullCost(planet, radicalLevel) {
   const ok = terraformable(planet, radicalLevel);
   let cost = 0;
@@ -235,21 +235,21 @@ export function terraformFullCost(planet, radicalLevel) {
   return Math.round(cost);
 }
 
-// ---------------------------------------------------------------------- Kampf
+// -------------------------------------------------------------------- Combat
 
 export const COMBAT_ROUNDS = 12;
 
 /**
- * Abfangen: wer aus einem Orbit abfliegt, in dem ein bewaffneter Gegner steht,
- * kaempft so viele Runden mit, bevor er fort ist. Drei reichen, damit ein
- * einzelner Jaeger einen Spaeher sicher erwischt.
+ * Interception: whoever departs from an orbit holding an armed enemy fights
+ * this many rounds before getting away. Three are enough for a single fighter
+ * to reliably catch a scout.
  */
 export const INTERCEPT_ROUNDS = 3;
 
 /**
- * Planetare Abwehrbatterien. Jede bewohnte Welt verteidigt sich selbst -
- * große Bevölkerungen sind harte Brocken. Die Batterie wird nie dauerhaft
- * zerstört, sie steht jede Runde neu bereit.
+ * Planetary defense batteries. Every inhabited world defends itself -
+ * large populations are tough nuts. The battery is never destroyed for
+ * good, it is ready again every turn.
  */
 export function batteryStats(pop, tech) {
   if (!(pop >= 0.5)) return null;
@@ -259,35 +259,35 @@ export function batteryStats(pop, tech) {
   };
 }
 
-// --------------------------------------------------------------------- Helfer
+// -------------------------------------------------------------------- Helpers
 
 export function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-/** Abstand im Raum. Ohne z (Klassik) ist es der Abstand in der Ebene. */
+/** Distance in space. Without z (classic) it is the distance in the plane. */
 export function dist(a, b) {
   const dx = a.x - b.x, dy = a.y - b.y, dz = (a.z || 0) - (b.z || 0);
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-// ------------------------------------------------- Sperrzone: schwarzes Loch
+// ---------------------------------------------- Exclusion zone: black hole
 
 /**
- * Sperrzone um das schwarze Loch, als Vielfaches seines Weltradius. Die
- * sichtbaren Strudelarme reichen bis etwa das 1,4-fache - die Zone liegt
- * darueber, damit klar ist, dass nicht nur der Schlund selbst gemeint ist.
- * Nach oben begrenzt sie die Karte: keine Welt kommt dem Loch naeher als das
- * 2,5-fache, es bleibt also immer ein Anflugweg frei.
+ * Exclusion zone around the black hole, as a multiple of its world radius.
+ * The visible swirl arms reach out to about 1.4 times - the zone lies beyond
+ * that, so it is clear that more than just the maw itself is meant.
+ * The map limits it from above: no world comes closer to the hole than
+ * 2.5 times, so an approach path always stays free.
  */
 export const HOLE_BLOCK = 1.8;
 
-/** Verbotener Bereich einer Galaxie, oder null ohne schwarzes Loch. */
+/** Forbidden area of a galaxy, or null without a black hole. */
 export function holeZone(galaxy) {
   const bh = galaxy && galaxy.blackHole;
   if (!bh) return null;
   return { x: bh.x, y: bh.y, z: bh.z || 0, r: bh.r * HOLE_BLOCK };
 }
 
-/** Kuerzester Abstand der Strecke a-b zu einem Punkt c. */
+/** Shortest distance of the segment a-b to a point c. */
 function segDist(a, b, c) {
   const vx = b.x - a.x, vy = b.y - a.y, vz = (b.z || 0) - (a.z || 0);
   const wx = c.x - a.x, wy = c.y - a.y, wz = (c.z || 0) - (a.z || 0);
@@ -297,30 +297,30 @@ function segDist(a, b, c) {
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-/** Schneidet die Strecke die Sperrzone? */
+/** Does the segment cross the exclusion zone? */
 export function blocked(a, b, zone) {
   return !!zone && segDist(a, b, zone) < zone.r;
 }
 
 const TAU2 = Math.PI * 2;
-const ARC_STEP = Math.PI / 12;        // Bogen in 15-Grad-Stuecken annaehern
+const ARC_STEP = Math.PI / 12;        // approximate the arc in 15-degree pieces
 
 /**
- * Weg von a nach b, der die Sperrzone aussen umgeht: zwei Tangenten und ein
- * Bogen, auf der kuerzeren der beiden Seiten. Gerechnet wird in der Ebene
- * durch a, b und den Mittelpunkt - damit gilt dasselbe Verfahren flach wie
- * raeumlich. Zurueck kommen die Wegpunkte nach a; der letzte ist b.
+ * Path from a to b that goes around the outside of the exclusion zone: two
+ * tangents and an arc, on the shorter of the two sides. Computed in the plane
+ * through a, b and the center - so the same method works flat and in 3D.
+ * Returns the waypoints after a; the last one is b.
  */
 export function route(a, b, zone) {
   const to = { x: b.x, y: b.y, z: b.z || 0 };
   if (!blocked(a, b, zone)) return [to];
   const c = zone;
-  // Der Bogen wird als Streckenzug gefahren; seine Sehnen lägen innerhalb des
-  // Kreises. Deshalb wird der Umfahrungsradius so weit aufgeblasen, dass die
-  // Sehnen genau auf der Zonengrenze liegen - sonst schrammte jede Flotte ein
-  // Stück zu dicht am Loch vorbei.
+  // The arc is flown as a polyline; its chords would lie inside the circle.
+  // That is why the detour radius is inflated just enough for the chords to
+  // lie exactly on the zone boundary - otherwise every fleet would scrape by
+  // a little too close to the hole.
   const r = zone.r / Math.cos(ARC_STEP / 2);
-  // Ebene aufspannen: ex zeigt zu a, ey quer dazu in Richtung b.
+  // Span the plane: ex points to a, ey across it towards b.
   const p = { x: a.x - c.x, y: a.y - c.y, z: (a.z || 0) - c.z };
   const q = { x: b.x - c.x, y: b.y - c.y, z: (b.z || 0) - c.z };
   const dA = Math.hypot(p.x, p.y, p.z) || 1e-6;
@@ -328,7 +328,7 @@ export function route(a, b, zone) {
   const qe = q.x * ex.x + q.y * ex.y + q.z * ex.z;
   let perp = { x: q.x - ex.x * qe, y: q.y - ex.y * qe, z: q.z - ex.z * qe };
   let pl = Math.hypot(perp.x, perp.y, perp.z);
-  if (pl < 1e-6) {                     // a, b und Mitte auf einer Linie
+  if (pl < 1e-6) {                     // a, b and center on one line
     perp = Math.abs(ex.z) < 0.9
       ? { x: -ex.y, y: ex.x, z: 0 }
       : { x: 1, y: 0, z: 0 };
@@ -341,10 +341,10 @@ export function route(a, b, zone) {
   const ey = { x: perp.x / pl, y: perp.y / pl, z: perp.z / pl };
   const dB = Math.hypot(q.x, q.y, q.z) || 1e-6;
 
-  // Winkel in dieser Ebene: a liegt bei 0, b irgendwo zwischen 0 und PI.
+  // Angles in this plane: a lies at 0, b somewhere between 0 and PI.
   const thA = 0, thB = Math.atan2(pl, qe);
-  // Liegt ein Punkt innerhalb des Umfahrungsradius, geht es von dort gerade
-  // nach aussen auf den Ring statt auf eine Tangente.
+  // If a point lies inside the detour radius, it goes straight outwards
+  // onto the ring from there instead of along a tangent.
   const phA = dA > r ? Math.acos(clamp(r / dA, -1, 1)) : 0;
   const phB = dB > r ? Math.acos(clamp(r / dB, -1, 1)) : 0;
   const tanA = dA > r ? Math.sqrt(dA * dA - r * r) : 0;
@@ -370,22 +370,22 @@ export function route(a, b, zone) {
   return out;
 }
 
-/** Laenge eines Weges, beginnend bei a. */
+/** Length of a path starting at a. */
 export function routeLength(a, path) {
   let len = 0, prev = a;
   for (const p of path) { len += dist(prev, p); prev = p; }
   return len;
 }
 
-/** Entfernung auf dem erlaubten Weg - so weit ist es wirklich. */
+/** Distance along the allowed path - that is how far it really is. */
 export function travelDistance(a, b, zone) {
   if (!blocked(a, b, zone)) return dist(a, b);
   return routeLength(a, route(a, b, zone));
 }
 
 /**
- * Einen Zug weit am Weg entlang. Gibt die neue Lage zurueck und ob das Ziel
- * (der letzte Wegpunkt) damit erreicht ist.
+ * One turn's worth along the path. Returns the new position and whether the
+ * destination (the last waypoint) is reached with it.
  */
 export function advance(a, path, speed) {
   let left = speed, cur = { x: a.x, y: a.y, z: a.z || 0 };
@@ -404,9 +404,9 @@ export function advance(a, path, speed) {
 }
 
 /**
- * Entfernung zur nächsten Versorgungsbasis - auf dem fliegbaren Weg. Server
- * und Oberfläche rufen dieselbe Funktion, damit die Reichweite, die man sieht,
- * und die, nach der entschieden wird, nicht auseinanderlaufen können.
+ * Distance to the nearest supply base - along the flyable path. Server and UI
+ * call the same function so the range you see and the range decisions are
+ * based on can never drift apart.
  */
 export function supplyDistance(bases, point, zone) {
   let best = Infinity;
@@ -415,34 +415,34 @@ export function supplyDistance(bases, point, zone) {
 }
 
 /**
- * Umriss der Fläche, die von einer Basis aus mit `range` erreichbar ist: je
- * Richtung die größte noch fliegbare Entfernung. Ohne Sperrzone ist das ein
- * Kreis; mit Sperrzone bekommt er dort eine Delle, wo der Weg außen herum
- * führt - genau das, was ein gezeichneter Kreis verschweigen würde.
+ * Outline of the area reachable from a base with `range`: per direction the
+ * largest distance that can still be flown. Without an exclusion zone that is
+ * a circle; with one it gets a dent where the path leads around the outside -
+ * exactly what a drawn circle would hide.
  */
 export function reachOutline(base, range, zone, n = 72) {
-  const punkte = [];
+  const points = [];
   const z = base.z || 0;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
     const dx = Math.cos(a), dy = Math.sin(a);
-    const bei = (d) => ({ x: base.x + dx * d, y: base.y + dy * d, z });
+    const at = (d) => ({ x: base.x + dx * d, y: base.y + dy * d, z });
     let r = range;
-    if (zone && travelDistance(base, bei(range), zone) > range) {
-      // Der Weg wächst mit der Entfernung, also genügt die Halbierung.
+    if (zone && travelDistance(base, at(range), zone) > range) {
+      // The path grows with the distance, so bisection is enough.
       let lo = 0, hi = range;
       for (let k = 0; k < 14; k++) {
         const m = (lo + hi) / 2;
-        if (travelDistance(base, bei(m), zone) <= range) lo = m; else hi = m;
+        if (travelDistance(base, at(m), zone) <= range) lo = m; else hi = m;
       }
       r = lo;
     }
-    punkte.push(bei(r));
+    points.push(at(r));
   }
-  return punkte;
+  return points;
 }
 
-/** Farbe eines Planeten nach Temperatur - die Palette des Klassikers. */
+/** Color of a planet by temperature - the palette of the classic. */
 export function tempColor(temp) {
   const stops = [
     [-180, [ 92, 108, 196]],

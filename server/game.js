@@ -1,5 +1,5 @@
-// Spielzustand und Zugauflösung. Der Server ist autoritativ - der Client
-// schickt nur Befehle, niemals Ergebnisse.
+// Game state and turn resolution. The server is authoritative - the client
+// only sends orders, never results.
 import {
   TECH_FIELDS, TECH_MAX_LEVEL, TECH_START_LEVEL, techCostToNext,
   SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
@@ -15,11 +15,11 @@ export const DEFAULT_SETTINGS = {
   planetsPerPlayer: 6,
   startMoney: 1600,
   startMetal: 400,
-  turnTimer: 0,        // Sekunden; 0 = warten bis alle fertig sind
-  expanding: true,     // Karte wächst mit der Erkundung
-  mode: 'classic',     // 'classic' = flach, 'space' = räumlich (Linse)
-  shape: 'scatter',    // 'scatter' = Streufeld, 'spiral' = Spirale um ein schwarzes Loch
-  maxTurns: 300,       // 0 = unbegrenzt
+  turnTimer: 0,        // seconds; 0 = wait until everyone is done
+  expanding: true,     // map grows with exploration
+  mode: 'classic',     // 'classic' = flat, 'space' = 3D (lens)
+  shape: 'scatter',    // 'scatter' = scattered field, 'spiral' = spiral around a black hole
+  maxTurns: 300,       // 0 = unlimited
   seed: null
 };
 
@@ -41,8 +41,10 @@ export function createGame(hostName) {
     nextShipId: 1,
     log: [],
     turnDeadline: null,
-    // Zuschauer: Verbindungen ohne eigenes Reich. Der Takt gehört zur Partie,
-    // damit mehrere Zuschauer dasselbe sehen.
+    startedAt: null,          // ms timestamps, for the admin overview
+    lastTurnAt: null,
+    // Spectators: connections without an empire of their own. The pace belongs
+    // to the game so that several spectators see the same thing.
     spectators: new Set(),
     pace: { paused: false, ms: 1500 },
     nextTurnAt: 0,
@@ -57,7 +59,7 @@ function makeGameCode() {
   return s;
 }
 
-// Namen für KI-Reiche - lieber albern als durchnummeriert.
+// Names for AI empires - rather silly than numbered.
 const BOT_NAMES = [
   'Admiral Wobblebeard', 'Captain Cupholder', 'Baroness Breadbox', 'Admiral Grumbleguts',
   'Dr. Thrustworthy', 'Colonel Fearnaught', 'Emperor Kerfuffle', 'Consul Shortcircuit',
@@ -72,41 +74,41 @@ const BOT_NAMES = [
   'Squire Sprocket', 'Bishop Bellyflop'
 ];
 
-/** Ein noch freier Spitzname; sind alle vergeben, zählt die Nummer. */
+/** A nickname still free; once all are taken, the number counts. */
 function botName(game) {
   const used = new Set(game.players.map(p => p.name));
   const free = BOT_NAMES.filter(n => !used.has(n));
   return free.length
     ? free[Math.floor(Math.random() * free.length)]
-    : 'KI ' + (game.players.length + 1);
+    : 'AI ' + (game.players.length + 1);
 }
 
 /**
- * Persönlichkeit für ein neues KI-Reich: eine, die in der Partie noch am
- * seltensten vorkommt - so bekommt jede Runde eine bunte Mischung.
+ * Personality for a new AI empire: the one that is still rarest in the
+ * game - that way every round gets a colorful mix.
  */
 function botPersona(game) {
-  const zahl = Object.fromEntries(AI_PERSONAS.map(k => [k, 0]));
-  for (const p of game.players) if (p.isBot && p.persona in zahl) zahl[p.persona]++;
-  const wenigste = Math.min(...Object.values(zahl));
-  const frei = AI_PERSONAS.filter(k => zahl[k] === wenigste);
-  return frei[Math.floor(Math.random() * frei.length)];
+  const count = Object.fromEntries(AI_PERSONAS.map(k => [k, 0]));
+  for (const p of game.players) if (p.isBot && p.persona in count) count[p.persona]++;
+  const fewest = Math.min(...Object.values(count));
+  const free = AI_PERSONAS.filter(k => count[k] === fewest);
+  return free[Math.floor(Math.random() * free.length)];
 }
 
-/** Die erste Farbe der Palette, die noch niemand traegt. */
+/** The first color of the palette that nobody wears yet. */
 function freeColor(game) {
-  const belegt = new Set(game.players.map(p => p.color));
-  return PLAYER_COLORS.find(c => !belegt.has(c)) || PLAYER_COLORS[game.players.length % PLAYER_COLORS.length];
+  const taken = new Set(game.players.map(p => p.color));
+  return PLAYER_COLORS.find(c => !taken.has(c)) || PLAYER_COLORS[game.players.length % PLAYER_COLORS.length];
 }
 
 /**
- * Farbe waehlen. Jede Farbe gibt es nur einmal; traegt sie schon jemand,
- * tauschen beide - so bleibt auch bei 16 Reichen jede Farbe waehlbar.
+ * Pick a color. Every color exists only once; if someone already wears it,
+ * the two swap - so every color stays selectable even with 16 empires.
  */
 export function setPlayerColor(game, player, color) {
   if (game.state !== 'lobby' || !PLAYER_COLORS.includes(color)) return false;
-  const andere = game.players.find(p => p !== player && p.color === color);
-  if (andere) andere.color = player.color;
+  const other = game.players.find(p => p !== player && p.color === color);
+  if (other) other.color = player.color;
   player.color = color;
   return true;
 }
@@ -114,13 +116,13 @@ export function setPlayerColor(game, player, color) {
 export function addPlayer(game, { name, isBot = false, connId = null, persona = null, avatar = null, account = null }) {
   if (game.players.length >= 16) return null;
   const slot = game.players.length;
-  // Ids bleiben eindeutig, auch wenn zwischendurch jemand gegangen ist.
-  let nr = slot + 1;
-  while (game.players.some(p => p.id === 'p' + nr)) nr++;
+  // Ids stay unique even if someone left in between.
+  let num = slot + 1;
+  while (game.players.some(p => p.id === 'p' + num)) num++;
   const p = {
-    id: 'p' + nr,
+    id: 'p' + num,
     slot,
-    name: name || (isBot ? botName(game) : 'Spieler ' + (slot + 1)),
+    name: name || (isBot ? botName(game) : 'Player ' + (slot + 1)),
     color: freeColor(game),
     avatar,
     account,
@@ -128,6 +130,7 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     isBot,
     persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
     connId,
+    joinedAt: Date.now(),
     connected: !isBot,
     alive: true,
     ready: false,
@@ -141,7 +144,7 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
       weights: Object.fromEntries(TECH_FIELDS.map(f => [f, 1]))
     },
     explored: new Set(),
-    knowledge: {},            // planetId -> letzter bekannter Zustand
+    knowledge: {},            // planetId -> last known state
     orders: { builds: {}, moves: {}, unload: {}, refit: {} },
     stats: { planets: 0, pop: 0, ships: 0, kills: 0, losses: 0 }
   };
@@ -153,14 +156,14 @@ export function removePlayer(game, playerId) {
   const i = game.players.findIndex(p => p.id === playerId);
   if (i < 0) return;
   game.players.splice(i, 1);
-  // Die Farbe bleibt, wie sie gewaehlt wurde; nur die Plaetze ruecken auf.
+  // The color stays as chosen; only the slots move up.
   game.players.forEach((p, idx) => {
     p.slot = idx;
     p.emblem = PLAYER_EMBLEMS[idx];
   });
 }
 
-// ------------------------------------------------------------------ Spielstart
+// ------------------------------------------------------------------ Game start
 
 export function startGame(game) {
   const n = game.players.length;
@@ -178,6 +181,7 @@ export function startGame(game) {
   game.state = 'running';
   game.turn = 1;
   game.log = [];
+  game.startedAt = Date.now();
 
   game.players.forEach((p, i) => {
     p.money = game.settings.startMoney;
@@ -186,7 +190,7 @@ export function startGame(game) {
     home.owner = p.id;
     home.pop = 12;
     p.homeworld = home.id;
-    // Startflotten: ein schnelles Späherpaar und ein Siedlerschiff
+    // Starting fleets: a fast pair of scouts and a settler ship
     const scouts = newFleet(game, p.id, home);
     addShip(game, scouts, 'scout', p.tech);
     addShip(game, scouts, 'scout', p.tech);
@@ -207,7 +211,7 @@ export function armTurnTimer(game) {
     : null;
 }
 
-// --------------------------------------------------------------- Schiffe/Flotten
+// ---------------------------------------------------------------- Ships/fleets
 
 function newFleet(game, owner, planet) {
   const f = {
@@ -251,7 +255,7 @@ function orbitFleet(game, owner, planet) {
   return f;
 }
 
-/** Flottenwerte: Geschwindigkeit = langsamstes Schiff, Reichweite = bestes + Tanker. */
+/** Fleet stats: speed = slowest ship, range = best one + tankers. */
 export function fleetStats(fleet) {
   let speed = Infinity, range = 0, attack = 0, hp = 0, tankers = 0;
   for (const s of fleet.ships) {
@@ -266,22 +270,22 @@ export function fleetStats(fleet) {
   return { speed, range: Math.round(range), attack: Math.round(attack * 10) / 10, hp, count: fleet.ships.length };
 }
 
-/** Bewohnte eigene Welten - von dort reicht der Nachschub. */
+/** Own inhabited worlds - supply reaches out from there. */
 export function supplyBases(game, owner) {
   return game.galaxy.planets.filter(p => p.owner === owner && p.pop > 0.5);
 }
 
 /**
- * Nächste eigene Versorgungsbasis (bewohnter eigener Planet). Gemessen wird
- * der tatsächlich fliegbare Weg: Nachschub kann so wenig durch das schwarze
- * Loch wie die Flotte selbst. Gerechnet wird in shared/rules.js, damit die
- * Oberfläche zum selben Ergebnis kommt.
+ * Nearest own supply base (inhabited own planet). Measured along the path
+ * that can actually be flown: supply can pass through the black hole as
+ * little as the fleet itself. Computed in shared/rules.js so the UI arrives
+ * at the same result.
  */
 function supplyDistanceFor(game, owner, point) {
   return supplyDistance(supplyBases(game, owner), point, holeZone(game.galaxy));
 }
 
-/** Darf diese Flotte dieses Ziel anfliegen? */
+/** May this fleet head for this target? */
 export function canReach(game, fleet, target) {
   const st = fleetStats(fleet);
   if (st.speed <= 0) return { ok: false, key: 'err.fleetImmobile', params: {} };
@@ -292,16 +296,16 @@ export function canReach(game, fleet, target) {
   return { ok: true };
 }
 
-// ------------------------------------------------------------------- Befehle
+// -------------------------------------------------------------------- Orders
 
-// ------------------------------------------------------- Bezahlbarkeit
+// ------------------------------------------------------- Affordability
 
 /**
- * Was dieser Spieler am Rundenende bezahlen kann - mit genau der Rechnung,
- * die auch der Client im Haushalt zeigt (shared/budget.js). Die Sicht dafuer
- * ist auf das beschraenkt, was der Haushalt braucht.
+ * What this player can pay for at the end of the turn - with exactly the
+ * calculation the client shows in the ledger (shared/budget.js). The view for
+ * it is limited to what the budget needs.
  */
-function haushalt(game, player) {
+function budgetFor(game, player) {
   return forecast({
     you: player.id,
     me: {
@@ -314,14 +318,14 @@ function haushalt(game, player) {
   });
 }
 
-/** Geht alles auf, was in Auftrag steht - Bau und Umrüstung vollstaendig? */
-function bezahlbar(game, player) {
-  const h = haushalt(game, player);
-  return h.bau.geplant.n === h.bau.gebucht.n && h.umr.geplant.n === h.umr.gebucht.n;
+/** Does everything on order work out - building and refits complete? */
+function affordable(game, player) {
+  const h = budgetFor(game, player);
+  return h.build.planned.n === h.build.booked.n && h.refit.planned.n === h.refit.booked.n;
 }
 
-/** Bauauftrag aendern; leere Eintraege verschwinden. */
-function bauSchritt(player, planetId, type, delta) {
+/** Change a build order; empty entries disappear. */
+function buildStep(player, planetId, type, delta) {
   const q = player.orders.builds[planetId] || (player.orders.builds[planetId] = {});
   q[type] = Math.max(0, (q[type] || 0) + delta);
   if (q[type] === 0) delete q[type];
@@ -330,27 +334,27 @@ function bauSchritt(player, planetId, type, delta) {
 
 export function setOrders(game, player, msg) {
   if (game.state !== 'running') return;
-  // Grundsatz: angenommen wird nur, was am Rundenende auch bezahlt werden
-  // kann. Eine Meldung "Bau unvollstaendig" darf es nicht geben - sie kaeme
-  // erst, wenn sich nichts mehr aendern laesst.
+  // Principle: only accept what can actually be paid for at the end of the
+  // turn. There must never be a "build incomplete" message - it would only
+  // arrive when nothing can be changed anymore.
   if (msg.research) {
     const r = msg.research;
-    const vorher = { budgetPct: player.research.budgetPct, weights: { ...player.research.weights } };
+    const before = { budgetPct: player.research.budgetPct, weights: { ...player.research.weights } };
     if (typeof r.budgetPct === 'number') player.research.budgetPct = clamp(Math.round(r.budgetPct), 0, 100);
     if (r.weights) {
       for (const f of TECH_FIELDS) {
         if (typeof r.weights[f] === 'number') player.research.weights[f] = clamp(Math.round(r.weights[f]), 0, 10);
       }
     }
-    // Die Forschung wird zuerst abgebucht. Nimmt sie den Auftraegen das Geld
-    // weg (oder verteuert ein Durchbruch die Schiffe), gilt der hoechste
-    // Anteil, bei dem alles aufgeht - Bauauftraege gehen vor.
-    if (!bezahlbar(game, player)) {
-      const wunsch = player.research.budgetPct;
-      while (player.research.budgetPct > 0 && !bezahlbar(game, player)) player.research.budgetPct--;
-      if (!bezahlbar(game, player)) player.research = { ...player.research, ...vorher };   // sollte nicht vorkommen
-      else if (player._forschungGedeckelt !== game.turn && player.research.budgetPct < wunsch) {
-        player._forschungGedeckelt = game.turn;      // einmal je Runde sagen, nicht bei jedem Reglerschritt
+    // Research is deducted first. If it takes the money away from the orders
+    // (or a breakthrough makes the ships more expensive), the highest share
+    // at which everything works out applies - build orders take precedence.
+    if (!affordable(game, player)) {
+      const wanted = player.research.budgetPct;
+      while (player.research.budgetPct > 0 && !affordable(game, player)) player.research.budgetPct--;
+      if (!affordable(game, player)) player.research = { ...player.research, ...before };   // should not happen
+      else if (player._researchCapped !== game.turn && player.research.budgetPct < wanted) {
+        player._researchCapped = game.turn;      // say it once per turn, not on every slider step
         return { error: 'notice.researchCapped', params: { pct: player.research.budgetPct } };
       }
     }
@@ -360,13 +364,13 @@ export function setOrders(game, player, msg) {
     const count = Math.round(Number(msg.build.count));
     const planet = planetById(game, planetId);
     if (!planet || planet.owner !== player.id || !SHIP_TYPES.includes(type) || !Number.isFinite(count) || !count) return;
-    if (count < 0) { bauSchritt(player, planetId, type, count); return; }
-    // Wo niemand lebt, baut der Server nicht - also auch nichts annehmen.
+    if (count < 0) { buildStep(player, planetId, type, count); return; }
+    // Where nobody lives, the server does not build - so accept nothing either.
     if (planet.pop < 1) return { error: 'yard.needPop' };
     for (let i = 0; i < Math.min(count, 99); i++) {
-      bauSchritt(player, planetId, type, 1);
-      if (!bezahlbar(game, player)) {
-        bauSchritt(player, planetId, type, -1);
+      buildStep(player, planetId, type, 1);
+      if (!affordable(game, player)) {
+        buildStep(player, planetId, type, -1);
         return { error: 'notice.buildUnaffordable' };
       }
     }
@@ -379,9 +383,9 @@ export function setOrders(game, player, msg) {
     }
   }
   if (msg.refit) {
-    // Umrüsten: eine Flotte im Orbit einer eigenen Werft, oder die Satelliten
-    // einer eigenen Welt. Ausgeführt wird am Rundenende nach der Forschung,
-    // also gleich mit dem neuesten Stand.
+    // Refit: a fleet in orbit of an own shipyard, or the satellites of an own
+    // world. Carried out at the end of the turn after research, so right away
+    // with the newest levels.
     const r = msg.refit;
     const key = r.fleetId != null ? 'f:' + r.fleetId : 'p:' + r.planetId;
     if (r.value === false) { delete player.orders.refit[key]; return; }
@@ -395,7 +399,7 @@ export function setOrders(game, player, msg) {
       if (!planet || planet.owner !== player.id || planet.pop < 1) return { error: 'err.refitNoYard' };
     }
     player.orders.refit[key] = true;
-    if (!bezahlbar(game, player)) {
+    if (!affordable(game, player)) {
       delete player.orders.refit[key];
       return { error: 'notice.refitUnaffordable' };
     }
@@ -408,9 +412,9 @@ export function setOrders(game, player, msg) {
   }
   if (msg.move) {
     const fleet = game.fleets.find(f => f.id === msg.move.fleetId);
-    // Nicht stumm verschlucken: wer einen Kurs befiehlt, soll erfahren, warum
-    // nichts passiert - sonst klickt man auf einen Knopf und es geschieht
-    // einfach nichts (etwa wenn die Flotte inzwischen verschmolzen ist).
+    // Do not swallow it silently: whoever orders a course should learn why
+    // nothing happens - otherwise you click a button and simply nothing
+    // happens (e.g. when the fleet has been merged in the meantime).
     if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
     if (msg.move.planetId === null) { delete player.orders.moves[fleet.id]; fleet.dest = null; return; }
     const target = planetById(game, msg.move.planetId);
@@ -443,8 +447,8 @@ export function setOrders(game, player, msg) {
 }
 
 /**
- * Führt die Umrüstaufträge eines Spielers aus. Reicht das Geld nicht für
- * alle, werden so viele Schiffe umgerüstet, wie bezahlbar sind.
+ * Carries out a player's refit orders. If the money is not enough for all
+ * of them, as many ships are refitted as can be paid for.
  */
 function refitOrders(game, p, entries) {
   for (const key of Object.keys(p.orders.refit)) {
@@ -468,7 +472,7 @@ function refitOrders(game, p, entries) {
       p.metal -= c.metal;
       p.ledger.refit.money += c.money; p.ledger.refit.metal += c.metal;
       const st = shipStats(s.type, c.tech);
-      // Der Schaden bleibt - neu ist nur, was die bessere Panzerung dazugibt.
+      // The damage stays - only what the better armor adds is new.
       s.hp = Math.max(1, s.hp + st.maxHp - s.maxHp);
       s.maxHp = st.maxHp;
       s.attack = Math.round(st.attack * 10) / 10;
@@ -489,7 +493,7 @@ function cleanupFleets(game) {
   game.fleets = game.fleets.filter(f => f.ships.length > 0);
 }
 
-// -------------------------------------------------------------- Zugauflösung
+// ----------------------------------------------------------- Turn resolution
 
 export function allReady(game) {
   return game.players.filter(p => p.alive).every(p => p.ready || p.isBot || !p.connected);
@@ -500,13 +504,13 @@ export function resolveTurn(game) {
   const rng = game.rng;
   for (const p of game.galaxy.planets) p._orbitLost = false;
 
-  // Was diese Runde wirklich gebucht wird, je Posten - zum Nachpruefen der
-  // Vorschau im Client (shared/budget.js, test/budget.js).
+  // What is really booked this turn, per item - to verify the client's
+  // forecast (shared/budget.js, test/budget.js).
   for (const p of game.players) {
     p.ledger = { research: 0, build: { money: 0, metal: 0 }, refit: { money: 0, metal: 0 }, terra: 0, income: 0, mined: 0 };
   }
 
-  // 1) Forschung
+  // 1) Research
   for (const p of game.players) {
     if (!p.alive) continue;
     const budget = Math.min(p.money, Math.floor(p.money * p.research.budgetPct / 100));
@@ -515,7 +519,7 @@ export function resolveTurn(game) {
     if (total <= 0) continue;
     p.money -= budget;
     p.ledger.research = budget;
-    const vorher = { ...p.tech };
+    const before = { ...p.tech };
     const advanced = [];
     for (const f of TECH_FIELDS) {
       const share = budget * p.research.weights[f] / total;
@@ -525,8 +529,8 @@ export function resolveTurn(game) {
         p.researchPoints[f] -= techCostToNext(p.tech[f]);
         p.tech[f]++;
       }
-      // Gegen den Stand vor dieser Runde - auch der allererste Durchbruch zaehlt.
-      if (p.tech[f] > vorher[f]) advanced.push({ field: f, level: p.tech[f] });
+      // Against the levels before this turn - the very first breakthrough counts too.
+      if (p.tech[f] > before[f]) advanced.push({ field: f, level: p.tech[f] });
     }
     if (advanced.length) {
       entries.push({ type: 'tech', playerIds: [p.id], private: p.id,
@@ -534,7 +538,7 @@ export function resolveTurn(game) {
     }
   }
 
-  // 2) Schiffsbau
+  // 2) Shipbuilding
   for (const p of game.players) {
     if (!p.alive) continue;
     for (const [pid, queue] of Object.entries(p.orders.builds)) {
@@ -611,9 +615,9 @@ export function resolveTurn(game) {
     }
   }
 
-  // 4) Bewegung
+  // 4) Movement
   const zone = holeZone(game.galaxy);
-  const abflug = [];                 // [Flotte, Welt, von der sie diesen Zug abfliegt]
+  const departures = [];            // [fleet, world it departs from this turn]
   for (const fleet of game.fleets) {
     if (fleet.dest == null) continue;
     const start = fleet.at;
@@ -629,10 +633,10 @@ export function resolveTurn(game) {
         because: { key: reach.key, params: reach.params } });
       continue;
     }
-    // Um das schwarze Loch herum statt hindurch - der Weg wird dadurch länger.
+    // Around the black hole instead of through it - this makes the path longer.
     const step = advance(fleet, route(fleet, target, zone), st.speed);
     fleet.x = step.x; fleet.y = step.y; fleet.z = step.z;
-    if (start != null && start !== fleet.dest) abflug.push([fleet, start]);
+    if (start != null && start !== fleet.dest) departures.push([fleet, start]);
     if (step.done) {
       fleet.at = target.id; fleet.dest = null;
       if (owner) {
@@ -646,19 +650,19 @@ export function resolveTurn(game) {
   }
   for (const p of game.players) p.orders.moves = {};
 
-  // 5) Kampf. Wer abfliegt, waehrend ein bewaffneter Gegner im Orbit steht,
-  // wird abgefangen: INTERCEPT_ROUNDS Gefechtsrunden muss er noch
-  // ueberstehen, dann ist er fort. Sonst entkaeme jeder Spaeher, weil alle Zuege gleichzeitig laufen.
+  // 5) Combat. Whoever departs while an armed enemy is in orbit gets
+  // intercepted: they still have to survive INTERCEPT_ROUNDS combat rounds,
+  // then they are gone. Otherwise every scout would escape, since all moves happen simultaneously.
   for (const planet of game.galaxy.planets) {
-    const fliehen = abflug
-      .filter(([f, von]) => von === planet.id && f.ships.length && game.fleets.some(g =>
+    const fleeing = departures
+      .filter(([f, from]) => from === planet.id && f.ships.length && game.fleets.some(g =>
         g.at === planet.id && g.owner !== f.owner && g.ships.some(s => s.attack > 0)))
       .map(([f]) => f);
-    resolveCombatAt(game, planet, entries, rng, fliehen);
+    resolveCombatAt(game, planet, entries, rng, fleeing);
   }
   cleanupFleets(game);
 
-  // 6) Kolonisierung und Invasion
+  // 6) Colonization and invasion
   for (const planet of game.galaxy.planets) {
     const present = presentOwners(game, planet);
     if (present.length !== 1) continue;
@@ -668,7 +672,7 @@ export function resolveTurn(game) {
     const cap = planetCapacity(planet);
 
     if (planet.owner && planet.owner !== owner) {
-      // Feindwelt ohne verbliebene Abwehr: Invasion
+      // Enemy world without remaining defenses: invasion
       const armed = game.fleets.some(f => f.owner === owner && f.at === planet.id && f.ships.some(s => s.attack > 0));
       if (armed) {
         const old = playerById(game, planet.owner);
@@ -683,9 +687,9 @@ export function resolveTurn(game) {
       continue;
     }
 
-    // Eigene oder freie Welt: Siedler gehen von Bord. Auf eigenen Welten nur
-    // auf ausdrücklichen Befehl - sonst löst sich das Kolonieschiff
-    // gleich im Heimatorbit auf.
+    // Own or free world: settlers disembark. On own worlds only on explicit
+    // orders - otherwise the colony ship would dissolve right in the home
+    // orbit.
     const unowned = planet.owner === null;
     if (!unowned && !p.orders.unload[planet.id]) continue;
 
@@ -715,7 +719,7 @@ export function resolveTurn(game) {
   for (const p of game.players) p.orders.unload = {};
   cleanupFleets(game);
 
-  // 7) Wirtschaft
+  // 7) Economy
   for (const p of game.players) { p.income = 0; }
   for (const planet of game.galaxy.planets) {
     if (!planet.owner) continue;
@@ -750,8 +754,8 @@ export function resolveTurn(game) {
     p.income = Math.round(p.income);
   }
 
-  // 8) Ausdehnung, Sichtbarkeit, Statistik, Ausscheiden - erst wachsen, dann
-  // schauen: neue Welten im Scannerbereich sind sonst eine Runde lang blind.
+  // 8) Expansion, visibility, statistics, elimination - grow first, then
+  // look: otherwise new worlds within scanner range stay blind for a turn.
   maybeExpand(game, entries);
   updateVisibility(game);
   for (const p of game.players) {
@@ -760,10 +764,10 @@ export function resolveTurn(game) {
     p.stats.pop = Math.round(planets.reduce((a, q) => a + q.pop, 0) * 10) / 10;
     p.stats.ships = game.fleets.filter(f => f.owner === p.id).reduce((a, f) => a + f.ships.length, 0)
       + game.galaxy.planets.reduce((a, q) => a + ((q.owner === p.id && q.defenses) ? q.defenses.length : 0), 0);
-    // Ohne Welt ist Schluss: Reichweite misst sich an eigenen bewohnten Welten,
-    // übrig gebliebene Schiffe kämen also nirgends mehr hin. Sie verschwinden
-    // mit dem Reich, statt als Geisterflotten auf der Karte zu stehen. (Ein
-    // Kolonieschiff über einer freien Welt hat oben schon landen dürfen.)
+    // Without a world it is over: range is measured from own inhabited worlds,
+    // so leftover ships could not go anywhere anymore. They vanish with the
+    // empire instead of standing on the map as ghost fleets. (A colony ship
+    // above a free world has already been allowed to land above.)
     if (p.alive && p.stats.planets === 0) {
       p.alive = false;
       game.fleets = game.fleets.filter(f => f.owner !== p.id);
@@ -774,6 +778,7 @@ export function resolveTurn(game) {
   }
 
   game.turn++;
+  game.lastTurnAt = Date.now();
   for (const p of game.players) p.ready = false;
   pushLog(game, entries);
 
@@ -794,32 +799,32 @@ export function resolveTurn(game) {
   return entries;
 }
 
-const EDGE_TRIGGER = 200;    // Abstand zur äußersten Welt, ab dem die Karte nachgibt
-// Die Himmelsrichtung kommt als Schluesselwort heraus; benannt wird sie im
-// Katalog (dir.left ... dir.bottom).
+const EDGE_TRIGGER = 200;    // distance to the outermost world at which the map gives way
+// The direction comes out as a keyword; it is named in the catalog
+// (dir.left ... dir.bottom).
 
 /**
- * Erkundung dehnt die Karte: wer den äußersten Welten nahe kommt, schiebt die
- * Grenze weiter hinaus. Höchstens ein Streifen pro Runde - die dringendste
- * Richtung zuerst -, damit die Galaxie wächst und nicht springt.
+ * Exploration stretches the map: whoever comes close to the outermost worlds
+ * pushes the border further out. At most one strip per turn - the most urgent
+ * direction first - so the galaxy grows instead of jumping.
  */
 function maybeExpand(game, entries) {
   if (game.settings.expanding === false) return;
   const g = game.galaxy;
-  // Neues Land erst, wenn das alte weitgehend vergeben ist: Solange es mehr
-  // als zwei freie bewohnbare Welten je lebendem Reich gibt, bleibt die Karte,
-  // wie sie ist - sonst wüchse sie ins Uferlose. Unbewohnbare Welten zählen
-  // nicht mit, die nimmt ohnehin niemand.
-  const lebende = game.players.filter(p => p.alive).length;
-  let frei = 0;
-  for (const q of g.planets) if (!q.owner && planetCapacity(q) >= 1) frei++;
-  if (frei > Math.max(3, lebende * 2)) return;
+  // New land only once the old one is largely taken: as long as there are
+  // more than two free habitable worlds per living empire, the map stays as
+  // it is - otherwise it would grow without bounds. Uninhabitable worlds do
+  // not count, nobody takes them anyway.
+  const living = game.players.filter(p => p.alive).length;
+  let free = 0;
+  for (const q of g.planets) if (!q.owner && planetCapacity(q) >= 1) free++;
+  if (free > Math.max(3, living * 2)) return;
   const eyes = [];
   for (const q of g.planets) if (q.owner) eyes.push(q);
   for (const f of game.fleets) eyes.push(f);
   if (!eyes.length) return;
 
-  // Spirale: gemessen wird vom Kern nach außen, und sie wächst als Ring.
+  // Spiral: measured from the core outwards, and it grows as a ring.
   if (g.field) {
     let maxR = 0;
     for (const e of eyes) maxR = Math.max(maxR, Math.hypot(e.x - g.field.cx, e.y - g.field.cy));
@@ -831,8 +836,8 @@ function maybeExpand(game, entries) {
     return;
   }
 
-  // Gemessen wird zur Grenze, nicht zur äußersten Welt: neue Welten halten
-  // Abstand zum Rand, also muss man für den nächsten Streifen weiter hinaus.
+  // Measured to the border, not to the outermost world: new worlds keep
+  // their distance from the edge, so you have to go further out for the next strip.
   let best = null, bestD = EDGE_TRIGGER;
   for (const e of eyes) {
     if (e.x - g.minX < bestD) { bestD = e.x - g.minX; best = 'left'; }
@@ -848,8 +853,8 @@ function maybeExpand(game, entries) {
     params: { count: added.length, direction: best } });
 }
 
-// Zahlen gehen ungeformt raus - wie sie geschrieben werden (Komma oder
-// Punkt), entscheidet die Sprache des Clients.
+// Numbers go out unformatted - how they are written (comma or period) is
+// up to the client's language.
 function round1(n) { return Math.round(n * 10) / 10; }
 
 function makeDefense(game, type, tech) {
@@ -871,8 +876,8 @@ function nearestName(game, point) {
 }
 
 /**
- * Welche Spieler haben Schiffe bei diesem Planeten? Die Bevölkerung allein
- * hält den Orbit nicht - genau daran scheitern wehrlose Kolonien.
+ * Which players have ships at this planet? The population alone does not
+ * hold the orbit - that is exactly where defenseless colonies fail.
  */
 function presentOwners(game, planet) {
   const set = new Set();
@@ -882,7 +887,7 @@ function presentOwners(game, planet) {
   return [...set];
 }
 
-function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
+function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   const sides = new Map();
   let battery = null;
   for (const f of game.fleets) {
@@ -890,18 +895,18 @@ function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
     if (!sides.has(f.owner)) sides.set(f.owner, []);
     sides.get(f.owner).push(...f.ships);
   }
-  // Abgefangene kaempfen nur die ersten INTERCEPT_ROUNDS Runden mit
-  const flucht = new Set();
-  for (const f of fliehen) {
+  // Intercepted ships only fight during the first INTERCEPT_ROUNDS rounds
+  const escaping = new Set();
+  for (const f of fleeing) {
     if (!sides.has(f.owner)) sides.set(f.owner, []);
     sides.get(f.owner).push(...f.ships);
-    for (const s of f.ships) flucht.add(s);
+    for (const s of f.ships) escaping.add(s);
   }
   if (planet.owner && planet.defenses && planet.defenses.length) {
     if (!sides.has(planet.owner)) sides.set(planet.owner, []);
     sides.get(planet.owner).push(...planet.defenses);
   }
-  // Nur kämpfen, wenn überhaupt ein Fremder im Orbit steht
+  // Only fight if there is any stranger in orbit at all
   const intruder = [...sides.keys()].some(o => o !== planet.owner);
   if (!intruder) return;
   if (planet.owner) {
@@ -919,42 +924,42 @@ function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
 
   const before = new Map([...sides].map(([k, v]) => [k, v.length]));
 
-  // Mitschrift fuer die Wiederholung im Client: jede Einheit einmal, jeder
-  // Schuss als [Schuetze, Ziel, Schaden]. Kompakt, weil sie mit der Sicht reist.
+  // Record for the replay in the client: every unit once, every shot as
+  // [shooter, target, damage]. Compact, because it travels with the view.
   const owners = [...sides.keys()];
   const units = [];
-  const nr = new Map();
+  const idx = new Map();
   owners.forEach((owner, k) => {
     for (const s of sides.get(owner)) {
-      nr.set(s, units.length);
+      idx.set(s, units.length);
       units.push([k, s.isBattery ? 'battery' : s.type, s.hp, round1(s.maxHp)]);
     }
   });
   const rounds = [];
 
   for (let round = 0; round < COMBAT_ROUNDS; round++) {
-    const dabei = s => s.hp > 0 && (round < INTERCEPT_ROUNDS || !flucht.has(s));
-    const alive = [...sides].filter(([, ships]) => ships.some(dabei));
+    const engaged = s => s.hp > 0 && (round < INTERCEPT_ROUNDS || !escaping.has(s));
+    const alive = [...sides].filter(([, ships]) => ships.some(engaged));
     if (alive.length < 2) break;
     const damage = [];
     for (const [owner, ships] of alive) {
-      const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(dabei));
+      const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(engaged));
       if (!enemies.length) continue;
       for (const s of ships) {
-        if (!dabei(s) || s.attack <= 0) continue;
+        if (!engaged(s) || s.attack <= 0) continue;
         const t = enemies[Math.floor(rng() * enemies.length)];
-        // Auf Zehntel gerundet - genau so steht er in der Mitschrift.
+        // Rounded to tenths - exactly as it appears in the record.
         damage.push([t, round1(s.attack * (0.75 + rng() * 0.5)), s]);
       }
     }
-    rounds.push(damage.map(([t, dmg, s]) => [nr.get(s), nr.get(t), dmg]));
-    // Auf Zehntel, wie der Schaden: sonst bliebe nach dem Abziehen ein
-    // Rest wie 2e-15 stehen, und ein Schiff ohne Huelle floege weiter.
+    rounds.push(damage.map(([t, dmg, s]) => [idx.get(s), idx.get(t), dmg]));
+    // To tenths, like the damage: otherwise a remainder like 2e-15 would be
+    // left after subtracting, and a ship without a hull would fly on.
     for (const [t, dmg] of damage) t.hp = round1(t.hp - dmg);
     for (const [, ships] of sides) for (const s of ships) if (s.hp < 0) s.hp = 0;
   }
 
-  // Verluste eintragen
+  // Record losses
   for (const [owner, ships] of sides) {
     const lost = ships.filter(s => s.hp <= 0 && !s.isBattery).length;
     const p = playerById(game, owner);
@@ -968,13 +973,13 @@ function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
       key: 'log.batteryBroken',
       params: { planet: planet.name, before: round1(before), after: round1(planet.pop) } });
   }
-  // Toten entfernen
+  // Remove the dead
   for (const f of game.fleets) {
-    if (f.at === planet.id || fliehen.includes(f)) f.ships = f.ships.filter(s => s.hp > 0);
+    if (f.at === planet.id || fleeing.includes(f)) f.ships = f.ships.filter(s => s.hp > 0);
   }
   if (planet.defenses) planet.defenses = planet.defenses.filter(s => s.hp > 0);
 
-  // Wer noch Waffen hat, beherrscht den Orbit; wehrlose Schiffe gehen verloren.
+  // Whoever still has weapons controls the orbit; defenseless ships are lost.
   const armedOwners = new Set();
   for (const f of game.fleets) if (f.at === planet.id && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
   if (planet.defenses && planet.defenses.some(s => s.attack > 0)) armedOwners.add(planet.owner);
@@ -986,35 +991,35 @@ function resolveCombatAt(game, planet, entries, rng, fliehen = []) {
       if (f.at === planet.id && f.owner !== victor && f.ships.length) {
         const p = playerById(game, f.owner);
         if (p) p.stats.losses += f.ships.length;
-        for (const s of f.ships) if (nr.has(s)) scuttled.push(nr.get(s));
+        for (const s of f.ships) if (idx.has(s)) scuttled.push(idx.get(s));
         f.ships = [];
       }
     }
   }
 
-  // Jede Seite als eigener Posten - der Satz drumherum gehoert in den Katalog.
-  const bilanz = [];
+  // Every side as its own item - the sentence around it belongs in the catalog.
+  const tally = [];
   for (const [owner, n] of before) {
     const p = playerById(game, owner);
-    const left = (game.fleets.filter(f => (f.at === planet.id || fliehen.includes(f)) && f.owner === owner)
+    const left = (game.fleets.filter(f => (f.at === planet.id || fleeing.includes(f)) && f.owner === owner)
       .reduce((a, f) => a + f.ships.length, 0))
       + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0);
-    bilanz.push({ name: p ? p.name : String(owner), left, before: n });
+    tally.push({ name: p ? p.name : String(owner), left, before: n });
   }
   entries.push({
     type: 'combat', planetId: planet.id, playerIds: [...before.keys()],
-    key: 'log.battle', params: { planet: planet.name, sides: bilanz },
-    battle: { sides: owners, units, rounds, scuttled, fled: [...flucht].map(s => nr.get(s)) }
+    key: 'log.battle', params: { planet: planet.name, sides: tally },
+    battle: { sides: owners, units, rounds, scuttled, fled: [...escaping].map(s => idx.get(s)) }
   });
   cleanupFleets(game);
 }
 
-// --------------------------------------------------------------- Sichtbarkeit
+// ---------------------------------------------------------------- Visibility
 
 export function updateVisibility(game) {
   for (const p of game.players) {
-    // Eigene Welten und Flotten einmal sammeln: die Karte wächst, sonst würde
-    // hier mit jeder neuen Welt jede gegen jede geprüft.
+    // Collect own worlds and fleets once: the map grows, otherwise every new
+    // world would be checked against every other here.
     const mine = game.galaxy.planets.filter(q => q.owner === p.id);
     const myFleets = game.fleets.filter(f => f.owner === p.id);
     for (const planet of game.galaxy.planets) {
@@ -1024,10 +1029,10 @@ export function updateVisibility(game) {
         p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn);
       }
     }
-    // Scanner: eigene Welten und Flotten sehen die Nachbarschaft grob - und
-    // zwar jede Runde neu. Nur beim ersten Entdecken aufzunehmen hiesse: eine
-    // Welt, die frei war, bliebe frei auf der Karte, auch wenn nebenan laengst
-    // jemand gesiedelt hat.
+    // Scanners: own worlds and fleets roughly see their neighborhood - anew
+    // every turn. Recording only on first discovery would mean: a world that
+    // was free would stay free on the map, even if someone settled there
+    // long ago.
     for (const planet of game.galaxy.planets) {
       if (planet.owner === p.id || myFleets.some(f => f.at === planet.id)) continue;
       const seen = mine.some(q => dist(q, planet) < 230)
@@ -1052,8 +1057,8 @@ function snapshotPlanet(game, planet, turn) {
 }
 
 /**
- * Kampfwerte der Satelliten einer eigenen Welt: zusammen, und der schwaechste
- * Techstand - der sagt, ob sich Umruesten lohnt.
+ * Combat stats of the satellites of an own world: combined, and the weakest
+ * tech level - that tells whether a refit is worth it.
  */
 function defenseStats(planet) {
   const d = planet.defenses || [];
@@ -1069,8 +1074,8 @@ function defenseStats(planet) {
 
 function pushLog(game, entries) {
   if (!entries.length) return;
-  // Nur die juengste Runde behaelt ihre Schlachtmitschriften - aeltere
-  // braucht niemand mehr, und sie wuerden mit jeder Sicht mitreisen.
+  // Only the latest turn keeps its battle records - nobody needs older
+  // ones, and they would travel along with every view.
   for (const l of game.log.slice(-3)) {
     if (l.turn < game.turn) for (const e of l.entries) delete e.battle;
   }
@@ -1078,10 +1083,10 @@ function pushLog(game, entries) {
   if (game.log.length > 120) game.log.shift();
 }
 
-// ------------------------------------------------------------- Sicht pro Spieler
+// ------------------------------------------------------------- View per player
 
 export function buildView(game, player) {
-  const vis = new Set();   // Planeten mit aktueller Sicht
+  const vis = new Set();   // planets with current sight
   for (const planet of game.galaxy.planets) {
     if (planet.owner === player.id || game.fleets.some(f => f.owner === player.id && f.at === planet.id)) vis.add(planet.id);
   }
@@ -1093,13 +1098,13 @@ export function buildView(game, player) {
         ...base, known: 'live',
         temp: p.temp, grav: p.grav, sizeFactor: p.sizeFactor,
         metalRichness: p.metalRichness,
-        // Genau, nicht gerundet: der Haushalt im Client rechnet damit die
-        // Foerderung nach (gerundet wird erst bei der Anzeige).
+        // Exact, not rounded: the client's ledger recomputes the mining with
+        // it (rounding only happens on display).
         metalReserve: p.owner === player.id ? p.metalReserve : Math.round(p.metalReserve),
         owner: p.owner, pop: p.pop,
         defenses: p.defenses ? p.defenses.length : 0,
-        // Typ und Techstand jedes Satelliten: umgerüstet wird mit dem Stand
-        // nach der Forschung, und den kennt erst der Client-Haushalt.
+        // Type and tech level of every satellite: refits use the levels after
+        // research, and only the client's ledger knows those.
         defenseShips: p.owner === player.id && p.defenses ? p.defenses.map(d => ({ type: d.type, tech: d.tech })) : null,
         defenseStats: p.owner === player.id ? defenseStats(p) : null,
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
@@ -1107,10 +1112,10 @@ export function buildView(game, player) {
       };
     }
     const k = player.knowledge[p.id];
-    // Eine Erinnerung, in der man selbst Besitzer war, ist ueberholt: liefe
-    // die Welt noch auf einen, waere sie oben in Sicht. Den Verlust hat das
-    // Protokoll gemeldet - also auch hier nicht mehr als eigene zeigen, sonst
-    // zaehlen Liste, Einkommen und Werft eine Welt mit, die einem nicht gehoert.
+    // A memory in which you were the owner yourself is outdated: if the world
+    // still belonged to you, it would be in sight above. The log has reported
+    // the loss - so do not show it as your own here either, otherwise the list,
+    // income and shipyard would count a world that is not yours.
     if (k) {
       const owner = k.owner === player.id ? p.owner : k.owner;
       return { ...base, known: 'memory', ...k, owner, terraBudget: 0, isHomeworld: !!p.isHomeworld };
@@ -1118,7 +1123,7 @@ export function buildView(game, player) {
     return { ...base, known: 'unknown' };
   });
 
-  // Flotten: eigene immer, fremde bei Sichtkontakt
+  // Fleets: own ones always, foreign ones on sight contact
   const fleets = [];
   for (const f of game.fleets) {
     if (!f.ships.length) continue;
@@ -1137,16 +1142,16 @@ export function buildView(game, player) {
       || game.galaxy.planets.some(q => q.owner === player.id && dist(q, f) < 300)
       || game.fleets.some(g => g.owner === player.id && g.ships.length && dist(g, f) < 240);
     if (detected) {
-      // Wer eine fremde Flotte im eigenen Raum hat, klärt sie so weit auf, dass
-      // er ihren Kurs und die Ankunft kennt - womit sie fliegt, bleibt verdeckt.
-      const ziel = f.dest != null ? planetById(game, f.dest) : null;
-      const tempo = ziel ? fleetStats(f).speed : 0;
+      // Whoever has a foreign fleet in their own space scouts it well enough to
+      // know its course and arrival - what it flies with stays hidden.
+      const target = f.dest != null ? planetById(game, f.dest) : null;
+      const speed = target ? fleetStats(f).speed : 0;
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0),
-        dest: ziel ? ziel.id : null,
-        eta: ziel && tempo > 0
-          ? Math.max(1, Math.ceil(travelDistance(f, ziel, holeZone(game.galaxy)) / tempo))
+        dest: target ? target.id : null,
+        eta: target && speed > 0
+          ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
         mine: false, count: f.ships.length,
         ships: f.ships.map(s => ({ id: s.id, type: s.type })),
@@ -1162,7 +1167,7 @@ export function buildView(game, player) {
     you: player.id,
     deadline: game.turnDeadline,
     mode: game.settings.mode || 'classic',
-    maxTurns: game.settings.maxTurns || 0,       // 0 = ohne Limit: es gewinnt, wer uebrig bleibt
+    maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -1172,8 +1177,8 @@ export function buildView(game, player) {
     },
     me: {
       id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
-      // Auf eine Nachkommastelle genau, wie der Server rechnet - mit dem
-      // gerundeten Stand laege die Forschungsvorschau gelegentlich um 1 daneben.
+      // Accurate to one decimal, as the server computes - with the rounded
+      // amount the research forecast would occasionally be off by 1.
       money: Math.round(player.money * 10) / 10, metal: Math.round(player.metal * 10) / 10, income: player.income,
       tech: { ...player.tech },
       techProgress: Object.fromEntries(TECH_FIELDS.map(f => [f, {
@@ -1199,8 +1204,8 @@ export function buildView(game, player) {
 }
 
 /**
- * Sicht für Zuschauer: keine Nebel, kein eigenes Reich. Alles liegt offen -
- * Technikstände, Kassen und das vollständige Protokoll.
+ * View for spectators: no fog, no empire of their own. Everything is out in
+ * the open - tech levels, treasuries and the complete log.
  */
 export function buildSpectatorView(game) {
   const planets = game.galaxy.planets.map(p => ({
@@ -1234,7 +1239,7 @@ export function buildSpectatorView(game) {
     deadline: null,
     pace: { ...game.pace },
     mode: game.settings.mode || 'classic',
-    maxTurns: game.settings.maxTurns || 0,       // 0 = ohne Limit: es gewinnt, wer uebrig bleibt
+    maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -1258,8 +1263,8 @@ export function buildSpectatorView(game) {
 }
 
 /**
- * Ein Protokolleintrag fuer den Client: Schluessel und Werte statt fertigem
- * Satz - der Satz entsteht erst dort, in der Sprache des Spielers.
+ * A log entry for the client: key and values instead of a finished sentence -
+ * the sentence is only assembled there, in the player's language.
  */
 function logEntry(e) {
   const out = {
@@ -1270,7 +1275,7 @@ function logEntry(e) {
   return out;
 }
 
-/** Alle sehen Siege und Ausscheiden; alles andere nur die Beteiligten. */
+/** Everyone sees victories and eliminations; everything else only those involved. */
 const PUBLIC_ENTRIES = new Set(['start', 'victory', 'eliminated']);
 function visibleEntry(e, playerId) {
   if (e.private && e.private !== playerId) return false;
@@ -1286,10 +1291,37 @@ export function lobbyView(game) {
     settings: game.settings,
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar,
-      // Das Konto dahinter, wenn der Anzeigename anders lautet - wer mit
-      // wem spielt, soll erkennbar bleiben.
+      // The account behind it if the display name differs - who plays with
+      // whom should remain recognizable.
       account: p.account && p.account.toLowerCase() !== p.name.toLowerCase() ? p.account : null,
       isBot: p.isBot, persona: p.persona, connected: p.connected
+    }))
+  };
+}
+
+/**
+ * A game as the admin overview shows it: who plays, since when, and how far
+ * along it is. No fog-of-war data - just the bookkeeping.
+ */
+export function adminGameView(game) {
+  return {
+    id: game.id,
+    state: game.state,
+    host: game.hostName,
+    mode: game.settings.mode,
+    shape: game.settings.shape,
+    turn: game.turn,
+    maxTurns: game.settings.maxTurns || 0,
+    created: game.created,
+    startedAt: game.startedAt,
+    lastTurnAt: game.lastTurnAt,
+    spectators: game.spectators.size,
+    winner: game.winner || null,
+    players: game.players.map(p => ({
+      id: p.id, name: p.name, color: p.color, avatar: p.avatar, account: p.account,
+      isBot: p.isBot, persona: p.persona, connected: p.connected,
+      alive: p.alive, ready: p.ready, joinedAt: p.joinedAt,
+      stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     }))
   };
 }

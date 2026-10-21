@@ -1,4 +1,4 @@
-// Sternkarten-Generator.
+// Star map generator.
 import {
   IDEAL, TEMP_RANGE, GRAV_RANGE, HOLE_BLOCK, dist, clamp, habitability, shipStats, travelDistance
 } from '../shared/rules.js';
@@ -22,8 +22,8 @@ const PLANET_NAMES = [
   'Thuban', 'Turais', 'Unukalhai', 'Vindemiatrix', 'Wasat', 'Wezen', 'Yed', 'Zaurak'
 ];
 
-// Silben für Welten jenseits der Namensliste - die Galaxie wächst, die Liste
-// ist endlich.
+// Syllables for worlds beyond the name list - the galaxy grows, the list
+// is finite.
 const SYL_A = ['Ar', 'Bel', 'Cor', 'Dra', 'El', 'Fen', 'Gal', 'Hy', 'Ith', 'Kar',
   'Lum', 'Mor', 'Nyx', 'Or', 'Pra', 'Quel', 'Rha', 'Sol', 'Tir', 'Ul', 'Vor',
   'Wyn', 'Xar', 'Yel', 'Zan', 'Ceph', 'Dir', 'Esh', 'Ghal', 'Ion'];
@@ -31,19 +31,19 @@ const SYL_B = ['ka', 'mir', 'dor', 'sae', 'tun', 'vel', 'ran', 'gis', 'lon',
   'thar', 'nis', 'pha', 'ryn', 'sek', 'tor', 'bar', 'dun', 'qis'];
 const SYL_C = ['', '', '', 'a', 'is', 'on', 'ar', 'eth', 'ux', 'or'];
 
-/** Breite eines neuen Streifens und Fläche je Welt (hält die Dichte konstant). */
+/** Width of a new strip and area per world (keeps the density constant). */
 export const BAND = 440;
 const AREA_PER_PLANET = 60000;
 const MIN_GAP = 78;
-// Randstreifen ohne Welten. Er sorgt dafür, dass die Karte nur nachgibt, wenn
-// jemand wirklich hinausfliegt - sonst stünde die nächste Welt gleich wieder
-// an der neuen Grenze und die Galaxie wüchse von allein weiter.
+// Border strip without worlds. It ensures the map only gives way when someone
+// really flies out - otherwise the next world would sit right at the new
+// border again and the galaxy would keep growing by itself.
 const MARGIN = 110;
-// Räumlicher Modus: die Galaxie ist eine Linse - in der Fläche weit, in der
-// Höhe etwa 40 % davon, und zum Rand hin dünner.
-const DEPTH_RATIO = 0.3;        // halbe Dicke, bezogen auf die kürzere Kante
+// 3D mode: the galaxy is a lens - wide in the plane, about 40 % of that in
+// height, and thinner towards the edge.
+const DEPTH_RATIO = 0.3;        // half thickness, relative to the shorter edge
 
-/** Deterministischer PRNG (mulberry32), damit Partien reproduzierbar sind. */
+/** Deterministic PRNG (mulberry32) so games are reproducible. */
 export function makeRng(seed) {
   let a = seed >>> 0;
   return function () {
@@ -60,11 +60,10 @@ function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 const HOLE_NAMES = ['Charybdis', 'Abyssos', 'Erebos', 'Tartaros', 'Mahlstrom', 'Nyx', 'Skylla'];
 
 /**
- * Dichtefeld einer Spiralgalaxie: zwei logarithmische Arme um einen dichten
- * Kern, drumherum ein dünner Halo, und in der Mitte ein Loch - dort sitzt das
- * schwarze Loch. Die Erzeugung würfelt Punkte und nimmt sie mit dieser
- * Wahrscheinlichkeit an; die Ausdehnung später genauso, dann setzen sich die
- * Arme nach außen fort.
+ * Density field of a spiral galaxy: two logarithmic arms around a dense core,
+ * a thin halo around them, and a hole in the middle - that is where the black
+ * hole sits. Generation rolls points and accepts them with this probability;
+ * later expansion does the same, so the arms continue outwards.
  */
 function spiralField(cx, cy, rOut, arms, twist) {
   const rIn = rOut * 0.13;
@@ -75,14 +74,14 @@ function spiralField(cx, cy, rOut, arms, twist) {
     density(x, y) {
       const dx = x - cx, dy = y - cy;
       const r = Math.hypot(dx, dy);
-      if (r < rIn) return 0;                       // Sperrzone um das schwarze Loch
-      // Welchen Winkel hätte ein Arm bei diesem Radius?
+      if (r < rIn) return 0;                       // exclusion zone around the black hole
+      // What angle would an arm have at this radius?
       const armTheta = Math.log(r / rIn) / b;
       let d = (Math.atan2(dy, dx) - armTheta) % period;
       if (d > period / 2) d -= period;
       else if (d < -period / 2) d += period;
-      const across = Math.abs(d) * r;              // Abstand quer zum Arm
-      const w = rOut * (0.05 + 0.08 * r / rOut);   // Arme werden außen breiter
+      const across = Math.abs(d) * r;              // distance across the arm
+      const w = rOut * (0.05 + 0.08 * r / rOut);   // arms get wider further out
       const arm = Math.exp(-(across * across) / (2 * w * w));
       const bulge = Math.exp(-((r / (rOut * 0.16)) ** 2));
       const falloff = Math.exp(-r / (rOut * 0.62));
@@ -92,40 +91,40 @@ function spiralField(cx, cy, rOut, arms, twist) {
 }
 
 /**
- * Ein Punkt auf den Spiralarmen. Beim Erzeugen wird direkt hier gewürfelt -
- * das gibt deutlich klarere Arme als ein Ablehnungsverfahren über die ganze
- * Fläche, bei dem der dichte Kern den Rest verschluckt.
+ * A point on the spiral arms. During generation the roll happens directly
+ * here - that gives much clearer arms than rejection sampling over the whole
+ * area, where the dense core swallows the rest.
  */
 function spiralPoint(field, rng) {
   const { rIn, rOut, arms, b, cx, cy } = field;
-  if (rng() < 0.14) {                                  // Kernwulst
+  if (rng() < 0.14) {                                  // core bulge
     const r = rIn * (1.05 + rng() * 1.2);
     const a = rng() * Math.PI * 2;
     return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
   }
-  const t = Math.pow(rng(), 0.7);                      // nach außen hin mehr
+  const t = Math.pow(rng(), 0.7);                      // more towards the outside
   const theta = t * Math.log(rOut / rIn) / b;
   const r = rIn * Math.exp(b * theta);
-  const w = rOut * (0.032 + 0.05 * r / rOut);          // Streuung quer zum Arm
+  const w = rOut * (0.032 + 0.05 * r / rOut);          // spread across the arm
   const ang = theta + Math.floor(rng() * arms) * (2 * Math.PI / arms)
     + ((rng() + rng() + rng() - 1.5) * w) / Math.max(r, 1);
   const rr = Math.max(rIn * 1.05, r + (rng() + rng() - 1) * w);
   return [cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr];
 }
 
-/** Höhe einer Welt in der Linse: mittig dicker, am Rand flacher. */
+/** Height of a world in the lens: thicker in the middle, flatter at the edge. */
 function lensZ(galaxy, rng, x, y) {
   const half = galaxy.halfDepth;
   if (!half) return 0;
   const c = galaxy.core;
   const d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2) / c.r;
   const thick = half * Math.max(0.25, 1 - 0.55 * Math.min(1.4, d));
-  const g = rng() + rng() - 1;                     // -1..1, zur Mitte hin dichter
+  const g = rng() + rng() - 1;                     // -1..1, denser towards the middle
   return Math.round(g * thick);
 }
 
 /**
- * Erzeugt die Galaxie.
+ * Generates the galaxy.
  * @param {{playerCount:number, planetsPerPlayer?:number, seed?:number,
  *          mode?:'classic'|'space', shape?:'scatter'|'spiral'}} opts
  */
@@ -136,9 +135,9 @@ export function generateGalaxy(opts) {
   const rng = makeRng(seed);
 
   const count = Math.max(playerCount * 2, Math.round(playerCount * perPlayer));
-  // Flaeche wächst mit der Planetenzahl, damit die Dichte konstant bleibt.
+  // Area grows with the number of planets so the density stays constant.
   const area = count * 60000;
-  // Eine Spirale ist rund - im Breitformat blieben die Ecken leer.
+  // A spiral is round - in a wide format the corners would stay empty.
   const spiral = opts.shape === 'spiral';
   const aspect = spiral ? 1.1 : 1.45;
   const height = Math.sqrt(area / aspect);
@@ -155,7 +154,7 @@ export function generateGalaxy(opts) {
 
   const planets = [];
   const names = PLANET_NAMES.slice();
-  // Namen mischen
+  // Shuffle names
   for (let i = names.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [names[i], names[j]] = [names[j], names[i]];
@@ -191,8 +190,8 @@ export function generateGalaxy(opts) {
   for (const h of homes) ensureNeighbours(planets, planets[h], names, rng, zone, bounds, minGap);
   const galaxy = {
     seed,
-    // Grenzen statt fester Maße: die Karte kann in jede Richtung wachsen,
-    // Koordinaten dürfen dabei negativ werden.
+    // Bounds instead of fixed dimensions: the map can grow in every direction,
+    // and coordinates may become negative in the process.
     minX: 0, minY: 0, maxX: Math.round(width), maxY: Math.round(height),
     minZ: -halfDepth, maxZ: halfDepth,
     width: Math.round(width), height: Math.round(height),
@@ -200,20 +199,20 @@ export function generateGalaxy(opts) {
     shape: spiral ? 'spiral' : 'scatter',
     halfDepth,
     field,
-    // Das schwarze Loch ist der Mittelpunkt der Spirale - keine Welt kommt ihm
-    // nahe, besiedeln lässt es sich nicht.
+    // The black hole is the center of the spiral - no world comes close to it,
+    // and it cannot be settled.
     blackHole,
-    // Kern für den Härtegrad: je weiter draußen, desto rauer und erzreicher
+    // Core for the harshness: the further out, the rougher and richer in ore
     core,
     epoch: 0,
-    names,                      // Rest der gemischten Namensliste
+    names,                      // rest of the shuffled name list
     used: new Set(planets.map(p => p.name)),
     planets, homeworlds: homes
   };
   return galaxy;
 }
 
-/** 0 im Startgebiet, darüber hinaus wachsend. */
+/** 0 in the starting area, growing beyond it. */
 export function harshnessAt(galaxy, x, y) {
   const c = galaxy.core;
   const d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2);
@@ -221,9 +220,9 @@ export function harshnessAt(galaxy, x, y) {
 }
 
 /**
- * Eine Spirale wächst nicht in Rechteckstreifen, sondern nach außen: die Arme
- * reichen weiter, und in dem neu hinzugekommenen Ring entstehen Welten.
- * @returns {object[]} die neuen Welten
+ * A spiral does not grow in rectangular strips but outwards: the arms reach
+ * further, and worlds appear in the newly added ring.
+ * @returns {object[]} the new worlds
  */
 export function expandSpiral(galaxy) {
   const g = galaxy, f = g.field;
@@ -232,8 +231,8 @@ export function expandSpiral(galaxy) {
   const rng = makeRng((g.seed ^ Math.imul(g.epoch, 0x9E3779B1)) >>> 0);
   const rOld = f.rOut;
   const rNew = rOld + BAND;
-  f.rOut = rNew;                                  // Arme reichen weiter hinaus
-  // Die Arme füllen den Ring nicht aus - entsprechend weniger Welten.
+  f.rOut = rNew;                                  // arms reach further out
+  // The arms do not fill the ring - correspondingly fewer worlds.
   const area = Math.PI * (rNew * rNew - rOld * rOld);
   const count = Math.max(2, Math.round(area / AREA_PER_PLANET * 0.42));
 
@@ -260,8 +259,8 @@ export function expandSpiral(galaxy) {
     added.push(p);
   }
 
-  // Grenzen nur so weit ziehen, wie wirklich Welten stehen - sonst umgibt ein
-  // riesiges leeres Gitter eine kleine Galaxie.
+  // Only extend the bounds as far as worlds really are - otherwise a huge
+  // empty grid surrounds a small galaxy.
   let reach = 0;
   for (const p of added) reach = Math.max(reach, Math.hypot(p.x - f.cx, p.y - f.cy));
   if (!reach) return added;
@@ -275,16 +274,16 @@ export function expandSpiral(galaxy) {
 }
 
 /**
- * Dehnt die Karte in eine Himmelsrichtung aus und füllt den neuen Streifen
- * mit Welten - in derselben Dichte, aber nach außen hin rauer.
+ * Extends the map in one direction and fills the new strip with worlds - at
+ * the same density, but rougher towards the outside.
  * @param {object} galaxy
  * @param {'left'|'right'|'top'|'bottom'} dir
- * @returns {object[]} die neuen Welten
+ * @returns {object[]} the new worlds
  */
 export function expandGalaxy(galaxy, dir) {
   const g = galaxy;
   const M = MARGIN;
-  // Der Streifen liegt überall um MARGIN innerhalb der neuen Grenze.
+  // The strip lies MARGIN inside the new border everywhere.
   const r = {
     left: { x0: g.minX - BAND + M, x1: g.minX, y0: g.minY + M, y1: g.maxY - M },
     right: { x0: g.maxX, x1: g.maxX + BAND - M, y0: g.minY + M, y1: g.maxY - M },
@@ -296,12 +295,12 @@ export function expandGalaxy(galaxy, dir) {
   g.epoch++;
   const rng = makeRng((g.seed ^ Math.imul(g.epoch, 0x9E3779B1)) >>> 0);
   const count = Math.max(1, Math.round((r.x1 - r.x0) * (r.y1 - r.y0) / AREA_PER_PLANET));
-  // Nur Nachbarn in der Nähe des Streifens auf Abstand prüfen
+  // Only check the gap to neighbors near the strip
   const near = g.planets.filter(q =>
     q.x > r.x0 - MIN_GAP && q.x < r.x1 + MIN_GAP && q.y > r.y0 - MIN_GAP && q.y < r.y1 + MIN_GAP);
 
-  // In der Spirale wird die Dichte des Streifens als Maßstab genommen, damit
-  // dort gleich viele Welten entstehen, die Arme sich aber fortsetzen.
+  // In the spiral the density of the strip is used as the yardstick, so the
+  // same number of worlds appears there but the arms continue.
   let ref = 0;
   if (g.field) {
     for (let i = 0; i < 200; i++) {
@@ -316,8 +315,8 @@ export function expandGalaxy(galaxy, dir) {
     guard++;
     const x = r.x0 + rng() * (r.x1 - r.x0);
     const y = r.y0 + rng() * (r.y1 - r.y0);
-    // Hoch gewichtet: lieber ein dünner Streifen entlang der Arme als ein
-    // gleichmäßig gefüllter Kasten.
+    // Heavily weighted: rather a thin strip along the arms than an evenly
+    // filled box.
     if (g.field && rng() > Math.pow(g.field.density(x, y) / ref, 2.0)) continue;
     const z = lensZ(g, rng, x, y);
     if (near.some(q => dist({ x, y, z }, q) < MIN_GAP)) continue;
@@ -336,7 +335,7 @@ export function expandGalaxy(galaxy, dir) {
   return added;
 }
 
-/** Namen aus der Liste, danach selbst gemünzt - immer eindeutig. */
+/** Names from the list, then self-coined ones - always unique. */
 function nextName(galaxy, rng, id) {
   while (galaxy.names.length) {
     const n = galaxy.names.pop();
@@ -346,28 +345,28 @@ function nextName(galaxy, rng, id) {
     const n = pick(rng, SYL_A) + pick(rng, SYL_B) + pick(rng, SYL_C);
     if (!galaxy.used.has(n)) { galaxy.used.add(n); return n; }
   }
-  const n = `Welt-${id + 1}`;
+  const n = `World-${id + 1}`;
   galaxy.used.add(n);
   return n;
 }
 
 /**
- * @param {object} src Namensquelle: die Galaxie, oder beim Erzeugen die Liste
- * @param {number} h Härtegrad: 0 im Kern, nach außen wachsend
+ * @param {object} src name source: the galaxy, or the list during generation
+ * @param {number} h harshness: 0 at the core, growing outwards
  */
 function makePlanet(id, x, y, src, rng, h = 0, z = 0) {
   const name = Array.isArray(src)
-    ? (src.length ? src.pop() : `Welt-${id + 1}`)
+    ? (src.length ? src.pop() : `World-${id + 1}`)
     : nextName(src, rng, id);
   const hc = Math.min(h, 2.5);
-  // Temperatur: weiter aussen eher extrem; erzeugt eine Mischung aus
-  // Perlen und Höllenlöchern wie im Original. Draußen wird die Mischung rauer.
+  // Temperature: rather extreme further out; produces a mix of gems and
+  // hellholes as in the original. Further out the mix gets rougher.
   const r = rng();
   const good = 0.18 / (1 + hc * 1.2);
   const mid = good + 0.44 / (1 + hc * 0.5);
   let temp;
-  if (r < good) temp = IDEAL.temp + (rng() * 2 - 1) * 35;                         // gute Welten
-  else if (r < mid) temp = IDEAL.temp + (rng() * 2 - 1) * (110 * (1 + 0.4 * hc)); // mittel
+  if (r < good) temp = IDEAL.temp + (rng() * 2 - 1) * 35;                         // good worlds
+  else if (r < mid) temp = IDEAL.temp + (rng() * 2 - 1) * (110 * (1 + 0.4 * hc)); // medium
   else temp = TEMP_RANGE.min + rng() * (TEMP_RANGE.max - TEMP_RANGE.min);
   temp = clamp(Math.round(temp), TEMP_RANGE.min, TEMP_RANGE.max);
 
@@ -377,7 +376,7 @@ function makePlanet(id, x, y, src, rng, h = 0, z = 0) {
   else grav = GRAV_RANGE.min + rng() * (GRAV_RANGE.max - GRAV_RANGE.min);
   grav = clamp(Math.round(grav * 20) / 20, GRAV_RANGE.min, GRAV_RANGE.max);
 
-  // Entschädigung für die Unwirtlichkeit: draußen liegt mehr Erz
+  // Compensation for the hostility: there is more ore further out
   const richness = Math.round((0.15 + Math.pow(rng(), 1.6) * 1.35) * (1 + 0.45 * hc) * 100) / 100;
   const reserve = Math.round((180 + rng() * 900) * richness * (1 + 0.2 * hc));
 
@@ -395,11 +394,11 @@ function makePlanet(id, x, y, src, rng, h = 0, z = 0) {
   };
 }
 
-// So weit kommt das Siedlerschiff, mit dem jedes Reich startet.
+// This is how far the settler ship every empire starts with can go.
 const START_REACH = shipStats('colony', {}).range;
-// Wie viele Welten von jeder Heimat aus mit dem Startschiff erreichbar sind,
-// und dass mindestens eine davon taugt. Der Puffer hält sie sicher in
-// Reichweite, auch wenn der Weg ums schwarze Loch ein Stück länger wird.
+// How many worlds are reachable from every home with the starting ship, and
+// that at least one of them is any good. The buffer keeps them safely in
+// range, even if the path around the black hole gets a bit longer.
 const START_NEIGHBOURS = 3;
 const NEIGHBOUR_REACH = START_REACH * 0.88;
 const START_HAB = 0.45;
@@ -410,11 +409,10 @@ function neighboursOf(planets, home, zone, reach = NEIGHBOUR_REACH) {
 }
 
 /**
- * Wählt möglichst weit auseinanderliegende Heimatwelten (Farthest-Point-
- * Sampling). Welten ohne Nachbarn zählen dabei weniger - sonst landet das
- * Verfahren zielsicher bei den Ausreißern am Rand. Ganz verboten sind sie
- * nicht, damit die Reiche weit auseinander bleiben; was dann noch fehlt,
- * ergänzt ensureNeighbours.
+ * Chooses homeworlds as far apart as possible (farthest-point sampling).
+ * Worlds without neighbors count less - otherwise the method unerringly ends
+ * up at the outliers on the edge. They are not forbidden entirely, so the
+ * empires stay far apart; whatever is still missing, ensureNeighbours adds.
  */
 function chooseHomeworlds(planets, playerCount, rng, zone) {
   const weight = planets.map(p =>
@@ -434,7 +432,7 @@ function chooseHomeworlds(planets, playerCount, rng, zone) {
     if (best < 0) break;
     chosen.push(best);
   }
-  // Heimatwelten sind ideale Welten mit soliden Metallvorräten - faire Startbedingungen.
+  // Homeworlds are ideal worlds with solid metal reserves - fair starting conditions.
   for (const i of chosen) {
     const p = planets[i];
     p.temp = IDEAL.temp;
@@ -448,16 +446,16 @@ function chooseHomeworlds(planets, playerCount, rng, zone) {
 }
 
 /**
- * Sorgt dafür, dass das Startschiff etwas zu tun hat: fehlen um eine Heimat
- * Welten in Reichweite, entstehen dort welche, und ist keine davon bewohnbar,
- * wird die nächste ein wenig milder.
+ * Makes sure the starting ship has something to do: if a home lacks worlds
+ * in range, some are created there, and if none of them is habitable, the
+ * nearest one becomes a little milder.
  */
 function ensureNeighbours(planets, home, names, rng, zone, b, minGap) {
   let near = neighboursOf(planets, home, zone);
   for (let guard = 0; near.length < START_NEIGHBOURS && guard < 600; guard++) {
     const d = minGap * 1.15 + rng() * (NEIGHBOUR_REACH - minGap * 1.15);
     const a = rng() * Math.PI * 2;
-    // Im Raum auch nach oben oder unten, aber flach - die Linse ist dünn.
+    // In 3D also up or down, but flat - the lens is thin.
     const tilt = b.halfDepth ? (rng() * 2 - 1) * 0.5 : 0;
     const p = {
       x: home.x + Math.cos(a) * Math.cos(tilt) * d,
@@ -474,7 +472,7 @@ function ensureNeighbours(planets, home, names, rng, zone, b, minGap) {
   }
   if (near.length && !near.some(q => habitability(q) >= START_HAB)) {
     const q = near.reduce((m, x) => dist(home, x) < dist(home, m) ? x : m);
-    // Mittelmäßig, kein Paradies: nur so weit Richtung Ideal, dass es sich lohnt.
+    // Mediocre, no paradise: only far enough towards the ideal to be worthwhile.
     q.temp = IDEAL.temp + Math.sign(q.temp - IDEAL.temp || 1) * Math.round(15 + rng() * 20);
     q.grav = clamp(Math.round((IDEAL.grav + (rng() * 2 - 1) * 0.2) * 20) / 20, GRAV_RANGE.min, GRAV_RANGE.max);
   }

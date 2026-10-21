@@ -149,7 +149,7 @@ vite.config.ts.timestamp-*
 .turbo
 
 # ---------------------------------------------------------------
-# Projektspezifisch / lokale Umgebung
+# Project-specific / local environment
 # ---------------------------------------------------------------
 
 # Editoren & IDEs
@@ -167,7 +167,7 @@ vite.config.ts.timestamp-*
 .\#*
 \#*\#
 
-# Betriebssystem-Müll
+# Operating system clutter
 .DS_Store
 .DS_Store?
 ._*
@@ -184,12 +184,12 @@ Desktop.ini
 desktop.ini
 $RECYCLE.BIN/
 
-# Claude Code / KI-Werkzeuge (lokale Einstellungen bleiben lokal)
+# Claude Code / AI tools (local settings stay local)
 .claude/settings.local.json
 .claude/scratchpad/
 CLAUDE.local.md
 
-# Zugangsdaten, Schlüssel, Zertifikate
+# Credentials, keys, certificates
 *.pem
 *.key
 *.crt
@@ -199,7 +199,7 @@ CLAUDE.local.md
 secrets.*
 *.secret
 
-# Temporäres, Backups, Scratch
+# Temporary files, backups, scratch
 tmp/
 temp/
 scratch/
@@ -209,7 +209,7 @@ scratch/
 *.tmp
 *.old
 
-# Archive & Binärkram, der versehentlich hier landet
+# Archives & binary stuff that ends up here by accident
 *.zip
 *.tar
 *.tar.gz
@@ -217,7 +217,7 @@ scratch/
 *.rar
 *.7z
 
-# Lokale Spielstände / Laufzeitdaten, falls der Server mal welche schreibt
+# Local save games / runtime data, in case the server ever writes any
 data/
 saves/
 *.sqlite

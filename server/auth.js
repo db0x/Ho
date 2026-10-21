@@ -1,23 +1,23 @@
-// Zugang zum Spiel. Vor der Lobby steht eine Anmeldung mit Name und Passwort;
-// ohne gueltige Sitzung gibt der Server weder den Client noch die WebSocket
-// heraus.
+// Access to the game. In front of the lobby there is a sign-in with name and
+// password; without a valid session the server hands out neither the client
+// nor the WebSocket.
 //
-// Sitzungen stehen nur im Speicher: so landet kein Schluessel auf der Platte,
-// auf dem Host liegt wirklich nur Name und Hash. Ein Neustart meldet alle ab -
-// das ist zu verkraften, denn mit ihm sind auch alle Partien weg.
+// Sessions live only in memory: that way no key ends up on disk, and the host
+// really only stores name and hash. A restart signs everyone out - that is
+// bearable, since all games are gone with it too.
 import crypto from 'node:crypto';
 import {
   verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, MIN_PASSWORD
 } from './userstore.js';
 
 /**
- * Konto nachschlagen, ohne dass eine unlesbare Datei den Server umbringt: sie
- * wird in jeder Anfrage gelesen, ein Wurf dort reichte bis in den HTTP-Server.
- * Im Zweifel kommt niemand herein - lieber ausgesperrt als offen.
+ * Look up an account without an unreadable file killing the server: it is read
+ * on every request, and a throw there would reach all the way into the HTTP
+ * server. When in doubt nobody gets in - better locked out than open.
  */
-function konto(name) {
+function account(name) {
   try { return getUser(name); } catch (e) {
-    console.error('Kontendatei unlesbar:', e.message);
+    console.error('Account file unreadable:', e.message);
     return null;
   }
 }
@@ -26,49 +26,49 @@ const COOKIE = 'ho_sid';
 const SESSION_MS = (Number(process.env.HO_SESSION_DAYS) || 30) * 86400 * 1000;
 const MAX_BODY = 4096;
 
-// Ab dem fuenften Fehlversuch wird gesperrt, und zwar immer laenger: 30 s, 1 min,
-// 2 min ... bis 15 min. Gezaehlt wird nach Konto und nach Herkunft, damit weder
-// ein Konto durchprobiert noch von einer Stelle aus gestreut werden kann.
-const FREI = 4;
-const SPERRE_MAX = 15 * 60 * 1000;
-const VERGESSEN = 60 * 60 * 1000;
+// From the fifth failed attempt on, there is a lockout, and an ever longer one:
+// 30 s, 1 min, 2 min ... up to 15 min. Counted per account and per origin, so
+// that neither one account can be brute-forced nor attempts spread from one place.
+const FREE_ATTEMPTS = 4;
+const LOCK_MAX = 15 * 60 * 1000;
+const FORGET_AFTER = 60 * 60 * 1000;
 
 /** @type {Map<string, {user: string, stamp: string, mustChange: boolean, created: number, seen: number}>} */
 const sessions = new Map();
 /** @type {Map<string, {fails: number, until: number, seen: number}>} */
-const versuche = new Map();
+const attempts = new Map();
 
-/** Abschaltbar fuer die Entwicklung und die Tests - im Betrieb bleibt sie an. */
+/** Can be switched off for development and tests - in production it stays on. */
 export function authEnabled() {
   return process.env.HO_AUTH !== 'off';
 }
 
-// Was ohne Anmeldung herausgeht: die Anmeldeseite und was sie zum Anzeigen
-// braucht. Alles andere - Spielclient, Regeln, WebSocket - bleibt zu.
-const OFFEN_GENAU = new Set([
+// What goes out without sign-in: the sign-in page and what it needs to
+// display. Everything else - game client, rules, WebSocket - stays closed.
+const PUBLIC_EXACT = new Set([
   '/login.html', '/js/login.js', '/js/i18n.js', '/shared/i18n.js', '/favicon.ico'
 ]);
-const OFFEN_PRAEFIX = ['/css/', '/img/', '/i18n/'];
+const PUBLIC_PREFIX = ['/css/', '/img/', '/i18n/'];
 
-function offen(pfad) {
-  return OFFEN_GENAU.has(pfad) || OFFEN_PRAEFIX.some(p => pfad.startsWith(p));
+function isPublic(urlPath) {
+  return PUBLIC_EXACT.has(urlPath) || PUBLIC_PREFIX.some(p => urlPath.startsWith(p));
 }
 
-// ---------------------------------------------------------------- Sitzungen
+// ----------------------------------------------------------------- Sessions
 
 function cookies(req) {
-  const roh = req.headers.cookie;
-  if (!roh) return {};
+  const raw = req.headers.cookie;
+  if (!raw) return {};
   const out = {};
-  for (const teil of roh.split(';')) {
-    const i = teil.indexOf('=');
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
     if (i < 1) continue;
-    out[teil.slice(0, i).trim()] = decodeURIComponent(teil.slice(i + 1).trim());
+    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
   }
   return out;
 }
 
-/** Hinter einem Reverse-Proxy entscheidet X-Forwarded-Proto ueber das Secure-Flag. */
+/** Behind a reverse proxy, X-Forwarded-Proto decides about the Secure flag. */
 function secure(req) {
   if (process.env.HO_SECURE_COOKIES === '1') return true;
   if (process.env.HO_SECURE_COOKIES === '0') return false;
@@ -77,19 +77,19 @@ function secure(req) {
 }
 
 function setCookie(req, res, token) {
-  const teile = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax',
+  const parts = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Lax',
     `Max-Age=${Math.floor(SESSION_MS / 1000)}`];
-  if (secure(req)) teile.push('Secure');
-  res.setHeader('set-cookie', teile.join('; '));
+  if (secure(req)) parts.push('Secure');
+  res.setHeader('set-cookie', parts.join('; '));
 }
 
 function clearCookie(req, res) {
-  const teile = [`${COOKIE}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0'];
-  if (secure(req)) teile.push('Secure');
-  res.setHeader('set-cookie', teile.join('; '));
+  const parts = [`${COOKIE}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0'];
+  if (secure(req)) parts.push('Secure');
+  res.setHeader('set-cookie', parts.join('; '));
 }
 
-function neueSitzung(user) {
+function newSession(user) {
   const token = crypto.randomBytes(32).toString('base64url');
   const now = Date.now();
   sessions.set(token, {
@@ -99,9 +99,9 @@ function neueSitzung(user) {
 }
 
 /**
- * Die Sitzung hinter einer Anfrage - oder null. Geprueft wird jedes Mal auch,
- * ob das Konto noch existiert und das Passwort nicht zwischenzeitlich
- * zurueckgesetzt wurde; ein `docker exec ... del` wirkt damit sofort.
+ * The session behind a request - or null. Every time it is also checked that
+ * the account still exists and the password has not been reset in the
+ * meantime; a `docker exec ... del` therefore takes effect immediately.
  */
 export function sessionOf(req) {
   const token = cookies(req)[COOKIE];
@@ -110,22 +110,22 @@ export function sessionOf(req) {
   if (!s) return null;
   const now = Date.now();
   if (now - s.created > SESSION_MS) { sessions.delete(token); return null; }
-  const user = konto(s.user);
+  const user = account(s.user);
   if (!user || stampOf(user.hash) !== s.stamp) { sessions.delete(token); return null; }
   s.seen = now;
   s.mustChange = !!user.mustChange;
-  // Die Schreibweise frisch aus der Kontendatei: ein `users.js name` wirkt
-  // damit ohne neues Anmelden.
+  // The spelling fresh from the account file: a `users.js name` thus takes
+  // effect without signing in again.
   return { ...s, token, display: displayName(s.user, user) };
 }
 
-/** Lebt diese Sitzung noch? Fuer offene WebSockets, die nachtraeglich fliegen. */
+/** Is this session still alive? For open WebSockets that get kicked out afterwards. */
 export function sessionAlive(token) {
   if (!authEnabled()) return true;
   if (!token) return false;
   const s = sessions.get(token);
   if (!s) return false;
-  const user = konto(s.user);
+  const user = account(s.user);
   if (!user || stampOf(user.hash) !== s.stamp || Date.now() - s.created > SESSION_MS) {
     sessions.delete(token);
     return false;
@@ -133,53 +133,53 @@ export function sessionAlive(token) {
   return true;
 }
 
-/** Alle Sitzungen eines Kontos beenden. */
+/** End all sessions of an account. */
 export function revoke(user) {
   for (const [token, s] of sessions) if (s.user === user) sessions.delete(token);
 }
 
-// ------------------------------------------------------------------- Bremse
+// ----------------------------------------------------------------- Throttle
 
-function herkunft(req) {
+function origin(req) {
   const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return fwd || req.socket.remoteAddress || '?';
 }
 
-function gesperrt(...schluessel) {
+function lockedFor(...keys) {
   const now = Date.now();
-  let bis = 0;
-  for (const k of schluessel) {
-    const v = versuche.get(k);
-    if (v && v.until > now) bis = Math.max(bis, v.until);
+  let until = 0;
+  for (const k of keys) {
+    const v = attempts.get(k);
+    if (v && v.until > now) until = Math.max(until, v.until);
   }
-  return bis ? Math.ceil((bis - now) / 1000) : 0;
+  return until ? Math.ceil((until - now) / 1000) : 0;
 }
 
-function fehlversuch(...schluessel) {
+function failedAttempt(...keys) {
   const now = Date.now();
-  for (const k of schluessel) {
-    const v = versuche.get(k) || { fails: 0, until: 0, seen: now };
+  for (const k of keys) {
+    const v = attempts.get(k) || { fails: 0, until: 0, seen: now };
     v.fails++;
     v.seen = now;
-    if (v.fails > FREI) {
-      v.until = now + Math.min(SPERRE_MAX, 30_000 * 2 ** (v.fails - FREI - 1));
+    if (v.fails > FREE_ATTEMPTS) {
+      v.until = now + Math.min(LOCK_MAX, 30_000 * 2 ** (v.fails - FREE_ATTEMPTS - 1));
     }
-    versuche.set(k, v);
+    attempts.set(k, v);
   }
 }
 
-function gelungen(...schluessel) {
-  for (const k of schluessel) versuche.delete(k);
+function succeeded(...keys) {
+  for (const k of keys) attempts.delete(k);
 }
 
-// Alte Zaehler und abgelaufene Sitzungen wegwerfen.
+// Throw away old counters and expired sessions.
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of versuche) if (now - v.seen > VERGESSEN && v.until < now) versuche.delete(k);
+  for (const [k, v] of attempts) if (now - v.seen > FORGET_AFTER && v.until < now) attempts.delete(k);
   for (const [token, s] of sessions) if (now - s.created > SESSION_MS) sessions.delete(token);
 }, 10 * 60 * 1000).unref?.();
 
-// ---------------------------------------------------------------- Endpunkte
+// ---------------------------------------------------------------- Endpoints
 
 function json(res, code, body) {
   const text = JSON.stringify(body);
@@ -189,43 +189,43 @@ function json(res, code, body) {
   }).end(text);
 }
 
-// Genau diese drei Arten kann ein Formular auf einer fremden Seite erzeugen.
-// Sie auszuschliessen schuetzt vor untergeschobenen Anmeldungen; alles andere
-// darf kommen, solange JSON darin steht - sonst scheitert die Anmeldung an
-// einer Kleinigkeit in der Kopfzeile, die kein Mensch sieht.
-const FORMULAR = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
+// Exactly these three types can be produced by a form on a foreign page.
+// Excluding them protects against forged sign-ins; anything else may come as
+// long as it contains JSON - otherwise sign-in would fail over some detail in
+// the header that no human ever sees.
+const FORM_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
 
 function body(req) {
-  return new Promise((ok, fehler) => {
+  return new Promise((ok, fail) => {
     const ct = String(req.headers['content-type'] || '').toLowerCase();
-    if (FORMULAR.some(f => ct.startsWith(f))) {
-      return fehler(new Error(`Formulardaten statt JSON (content-type: ${ct})`));
+    if (FORM_TYPES.some(f => ct.startsWith(f))) {
+      return fail(new Error(`form data instead of JSON (content-type: ${ct})`));
     }
-    let roh = '';
+    let raw = '';
     req.on('data', (d) => {
-      roh += d;
-      if (roh.length > MAX_BODY) {
-        fehler(new Error(`Rumpf zu gross (ueber ${MAX_BODY} Zeichen)`));
+      raw += d;
+      if (raw.length > MAX_BODY) {
+        fail(new Error(`body too large (over ${MAX_BODY} characters)`));
         req.destroy();
       }
     });
     req.on('end', () => {
-      try { ok(JSON.parse(roh || '{}')); } catch {
-        fehler(new Error(`kein JSON im Rumpf (content-type: ${ct || 'fehlt'}, ${roh.length} Zeichen)`));
+      try { ok(JSON.parse(raw || '{}')); } catch {
+        fail(new Error(`no JSON in body (content-type: ${ct || 'missing'}, ${raw.length} characters)`));
       }
     });
-    req.on('error', (e) => fehler(new Error('Verbindung abgebrochen: ' + e.message)));
+    req.on('error', (e) => fail(new Error('connection aborted: ' + e.message)));
   });
 }
 
 /**
- * Behandelt /api/auth/*. Gibt true zurueck, wenn die Anfrage beantwortet ist.
+ * Handles /api/auth/*. Returns true if the request has been answered.
  */
-export function handleAuth(req, res, pfad) {
-  if (!pfad.startsWith('/api/auth/')) return false;
+export function handleAuth(req, res, urlPath) {
+  if (!urlPath.startsWith('/api/auth/')) return false;
   if (!authEnabled()) { json(res, 404, { error: 'auth.err.off' }); return true; }
 
-  const route = pfad.slice('/api/auth/'.length);
+  const route = urlPath.slice('/api/auth/'.length);
   if (route === 'me' && req.method === 'GET') {
     const s = sessionOf(req);
     if (!s) json(res, 401, { error: 'auth.err.noSession' });
@@ -246,96 +246,96 @@ export function handleAuth(req, res, pfad) {
 }
 
 async function login(req, res) {
-  let daten;
-  try { daten = await body(req); } catch (e) {
-    console.warn('Anmeldung unverstaendlich:', e.message);
+  let data;
+  try { data = await body(req); } catch (e) {
+    console.warn('Sign-in not understood:', e.message);
     return json(res, 400, { error: 'auth.err.badRequest' });
   }
-  const name = String(daten.user ?? '').trim().toLowerCase();
-  const pw = String(daten.password ?? '');
+  const name = String(data.user ?? '').trim().toLowerCase();
+  const pw = String(data.password ?? '');
   if (!name || !pw) return json(res, 400, { error: 'auth.err.needFields' });
 
-  const ip = herkunft(req);
-  const wartet = gesperrt(`u:${name}`, `i:${ip}`);
-  if (wartet) return json(res, 429, { error: 'auth.err.locked', params: { n: wartet } });
+  const ip = origin(req);
+  const wait = lockedFor(`u:${name}`, `i:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
 
   let user = null;
   try { user = await verifyUser(name, pw); } catch (e) {
-    console.error('Anmeldung fehlgeschlagen:', e.message);
+    console.error('Sign-in failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
   if (!user) {
-    fehlversuch(`u:${name}`, `i:${ip}`);
-    console.warn(`Anmeldung abgewiesen: ${name} von ${ip}`);
+    failedAttempt(`u:${name}`, `i:${ip}`);
+    console.warn(`Sign-in rejected: ${name} from ${ip}`);
     return json(res, 401, { error: 'auth.err.badLogin' });
   }
-  gelungen(`u:${name}`, `i:${ip}`);
-  setCookie(req, res, neueSitzung(user));
-  console.log(`Angemeldet: ${user.name}${user.mustChange ? ' (Passwortwechsel faellig)' : ''}`);
+  succeeded(`u:${name}`, `i:${ip}`);
+  setCookie(req, res, newSession(user));
+  console.log(`Signed in: ${user.name}${user.mustChange ? ' (password change due)' : ''}`);
   json(res, 200, { ok: true, user: user.name, mustChange: user.mustChange });
 }
 
 async function change(req, res) {
   const s = sessionOf(req);
   if (!s) return json(res, 401, { error: 'auth.err.noSession' });
-  let daten;
-  try { daten = await body(req); } catch (e) {
-    console.warn('Passwortwechsel unverstaendlich:', e.message);
+  let data;
+  try { data = await body(req); } catch (e) {
+    console.warn('Password change not understood:', e.message);
     return json(res, 400, { error: 'auth.err.badRequest' });
   }
-  const alt = String(daten.password ?? '');
-  const neu = String(daten.newPassword ?? '');
+  const oldPw = String(data.password ?? '');
+  const newPw = String(data.newPassword ?? '');
 
-  const ip = herkunft(req);
-  const wartet = gesperrt(`u:${s.user}`, `i:${ip}`);
-  if (wartet) return json(res, 429, { error: 'auth.err.locked', params: { n: wartet } });
+  const ip = origin(req);
+  const wait = lockedFor(`u:${s.user}`, `i:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
 
-  // Das bisherige Passwort noch einmal verlangen: sonst koennte ein fremder
-  // Browser mit offener Sitzung das Konto uebernehmen.
+  // Ask for the current password once more: otherwise a foreign browser with
+  // an open session could take over the account.
   let user = null;
-  try { user = await verifyUser(s.user, alt); } catch (e) {
-    console.error('Passwortpruefung fehlgeschlagen:', e.message);
+  try { user = await verifyUser(s.user, oldPw); } catch (e) {
+    console.error('Password check failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
   if (!user) {
-    fehlversuch(`u:${s.user}`, `i:${ip}`);
+    failedAttempt(`u:${s.user}`, `i:${ip}`);
     return json(res, 401, { error: 'auth.err.badLogin' });
   }
-  if (neu === alt) return json(res, 400, { error: 'auth.err.sameAsOld' });
-  const rüge = checkPassword(neu, s.user);
-  if (rüge) return json(res, 400, { error: rüge, params: { n: MIN_PASSWORD } });
+  if (newPw === oldPw) return json(res, 400, { error: 'auth.err.sameAsOld' });
+  const problem = checkPassword(newPw, s.user);
+  if (problem) return json(res, 400, { error: problem, params: { n: MIN_PASSWORD } });
 
-  try { await setPassword(s.user, neu, { mustChange: false }); } catch (e) {
-    console.error('Passwortwechsel fehlgeschlagen:', e.message);
+  try { await setPassword(s.user, newPw, { mustChange: false }); } catch (e) {
+    console.error('Password change failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
-  gelungen(`u:${s.user}`, `i:${ip}`);
-  // Alle Sitzungen des Kontos verfallen mit dem neuen Hash - auch die eigene,
-  // also gleich eine frische ausstellen.
+  succeeded(`u:${s.user}`, `i:${ip}`);
+  // All sessions of the account expire with the new hash - including our own,
+  // so issue a fresh one right away.
   revoke(s.user);
-  const frisch = konto(s.user);
-  setCookie(req, res, neueSitzung({ name: s.user, stamp: stampOf(frisch.hash), mustChange: false }));
-  console.log(`Passwort geaendert: ${s.user}`);
+  const fresh = account(s.user);
+  setCookie(req, res, newSession({ name: s.user, stamp: stampOf(fresh.hash), mustChange: false }));
+  console.log(`Password changed: ${s.user}`);
   json(res, 200, { ok: true, user: s.user, mustChange: false });
 }
 
-// ------------------------------------------------------------- Torwaechter
+// ------------------------------------------------------------ Gatekeeper
 
 /**
- * Darf diese Anfrage durch zu den Dateien? Sonst ist die Antwort schon
- * geschrieben: ein Verweis auf die Anmeldeseite, wenn ein Browser eine Seite
- * holen will, sonst ein nackter 401.
+ * May this request pass through to the files? Otherwise the response has
+ * already been written: a redirect to the sign-in page if a browser wants to
+ * fetch a page, a bare 401 otherwise.
  */
-export function gate(req, res, pfad) {
+export function gate(req, res, urlPath) {
   if (!authEnabled()) return true;
-  // Stylesheet, Wortmarke und Kataloge gehen heraus, ohne dass dafuer die
-  // Kontendatei angefasst wird.
-  if (offen(pfad) && pfad !== '/login.html') return true;
+  // Stylesheet, wordmark and catalogs go out without touching the account
+  // file for them.
+  if (isPublic(urlPath) && urlPath !== '/login.html') return true;
   const s = sessionOf(req);
-  if (offen(pfad)) {
-    // Angemeldet und nichts mehr zu tun? Dann gehoert man ins Spiel, nicht auf
-    // die Anmeldeseite.
-    if (pfad === '/login.html' && s && !s.mustChange) {
+  if (isPublic(urlPath)) {
+    // Signed in with nothing left to do? Then you belong in the game, not on
+    // the sign-in page.
+    if (urlPath === '/login.html' && s && !s.mustChange) {
       res.writeHead(302, { location: './', 'cache-control': 'no-store' }).end();
       return false;
     }
@@ -343,23 +343,23 @@ export function gate(req, res, pfad) {
   }
   if (s && !s.mustChange) return true;
 
-  const willSeite = String(req.headers.accept || '').includes('text/html');
-  if (!willSeite) {
+  const wantsPage = String(req.headers.accept || '').includes('text/html');
+  if (!wantsPage) {
     json(res, 401, { error: s ? 'auth.err.mustChange' : 'auth.err.noSession' });
     return false;
   }
-  // Relative Verweise: hinter einem Proxy unter /ho/ zeigt '/login.html' sonst
-  // aus dem Spiel heraus. Fuer tiefere Pfade wieder zur Wurzel hinauf.
-  const hoch = '../'.repeat(Math.max(0, pfad.split('/').length - 2)) || './';
-  const ziel = pfad === '/' || pfad === '/index.html' ? 'login.html'
-    : `${hoch}login.html?next=${encodeURIComponent(pfad)}`;
-  res.writeHead(302, { location: ziel, 'cache-control': 'no-store' }).end();
+  // Relative redirects: behind a proxy under /ho/, '/login.html' would point
+  // out of the game otherwise. For deeper paths, go back up to the root.
+  const up = '../'.repeat(Math.max(0, urlPath.split('/').length - 2)) || './';
+  const target = urlPath === '/' || urlPath === '/index.html' ? 'login.html'
+    : `${up}login.html?next=${encodeURIComponent(urlPath)}`;
+  res.writeHead(302, { location: target, 'cache-control': 'no-store' }).end();
   return false;
 }
 
 /**
- * Prueft das Upgrade auf eine WebSocket. Ohne das hiesse die Anmeldung nichts:
- * das Spiel laeuft ueber die Socket, nicht ueber HTTP.
+ * Checks the upgrade to a WebSocket. Without this the sign-in would mean
+ * nothing: the game runs over the socket, not over HTTP.
  */
 export function checkUpgrade(req) {
   if (!authEnabled()) return { user: null, display: null, token: null };
@@ -368,8 +368,8 @@ export function checkUpgrade(req) {
   return { user: s.user, display: s.display, token: s.token };
 }
 
-/** Nur fuer Tests: Zustand zuruecksetzen. */
+/** For tests only: reset the state. */
 export function resetAuthState() {
   sessions.clear();
-  versuche.clear();
+  attempts.clear();
 }

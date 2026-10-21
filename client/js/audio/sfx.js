@@ -1,17 +1,17 @@
-// Klangeffekte. Alles wird im Browser synthetisiert - keine Audiodateien,
-// keine Abhängigkeiten, kein Build-Schritt.
+// Sound effects. Everything is synthesized in the browser - no audio files,
+// no dependencies, no build step.
 //
-// Aufbau: play(name) sucht ein Rezept, legt für diesen einen Klang einen Bus
-// (Lautstärke + Stereoposition) an und setzt ihn aus Tönen und Rauschen
-// zusammen. Die Drosselung verhindert, dass eine Runde mit fünf Raumschlachten
-// zu Lärm wird: gleiche Effekte werden gestaffelt und begrenzt.
+// Structure: play(name) looks up a recipe, creates a bus (volume + stereo
+// position) for this one sound and assembles it from tones and noise.
+// Throttling prevents a turn with five space battles from turning into noise:
+// identical effects are staggered and limited.
 
 const KEY = 'ho-audio';
-// Ausgangsanhebung: die Rezepte sind leise gemischt, damit sich zehn
-// gleichzeitige Effekte nicht aufschaukeln. Der Begrenzer fängt die Spitzen.
+// Output boost: the recipes are mixed quietly so ten simultaneous effects do
+// not build up. The limiter catches the peaks.
 const TRIM = 2.0;
-// Ein laufender Audiokontext kostet auch in Stille Rechenzeit; nach dieser
-// Stille halten wir ihn an, der nächste Klang weckt ihn wieder.
+// A running audio context costs CPU time even in silence; after this much
+// silence we suspend it, and the next sound wakes it up again.
 const IDLE_SUSPEND_MS = 20000;
 
 export class Sfx {
@@ -22,19 +22,19 @@ export class Sfx {
     this.ctx = null;
     this.master = null;
     this._noise = null;
-    this._recent = new Map();   // Rezeptname -> {last, n, since}
-    this._pitch = 1;            // Zufallsstreuung des laufenden Klangs
-    this._idle = null;          // Abschaltuhr
+    this._recent = new Map();   // recipe name -> {last, n, since}
+    this._pitch = 1;            // random spread of the current sound
+    this._idle = null;          // suspend timer
     this._everRan = false;
   }
 
-  /** Audio darf erst nach einer Nutzeraktion starten - daher spät und faul. */
+  /** Audio may only start after a user action - hence late and lazy. */
   start() {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       try { this.ctx = new AC(); } catch { return null; }
-      // Begrenzer, damit gleichzeitige Effekte nicht übersteuern
+      // Limiter so simultaneous effects do not clip
       const comp = this.ctx.createDynamicsCompressor();
       comp.threshold.value = -14;
       comp.ratio.value = 6;
@@ -50,7 +50,7 @@ export class Sfx {
     return this.ctx;
   }
 
-  /** Nach längerer Stille den Kontext anhalten - sonst rechnet er weiter. */
+  /** Suspend the context after a longer silence - otherwise it keeps computing. */
   keepAwake() {
     clearTimeout(this._idle);
     this._idle = setTimeout(() => {
@@ -78,9 +78,9 @@ export class Sfx {
   }
 
   /**
-   * Spielt einen Effekt.
-   * @param {string} name Rezeptname
-   * @param {{pan?:number, gain?:number}} opts pan -1..1 (links/rechts), gain Faktor
+   * Plays an effect.
+   * @param {string} name recipe name
+   * @param {{pan?:number, gain?:number}} opts pan -1..1 (left/right), gain factor
    */
   play(name, opts = {}) {
     if (!this.on) return;
@@ -88,28 +88,28 @@ export class Sfx {
     if (!rec) return;
     const ctx = this.start();
     if (!ctx || ctx.state === 'closed') return;
-    // Vor der ersten Nutzeraktion lässt der Browser keinen Ton zu - dann gar
-    // nicht einplanen, sonst bricht beim Aufwachen alles auf einmal los.
+    // Before the first user action the browser allows no sound - then do not
+    // schedule anything, otherwise everything bursts out at once on wake-up.
     if (ctx.state !== 'running' && !this._everRan) return;
 
-    // Beim Aufwachen etwas Vorlauf, damit der Anfang nicht verschluckt wird
+    // A little lead time on wake-up so the beginning is not swallowed
     const lead = ctx.state === 'running' ? 0.005 : 0.09;
     const now = ctx.currentTime;
     const r = this._recent.get(name) || { last: 0, n: 0, since: 0 };
     if (now - r.since > 1) { r.n = 0; r.since = now; }
     if (r.n >= (rec.max ?? 4)) return;
     const at = Math.max(now + lead, r.last + (rec.gap ?? 0.07));
-    if (at > now + 0.9) return;          // zu viel auf einmal: verwerfen
+    if (at > now + 0.9) return;          // too much at once: discard
     r.last = at; r.n++;
     this._recent.set(name, r);
 
-    // Leichte Tonhöhenstreuung, damit Wiederholungen nicht mechanisch klingen
+    // Slight pitch spread so repetitions do not sound mechanical
     this._pitch = 1 + (Math.random() - 0.5) * (rec.vary ?? 0.05);
     rec.build(this, this.bus(opts), at);
     this.keepAwake();
   }
 
-  /** Bus für einen einzelnen Klang: Lautstärke und Ort im Stereobild. */
+  /** Bus for a single sound: volume and position in the stereo image. */
   bus({ pan = 0, gain = 1 } = {}) {
     const g = this.ctx.createGain();
     g.gain.value = gain;
@@ -119,14 +119,14 @@ export class Sfx {
       g.connect(p);
       p.connect(this.master);
     } else {
-      g.connect(this.master);          // ältere Browser: mittig
+      g.connect(this.master);          // older browsers: centered
     }
     return g;
   }
 
-  // ------------------------------------------------------------ Bausteine
+  // -------------------------------------------------------- Building blocks
 
-  /** Ein Ton mit Hüllkurve; from/to beschreiben den Tonhöhenverlauf. */
+  /** A tone with an envelope; from/to describe the pitch curve. */
   tone(bus, at, { type = 'sine', from, to = from, dur = 0.2, gain = 0.2, attack = 0.005, filter = 0, q = 0 }) {
     const ctx = this.ctx;
     const f0 = Math.max(10, from * this._pitch), f1 = Math.max(10, to * this._pitch);
@@ -150,7 +150,7 @@ export class Sfx {
     o.stop(at + dur + 0.03);
   }
 
-  /** Gefiltertes Rauschen - Explosionen, Triebwerke, Wind. */
+  /** Filtered noise - explosions, engines, wind. */
   noise(bus, at, { dur = 0.3, type = 'lowpass', from = 1200, to = from, q = 1, gain = 0.2, attack = 0.005 }) {
     const ctx = this.ctx;
     const src = ctx.createBufferSource();
@@ -170,7 +170,7 @@ export class Sfx {
     src.stop(at + dur + 0.03);
   }
 
-  /** Tonfolge im Abstand step. */
+  /** Sequence of tones spaced by step. */
   seq(bus, at, freqs, step, opts) {
     freqs.forEach((f, i) => this.tone(bus, at + i * step, { ...opts, from: f, to: opts.to ?? f }));
   }
@@ -195,10 +195,10 @@ function env(ctx, at, dur, gain, attack) {
   return g;
 }
 
-// --------------------------------------------------------------- Rezepte
-// max/gap = Drosselung, vary = Tonhöhenstreuung.
+// ---------------------------------------------------------------- Recipes
+// max/gap = throttling, vary = pitch spread.
 const RECIPES = {
-  // Oberfläche
+  // UI
   click: { max: 5, gap: 0.03, build: (s, b, t) => {
     s.tone(b, t, { type: 'triangle', from: 520, to: 430, dur: 0.045, gain: 0.05 });
     s.noise(b, t, { dur: 0.03, type: 'highpass', from: 2600, gain: 0.025 });
@@ -223,7 +223,7 @@ const RECIPES = {
     s.seq(b, t, [400, 300, 220], 0.12, { type: 'square', dur: 0.2, gain: 0.06, filter: 800 });
   } },
 
-  // Befehle
+  // Orders
   course: { max: 3, gap: 0.08, vary: 0.09, build: (s, b, t) => {
     s.noise(b, t, { dur: 0.34, type: 'lowpass', from: 300, to: 2800, q: 1.3, gain: 0.1, attack: 0.09 });
     s.tone(b, t, { type: 'sawtooth', from: 180, to: 760, dur: 0.3, gain: 0.05, filter: 1800 });
@@ -235,7 +235,7 @@ const RECIPES = {
     s.seq(b, t, [740, 494], 0.08, { type: 'sine', dur: 0.18, gain: 0.08 });
   } },
 
-  // Rundenwechsel
+  // Turn change
   start: { max: 1, build: (s, b, t) => {
     s.tone(b, t, { type: 'sine', from: 60, to: 120, dur: 1.1, gain: 0.2, attack: 0.35 });
     s.seq(b, t + 0.25, [392, 523, 659], 0.1, { type: 'triangle', dur: 0.6, gain: 0.08 });
@@ -246,19 +246,19 @@ const RECIPES = {
     s.seq(b, t + 0.06, [523, 659, 784], 0.055, { type: 'triangle', dur: 0.5, gain: 0.06 });
   } },
 
-  // Rundenereignisse
+  // Turn events
   combat: { max: 3, gap: 0.14, vary: 0.16, build: (s, b, t) => {
-    for (let i = 0; i < 3; i++) {                     // Laserschüsse
+    for (let i = 0; i < 3; i++) {                     // laser shots
       s.tone(b, t + i * 0.05 + Math.random() * 0.02,
         { type: 'sawtooth', from: 2100 - i * 200, to: 620, dur: 0.08, gain: 0.05, filter: 3200 });
     }
-    for (let i = 0; i < 3; i++) {                     // Einschläge
+    for (let i = 0; i < 3; i++) {                     // impacts
       const at = t + 0.06 + i * 0.09 + Math.random() * 0.04;
       s.noise(b, at, { dur: 0.3, type: 'lowpass', from: 1800, to: 180, q: 0.9, gain: 0.15 });
       s.tone(b, at, { type: 'square', from: 300 - i * 60, to: 70, dur: 0.22, gain: 0.06, filter: 1200 });
     }
   } },
-  // Schlachtfenster: ein einzelner Schuss und ein vergehendes Schiff
+  // Battle window: a single shot and a perishing ship
   laser: { max: 7, gap: 0.035, vary: 0.25, build: (s, b, t) => {
     s.tone(b, t, { type: 'sawtooth', from: 1900, to: 520, dur: 0.07, gain: 0.035, filter: 3000 });
   } },
@@ -307,7 +307,7 @@ const RECIPES = {
     s.tone(b, t, { type: 'sawtooth', from: 120, to: 48, dur: 1.5, gain: 0.15, filter: 500 });
     s.noise(b, t, { dur: 1.5, type: 'lowpass', from: 600, to: 80, gain: 0.1, attack: 0.12 });
   } },
-  // Die Karte dehnt sich: ein weiter, aufgehender Klang
+  // The map expands: a wide, rising sound
   expand: { max: 1, build: (s, b, t) => {
     s.tone(b, t, { type: 'sine', from: 110, to: 220, dur: 1.3, gain: 0.12, attack: 0.3 });
     s.noise(b, t, { dur: 1.1, type: 'bandpass', from: 300, to: 2600, q: 0.8, gain: 0.09, attack: 0.5 });
@@ -321,7 +321,7 @@ const RECIPES = {
   } }
 };
 
-/** Ereignistyp aus dem Rundenprotokoll -> Effekt. */
+/** Event type from the turn log -> effect. */
 export const LOG_SFX = {
   combat: 'combat', invade: 'invade', colonize: 'colonize', settle: 'settle',
   build: 'build', tech: 'tech', terra: 'terra', arrive: 'arrive', warn: 'warn',
@@ -329,7 +329,7 @@ export const LOG_SFX = {
   lost: 'lost', eliminated: 'eliminated', victory: 'victory'
 };
 
-// ------------------------------------------------------------ Einstellungen
+// --------------------------------------------------------------- Settings
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -344,8 +344,8 @@ function save(s) {
 export const sfx = new Sfx();
 
 /**
- * Klick für alle Knöpfe an einer Stelle - und der erste Tastendruck oder Klick
- * weckt den Audiokontext, den der Browser sonst stummschaltet.
+ * Click for all buttons in one place - and the first key press or click wakes
+ * the audio context, which the browser would otherwise keep muted.
  */
 export function bindUi() {
   const wake = () => sfx.start();
@@ -354,7 +354,7 @@ export function bindUi() {
   addEventListener('pointerdown', (e) => {
     const b = e.target.closest?.('button');
     if (!b || b.disabled) return;
-    if (b.dataset.sfx === 'none') return;     // eigener Klang an anderer Stelle
+    if (b.dataset.sfx === 'none') return;     // own sound elsewhere
     sfx.play(b.dataset.sfx || 'click');
   }, true);
 }

@@ -4,22 +4,23 @@ services:
     image: ho:latest
     container_name: ho
     restart: unless-stopped
-    # Linker Port = Port auf dem Host, per HOST_PORT aenderbar. Hinter einem
-    # Reverse-Proxy gehoert HOST_BIND auf 127.0.0.1, damit nur der Proxy
-    # herankommt und niemand den Port am Zugang vorbei aufmacht.
+    # Left port = port on the host, changeable via HOST_PORT. Behind a
+    # reverse proxy set HOST_BIND to 127.0.0.1 so only the proxy can reach
+    # it and nobody opens the port around the access control.
     ports:
       - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
-    # Die Konten ueberleben jedes neue Abbild und liegen in ./data neben
-    # dieser Datei - Backup = Verzeichnis kopieren. ./data vorher selbst
-    # anlegen, sonst legt Docker es als root an und node darf nicht schreiben.
+    # Accounts survive every new image and live in ./data next to this
+    # file - backup = copy the directory. Create ./data yourself first,
+    # otherwise Docker creates it as root and node cannot write to it.
     volumes:
       - ./data:/data
-    # Anmeldung vor der Lobby. Gehostet bleibt sie an (Standard), lokal
-    # schaltet HO_AUTH=off sie ab - am bequemsten als Zeile in einer .env
-    # neben dieser Datei. Fehlt die Angabe, gilt "an": vergessen heisst sicher.
+    # Sign-in in front of the lobby. Hosted it stays on (default), locally
+    # HO_AUTH=off switches it off - most conveniently as a line in a .env
+    # next to this file. If the setting is missing, "on" applies: forgetting
+    # it means safe.
     environment:
       HO_AUTH: ${HO_AUTH:-on}
-    # Node laeuft sonst als PID 1 und ignoriert SIGTERM -> langsames Stoppen.
+    # Otherwise node runs as PID 1 and ignores SIGTERM -> slow shutdown.
     init: true
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/login.html').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
@@ -28,7 +29,7 @@ services:
       start_period: 5s
       retries: 3
 
-  # Nur auf Zuruf: docker compose --profile test run --rm test
+  # Only on demand: docker compose --profile test run --rm test
   test:
     build: .
     image: ho:latest

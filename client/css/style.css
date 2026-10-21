@@ -1,5 +1,5 @@
 /* ========================================================================
-   Ho!! - Oberflaeche. Dunkler Weltraum, warme Messing-Akzente.
+   Ho!! - user interface. Dark space, warm brass accents.
    ===================================================================== */
 :root {
   --bg: #05060c;
@@ -24,9 +24,9 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 
-/* App-Gefühl statt Webseite: nichts lässt sich versehentlich markieren, kein
-   blauer Block beim Doppelklick, kein Aufblitzen beim Antippen. Ausgenommen
-   ist alles, was man wirklich kopieren will. */
+/* App feel instead of a web page: nothing can be selected by accident, no
+   blue block on double-click, no flash on tap. Exempt is everything you
+   really want to copy. */
 body {
   user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -77,7 +77,7 @@ button.ghost { background: transparent; }
 button.tiny { padding: 4px 8px; font-size: 13px; border-radius: 6px; }
 .icon-btn { background: none; border: none; padding: 2px 8px; color: var(--ink-faint); }
 
-/* ------------------------------------------------------------- Felder */
+/* -------------------------------------------------------------- Fields */
 .field { display: block; margin: 14px 0; }
 .field > span { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
 .field input[type=text], .field input[type=password], .field input:not([type]),
@@ -86,8 +86,8 @@ input[type=text], input[type=password], input:not([type]) {
   background: #0b1020; border: 1px solid var(--line-strong); border-radius: 8px;
 }
 input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
-/* Fest vorgegeben (der Name kommt mit Anmeldung aus dem Konto): sichtbar,
-   aber erkennbar nicht zum Bearbeiten. */
+/* Fixed (with sign-in the name comes from the account): visible, but
+   recognizably not editable. */
 input[readonly] { color: var(--ink-dim); background: transparent; border-style: dashed; cursor: default; }
 input[readonly]:focus { outline: none; }
 .field.slim { margin: 10px 0; }
@@ -95,15 +95,15 @@ input[readonly]:focus { outline: none; }
 .field.slim b { color: var(--gold); font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--gold); }
 
-/* =================================================== Startbildschirm */
-/* Start, Anmeldung und Lobby: mittig, solange Platz ist - und scrollbar,
-   sobald nicht. Zentriert wird ueber margin: auto am Inhalt statt ueber
-   place-items: center; das schoebe den oberen Teil eines zu hohen Inhalts
-   ueber den Rand, wo kein Scrollen mehr hinkommt. */
+/* ======================================================= Start screen */
+/* Start, sign-in and lobby: centered as long as there is room - and
+   scrollable once there is not. Centering uses margin: auto on the content
+   instead of place-items: center; the latter would push the top part of
+   overly tall content beyond the edge, where scrolling cannot reach. */
 #screen-menu, #screen-login, #screen-lobby { display: grid; overflow-y: auto; overscroll-behavior: contain; }
 #screen-menu > .menu-box, #screen-login > .menu-box, #screen-lobby > .lobby { margin: auto; }
 #screen-menu { padding: 16px 0; background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
-/* Der Sternenhimmel bleibt stehen, waehrend das Menue scrollt. */
+/* The starry sky stays put while the menu scrolls. */
 .menu-sky { position: fixed; inset: 0; }
 .menu-sky canvas { width: 100%; height: 100%; display: block; }
 .menu-box {
@@ -112,11 +112,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   border: 1px solid var(--line); border-radius: 16px;
   padding: 30px 32px 22px; box-shadow: var(--shadow);
 }
-/* Die Wortmarke liegt als SVG in client/img/logo.svg - der Schein darunter
-   bleibt CSS, damit er zur Stimmung des Startbildschirms passt. */
-/* Der durchsichtige Überstand der Grafik (Platz für die Atmosphäre) wird mit
-   negativen Rändern wieder hereingeholt - sonst schöbe er die Zeile darunter
-   weg, obwohl dort nichts steht als Schein. */
+/* The wordmark lives as an SVG in client/img/logo.svg - the glow beneath it
+   stays CSS so it matches the mood of the start screen. */
+/* The transparent overhang of the graphic (room for the atmosphere) is
+   pulled back in with negative margins - otherwise it would push the line
+   below away, although there is nothing there but glow. */
 .logo { margin: -14px 0 -10px; line-height: 0; }
 .logo img {
   display: block; width: min(300px, 76%); height: auto;
@@ -133,7 +133,51 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020;
 }
 .open-games .og b { font-family: var(--mono); color: var(--gold); letter-spacing: .15em; }
-/* Profil im Startmenue: Bild links, Name daneben */
+/* Admin panel next to the start menu; on narrower screens it moves below. */
+#screen-menu.with-admin { grid-template-columns: auto auto; justify-content: center; align-content: center; align-items: start; column-gap: 20px; }
+#screen-menu.with-admin > .menu-box { margin: 0; }
+.admin-box { width: min(560px, 92vw); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px 24px; }
+@media (max-width: 1120px) {
+  #screen-menu.with-admin { grid-template-columns: auto; row-gap: 16px; justify-items: center; align-content: start; }
+  .admin-box { max-height: none; width: min(480px, 92vw); }
+}
+.admin-head { display: flex; align-items: baseline; gap: 12px; }
+.admin-head h2 { margin: 0; font-size: 20px; color: var(--gold); }
+.admin-head #admin-refresh { margin-left: auto; }
+.admin-box h3 { margin: 18px 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.admin-list { display: flex; flex-direction: column; gap: 8px; }
+.admin-game { padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020; }
+.ag-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 2px; }
+.ag-code { font-family: var(--mono); color: var(--gold); letter-spacing: .15em; }
+.ag-state { font-size: 11.5px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--ink-dim); }
+.ag-state[data-state="running"] { border-color: var(--good); color: var(--good); }
+.ag-turn { font-variant-numeric: tabular-nums; }
+/* Ending a game from the admin panel: a second click is needed, and the armed state shows it. */
+.ag-actions { margin-left: auto; display: flex; gap: 6px; }
+.ag-end.armed { border-color: var(--bad); color: var(--bad); }
+.admin-compose { margin: 0 0 10px; padding: 10px 11px; border: 1px solid var(--gold-dim); border-radius: 8px; background: #141225; }
+.ac-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.ac-head b { color: var(--gold); font-size: 13.5px; }
+.ac-head button { margin-left: auto; }
+.admin-compose textarea { width: 100%; resize: vertical; min-height: 64px; box-sizing: border-box; font: inherit; font-size: 14px;
+  color: var(--ink); background: #0b1020; border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 9px; }
+.ac-foot { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.ac-foot button { margin-left: auto; }
+.ag-players { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.ag-players li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; min-width: 0; }
+.ag-players li.dead { opacity: .5; }
+.ag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-stats { white-space: nowrap; }
+.admin-account { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; column-gap: 9px;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020; font-size: 13.5px; }
+.aa-avatar { position: relative; grid-row: 1 / span 2; width: 30px; height: 30px; }
+.admin-account .dot { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+  background: #3a4258; border: 2px solid #0b1020; }
+.admin-account .dot.on { background: var(--good); box-shadow: 0 0 6px var(--good); }
+.aa-name { min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.aa-status { grid-column: 2; }
+.aa-created { grid-column: 3; grid-row: 1 / span 2; text-align: right; }
+/* Profile in the start menu: image on the left, name next to it */
 .profile-row { display: flex; gap: 10px; align-items: center; }
 .avatar-pick {
   width: 42px; height: 42px; padding: 0; flex: none; border-radius: 50%; overflow: hidden;
@@ -144,8 +188,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .profile-hint { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; min-height: 0; }
 .profile-hint a { color: var(--ink-faint); margin-left: auto; }
 .hint { margin: 18px 0 0; font-size: 13px; color: var(--ink-faint); text-align: center; }
-/* Sprachwahl unter dem Hinweis: da sucht man sie, und sie draengt sich nicht vor. */
-/* Versionsnummer: klein und zurückhaltend, aber immer da */
+/* Language picker below the hint: that is where people look for it, and it does not push itself forward. */
+/* Version number: small and unobtrusive, but always there */
 .ho-version { margin: 12px 0 0; text-align: center; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); letter-spacing: .04em; }
 .ho-version.inline { margin: 0 0 0 6px; }
 #mapcorner .ho-version { margin: -2px 4px 0 0; text-align: right; font-size: 10.5px; opacity: .8; pointer-events: none; text-shadow: 0 1px 2px #000; }
@@ -153,15 +197,15 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .lang-row .sel, .lang-row select { width: auto; }
 .lang-row .sel-btn { padding: 6px 30px 6px 10px; font-size: 13px; }
 
-/* =================================================== Anmeldung */
-/* Die Anmeldung (client/login.html) borgt sich die Buehne des Startbildschirms,
-   nur ohne Sternhimmel - sie soll leicht sein, nicht beeindrucken. */
+/* =================================================== Sign-in */
+/* The sign-in (client/login.html) borrows the stage of the start screen,
+   just without the starry sky - it should be light, not impressive. */
 #screen-login { padding: 16px 0;
   background: radial-gradient(ellipse at 50% 35%, #131a33 0%, #05060c 70%); }
 #screen-login h2 { margin: 0 0 6px; font-size: 20px; }
 #screen-login .field:first-of-type { margin-top: 12px; }
 #screen-login .wide { width: 100%; padding: 12px; font-size: 15px; margin-top: 4px; }
-/* Die Zeile mit Konto und Abmelden sitzt unter der Sprachwahl im Startmenue. */
+/* The row with account and sign-out sits below the language picker in the start menu. */
 .account-row { display: flex; align-items: center; justify-content: center; gap: 10px;
   margin: 10px 0 0; font-size: 13px; color: var(--ink-faint); }
 
@@ -181,7 +225,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .player-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
 .player-list li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: #0b1020; border: 1px solid var(--line); border-radius: 8px; }
 .player-list li.me { border-color: var(--gold-dim); }
-/* Farbfeld: anklickbar, wenn man die Farbe aendern darf - sonst nur Anzeige. */
+/* Color swatch: clickable if you may change the color - otherwise display only. */
 .player-list .swatch {
   width: 18px; height: 18px; padding: 0; border-radius: 5px; flex: none;
   background: var(--c); border: 1px solid rgba(255,255,255,.3); box-shadow: 0 0 10px var(--c);
@@ -200,7 +244,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .player-list .avatar-btn:hover .avatar { box-shadow: 0 0 0 2px var(--gold-dim); }
 .tag-host { font-size: 11px; color: var(--gold); border: 1px solid var(--gold-dim); padding: 0 6px; border-radius: 20px; }
 
-/* Spielerbild: rund, mit der Spielerfarbe als Ring; ohne Bild der Anfangsbuchstabe. */
+/* Player image: round, with the player color as a ring; without an image, the initial. */
 .avatar {
   display: inline-grid; place-items: center; flex: none; border-radius: 50%; overflow: hidden;
   background: color-mix(in srgb, var(--c) 30%, #0b1020); color: #fff; font-weight: 650;
@@ -208,7 +252,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Palette zum Umfaerben */
+/* Palette for recoloring */
 .color-pop {
   position: fixed; z-index: 60; display: grid; grid-template-columns: repeat(8, 26px); gap: 6px;
   padding: 10px; background: var(--panel-solid); border: 1px solid var(--line-strong);
@@ -217,11 +261,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .color-pop button { width: 26px; height: 26px; padding: 0; border-radius: 6px; background: var(--c); border: 2px solid transparent; }
 .color-pop button:hover { background: var(--c); border-color: #fff; }
 .color-pop button.cur { border-color: #fff; box-shadow: 0 0 10px var(--c); }
-/* Vergeben: Ecke ausgeschnitten - waehlbar heisst hier tauschen. */
+/* Taken: corner cut out - selectable here means swapping. */
 .color-pop button.taken { clip-path: polygon(0 0, 100% 0, 100% 62%, 62% 100%, 0 100%); }
 .color-pop button:disabled { opacity: .25; cursor: not-allowed; }
 
-/* Einstellungen nur ansehen: keine Regler, keine Knoepfe - nur Werte. */
+/* Settings view-only: no sliders, no buttons - only values. */
 .lock-hint {
   margin: -4px 0 10px; padding: 8px 10px; font-size: 13px; color: var(--ink-dim);
   background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 8px;
@@ -240,14 +284,14 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 #lobby-settings.readonly .chk { cursor: default; color: var(--ink); font-size: 14px; }
 #lobby-settings.readonly .chk:hover { color: var(--ink); }
 #lobby-settings.readonly .field.slim, #lobby-settings.readonly .chk { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-.player-list .tagbot { font-size: 12px; color: var(--ink-faint); border: 1px solid var(--line); padding: 1px 6px; border-radius: 20px; }
+.player-list .tagbot, .admin-account .tagbot { font-size: 12px; color: var(--ink-faint); border: 1px solid var(--line); padding: 1px 6px; border-radius: 20px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .lobby-foot { display: flex; justify-content: space-between; margin-top: 16px; }
 
-/* =============================================================== Spiel */
+/* ================================================================ Game */
 #screen-game { background: #04050a; }
-/* touch-action: der Browser soll weder scrollen noch zoomen - die Karte
-   macht beides selbst, sonst zieht man beim Schwenken die Seite mit. */
+/* touch-action: the browser should neither scroll nor zoom - the map does
+   both itself, otherwise panning would drag the page along. */
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
   cursor: grab; touch-action: none; }
 #map.dragging { cursor: grabbing; }
@@ -257,8 +301,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   display: flex; align-items: center; gap: 14px; padding: 0 14px;
   background: linear-gradient(rgba(6, 9, 18, .95), rgba(6, 9, 18, .72));
   border-bottom: 1px solid var(--line); backdrop-filter: blur(10px);
-  /* Ueber den Fenstern (z 4-6, siehe dialog.js) und Einblendungen: der
-     Haushalt klappt aus der Kopfleiste nach unten und darf nie darunter liegen. */
+  /* Above the windows (z 4-6, see dialog.js) and overlays: the ledger folds
+     down out of the top bar and must never lie beneath them. */
   z-index: 10;
 }
 .emblem { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 14px currentColor; flex: none; overflow: hidden; }
@@ -266,7 +310,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .me-name { font-weight: 650; line-height: 1.1; }
 .me-sub { font-size: 12px; color: var(--ink-dim); }
 .res { position: relative; display: flex; gap: 6px; margin-left: 4px; }
-/* Knopf, sieht aber wie eine Anzeige aus: erst beim Zeigen wird er greifbar. */
+/* A button, but it looks like a display: it only becomes tangible on hover. */
 .res-item {
   display: flex; align-items: baseline; gap: 6px;
   background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px;
@@ -275,11 +319,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .res-item:active { transform: none; }
 .res-item .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
 .res-item .val { font-family: var(--mono); font-size: 19px; color: var(--gold); font-variant-numeric: tabular-nums; }
-/* Stand nach dem Rundenende - still, solange alles aufgeht. */
+/* Balance after the end of the turn - quiet as long as everything works out. */
 .res-item .next { font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.res-item .next.knapp { color: var(--bad); font-weight: 600; }
+.res-item .next.tight { color: var(--bad); font-weight: 600; }
 
-/* Haushalt: die Rechnung hinter "jetzt -> nächste Runde" */
+/* Ledger: the calculation behind "now -> next turn" */
 .ledger {
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: 340px;
   background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--radius);
@@ -292,9 +336,9 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .ledger thead td { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
 .ledger th small { display: block; font-size: 11.5px; }
 .ledger .bad { color: var(--bad); }
-.ledger tr.stand th, .ledger tr.stand td { color: var(--ink-dim); }
-.ledger tr.ein td { color: var(--good); }
-.ledger tr.summe th, .ledger tr.summe td { border-top: 1px solid var(--line-strong); padding-top: 6px; font-weight: 650; color: var(--gold); }
+.ledger tr.now th, .ledger tr.now td { color: var(--ink-dim); }
+.ledger tr.income td { color: var(--good); }
+.ledger tr.total th, .ledger tr.total td { border-top: 1px solid var(--line-strong); padding-top: 6px; font-weight: 650; color: var(--gold); }
 .ledger p { margin: 8px 0 0; line-height: 1.4; }
 .turnbox { text-align: right; }
 .turn { font-size: 14px; color: var(--ink-dim); }
@@ -310,20 +354,20 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
 }
-/* Unter den Docks steht das Protokollfenster (Grundhoehe 240) bzw. die
-   Kartensteuerung - so weit reichen sie, ohne sich zu ueberlappen. */
-/* Auch das linke Dock ist ein Fenster; hier steht nur die Startlage. */
+/* Below the docks sit the log window (base height 240) or the map
+   controls - this is how far they reach without overlapping. */
+/* The left dock is a window too; only the starting position is set here. */
 #leftdock { top: 72px; left: 12px; width: 300px; height: calc(100vh - 332px); }
 #leftdock .tabbody { flex: 1; min-height: 0; }
 .dlg.dlg-busy .tabbody { pointer-events: none; }
 #rightdock { top: 72px; right: 12px; width: 340px; max-height: calc(100vh - 140px); }
-/* Das Protokoll ist ein Fenster: Leiste zum Ziehen, Griff zum Aufziehen.
-   Lage und Groesse setzt client/js/ui/dialog.js, hier steht nur der Start. */
+/* The log is a window: a bar for dragging, a grip for resizing.
+   Position and size are set by client/js/ui/dialog.js, only the start is here. */
 #logdock { bottom: 12px; left: 12px; width: 460px; height: 240px; z-index: 6; }
 #logdock.collapsed { height: auto; }
 #logdock.collapsed .logbody, #logdock.collapsed #chat-input-row,
 #logdock.collapsed .dlg-grip { display: none; }
-/* Waehrend gezogen wird darf nichts unter dem Zeiger reagieren. */
+/* While dragging, nothing under the pointer may react. */
 .dlg.dlg-busy { user-select: none; }
 .dlg.dlg-busy .logbody { pointer-events: none; }
 
@@ -335,10 +379,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .dlg-bar .tabs { border-bottom: none; flex: none; }
 .dlg-bar .spacer { min-width: 20px; }
 #leftdock .dlg-bar .spacer { min-width: 0; }
-/* Drei Reiter plus Griff in 288 px: die Reiter dürfen enger werden. */
+/* Three tabs plus a grip in 288 px: the tabs may get narrower. */
 #leftdock .dlg-bar .tabs { flex: 0 1 auto; min-width: 0; }
 #leftdock .dlg-bar .tabs button { padding: 7px 7px; font-size: 12px; letter-spacing: .02em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Punktgriff: immer frei zum Anfassen, auch wenn die Reiter die Leiste füllen */
+/* Dot grip: always free to grab, even when the tabs fill the bar */
 .dlg-handle {
   flex: none; width: 18px; align-self: stretch; margin-right: 4px; border-radius: 6px;
   background: radial-gradient(circle, var(--ink-faint) 1.2px, transparent 1.6px) center / 6px 6px;
@@ -370,7 +414,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .tabbody, #selection { overflow-y: auto; padding: 12px; }
 .logbody { overflow-y: auto; padding: 8px 12px; font-size: 13.5px; flex: 1 1 auto; min-height: 0; }
 
-/* Forschung */
+/* Research */
 .tech-row { margin-bottom: 11px; }
 .tech-head { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
 .tech-head .lvl { margin-left: auto; font-family: var(--mono); color: var(--gold); }
@@ -382,7 +426,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .wrow .pct { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); width: 38px; text-align: right; }
 .budget-box { background: #0b1020; border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
 
-/* Auswahl-Panel */
+/* Selection panel */
 .sel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .sel-head canvas { flex: none; }
 .sel-title { font-size: 18px; font-weight: 650; line-height: 1.1; }
@@ -400,13 +444,13 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .buildrow .bname { font-size: 14px; }
 .buildrow .bcost { font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
 .buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
-/* Feste Breite fuer bis zu drei Stellen: sonst rueckt "−" bei 10 oder 100 zur Seite. */
+/* Fixed width for up to three digits: otherwise "−" shifts aside at 10 or 100. */
 .buildrow .bq .n { font-family: var(--mono); min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .shiplist { display: flex; flex-direction: column; gap: 4px; }
 .shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }
 .shipitem .hp { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
 .hint-line { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
-/* Verteidigung und Flotten im Orbit */
+/* Defense and fleets in orbit */
 .def-warn { margin: 0 0 8px; padding: 6px 9px; border-radius: 7px; font-size: 13px;
   color: #ffd0c4; background: rgba(255, 95, 95, .12); border: 1px solid rgba(255, 95, 95, .35); }
 .def-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px;
@@ -427,7 +471,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .fr-sub { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; font-size: 12px; color: var(--ink-faint); }
 .sel-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 
-/* Reich / Spieler */
+/* Empire / players */
 .listrow {
   display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px;
   cursor: pointer; border: 1px solid transparent;
@@ -453,8 +497,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .logline.clickable:hover { color: var(--ink); }
 #chat-input-row { padding: 8px; border-top: 1px solid var(--line); }
 
-/* Kartensteuerung: unten rechts steht nur, was man staendig braucht -
-   Einpassen und Zoom. Alles Weitere klappt ueber das Zahnrad auf. */
+/* Map controls: the bottom right only holds what you constantly need -
+   fit and zoom. Everything else folds out via the gear. */
 #mapcorner {
   position: absolute; right: 12px; bottom: 12px; z-index: 4;
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -465,15 +509,15 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 6px; backdrop-filter: blur(10px); box-shadow: var(--shadow);
 }
-/* Alle vier gleich gross: die Zeichen sind verschieden breit, die Knoepfe
-   sollen es nicht sein. */
+/* All four the same size: the characters differ in width, the buttons
+   should not. */
 #mapcontrols button {
   width: 34px; height: 34px; padding: 0;
   display: grid; place-items: center;
   font-size: 15px; line-height: 1;
 }
 #btn-mapopts { font-size: 16px; }
-#btn-mapopts.auf { border-color: var(--gold-dim); color: var(--gold); }
+#btn-mapopts.open { border-color: var(--gold-dim); color: var(--gold); }
 
 #mapsettings {
   display: flex; flex-direction: column; gap: 10px; min-width: 190px;
@@ -503,8 +547,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .sp-speeds { display: flex; gap: 2px; margin-left: 4px; }
 .sp-speeds button { padding: 6px 8px; font-variant-numeric: tabular-nums; }
 .sp-speeds button.active { border-color: var(--gold-dim); color: var(--gold); }
-/* Auswahlfelder: wie die Texteingaben, nur mit eigenem Pfeil - der native
-   sieht auf jedem System anders aus und passt nirgends zum Rest. */
+/* Select fields: like the text inputs, just with their own arrow - the
+   native one looks different on every system and matches the rest nowhere. */
 select {
   appearance: none; -webkit-appearance: none;
   padding: 10px 34px 10px 12px;
@@ -521,17 +565,17 @@ select {
   transition: border-color .12s ease, background-color .12s ease;
 }
 select:hover:not(:disabled) { border-color: var(--gold-dim); background-color: #0e1426; }
-/* Wie bei den Texteingaben auch beim Klick, nicht nur bei Tastatursteuerung */
+/* As with the text inputs, also on click, not only with keyboard navigation */
 select:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
 select:disabled { opacity: .45; cursor: default; }
-/* Die aufgeklappte Liste lässt sich nur begrenzt gestalten - wenigstens dunkel. */
+/* The expanded list can only be styled to a limited extent - dark at least. */
 select option { background: var(--panel-solid); color: var(--ink); }
 
 .field select { width: 100%; }
 .join-row select { flex: 0 0 auto; }
 
-/* Eigene Auswahlliste (client/js/ui/select.js): das native <select> bleibt als
-   Zustandsträger darunter liegen, sichtbar sind Knopf und Liste. */
+/* Custom select list (client/js/ui/select.js): the native <select> stays
+   beneath as the holder of state, button and list are what is visible. */
 .sel { position: relative; width: 100%; }
 .sel select { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
 .sel-btn {
@@ -550,7 +594,7 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .sel-btn:hover:not(:disabled) { border-color: var(--gold-dim); background-color: #0e1426; }
 .sel-btn:focus-visible { outline: 2px solid var(--gold-dim); outline-offset: 0; }
 .sel-btn:disabled { opacity: .45; cursor: default; }
-.sel.auf .sel-btn { border-color: var(--gold-dim); background-color: #0e1426; }
+.sel.open .sel-btn { border-color: var(--gold-dim); background-color: #0e1426; }
 
 .sel-list {
   display: none;
@@ -559,9 +603,9 @@ select option { background: var(--panel-solid); color: var(--ink); }
   border-radius: 10px; box-shadow: var(--shadow);
   padding: 4px; max-height: 260px; overflow-y: auto;
 }
-.sel.auf .sel-list { display: block; animation: sel-in .11s ease-out; }
-/* Nach oben aufgeklappt, wenn darunter kein Platz ist (select.js). */
-.sel.hoch .sel-list { top: auto; bottom: calc(100% + 5px); }
+.sel.open .sel-list { display: block; animation: sel-in .11s ease-out; }
+/* Opened upwards when there is no room below (select.js). */
+.sel.above .sel-list { top: auto; bottom: calc(100% + 5px); }
 @keyframes sel-in { from { opacity: 0; transform: translateY(-4px); } }
 .sel-opt { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
 .sel-opt:hover { background: rgba(160, 190, 240, .1); }
@@ -570,8 +614,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .join-row .sel { width: auto; }
 .join-row .sel-btn { width: auto; }
 .league { display: flex; flex-direction: column; gap: 2px; }
-/* Breite festnageln: sonst zieht der nicht umbrechende Name die Mindestbreite
-   der Zeile über den Kasten hinaus und nichts wird je gekürzt. */
+/* Pin the width: otherwise the non-wrapping name pulls the row's minimum
+   width beyond the box and nothing ever gets truncated. */
 .league .row { width: 100%; box-sizing: border-box; overflow: hidden;
   padding: 6px 8px; border-radius: 8px; background: #0b1020cc; border: 1px solid var(--line); }
 .league .row.dead { opacity: .45; }
@@ -581,8 +625,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .league .tech { margin-top: 3px; font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
 .league .bar { height: 3px; border-radius: 2px; margin-top: 5px; background: #ffffff14; overflow: hidden; }
 .league .bar i { display: block; height: 100%; }
-/* Schalter statt Haekchen: deutlicher zu erkennen und mit dem Daumen zu
-   treffen. Das Kaestchen bleibt als Zustandstraeger, nur umgemalt. */
+/* Switch instead of a checkmark: easier to recognize and to hit with the
+   thumb. The checkbox stays as the holder of state, just repainted. */
 .chk { font-size: 13px; color: var(--ink-dim); display: flex; align-items: center; gap: 7px; padding: 0 4px; cursor: pointer; }
 .chk:hover { color: var(--ink); }
 .chk input[type=checkbox] {
@@ -634,7 +678,7 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .help-cols h4 { margin: 14px 0 4px; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
 .help-cols p { margin: 0 0 8px; color: var(--ink-dim); font-size: 14px; }
 .modal-box > .primary { margin-top: 18px; }
-/* Schiffssteckbrief */
+/* Ship profile */
 .shipinfo-box { width: min(760px, 94vw); }
 .si-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .si-tabs button { display: inline-flex; align-items: center; gap: 4px; }
@@ -649,7 +693,7 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .si-body { grid-template-columns: 1fr; }
   .si-stage { margin: 0 auto; }
 }
-/* Schlachtfenster */
+/* Battle window */
 .battle-box { width: min(980px, 96vw); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
 .bt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .bt-head h2 { margin: 0; }
@@ -695,20 +739,20 @@ select option { background: var(--panel-solid); color: var(--ink); }
 ::-webkit-scrollbar-thumb { background: #1d2740; border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: #2a3658; }
 
-/* ====================================================== Kleine Geräte
-   Auf einem Telefon ist kein Platz für schwebende Docks: die drei Panels
-   werden zu Blättern, die über eine Leiste am unteren Rand aufgehen - immer
-   nur eines. Die Karte behält den Rest des Bildschirms für sich.
-   Umschaltpunkt ist die Breite, nicht die Art des Zeigers: ein schmales
-   Fenster am Rechner hat dasselbe Platzproblem. */
+/* ====================================================== Small devices
+   On a phone there is no room for floating docks: the three panels become
+   sheets that open from a bar at the bottom edge - only one at a time. The
+   map keeps the rest of the screen for itself.
+   The breakpoint is the width, not the kind of pointer: a narrow window on
+   a computer has the same space problem. */
 .only-phone { display: none; }
 
-/* Umschaltpunkt: zu schmal ODER zu niedrig fuer nebeneinanderliegende
-   Docks. Dieselbe Abfrage steht in client/js/ui/viewport.js. */
+/* Breakpoint: too narrow OR too low for docks side by side. The same query
+   lives in client/js/ui/viewport.js. */
 @media (max-width: 760px), (max-height: 560px) {
   .only-phone { display: block; }
 
-  /* ---------------------------------------------------- Start und Lobby */
+  /* ----------------------------------------------------- Start and lobby */
   .logo img { width: min(250px, 72%); }
   .menu-box { padding: 22px 20px 18px; border-radius: 14px; }
   .tagline { margin-bottom: 16px; }
@@ -721,13 +765,13 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .help-cols { grid-template-columns: 1fr; }
 
   /* ------------------------------------------------------------ Topbar */
-  /* Ueber den Blaettern (z 11) und der Leiste unten - wegen des Haushalts. */
+  /* Above the sheets (z 11) and the bar at the bottom - because of the ledger. */
   #topbar { height: 54px; gap: 10px; padding: 0 10px; z-index: 13; }
   #topbar .me, #btn-quit { display: none; }
   .emblem { width: 26px; height: 26px; }
-  /* Beschriftung über den Wert statt daneben: zwei nackte Zahlen
-     nebeneinander wären nicht auseinanderzuhalten, und Platz für "Geld" in
-     voller Größe ist nicht. */
+  /* Label above the value instead of next to it: two bare numbers side by
+     side could not be told apart, and there is no room for "Money" at full
+     size. */
   .res { gap: 14px; margin-left: 0; }
   .res-item { flex-wrap: wrap; align-items: baseline; gap: 0 5px; line-height: 1.15; }
   .res-item .lbl { width: 100%; font-size: 9px; letter-spacing: .05em; }
@@ -744,7 +788,7 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #spectate button { padding: 6px 8px; font-size: 13px; }
   .sp-speeds { display: none; }
 
-  /* ------------------------------------------------------- Blätter */
+  /* ------------------------------------------------------- Sheets */
   #tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
     display: flex; align-items: stretch;
@@ -755,15 +799,15 @@ select option { background: var(--panel-solid); color: var(--ink); }
     flex: 1; background: none; border: none; border-radius: 0;
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     padding: 8px 2px; font-size: 11px; color: var(--ink-dim);
-    min-height: 54px;                 /* mit dem Daumen zu treffen */
+    min-height: 54px;                 /* easy to hit with the thumb */
   }
   #tabbar button .ic { font-size: 17px; line-height: 1; }
   #tabbar button.active { color: var(--gold); }
   #tabbar button.active .ic { text-shadow: 0 0 10px rgba(240,180,41,.5); }
   #tabbar button:hover { background: none; }
 
-  /* Mit ID adressiert, weil #leftdock & Co. oben ihre feste Lage per ID
-     setzen - eine Klassenregel käme dagegen nicht an. */
+  /* Addressed by ID, because #leftdock & co. set their fixed position by ID
+     above - a class rule would not win against that. */
   #leftdock, #rightdock, #logdock {
     position: fixed; left: 0; right: 0; width: auto;
     top: auto; bottom: 54px; height: 54vh; max-height: none;
@@ -774,9 +818,9 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #screen-game[data-sheet="left"] #leftdock,
   #screen-game[data-sheet="right"] #rightdock,
   #screen-game[data-sheet="log"] #logdock { display: flex; }
-  /* Das Protokollfenster ist hier kein Fenster: Leiste und Griff entfallen. */
-  /* Das Protokoll ist hier kein Fenster - die gemerkte Geometrie gilt wieder,
-     sobald das Fenster breit genug ist (siehe client/js/ui/dialog.js). */
+  /* The log window is not a window here: bar and grip are dropped. */
+  /* The log is not a window here - the remembered geometry applies again as
+     soon as the window is wide enough (see client/js/ui/dialog.js). */
   #logdock { left: 0 !important; right: 0 !important; top: auto !important;
     bottom: 54px !important; width: auto !important; height: 54vh !important; }
   #logdock .dlg-bar, #leftdock .dlg-bar { cursor: default; }
@@ -786,10 +830,10 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #logdock.collapsed .logbody, #logdock.collapsed #chat-input-row { display: block; }
   .tabbody, #selection { padding: 12px 14px; }
 
-  /* --------------------------------------------------- Kartensteuerung */
+  /* -------------------------------------------------------- Map controls */
   #mapcorner { right: 8px; bottom: 62px; }
-  /* Nur die Knopfleiste weicht dem Blatt - die Einstellungen liegen im
-     selben Container und sind selbst ein Blatt. */
+  /* Only the button bar makes way for the sheet - the settings live in the
+     same container and are a sheet themselves. */
   #screen-game[data-sheet]:not([data-sheet=""]) #mapcontrols { display: none; }
   #mapcontrols button { width: 40px; height: 40px; }
   #mapsettings {
@@ -800,22 +844,22 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #mapsettings .chk { padding: 6px 0; }
   #btn-quit2 { width: 100%; margin-top: 6px; }
 
-  /* Mit dem Daumen bedienbar: Mindestgrößen für alles Anfassbare */
+  /* Usable with the thumb: minimum sizes for everything touchable */
   button.tiny { padding: 8px 12px; font-size: 13px; }
   .buildrow .bq button.tiny { min-width: 38px; min-height: 36px; }
   input[type=range] { height: 28px; }
   .listrow { padding: 10px 8px; }
   .shipitem { padding: 8px 8px; }
 
-  /* Meldungen über der Karte, nicht über der Leiste */
+  /* Messages above the map, not above the bar */
   #toasts { top: 58px; width: min(92vw, 420px); }
   .toast { font-size: 13px; }
   #turnbanner .big { font-size: 34px; }
 }
 
-/* Breit, aber niedrig (Telefon quer, geteiltes Fenster): nach unten ist kein
-   Platz, nach rechts schon - das Blatt legt sich an die Seite und lässt die
-   halbe Karte frei. */
+/* Wide but low (phone in landscape, split window): there is no room
+   downwards, but there is to the right - the sheet docks at the side and
+   leaves half the map free. */
 @media (min-width: 761px) and (max-height: 560px) {
   #leftdock, #rightdock, #logdock, #mapsettings {
     left: auto; right: 0; width: min(54vw, 420px);
@@ -831,19 +875,19 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #mapcorner { bottom: 62px; right: 8px; }
 }
 
-/* Sehr niedrig und schmal zugleich: dann bleibt nur, das Blatt höher zu
-   ziehen - die Karte ist darüber noch zu sehen. */
+/* Very low and narrow at the same time: then the only option is to make the
+   sheet taller - the map is still visible above it. */
 @media (max-width: 760px) and (max-height: 520px) {
   #leftdock, #rightdock, #logdock, #mapsettings { height: 68vh; max-height: 68vh; }
   #logdock { height: 68vh !important; }
 }
 
-/* Werft: Zusammenfassung mit fester Hoehe (zwei Zeilen) - Knöpfe darunter
-   bleiben beim Bestellen an ihrem Platz. */
+/* Shipyard: summary with a fixed height (two lines) - buttons below stay
+   in place while ordering. */
 .buildsum { margin-top: 6px; }
 .buildsum > div, .oneline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.45; }
 
-/* Rangliste: Platz, Bild, Name - rechts die Bevölkerung, nach der gewertet wird */
+/* Ranking: place, image, name - on the right the population that is scored */
 .rank-hint { margin: 0 0 8px; }
 .rankrow .rank { width: 1.6em; flex: none; text-align: right; font-family: var(--mono); color: var(--ink-faint); }
 .rankrow.me { border-color: var(--gold-dim); }
@@ -856,3 +900,25 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .rankrow.dead { opacity: .5; }
 .rankrow.dead .nm { text-decoration: line-through; }
 
+
+/* =================================================== Admin announcements
+   Above everything, including dialogs: an admin message must not hide
+   behind a battle replay. Amber, not the gold of the UI, so it does not
+   read like part of the game. */
+#announcements { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 70;
+  display: flex; flex-direction: column; gap: 10px; width: min(520px, 92vw); }
+.announcement {
+  padding: 14px 16px 12px; border-radius: 12px; border: 2px solid #ff9f1c;
+  background: linear-gradient(180deg, #2a1d06, #150f04); color: #fff3dc;
+  box-shadow: 0 0 0 4px rgba(255, 159, 28, .15), 0 18px 50px rgba(0, 0, 0, .7);
+  animation: an-in .25s ease-out, an-pulse 1.6s ease-in-out 3;
+}
+.an-head { display: flex; align-items: center; gap: 8px; }
+.an-icon { font-size: 20px; }
+.an-title { text-transform: uppercase; letter-spacing: .1em; font-size: 13px; color: #ffb74d; }
+.an-text { margin: 8px 0 10px; font-size: 16px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.an-foot { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #e0c9a0; }
+.an-foot .an-ok { margin-left: auto; }
+@keyframes an-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+@keyframes an-pulse { 50% { box-shadow: 0 0 0 10px rgba(255, 159, 28, .28), 0 18px 50px rgba(0, 0, 0, .7); } }
+@media (max-width: 760px), (max-height: 560px) { #announcements { top: 62px; } }

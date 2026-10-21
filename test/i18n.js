@@ -1,85 +1,85 @@
-// Die Kataloge müssen zueinander passen: gleiche Schlüssel, gleiche Platzhalter.
-// Ein fehlender Schlüssel fällt sonst erst im Spiel auf - als englischer Satz
-// mitten im deutschen Text oder, schlimmer, als nackter Schlüssel.
+// The catalogs must match each other: same keys, same placeholders.
+// A missing key otherwise only shows up in the game - as an English sentence
+// in the middle of German text or, worse, as a bare key.
 import { readFileSync } from 'node:fs';
-const katalog = (code) => JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8'));
-const de = katalog('de');
-const en = katalog('en');
+const catalog = (code) => JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8'));
+const de = catalog('de');
+const en = catalog('en');
 import { registerLocale, setLocale, t } from '../shared/i18n.js';
 
-const kataloge = { de, en };
-let fehler = 0;
-const rüge = (txt) => { console.log('  ' + txt); fehler++; };
+const catalogs = { de, en };
+let errors = 0;
+const fail = (txt) => { console.log('  ' + txt); errors++; };
 
-// 1) Gleiche Schlüsselmenge
-const alle = new Set([...Object.keys(de), ...Object.keys(en)]);
-for (const [name, kat] of Object.entries(kataloge)) {
-  const fehlt = [...alle].filter(k => kat[k] == null);
-  if (fehlt.length) rüge(`${name}: ${fehlt.length} Schlüssel fehlen: ${fehlt.slice(0, 5).join(', ')}`);
+// 1) Same set of keys
+const all = new Set([...Object.keys(de), ...Object.keys(en)]);
+for (const [name, cat] of Object.entries(catalogs)) {
+  const missing = [...all].filter(k => cat[k] == null);
+  if (missing.length) fail(`${name}: ${missing.length} keys missing: ${missing.slice(0, 5).join(', ')}`);
 }
-console.log(`${alle.size} Schlüssel, ${Object.keys(kataloge).length} Sprachen.`);
+console.log(`${all.size} keys, ${Object.keys(catalogs).length} languages.`);
 
-// 2) Gleiche Platzhalter je Schlüssel
-const platzhalter = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
-for (const k of alle) {
+// 2) Same placeholders per key
+const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+for (const k of all) {
   if (de[k] == null || en[k] == null) continue;
-  if (platzhalter(de[k]) !== platzhalter(en[k])) {
-    rüge(`${k}: Platzhalter unterschiedlich (de: ${platzhalter(de[k]) || '–'}, en: ${platzhalter(en[k]) || '–'})`);
+  if (placeholders(de[k]) !== placeholders(en[k])) {
+    fail(`${k}: placeholders differ (de: ${placeholders(de[k]) || '–'}, en: ${placeholders(en[k]) || '–'})`);
   }
 }
 
-// 3) Jeder Schlüssel, den Server oder Werkzeug nennen kann, muss übersetzbar
-//    sein - sonst steht im Browser oder auf der Konsole der nackte Schlüssel.
+// 3) Every key the server or a tool can name must be translatable - otherwise
+//    the bare key shows up in the browser or on the console.
 const { readFile } = await import('node:fs/promises');
-const quellen = ['game.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
-let quelle = '';
-for (const name of quellen) {
-  quelle += await readFile(new URL('../server/' + name, import.meta.url), 'utf8');
+const sources = ['game.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
+let source = '';
+for (const name of sources) {
+  source += await readFile(new URL('../server/' + name, import.meta.url), 'utf8');
 }
-// Schlüssel reisen als key:, error:, Rückgabewert oder Fehlermeldung.
-const SCHL = "([a-z]+(?:\\.[A-Za-z]+)+)";
-const benutzt = new Set();
-for (const muster of [`key: '${SCHL}'`, `error: '${SCHL}'`,
-                      `return '${SCHL}'`, `Error\\('${SCHL}'\\)`, `t\\('${SCHL}'`]) {
-  for (const m of quelle.matchAll(new RegExp(muster, 'g'))) benutzt.add(m[1]);
+// Keys travel as key:, error:, return value or error message.
+const KEY = "([a-z]+(?:\\.[A-Za-z]+)+)";
+const used = new Set();
+for (const pattern of [`key: '${KEY}'`, `error: '${KEY}'`,
+                       `return '${KEY}'`, `Error\\('${KEY}'\\)`, `t\\('${KEY}'`]) {
+  for (const m of source.matchAll(new RegExp(pattern, 'g'))) used.add(m[1]);
 }
-// Mehrzahlschlüssel stehen als k#one / k#other im Katalog - beides gilt.
-const kennt = (kat, k) => kat[k] != null || kat[`${k}#one`] != null || kat[`${k}#other`] != null;
-for (const k of benutzt) {
-  for (const [name, kat] of Object.entries(kataloge)) {
-    if (!kennt(kat, k)) rüge(`Server schickt '${k}', ${name} kennt ihn nicht.`);
+// Plural keys are in the catalog as k#one / k#other - both count.
+const knows = (cat, k) => cat[k] != null || cat[`${k}#one`] != null || cat[`${k}#other`] != null;
+for (const k of used) {
+  for (const [name, cat] of Object.entries(catalogs)) {
+    if (!knows(cat, k)) fail(`Server sends '${k}', ${name} does not know it.`);
   }
 }
-console.log(`${benutzt.size} Schlüssel kommen vom Server.`);
+console.log(`${used.size} keys come from the server.`);
 
-// 4) Mehrzahl und Platzhalter funktionieren in beiden Sprachen
+// 4) Plurals and placeholders work in both languages
 registerLocale('de', de); registerLocale('en', en);
-for (const [code, erwartet] of [['de', 'Flotte (1 Schiff) erreicht Sirrah.'],
+for (const [code, expected] of [['de', 'Flotte (1 Schiff) erreicht Sirrah.'],
                                 ['en', 'Fleet (1 ship) reaches Sirrah.']]) {
   setLocale(code);
   const got = t('log.arrive', { count: 1, planet: 'Sirrah' });
-  if (got !== erwartet) rüge(`${code}: '${got}' statt '${erwartet}'`);
+  if (got !== expected) fail(`${code}: '${got}' instead of '${expected}'`);
 }
 
-// 5) Die Oberflaeche nennt nur Schlüssel, die es gibt - ein Tippfehler im
-//    Markup faellt sonst erst auf, wenn jemand den nackten Schlüssel liest.
+// 5) The UI only names keys that exist - a typo in the markup would otherwise
+//    only show up when someone reads the bare key.
 const markup = [];
-for (const datei of ['index.html', 'login.html', 'js/login.js']) {
-  markup.push(await readFile(new URL('../client/' + datei, import.meta.url), 'utf8'));
+for (const file of ['index.html', 'login.html', 'js/login.js']) {
+  markup.push(await readFile(new URL('../client/' + file, import.meta.url), 'utf8'));
 }
-const ausMarkup = new Set();
-for (const m of markup.join('').matchAll(/data-i18n(?:-html)?="([^"]+)"/g)) ausMarkup.add(m[1]);
+const fromMarkup = new Set();
+for (const m of markup.join('').matchAll(/data-i18n(?:-html)?="([^"]+)"/g)) fromMarkup.add(m[1]);
 for (const m of markup.join('').matchAll(/data-i18n-attr="([^"]+)"/g)) {
-  for (const paar of m[1].split(';')) ausMarkup.add(paar.split(':')[1]?.trim());
+  for (const pair of m[1].split(';')) fromMarkup.add(pair.split(':')[1]?.trim());
 }
-for (const m of markup.join('').matchAll(/t\('([a-z]+(?:\.[A-Za-z]+)+)'/g)) ausMarkup.add(m[1]);
-for (const k of ausMarkup) {
+for (const m of markup.join('').matchAll(/t\('([a-z]+(?:\.[A-Za-z]+)+)'/g)) fromMarkup.add(m[1]);
+for (const k of fromMarkup) {
   if (!k) continue;
-  for (const [name, kat] of Object.entries(kataloge)) {
-    if (!kennt(kat, k)) rüge(`Die Oberfläche nennt '${k}', ${name} kennt ihn nicht.`);
+  for (const [name, cat] of Object.entries(catalogs)) {
+    if (!knows(cat, k)) fail(`The UI names '${k}', ${name} does not know it.`);
   }
 }
-console.log(`${ausMarkup.size} Schlüssel stehen in der Oberfläche.`);
+console.log(`${fromMarkup.size} keys appear in the UI.`);
 
-if (fehler) { console.error(`\n${fehler} Probleme in den Katalogen.`); process.exit(1); }
-console.log('\nKataloge sind vollständig und passen zueinander.');
+if (errors) { console.error(`\n${errors} problems in the catalogs.`); process.exit(1); }
+console.log('\nCatalogs are complete and match each other.');
