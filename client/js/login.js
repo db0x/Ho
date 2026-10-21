@@ -3,6 +3,7 @@
 import {
   initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, t
 } from './i18n.js';
+import { startStars, sceneReady, leaveTo } from './ui/scene.js';
 
 const $ = s => document.querySelector(s);
 const NAME_KEY = 'ho-user';
@@ -13,6 +14,7 @@ let minPassword = 8;
 
 initLocale();
 languagePicker();
+startStars($('#login-canvas'));
 
 /** Language picker as in the start menu, just without its own select list. */
 function languagePicker() {
@@ -57,6 +59,7 @@ function target() {
 function show(which) {
   loginForm.classList.toggle('hidden', which !== 'login');
   changeForm.classList.toggle('hidden', which !== 'change');
+  sceneReady();
   const first = which === 'login'
     ? ($('#in-user').value ? $('#in-pass') : $('#in-user'))
     : ($('#in-old').value ? $('#in-new') : $('#in-old'));
@@ -86,7 +89,7 @@ loginForm.onsubmit = (e) => {
     const a = await api('login', 'POST', { user, password });
     if (!a.ok) return { key: a.error || 'auth.err.badLogin', params: a.params };
     try { localStorage.setItem(NAME_KEY, user); } catch { /* never mind */ }
-    if (!a.mustChange) { location.replace(target()); return null; }
+    if (!a.mustChange) { leaveTo(target()); return null; }
     // The first password is only valid here - fill it in right away so nobody
     // has to type it from the mail twice.
     $('#in-old').value = password;
@@ -107,7 +110,7 @@ changeForm.onsubmit = (e) => {
   submit(changeForm, async () => {
     const a = await api('change', 'POST', { password, newPassword });
     if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
-    location.replace(target());
+    leaveTo(target());
     return null;
   });
 };

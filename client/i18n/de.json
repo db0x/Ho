@@ -501,5 +501,7 @@
   "err.badAdminMessage": "Die Nachricht ist leer oder länger als {n} Zeichen.",
   "admin.watch": "Zusehen",
   "admin.watchTitle": "Partie als Zuschauer verfolgen, ohne Nebel",
-  "err.notStarted": "Die Partie hat noch nicht begonnen."
+  "err.notStarted": "Die Partie hat noch nicht begonnen.",
+  "app.repo": "Quellcode auf GitHub",
+  "app.repoTitle": "Ho!! ist Open Source – Code, Issues und Releases auf GitHub"
 }

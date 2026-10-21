@@ -2,6 +2,7 @@
 import { loadName, saveName, loadAvatar, saveAvatar } from '../net.js';
 import { syncSelects } from './select.js';
 import { pickAvatar, avatarHtml } from './avatar.js';
+import { startStars } from './scene.js';
 import { PLAYER_COLORS } from '../../shared/rules.js';
 import { t, n as num } from '../i18n.js';
 
@@ -15,7 +16,8 @@ export class Lobby {
     this.isHost = false;
     this.settings = null;
     this.bind();
-    this.menuStars();
+    // The sky only moves while the start menu is visible.
+    startStars($('#menu-canvas'), () => !$('#screen-menu').classList.contains('hidden'));
   }
 
   bind() {
@@ -315,35 +317,4 @@ export class Lobby {
     this.profileHint();
   }
 
-  // Subtle star animation behind the start menu
-  menuStars() {
-    const cv = $('#menu-canvas');
-    const ctx = cv.getContext('2d');
-    let stars = [];
-    const resize = () => {
-      const dpr = Math.min(2, devicePixelRatio || 1);
-      cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      stars = Array.from({ length: 260 }, () => ({
-        x: Math.random() * cv.clientWidth, y: Math.random() * cv.clientHeight,
-        r: Math.random() * 1.6 + 0.2, s: Math.random() * 0.12 + 0.02,
-        a: Math.random() * 0.7 + 0.2
-      }));
-    };
-    resize();
-    addEventListener('resize', resize);
-    const tick = () => {
-      if (!document.querySelector('#screen-menu').classList.contains('hidden')) {
-        ctx.clearRect(0, 0, cv.clientWidth, cv.clientHeight);
-        for (const s of stars) {
-          s.x += s.s;
-          if (s.x > cv.clientWidth) s.x = 0;
-          ctx.fillStyle = `rgba(226,236,255,${s.a})`;
-          ctx.fillRect(s.x, s.y, s.r, s.r);
-        }
-      }
-      requestAnimationFrame(tick);
-    };
-    tick();
-  }
 }

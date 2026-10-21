@@ -145,7 +145,7 @@ function wsAttempt() {
 
   const signInPage = await request('/login.html', { headers: page });
   check(signInPage.status === 200, 'The sign-in page itself cannot be reached');
-  for (const urlPath of ['/js/login.js', '/js/i18n.js', '/shared/i18n.js', '/i18n/de.json', '/css/style.css', '/img/logo.svg']) {
+  for (const urlPath of ['/js/login.js', '/js/i18n.js', '/js/ui/scene.js', '/shared/i18n.js', '/i18n/de.json', '/css/style.css', '/img/logo.svg']) {
     const r = await request(urlPath);
     check(r.status === 200, `The sign-in page cannot load ${urlPath} (${r.status})`);
   }

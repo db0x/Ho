@@ -26,8 +26,9 @@
 
 <!-- In front of the lobby: without a session the server does not hand out
      the game client, but it does hand out this page. That is why it only
-     needs the stylesheet, the language catalogs and itself. -->
+     needs the stylesheet, the language catalogs, the starry sky and itself. -->
 <div id="screen-login" class="screen">
+  <div class="menu-sky"><canvas id="login-canvas"></canvas></div>
   <div class="menu-box">
     <h1 class="logo"><img src="img/logo.svg" alt="Ho!!" width="330" height="182"></h1>
 
@@ -67,7 +68,7 @@
 
     <div class="lang-row"><span class="muted small" data-i18n="menu.language"></span>
       <select id="in-lang"></select></div>
-    <p class="ho-version">Ho!! v__HO_VERSION__</p>
+    <p class="ho-version">Ho!! v__HO_VERSION__ · <a href="https://github.com/db0x/Ho" class="repo-link" target="_blank" rel="noopener" data-i18n="app.repo" data-i18n-attr="title:app.repoTitle"></a></p>
   </div>
 </div>
 

@@ -4,6 +4,7 @@ import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
+import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
@@ -24,6 +25,8 @@ initLocale();
 languagePicker();
 bindUi();
 enhanceSelects();
+// Texts and select lists are in place: let the start menu float in.
+sceneReady();
 
 /**
  * Select fields for the language, in the start menu and in the game (gear at
@@ -88,7 +91,7 @@ async function account() {
     e.preventDefault();
     net.forget();
     try { await fetch('api/auth/logout', { method: 'POST' }); } catch { /* never mind */ }
-    location.replace('login.html');
+    leaveTo('login.html');
   };
 }
 

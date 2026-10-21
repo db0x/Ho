@@ -40,7 +40,8 @@ client/
                      map.js (flat), space.js (spatial), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
                      dialog.js (windows), avatar.js, battle.js, shipinfo.js, viewport.js,
-                     admin.js (admin panel on the start screen)
+                     admin.js (admin panel on the start screen), announce.js (admin banners),
+                     scene.js (starry sky and fade between sign-in and start menu)
   js/audio/sfx.js    Sound effects, synthesised at runtime
 test/                see Tests
 ```

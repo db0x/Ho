@@ -501,5 +501,7 @@
   "err.badAdminMessage": "The message is empty or longer than {n} characters.",
   "admin.watch": "Watch",
   "admin.watchTitle": "Watch this game as a spectator, without fog of war",
-  "err.notStarted": "The game has not started yet."
+  "err.notStarted": "The game has not started yet.",
+  "app.repo": "Source on GitHub",
+  "app.repoTitle": "Ho!! is open source - the code, issues and releases on GitHub"
 }
