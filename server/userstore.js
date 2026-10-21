@@ -1,11 +1,11 @@
-// Benutzerkonten. Auf dem Host steht nur, wer mitspielen darf (Name) und wie
-// sich ein Passwort pruefen laesst (scrypt-Hash samt Salz und Parametern) -
-// kein Klartext, keine Sitzungsschluessel, keine Mailadressen.
+// User accounts. The host only stores who may play (name) and how a password
+// can be checked (scrypt hash with salt and parameters) - no plain text, no
+// session keys, no email addresses.
 //
-// Angelegt und geloescht wird von aussen mit server/users.js, also per
-// `docker exec`. Der Server liest die Datei nur und merkt an mtime und Groesse,
-// wenn sie sich geaendert hat: ein geloeschtes Konto fliegt dadurch auch aus
-// einer laufenden Sitzung.
+// Accounts are created and deleted from outside with server/users.js, i.e. via
+// `docker exec`. The server only reads the file and notices from mtime and size
+// when it has changed: a deleted account is thereby also kicked out of a
+// running session.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -13,21 +13,21 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// scrypt mit N=16384: rund 40 ms und 16 MB je Pruefung. Genug Bremse gegen
-// Rateversuche und noch unter dem maxmem, das Node von sich aus zulaesst.
+// scrypt with N=16384: about 40 ms and 16 MB per check. Enough of a brake
+// against guessing and still below the maxmem Node allows by default.
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 
 /**
- * Namen bleiben als Schluessel klein geschrieben und schlicht - sie landen in
- * Dateien und URLs, und beim Anmelden ist die Schreibweise egal. Wie der Name
- * angezeigt wird (BATMAN statt batman), steht daneben in `display`.
+ * Names as keys stay lowercase and plain - they end up in files and URLs, and
+ * the spelling does not matter when signing in. How the name is displayed
+ * (BATMAN instead of batman) is stored alongside in `display`.
  */
 export const NAME_RE = /^[a-z0-9][a-z0-9._-]{1,23}$/;
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD = 200;
 
-// Zeichen ohne Verwechslungsgefahr (kein 0/O, kein 1/l/I) - das erste Passwort
-// wird abgetippt oder vorgelesen.
+// Characters that cannot be confused (no 0/O, no 1/l/I) - the first password
+// gets typed in or read out loud.
 const ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
 
 export function userFile() {
@@ -42,12 +42,12 @@ export function validName(name) {
   return NAME_RE.test(normalizeName(name));
 }
 
-/** So heisst das Konto auf dem Bildschirm. */
+/** This is what the account is called on screen. */
 export function displayName(key, user) {
   return user?.display || key;
 }
 
-/** Null, wenn das Passwort taugt, sonst der Schluessel der Beanstandung. */
+/** Null if the password is fine, otherwise the key of the complaint. */
 export function checkPassword(password, name) {
   const pw = String(password ?? '');
   if (pw.length < MIN_PASSWORD) return 'auth.err.tooShort';
@@ -56,19 +56,19 @@ export function checkPassword(password, name) {
   return null;
 }
 
-/** Erstes Passwort: drei Gruppen zu fuenf Zeichen, rund 73 Bit. */
+/** First password: three groups of five characters, about 73 bits. */
 export function generatePassword() {
-  const zeichen = () => ALPHABET[crypto.randomInt(ALPHABET.length)];
-  return [0, 1, 2].map(() => Array.from({ length: 5 }, zeichen).join('')).join('-');
+  const char = () => ALPHABET[crypto.randomInt(ALPHABET.length)];
+  return [0, 1, 2].map(() => Array.from({ length: 5 }, char).join('')).join('-');
 }
 
 // ------------------------------------------------------------------- Hashes
 
 export function hashPassword(password) {
   const salt = crypto.randomBytes(16);
-  return new Promise((ok, fehler) => {
+  return new Promise((ok, fail) => {
     crypto.scrypt(password, salt, SCRYPT.keylen, SCRYPT, (e, key) => {
-      if (e) return fehler(e);
+      if (e) return fail(e);
       ok(['scrypt', SCRYPT.N, SCRYPT.r, SCRYPT.p,
         salt.toString('base64'), key.toString('base64')].join('$'));
     });
@@ -76,56 +76,56 @@ export function hashPassword(password) {
 }
 
 /**
- * Prueft ein Passwort gegen einen gespeicherten Hash. Laeuft auch bei Unsinn
- * im Hash die volle Zeit ab und vergleicht zeitunabhaengig - sonst verraet
- * die Dauer, ob ein Konto ueberhaupt existiert.
+ * Checks a password against a stored hash. Takes the full time even with
+ * garbage in the hash and compares in constant time - otherwise the duration
+ * would reveal whether an account exists at all.
  */
 export function verifyPassword(password, stored) {
-  const teile = String(stored ?? '').split('$');
-  const brauchbar = teile.length === 6 && teile[0] === 'scrypt';
-  const N = brauchbar ? Number(teile[1]) : SCRYPT.N;
-  const r = brauchbar ? Number(teile[2]) : SCRYPT.r;
-  const p = brauchbar ? Number(teile[3]) : SCRYPT.p;
-  const salt = brauchbar ? Buffer.from(teile[4], 'base64') : Buffer.alloc(16);
-  const soll = brauchbar ? Buffer.from(teile[5], 'base64') : Buffer.alloc(SCRYPT.keylen);
+  const parts = String(stored ?? '').split('$');
+  const usable = parts.length === 6 && parts[0] === 'scrypt';
+  const N = usable ? Number(parts[1]) : SCRYPT.N;
+  const r = usable ? Number(parts[2]) : SCRYPT.r;
+  const p = usable ? Number(parts[3]) : SCRYPT.p;
+  const salt = usable ? Buffer.from(parts[4], 'base64') : Buffer.alloc(16);
+  const expected = usable ? Buffer.from(parts[5], 'base64') : Buffer.alloc(SCRYPT.keylen);
   if (!Number.isInteger(N) || N < 2 || N > 1 << 20 || !Number.isInteger(r) || r < 1 || r > 32
-    || !Number.isInteger(p) || p < 1 || p > 16 || !soll.length) {
+    || !Number.isInteger(p) || p < 1 || p > 16 || !expected.length) {
     return Promise.resolve(false);
   }
   return new Promise((ok) => {
-    crypto.scrypt(password, salt, soll.length, { N, r, p, maxmem: 160 * 1024 * 1024 }, (e, key) => {
+    crypto.scrypt(password, salt, expected.length, { N, r, p, maxmem: 160 * 1024 * 1024 }, (e, key) => {
       if (e) return ok(false);
-      ok(brauchbar && crypto.timingSafeEqual(key, soll));
+      ok(usable && crypto.timingSafeEqual(key, expected));
     });
   });
 }
 
-// -------------------------------------------------------------------- Datei
+// --------------------------------------------------------------------- File
 
 let cache = null;              // { db, mtimeMs, size }
 
-function leer() { return { version: 1, users: {} }; }
+function empty() { return { version: 1, users: {} }; }
 
-/** Liest die Datei; unveraendert kommt sie aus dem Zwischenspeicher. */
+/** Reads the file; if unchanged, it comes from the cache. */
 export function load() {
   const file = userFile();
   let st = null;
-  try { st = fs.statSync(file); } catch { cache = null; return leer(); }
+  try { st = fs.statSync(file); } catch { cache = null; return empty(); }
   if (cache && cache.mtimeMs === st.mtimeMs && cache.size === st.size) return cache.db;
-  let db = leer();
+  let db = empty();
   try {
-    const roh = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (roh && typeof roh.users === 'object' && roh.users) db = { version: 1, users: roh.users };
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (raw && typeof raw.users === 'object' && raw.users) db = { version: 1, users: raw.users };
   } catch (e) {
-    // Lieber laut scheitern als stillschweigend alle aussperren oder, schlimmer,
-    // alle hereinlassen.
-    throw new Error(`users.json ist unlesbar (${file}): ${e.message}`);
+    // Better to fail loudly than to silently lock everyone out or, worse,
+    // let everyone in.
+    throw new Error(`users.json is unreadable (${file}): ${e.message}`);
   }
   cache = { db, mtimeMs: st.mtimeMs, size: st.size };
   return db;
 }
 
-/** Schreibt erst daneben und schiebt dann um - ein Abbruch laesst die alte Datei stehen. */
+/** Writes next to it first and then renames - an abort leaves the old file in place. */
 export function save(db) {
   const file = userFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -136,7 +136,7 @@ export function save(db) {
   return file;
 }
 
-// ------------------------------------------------------------------- Konten
+// ----------------------------------------------------------------- Accounts
 
 export function getUser(name) {
   return load().users[normalizeName(name)] || null;
@@ -154,61 +154,61 @@ export function listUsers() {
 }
 
 /**
- * Legt ein Konto an. Ohne Passwort wird eines gewuerfelt und zurueckgegeben -
- * es ist der einzige Moment, in dem es im Klartext existiert.
+ * Creates an account. Without a password one is generated and returned -
+ * this is the only moment it exists in plain text.
  */
 export async function addUser(name, password) {
   const key = normalizeName(name);
   if (!validName(key)) throw new Error('auth.cli.badName');
   const db = load();
   if (db.users[key]) throw new Error('auth.cli.exists');
-  const gewuerfelt = !password;
+  const generated = !password;
   const pw = password || generatePassword();
-  const rüge = password ? checkPassword(pw, key) : null;
-  if (rüge) throw new Error(rüge);
-  const schreibweise = String(name).trim();
+  const problem = password ? checkPassword(pw, key) : null;
+  if (problem) throw new Error(problem);
+  const spelling = String(name).trim();
   db.users[key] = {
     hash: await hashPassword(pw),
     mustChange: true,
     created: new Date().toISOString(),
     changed: null,
-    ...(schreibweise !== key ? { display: schreibweise } : {})
+    ...(spelling !== key ? { display: spelling } : {})
   };
   save(db);
-  return { name: key, display: displayName(key, db.users[key]), password: pw, generated: gewuerfelt };
+  return { name: key, display: displayName(key, db.users[key]), password: pw, generated };
 }
 
 /**
- * Legt die Schreibweise fest, in der ein Konto angezeigt wird. Erlaubt ist nur
- * eine andere Gross- und Kleinschreibung desselben Namens - umbenennen hiesse,
- * dass ein Spieler unter einem fremden Namen weiterspielt.
+ * Sets the spelling in which an account is displayed. Only a different
+ * capitalization of the same name is allowed - renaming would mean a player
+ * keeps playing under someone else's name.
  */
 export function setDisplay(name, spelling) {
   const key = normalizeName(name);
   const db = load();
   if (!db.users[key]) throw new Error('auth.cli.unknown');
-  const schreibweise = String(spelling ?? '').trim();
-  if (normalizeName(schreibweise) !== key) throw new Error('auth.cli.badSpelling');
-  if (schreibweise === key) delete db.users[key].display;
-  else db.users[key].display = schreibweise;
+  const shown = String(spelling ?? '').trim();
+  if (normalizeName(shown) !== key) throw new Error('auth.cli.badSpelling');
+  if (shown === key) delete db.users[key].display;
+  else db.users[key].display = shown;
   save(db);
   return { name: key, display: displayName(key, db.users[key]) };
 }
 
 /**
- * Profil eines Kontos: frei gewaehlter Anzeigename (`nick`) und die Version
- * des Bildes (`avatar`, das Bild selbst liegt in server/profile.js). null
- * entfernt den Eintrag, undefined laesst ihn stehen.
+ * Profile of an account: freely chosen display name (`nick`) and the version
+ * of the image (`avatar`, the image itself is handled in server/profile.js).
+ * null removes the entry, undefined leaves it in place.
  */
 export function setProfile(name, { nick, avatar } = {}) {
   const key = normalizeName(name);
   const db = load();
   const user = db.users[key];
   if (!user) throw new Error('auth.cli.unknown');
-  for (const [feld, wert] of Object.entries({ nick, avatar })) {
-    if (wert === undefined) continue;
-    if (wert === null || wert === '') delete user[feld];
-    else user[feld] = String(wert);
+  for (const [field, value] of Object.entries({ nick, avatar })) {
+    if (value === undefined) continue;
+    if (value === null || value === '') delete user[field];
+    else user[field] = String(value);
   }
   save(db);
   return { name: key, nick: user.nick || null, avatar: user.avatar || null };
@@ -220,23 +220,23 @@ export function deleteUser(name) {
   if (!db.users[key]) return false;
   delete db.users[key];
   save(db);
-  // Das Profilbild gehoert zum Konto und geht mit (siehe server/profile.js).
-  for (const art of ['png', 'jpeg', 'webp']) {
-    try { fs.unlinkSync(path.join(path.dirname(userFile()), 'avatars', `${key}.${art}`)); } catch { /* keins */ }
+  // The profile image belongs to the account and goes with it (see server/profile.js).
+  for (const ext of ['png', 'jpeg', 'webp']) {
+    try { fs.unlinkSync(path.join(path.dirname(userFile()), 'avatars', `${key}.${ext}`)); } catch { /* none */ }
   }
   return true;
 }
 
 /**
- * Setzt ein Passwort. `mustChange` heisst: beim naechsten Anmelden muss der
- * Spieler ein eigenes waehlen - so ist es beim Anlegen und beim Zuruecksetzen.
+ * Sets a password. `mustChange` means: on the next sign-in the player has to
+ * choose their own - that is how it is after creating and after resetting.
  */
 export async function setPassword(name, password, { mustChange = false } = {}) {
   const key = normalizeName(name);
   const db = load();
   if (!db.users[key]) throw new Error('auth.cli.unknown');
-  const rüge = checkPassword(password, key);
-  if (rüge) throw new Error(rüge);
+  const problem = checkPassword(password, key);
+  if (problem) throw new Error(problem);
   db.users[key] = {
     ...db.users[key],
     hash: await hashPassword(password),
@@ -247,7 +247,7 @@ export async function setPassword(name, password, { mustChange = false } = {}) {
   return { name: key };
 }
 
-/** Wie beim Anlegen: neues Zufallspasswort, das wieder gewechselt werden muss. */
+/** As when creating: a new random password that has to be changed again. */
 export async function resetPassword(name) {
   const pw = generatePassword();
   await setPassword(name, pw, { mustChange: true });
@@ -255,8 +255,8 @@ export async function resetPassword(name) {
 }
 
 /**
- * Anmeldedaten pruefen. Laeuft bei unbekanntem Namen gegen einen Blindhash,
- * damit die Antwortzeit nicht verraet, welche Konten es gibt.
+ * Check sign-in data. With an unknown name it runs against a dummy hash so
+ * the response time does not reveal which accounts exist.
  */
 export async function verifyUser(name, password) {
   const user = getUser(name);
@@ -267,9 +267,8 @@ export async function verifyUser(name, password) {
 }
 
 /**
- * Kurzer Fingerabdruck des Hashes. Eine Sitzung merkt sich ihn und gilt nur
- * weiter, solange er passt - ein zurueckgesetztes Passwort meldet damit alle
- * alten Sitzungen ab.
+ * Short fingerprint of the hash. A session remembers it and only stays valid
+ * as long as it matches - a reset password thereby signs out all old sessions.
  */
 export function stampOf(hash) {
   return crypto.createHash('sha256').update(String(hash ?? '')).digest('base64url').slice(0, 16);

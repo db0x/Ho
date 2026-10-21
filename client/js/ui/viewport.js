@@ -1,8 +1,8 @@
-// Ein Umschaltpunkt für alle, die ihn brauchen. "Klein" heißt: zu schmal für
-// nebeneinanderliegende Docks (Telefon hochkant) oder zu niedrig dafür
-// (Telefon quer, geteiltes Fenster). In beiden Fällen gilt die Blattleiste.
+// One breakpoint for everyone who needs it. "Compact" means: too narrow for
+// docks side by side (phone in portrait) or too low for them (phone in
+// landscape, split window). In both cases the sheet bar applies.
 //
-// Muss zur Medienabfrage in client/css/style.css passen - ändert sich die
-// eine, ändert sich die andere mit.
-export const KLEIN = '(max-width: 760px), (max-height: 560px)';
-export const klein = matchMedia(KLEIN);
+// Must match the media query in client/css/style.css - if one changes, the
+// other changes with it.
+export const COMPACT = '(max-width: 760px), (max-height: 560px)';
+export const compact = matchMedia(COMPACT);

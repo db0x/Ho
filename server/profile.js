@@ -1,29 +1,29 @@
-// Profil eines Spielers: Anzeigename und Bild.
+// A player's profile: display name and image.
 //
-// Mit Anmeldung gehoert beides zum Konto - der Name steht als `nick` in der
-// Kontendatei, das Bild als Datei daneben (avatars/<konto>.<endung>), damit es
-// jede Sitzung und jedes Geraet wiederfindet. Ohne Anmeldung haelt der
-// Browser beides selbst und reicht es beim Verbinden herein; der Server
-// merkt sich das Bild dann nur im Speicher.
+// With sign-in both belong to the account - the name is stored as `nick` in
+// the account file, the image as a file next to it (avatars/<account>.<ext>),
+// so every session and every device finds it again. Without sign-in the
+// browser keeps both itself and hands them in when connecting; the server
+// then only keeps the image in memory.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { getUser, listUsers, normalizeName, setProfile, userFile } from './userstore.js';
 
 export const NAME_MAX = 18;
-// Ein verkleinertes Bild (128 px, WebP) liegt bei 5-15 kB. Was weit darueber
-// liegt, hat der Client nicht verkleinert.
+// A downscaled image (128 px, WebP) is around 5-15 kB. Anything far above
+// that has not been downscaled by the client.
 export const AVATAR_MAX = 64 * 1024;
 
-const ARTEN = {
-  png: { mime: 'image/png', passt: b => b.length > 8 && b.readUInt32BE(0) === 0x89504e47 },
-  jpeg: { mime: 'image/jpeg', passt: b => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  webp: { mime: 'image/webp', passt: b => b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP' }
+const FORMATS = {
+  png: { mime: 'image/png', matches: b => b.length > 8 && b.readUInt32BE(0) === 0x89504e47 },
+  jpeg: { mime: 'image/jpeg', matches: b => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  webp: { mime: 'image/webp', matches: b => b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP' }
 };
 
 /**
- * Namen landen ueberall per innerHTML im Client - also nichts, was dort als
- * Markup gelesen werden koennte, keine Steuerzeichen, kein Leerraum am Rand.
+ * Names end up everywhere in the client via innerHTML - so nothing that could
+ * be read as markup there, no control characters, no whitespace at the edges.
  */
 export function cleanName(name) {
   return String(name ?? '')
@@ -35,8 +35,8 @@ export function cleanName(name) {
 }
 
 /**
- * Darf ein Konto so heissen? Frei, nur nicht wie ein anderes Konto - sonst
- * spielte jemand unter dem Namen eines Mitspielers.
+ * May an account use this name? Any name, just not that of another account -
+ * otherwise someone would play under a fellow player's name.
  */
 export function nameAllowed(name, ownKey) {
   const n = normalizeName(name);
@@ -50,108 +50,108 @@ export function nameAllowed(name, ownKey) {
   return null;
 }
 
-/** In einer Partie heisst jeder anders: notfalls mit angehaengter Nummer. */
+/** Within a game everyone has a different name: with a number appended if need be. */
 export function uniqueName(game, name, selfId) {
-  const belegt = new Set(game.players.filter(p => p.id !== selfId).map(p => p.name.toLowerCase()));
-  if (!belegt.has(name.toLowerCase())) return name;
+  const taken = new Set(game.players.filter(p => p.id !== selfId).map(p => p.name.toLowerCase()));
+  if (!taken.has(name.toLowerCase())) return name;
   for (let i = 2; ; i++) {
-    const anhang = ' ' + i;
-    const kandidat = name.slice(0, NAME_MAX - anhang.length).trim() + anhang;
-    if (!belegt.has(kandidat.toLowerCase())) return kandidat;
+    const suffix = ' ' + i;
+    const candidate = name.slice(0, NAME_MAX - suffix.length).trim() + suffix;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
   }
 }
 
-// ------------------------------------------------------------------- Bilder
+// ------------------------------------------------------------------- Images
 
-/** id -> { buf, mime } ; Gaeste nur hier, Konten zusaetzlich auf der Platte. */
-const bilder = new Map();
-const GAESTE_MAX = 400;
+/** id -> { buf, mime } ; guests only here, accounts additionally on disk. */
+const images = new Map();
+const GUESTS_MAX = 400;
 
-function ordner() {
+function folder() {
   return path.join(path.dirname(userFile()), 'avatars');
 }
 
-/** Ein data:-URL vom Client in geprueftes Bild verwandeln - oder Fehlerschluessel. */
+/** Turn a data: URL from the client into a checked image - or an error key. */
 export function parseAvatar(dataUrl) {
   const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl ?? ''));
   if (!m) return { error: 'profile.err.image' };
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > AVATAR_MAX) return { error: 'profile.err.imageSize' };
-  // Dem Etikett allein wird nicht geglaubt: die ersten Bytes muessen passen.
-  if (!ARTEN[m[1]].passt(buf)) return { error: 'profile.err.image' };
-  return { buf, art: m[1] };
+  // The label alone is not trusted: the first bytes have to match.
+  if (!FORMATS[m[1]].matches(buf)) return { error: 'profile.err.image' };
+  return { buf, format: m[1] };
 }
 
 function url(id, version) {
   return `api/avatar/${id}?v=${version}`;
 }
 
-/** Bild eines Gastes ablegen; zurueck kommt die Adresse fuer die Spielsicht. */
-export function putGuestAvatar(bild, alteId) {
-  if (alteId) bilder.delete(alteId);
+/** Store a guest's image; returns the address for the game view. */
+export function putGuestAvatar(image, oldId) {
+  if (oldId) images.delete(oldId);
   const id = 'g-' + crypto.randomBytes(9).toString('base64url');
-  bilder.set(id, { buf: bild.buf, mime: ARTEN[bild.art].mime });
-  // Aelteste Gaeste zuerst vergessen - sie laden ihr Bild beim naechsten
-  // Verbinden ohnehin neu hoch.
-  while (bilder.size > GAESTE_MAX) {
-    const aelteste = [...bilder.keys()].find(k => k.startsWith('g-'));
-    if (!aelteste) break;
-    bilder.delete(aelteste);
+  images.set(id, { buf: image.buf, mime: FORMATS[image.format].mime });
+  // Forget the oldest guests first - they upload their image again on the
+  // next connect anyway.
+  while (images.size > GUESTS_MAX) {
+    const oldest = [...images.keys()].find(k => k.startsWith('g-'));
+    if (!oldest) break;
+    images.delete(oldest);
   }
   return url(id, 1);
 }
 
-/** Bild eines Kontos speichern (null: entfernen); zurueck kommt die Adresse. */
-export function putAccountAvatar(key, bild) {
-  const dir = ordner();
-  for (const art of Object.keys(ARTEN)) {
-    try { fs.unlinkSync(path.join(dir, `${key}.${art}`)); } catch { /* war keins */ }
+/** Save an account's image (null: remove it); returns the address. */
+export function putAccountAvatar(key, image) {
+  const dir = folder();
+  for (const ext of Object.keys(FORMATS)) {
+    try { fs.unlinkSync(path.join(dir, `${key}.${ext}`)); } catch { /* there was none */ }
   }
-  bilder.delete('u-' + key);
-  if (!bild) { setProfile(key, { avatar: null }); return null; }
+  images.delete('u-' + key);
+  if (!image) { setProfile(key, { avatar: null }); return null; }
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `${key}.${process.pid}.tmp`);
-  fs.writeFileSync(tmp, bild.buf, { mode: 0o600 });
-  fs.renameSync(tmp, path.join(dir, `${key}.${bild.art}`));
+  fs.writeFileSync(tmp, image.buf, { mode: 0o600 });
+  fs.renameSync(tmp, path.join(dir, `${key}.${image.format}`));
   const version = Date.now().toString(36);
   setProfile(key, { avatar: version });
   return url('u-' + key, version);
 }
 
-/** Adresse des Kontobilds oder null. */
+/** Address of the account image, or null. */
 export function accountAvatarUrl(key) {
   const v = getUser(key)?.avatar;
   return v ? url('u-' + key, v) : null;
 }
 
-function lade(id) {
-  if (bilder.has(id)) return bilder.get(id);
+function loadImage(id) {
+  if (images.has(id)) return images.get(id);
   if (!id.startsWith('u-')) return null;
   const key = id.slice(2);
   if (normalizeName(key) !== key || key.includes('/') || key.includes('.')) return null;
-  for (const [art, a] of Object.entries(ARTEN)) {
+  for (const [ext, f] of Object.entries(FORMATS)) {
     try {
-      const buf = fs.readFileSync(path.join(ordner(), `${key}.${art}`));
-      if (!a.passt(buf)) continue;
-      const bild = { buf, mime: a.mime };
-      bilder.set(id, bild);
-      return bild;
-    } catch { /* naechste Endung */ }
+      const buf = fs.readFileSync(path.join(folder(), `${key}.${ext}`));
+      if (!f.matches(buf)) continue;
+      const image = { buf, mime: f.mime };
+      images.set(id, image);
+      return image;
+    } catch { /* next extension */ }
   }
   return null;
 }
 
-/** GET /api/avatar/<id>. Gibt true zurueck, wenn die Anfrage beantwortet ist. */
-export function handleAvatar(req, res, pfad) {
-  if (!pfad.startsWith('/api/avatar/')) return false;
-  const id = pfad.slice('/api/avatar/'.length);
-  const bild = /^[gu]-[A-Za-z0-9._-]{1,40}$/.test(id) ? lade(id) : null;
-  if (!bild || req.method !== 'GET') { res.writeHead(404, { 'content-type': 'text/plain' }).end('404'); return true; }
+/** GET /api/avatar/<id>. Returns true if the request has been answered. */
+export function handleAvatar(req, res, urlPath) {
+  if (!urlPath.startsWith('/api/avatar/')) return false;
+  const id = urlPath.slice('/api/avatar/'.length);
+  const image = /^[gu]-[A-Za-z0-9._-]{1,40}$/.test(id) ? loadImage(id) : null;
+  if (!image || req.method !== 'GET') { res.writeHead(404, { 'content-type': 'text/plain' }).end('404'); return true; }
   res.writeHead(200, {
-    'content-type': bild.mime,
+    'content-type': image.mime,
     'x-content-type-options': 'nosniff',
-    // Die Adresse traegt die Version - ein neues Bild hat eine neue.
+    // The address carries the version - a new image gets a new one.
     'cache-control': 'private, max-age=31536000, immutable'
-  }).end(bild.buf);
+  }).end(image.buf);
   return true;
 }

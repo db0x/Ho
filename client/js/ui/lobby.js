@@ -1,4 +1,4 @@
-// Startbildschirm und Lobby.
+// Start screen and lobby.
 import { loadName, saveName, loadAvatar, saveAvatar } from '../net.js';
 import { syncSelects } from './select.js';
 import { pickAvatar, avatarHtml } from './avatar.js';
@@ -82,19 +82,19 @@ export class Lobby {
     this.sliders = sliders;
   }
 
-  /** Spielfeld aus dem Startbildschirm. */
+  /** Board from the start screen. */
   mode() { return $('#in-mode')?.value === 'space' ? 'space' : 'classic'; }
 
-  /** Form der Galaxie aus dem Startbildschirm. */
+  /** Shape of the galaxy from the start screen. */
   shape() { return $('#in-shape')?.value === 'spiral' ? 'spiral' : 'scatter'; }
 
-  /** Rundenlimit aus dem Startbildschirm; 0 = unbegrenzt. */
+  /** Turn limit from the start screen; 0 = unlimited. */
   maxTurns() {
     const v = Number($('#in-turns')?.value);
     return Number.isFinite(v) ? v : 300;
   }
 
-  /** Eröffnet eine Partie, füllt sie mit KI und startet sofort. */
+  /** Opens a game, fills it with AI and starts right away. */
   quickStart(bots) {
     this.pendingQuickStart = bots;
     this.net.forget();
@@ -107,19 +107,19 @@ export class Lobby {
     return n;
   }
 
-  // ------------------------------------------------------------- Profil
+  // ------------------------------------------------------------- Profile
 
   /**
-   * Stand des Profils vom Server (nach 'hello' und jeder Aenderung). Mit
-   * Konto ist er massgeblich; ohne Konto reicht der Browser beim ersten Mal
-   * nach, was er sich gemerkt hat.
+   * State of the profile from the server (after 'hello' and every change).
+   * With an account it is authoritative; without an account the browser
+   * hands in what it remembered the first time.
    */
-  setProfile(profile, erstesMal = false) {
-    if (erstesMal && !profile.account) {
-      const bild = loadAvatar();
+  setProfile(profile, firstTime = false) {
+    if (firstTime && !profile.account) {
+      const image = loadAvatar();
       const name = loadName();
-      if (bild || name) {
-        this.net.send({ t: 'profile', ...(name ? { name } : {}), ...(bild ? { avatar: bild } : {}) });
+      if (image || name) {
+        this.net.send({ t: 'profile', ...(name ? { name } : {}), ...(image ? { avatar: image } : {}) });
       }
     }
     this.profile = profile;
@@ -136,8 +136,8 @@ export class Lobby {
     $('#profile-account').textContent = a ? t('profile.account', { account: a }) : '';
   }
 
-  rename(wert) {
-    const name = String(wert || '').trim();
+  rename(value) {
+    const name = String(value || '').trim();
     if (!name || name === this.profile?.name) return;
     if (!this.profile?.account) saveName(name);
     $('#in-name').value = name;
@@ -145,34 +145,34 @@ export class Lobby {
   }
 
   async chooseAvatar() {
-    const bild = await pickAvatar();
-    if (!bild) return;
-    if (!this.profile?.account) saveAvatar(bild);
-    this.net.send({ t: 'profile', avatar: bild });
+    const image = await pickAvatar();
+    if (!image) return;
+    if (!this.profile?.account) saveAvatar(image);
+    this.net.send({ t: 'profile', avatar: image });
   }
 
-  // ------------------------------------------------------------- Farben
+  // -------------------------------------------------------------- Colors
 
-  /** Palette unter dem angeklickten Farbfeld. */
-  colorMenu(anker, playerId) {
+  /** Palette below the clicked color swatch. */
+  colorMenu(anchor, playerId) {
     this.closeColorMenu();
-    const spieler = this.lobby.players;
-    const ziel = spieler.find(p => p.id === playerId);
-    if (!ziel) return;
+    const players = this.lobby.players;
+    const target = players.find(p => p.id === playerId);
+    if (!target) return;
     const pop = document.createElement('div');
     pop.className = 'color-pop';
     pop.setAttribute('role', 'listbox');
     pop.innerHTML = PLAYER_COLORS.map(c => {
-      const traeger = spieler.find(p => p.color === c);
-      // Die Farbe eines Mitspielers nimmt nur der Gastgeber - dann wird getauscht.
-      const zu = traeger && traeger !== ziel && !traeger.isBot && !this.isHost;
-      const titel = !traeger ? '' : traeger === ziel ? t('lobby.colorCurrent')
-        : t(zu ? 'lobby.colorTakenBy' : 'lobby.colorSwap', { player: traeger.name });
-      return `<button type="button" data-c="${c}" style="--c:${c}" title="${titel}"
-        class="${traeger === ziel ? 'cur' : traeger ? 'taken' : ''}" ${zu ? 'disabled' : ''}></button>`;
+      const wearer = players.find(p => p.color === c);
+      // Only the host takes a fellow player's color - then they swap.
+      const locked = wearer && wearer !== target && !wearer.isBot && !this.isHost;
+      const title = !wearer ? '' : wearer === target ? t('lobby.colorCurrent')
+        : t(locked ? 'lobby.colorTakenBy' : 'lobby.colorSwap', { player: wearer.name });
+      return `<button type="button" data-c="${c}" style="--c:${c}" title="${title}"
+        class="${wearer === target ? 'cur' : wearer ? 'taken' : ''}" ${locked ? 'disabled' : ''}></button>`;
     }).join('');
     document.body.appendChild(pop);
-    const r = anker.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
     pop.style.left = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.left)) + 'px';
     pop.style.top = (r.bottom + 6) + 'px';
     for (const b of pop.querySelectorAll('button:not([disabled])')) {
@@ -198,7 +198,7 @@ export class Lobby {
   error(sel, msg) { $(sel).textContent = msg; setTimeout(() => { $(sel).textContent = ''; }, 5000); }
 
   showOpenGames(list) {
-    this.offeneSpiele = list;
+    this.openGames = list;
     const host = $('#open-games');
     if (!list?.length) { host.innerHTML = ''; return; }
     host.innerHTML = `<div class="small muted">${t('menu.openGames')}</div>` + list.map(g =>
@@ -218,8 +218,8 @@ export class Lobby {
     }
   }
 
-  /** @param {boolean} zeigen false: nur neu beschriften, den Bildschirm nicht wechseln */
-  update(msg, zeigen = true) {
+  /** @param {boolean} reveal false: only relabel, do not switch the screen */
+  update(msg, reveal = true) {
     if (this.pendingQuickStart && msg.host) {
       const n = this.pendingQuickStart;
       this.pendingQuickStart = 0;
@@ -230,33 +230,33 @@ export class Lobby {
     this.isHost = msg.host;
     this.youId = msg.you;
     this.settings = msg.lobby.settings;
-    if (zeigen) this.show('lobby');
+    if (reveal) this.show('lobby');
     $('#lobby-code').textContent = msg.lobby.id;
     $('#lobby-count').textContent = `${msg.lobby.players.length}/16`;
-    // Wird gerade der eigene Name bearbeitet, darf der Neuaufbau ihn nicht
-    // unter den Fingern wegziehen.
-    const feld = document.activeElement?.classList?.contains('name-edit') ? document.activeElement : null;
-    const entwurf = feld ? { value: feld.value, a: feld.selectionStart, b: feld.selectionEnd } : null;
-    const gastgeber = msg.lobby.players[0];
+    // If the own name is being edited right now, the rebuild must not pull
+    // it away from under your fingers.
+    const field = document.activeElement?.classList?.contains('name-edit') ? document.activeElement : null;
+    const draft = field ? { value: field.value, a: field.selectionStart, b: field.selectionEnd } : null;
+    const host = msg.lobby.players[0];
     $('#lobby-players').innerHTML = msg.lobby.players.map(p => {
-      const ich = p.id === msg.you;
-      const farbe = ich || (this.isHost && p.isBot);
+      const self = p.id === msg.you;
+      const canColor = self || (this.isHost && p.isBot);
       return `
-      <li class="${ich ? 'me' : ''}">
+      <li class="${self ? 'me' : ''}">
         <button type="button" class="swatch" style="--c:${p.color}" data-color="${p.id}"
-          ${farbe ? `title="${t('lobby.pickColor')}"` : 'disabled'}></button>
-        ${ich ? `<button type="button" class="avatar-btn" data-avatar title="${t('profile.pick')}">${avatarHtml(p, 30)}</button>`
+          ${canColor ? `title="${t('lobby.pickColor')}"` : 'disabled'}></button>
+        ${self ? `<button type="button" class="avatar-btn" data-avatar title="${t('profile.pick')}">${avatarHtml(p, 30)}</button>`
           : avatarHtml(p, 30)}
         <span class="pname">
-          ${ich ? `<input class="name-edit" value="${p.name}" maxlength="18" title="${t('lobby.renameTitle')}" aria-label="${t('menu.name')}">`
+          ${self ? `<input class="name-edit" value="${p.name}" maxlength="18" title="${t('lobby.renameTitle')}" aria-label="${t('menu.name')}">`
             : `<span class="nm">${p.name}</span>`}
-          ${ich ? `<span class="muted small">${t('word.you')}</span>` : ''}
+          ${self ? `<span class="muted small">${t('word.you')}</span>` : ''}
           ${p.account ? `<span class="muted small" title="${t('lobby.accountTitle')}">@${p.account}</span>` : ''}
-          ${p.id === gastgeber?.id ? `<span class="tag-host">${t('lobby.host')}</span>` : ''}
+          ${p.id === host?.id ? `<span class="tag-host">${t('lobby.host')}</span>` : ''}
         </span>
         ${p.isBot ? `<span class="tagbot"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>`
           : (p.connected ? '' : `<span class="tagbot">${t('word.offline')}</span>`)}
-        ${this.isHost && !ich ? `<button class="tiny" data-kick="${p.id}" title="${t('lobby.kick')}">×</button>` : ''}
+        ${this.isHost && !self ? `<button class="tiny" data-kick="${p.id}" title="${t('lobby.kick')}">×</button>` : ''}
       </li>`;
     }).join('');
     for (const b of $('#lobby-players').querySelectorAll('[data-kick]')) {
@@ -271,15 +271,15 @@ export class Lobby {
     if (edit) {
       edit.onchange = () => this.rename(edit.value);
       edit.onkeydown = (e) => { if (e.key === 'Enter') edit.blur(); if (e.key === 'Escape') { edit.value = this.profile?.name || edit.value; edit.blur(); } };
-      if (entwurf) { edit.value = entwurf.value; edit.focus(); edit.setSelectionRange(entwurf.a, entwurf.b); }
+      if (draft) { edit.value = draft.value; edit.focus(); edit.setSelectionRange(draft.a, draft.b); }
     }
     if (this.colorPop) this.closeColorMenu();
 
-    // Gaeste sehen, was gilt - aber nichts, das nach Bedienen aussieht.
+    // Guests see what applies - but nothing that looks like it can be operated.
     $('#lobby-settings').classList.toggle('readonly', !this.isHost);
-    const schloss = $('#settings-lock');
-    schloss.classList.toggle('hidden', this.isHost);
-    schloss.textContent = this.isHost ? '' : t('lobby.settingsLocked', { host: gastgeber?.name || '' });
+    const lock = $('#settings-lock');
+    lock.classList.toggle('hidden', this.isHost);
+    lock.textContent = this.isHost ? '' : t('lobby.settingsLocked', { host: host?.name || '' });
     for (const el of document.querySelectorAll('#screen-lobby .host-only')) el.classList.toggle('hidden', !this.isHost);
     const s = msg.lobby.settings;
     $('#s-ppp').value = s.planetsPerPlayer; $('#v-ppp').textContent = t('word.worlds', { n: s.planetsPerPlayer });
@@ -291,7 +291,7 @@ export class Lobby {
     $('#s-mode').disabled = !this.isHost;
     $('#s-shape').value = s.shape === 'spiral' ? 'spiral' : 'scatter';
     $('#s-shape').disabled = !this.isHost;
-    // Werte, die es in der Auswahl nicht gibt, landen auf dem nächstgrößeren.
+    // Values that do not exist in the selection land on the next larger one.
     const limits = [100, 200, 300, 500];
     $('#s-turns').value = s.maxTurns ? String(limits.find(n => n >= s.maxTurns) || 500) : '0';
     $('#s-turns').disabled = !this.isHost;
@@ -299,23 +299,23 @@ export class Lobby {
     $('#v-expand').textContent = t(s.expanding !== false ? 'word.yes' : 'word.no');
     $('#s-expand').disabled = !this.isHost;
     for (const sel of Object.keys(this.sliders)) $(sel).disabled = !this.isHost;
-    syncSelects();            // Knöpfe an die eben gesetzten Werte angleichen
+    syncSelects();            // align the buttons with the values just set
     $('#btn-start').disabled = !this.isHost;
     $('#btn-addbot').disabled = !this.isHost || msg.lobby.players.length >= 16;
     $('#btn-fill').disabled = !this.isHost || msg.lobby.players.length >= 16;
     $('#btn-start').textContent = this.isHost ? t('lobby.start') : t('lobby.waitHost');
   }
 
-  /** Nach einem Sprachwechsel: alles neu schreiben, was hier gesetzt wird. */
+  /** After a language change: rewrite everything that is set here. */
   relabel() {
-    // Nur beschriften: läuft die Partie schon, darf der Wechsel nicht in die
-    // Lobby zurückwerfen.
+    // Only relabel: if the game is already running, the change must not throw
+    // you back into the lobby.
     if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId }, false);
-    if (this.offeneSpiele) this.showOpenGames(this.offeneSpiele);
+    if (this.openGames) this.showOpenGames(this.openGames);
     this.profileHint();
   }
 
-  // Zarte Sternanimation hinter dem Startmenü
+  // Subtle star animation behind the start menu
   menuStars() {
     const cv = $('#menu-canvas');
     const ctx = cv.getContext('2d');

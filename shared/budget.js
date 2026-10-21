@@ -1,130 +1,130 @@
-// Haushalt einer Runde: was am Rundenende mit Geld und Metall geschieht.
+// Budget of one turn: what happens to money and metal at the end of the turn.
 //
-// Rechnet aus der Spielersicht (server/game.js buildView) Schritt fuer
-// Schritt nach, was resolveTurn abbucht - in derselben Reihenfolge und mit
-// denselben Regeln: Forschung, Schiffsbau, Umrüstung, Terraforming, zuletzt
-// Einnahmen und Förderung. Der Client zeigt damit Kopfleiste, Werft und
-// Haushalt; test/budget.js haelt es gegen das, was der Server wirklich bucht.
+// Recomputes step by step, from the player's view (server/game.js buildView),
+// what resolveTurn deducts - in the same order and with the same rules:
+// research, shipbuilding, refits, terraforming, and finally income and mining.
+// The client uses it for the top bar, the shipyard and the ledger;
+// test/budget.js checks it against what the server really books.
 //
-// Was hier nicht vorhersehbar ist: Kampf, Eroberung und neue Kolonien
-// zwischen Bau und Abrechnung - sie aendern nur die Einnahmen.
+// What cannot be foreseen here: combat, conquest and new colonies between
+// building and settlement - they only change the income.
 import {
   TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost, refitCost,
   terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining
 } from './rules.js';
 
 /**
- * Techstand nach der Forschung dieser Runde. Ein Schiff kostet nach dem Stand
- * zum Bauzeitpunkt, und der Server forscht vor dem Bau.
+ * Tech levels after this turn's research. A ship costs according to the
+ * levels at build time, and the server researches before building.
  */
 export function researchStep(me) {
-  const gewichte = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0);
+  const weights = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0);
   const budget = Math.min(me.money, Math.floor(me.money * me.research.budgetPct / 100));
   const tech = { ...me.tech };
-  // Ohne Gewichtung gibt der Server das Budget wieder frei.
-  if (budget <= 0 || gewichte <= 0) return { tech, budget: 0, durchbruch: false };
-  let durchbruch = false;
+  // Without weights the server releases the budget again.
+  if (budget <= 0 || weights <= 0) return { tech, budget: 0, breakthrough: false };
+  let breakthrough = false;
   for (const f of TECH_FIELDS) {
-    const anteil = budget * me.research.weights[f] / gewichte;
-    if (anteil <= 0) continue;
-    let punkte = (me.techProgress?.[f]?.points || 0) + anteil;
-    while (tech[f] < TECH_MAX_LEVEL && punkte >= techCostToNext(tech[f])) {
-      punkte -= techCostToNext(tech[f]);
+    const share = budget * me.research.weights[f] / weights;
+    if (share <= 0) continue;
+    let points = (me.techProgress?.[f]?.points || 0) + share;
+    while (tech[f] < TECH_MAX_LEVEL && points >= techCostToNext(tech[f])) {
+      points -= techCostToNext(tech[f]);
       tech[f]++;
-      durchbruch = true;
+      breakthrough = true;
     }
   }
-  return { tech, budget, durchbruch };
+  return { tech, budget, breakthrough };
 }
 
-/** Kann auf dieser Welt gebaut oder umgerüstet werden? Wie der Server. */
-function werft(view, planetId) {
+/** Can ships be built or refitted on this world? Same as the server. */
+function shipyard(view, planetId) {
   const w = view.planets[planetId];
   return !!w && w.owner === view.you && w.pop >= 1;
 }
 
-/** Die Schiffe hinter einem Umrüstauftrag ('f:<flotte>' oder 'p:<welt>'). */
+/** The ships behind a refit order ('f:<fleet>' or 'p:<world>'). */
 export function refitShips(view, key) {
   if (key.startsWith('f:')) {
     const f = view.fleets.find(x => x.mine && x.id === key.slice(2));
-    return f && f.at != null && werft(view, f.at) ? f.ships : [];
+    return f && f.at != null && shipyard(view, f.at) ? f.ships : [];
   }
   const id = Number(key.slice(2));
-  return werft(view, id) ? (view.planets[id].defenseShips || []) : [];
+  return shipyard(view, id) ? (view.planets[id].defenseShips || []) : [];
 }
 
 /**
- * Der ganze Haushalt. Betraege ungerundet; `geplant` ist, was in Auftrag
- * steht, `gebucht`, was davon bezahlbar ist.
+ * The whole budget. Amounts are unrounded; `planned` is what has been
+ * ordered, `booked` is the part of it that can be paid for.
  */
 export function forecast(view) {
   const me = view.me;
-  const { tech, budget: forschung, durchbruch } = researchStep(me);
-  let geld = me.money - forschung, metall = me.metal;
-  const verfuegbar = { geld, metall };
+  const { tech, budget: research, breakthrough } = researchStep(me);
+  let money = me.money - research, metal = me.metal;
+  const available = { money, metal };
 
-  // Gezaehlt wird auch, woran es scheitert - "zu wenig Metall" soll nur
-  // dastehen, wenn wirklich das Metall nicht reicht.
-  const topf = () => ({ geplant: { geld: 0, metall: 0, n: 0 }, gebucht: { geld: 0, metall: 0, n: 0 },
-    ohneGeld: false, ohneMetall: false });
-  const bau = topf(), umr = topf();
-  const buche = (t, c) => {
-    t.geplant.geld += c.money; t.geplant.metall += c.metal; t.geplant.n++;
-    if (geld < c.money || metall < c.metal) {
-      if (geld < c.money) t.ohneGeld = true;
-      if (metall < c.metal) t.ohneMetall = true;
+  // We also track what it fails on - "not enough metal" should only show
+  // up when it really is the metal that runs short.
+  const pot = () => ({ planned: { money: 0, metal: 0, n: 0 }, booked: { money: 0, metal: 0, n: 0 },
+    lacksMoney: false, lacksMetal: false });
+  const build = pot(), refit = pot();
+  const book = (t, c) => {
+    t.planned.money += c.money; t.planned.metal += c.metal; t.planned.n++;
+    if (money < c.money || metal < c.metal) {
+      if (money < c.money) t.lacksMoney = true;
+      if (metal < c.metal) t.lacksMetal = true;
       return false;
     }
-    geld -= c.money; metall -= c.metal;
-    t.gebucht.geld += c.money; t.gebucht.metall += c.metal; t.gebucht.n++;
+    money -= c.money; metal -= c.metal;
+    t.booked.money += c.money; t.booked.metal += c.metal; t.booked.n++;
     return true;
   };
 
-  // Bau: Welt fuer Welt, je Typ so viele wie bezahlbar - nach dem ersten,
-  // der nicht mehr geht, bleibt der Rest dieses Typs liegen.
+  // Building: world by world, per type as many as affordable - after the
+  // first one that fails, the rest of that type is left over.
   for (const [pid, q] of Object.entries(me.builds || {})) {
-    if (!werft(view, pid)) continue;
-    for (const typ of SHIP_TYPES) {
-      const c = shipCost(typ, tech);
-      let pleite = false;
-      for (let i = 0; i < (q[typ] || 0); i++) {
-        if (pleite) { bau.geplant.geld += c.money; bau.geplant.metall += c.metal; bau.geplant.n++; continue; }
-        pleite = !buche(bau, c);
+    if (!shipyard(view, pid)) continue;
+    for (const type of SHIP_TYPES) {
+      const c = shipCost(type, tech);
+      let broke = false;
+      for (let i = 0; i < (q[type] || 0); i++) {
+        if (broke) { build.planned.money += c.money; build.planned.metal += c.metal; build.planned.n++; continue; }
+        broke = !book(build, c);
       }
     }
   }
-  // Umrüstung: Schiff fuer Schiff; was nicht bezahlbar ist, wird uebersprungen.
+  // Refits: ship by ship; whatever cannot be paid for is skipped.
   for (const key of Object.keys(me.refit || {})) {
     for (const s of refitShips(view, key)) {
       const c = refitCost(s.type, s.tech || {}, tech);
-      if (c) buche(umr, c);
+      if (c) book(refit, c);
     }
   }
-  // Terraforming: je Welt bis zum eingestellten Budget, solange Geld da ist.
-  // Die neuen Werte gelten schon fuer die Einnahmen dieser Runde.
-  const terra = { geplant: 0, gebucht: 0, welten: 0 };
-  const nachTerra = new Map();
+  // Terraforming: per world up to the set budget, as long as there is money.
+  // The new values already count for this turn's income.
+  const terra = { planned: 0, booked: 0, worlds: 0 };
+  const afterTerra = new Map();
   for (const w of view.planets) {
     if (w.owner !== view.you || !w.terraBudget) continue;
     const ok = terraformable(w, tech.radical);
     const dT = w.temp - IDEAL.temp, dG = w.grav - IDEAL.grav;
-    const noetigT = ok.temp ? Math.abs(dT) * TERRA_COST_PER_DEGREE : 0;
-    const noetigG = ok.grav ? Math.abs(dG) * TERRA_COST_PER_G : 0;
-    const noetig = noetigT + noetigG;
-    if (noetig <= 0) continue;
-    const soll = Math.min(w.terraBudget, noetig);
-    terra.geplant += soll; terra.welten++;
-    const budget = Math.min(w.terraBudget, geld);
+    const neededT = ok.temp ? Math.abs(dT) * TERRA_COST_PER_DEGREE : 0;
+    const neededG = ok.grav ? Math.abs(dG) * TERRA_COST_PER_G : 0;
+    const needed = neededT + neededG;
+    if (needed <= 0) continue;
+    const target = Math.min(w.terraBudget, needed);
+    terra.planned += target; terra.worlds++;
+    const budget = Math.min(w.terraBudget, money);
     if (budget <= 0) continue;
-    const ist = Math.min(budget, noetig);
-    geld -= ist; terra.gebucht += ist;
-    // Wirkung wie auf dem Server, samt Rundung
-    const anteilT = noetigT / noetig;
+    const spent = Math.min(budget, needed);
+    money -= spent; terra.booked += spent;
+    // Effect as on the server, including rounding
+    const shareT = neededT / needed;
     let temp = w.temp, grav = w.grav;
-    const sT = ist * anteilT, sG = ist - sT;
+    const sT = spent * shareT, sG = spent - sT;
     if (sT > 0) {
-      const grad = sT / TERRA_COST_PER_DEGREE;
-      temp += dT > 0 ? -Math.min(grad, Math.abs(dT)) : Math.min(grad, Math.abs(dT));
+      const deg = sT / TERRA_COST_PER_DEGREE;
+      temp += dT > 0 ? -Math.min(deg, Math.abs(dT)) : Math.min(deg, Math.abs(dT));
       temp = Math.round(temp * 10) / 10;
     }
     if (sG > 0) {
@@ -132,19 +132,19 @@ export function forecast(view) {
       grav += dG > 0 ? -Math.min(g, Math.abs(dG)) : Math.min(g, Math.abs(dG));
       grav = Math.round(grav * 1000) / 1000;
     }
-    // Am Ziel rastet der Server genau auf das Ideal ein.
+    // At the target the server snaps exactly onto the ideal.
     if (Math.abs(temp - IDEAL.temp) < 0.05 && Math.abs(grav - IDEAL.grav) < 0.002) { temp = IDEAL.temp; grav = IDEAL.grav; }
-    nachTerra.set(w.id, { ...w, temp, grav });
+    afterTerra.set(w.id, { ...w, temp, grav });
   }
 
-  const mine = view.planets.filter(p => p.owner === view.you).map(p => nachTerra.get(p.id) || p);
-  const einnahmen = mine.reduce((a, p) => a + planetIncome(p), 0);
-  const foerderung = mine.reduce((a, p) => a + planetMining(p), 0);
+  const mine = view.planets.filter(p => p.owner === view.you).map(p => afterTerra.get(p.id) || p);
+  const income = mine.reduce((a, p) => a + planetIncome(p), 0);
+  const mining = mine.reduce((a, p) => a + planetMining(p), 0);
 
   return {
-    tech, durchbruch, forschung, verfuegbar,
-    bau, umr, terra, einnahmen, foerderung,
-    nachTerra,
-    danach: { geld: geld + einnahmen, metall: metall + foerderung }
+    tech, breakthrough, research, available,
+    build, refit, terra, income, mining,
+    afterTerra,
+    after: { money: money + income, metal: metal + mining }
   };
 }

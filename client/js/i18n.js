@@ -1,37 +1,37 @@
-// Sprachauswahl des Clients. Der Kern liegt in /shared, hier kommen die
-// Kataloge dazu und das, was nur der Browser braucht: Sprache des Nutzers
-// erkennen, Markup mit data-i18n füllen, Wechsel merken.
+// Language selection of the client. The core lives in /shared; this adds the
+// catalogs and what only the browser needs: detecting the user's language,
+// filling markup with data-i18n, remembering the choice.
 import {
   registerLocale, setLocale, getLocale, availableLocales, hasLocale, t, tIn, n, localeTag
 } from '../shared/i18n.js';
 
-// Die Kataloge liegen als JSON unter /i18n/<code>.json: Schlüssel sind nach
-// Bereichen benannt (menu., lobby., log. ...), {werte} werden eingesetzt,
-// Schlüssel mit #one / #other sind Einzahl und Mehrzahl. Geladen wird vor
-// allem anderen - wer dieses Modul importiert, wartet, bis beide da sind.
-const SPRACHEN = ['de', 'en'];
-const kataloge = await Promise.all(SPRACHEN.map(code =>
+// The catalogs live as JSON under /i18n/<code>.json: keys are named by area
+// (menu., lobby., log. ...), {values} get inserted, keys with #one / #other
+// are singular and plural. They load before anything else - whoever imports
+// this module waits until both are there.
+const LANGUAGES = ['de', 'en'];
+const catalogs = await Promise.all(LANGUAGES.map(code =>
   fetch(`i18n/${code}.json`).then(r => {
-    if (!r.ok) throw new Error(`Katalog ${code}: HTTP ${r.status}`);
+    if (!r.ok) throw new Error(`Catalog ${code}: HTTP ${r.status}`);
     return r.json();
   })));
-SPRACHEN.forEach((code, i) => registerLocale(code, kataloge[i]));
+LANGUAGES.forEach((code, i) => registerLocale(code, catalogs[i]));
 
 const KEY = 'ho-lang';
-const horcher = new Set();
+const listeners = new Set();
 
-/** Gemerkte Wahl, sonst die Sprache des Browsers, sonst Englisch. */
+/** The remembered choice, otherwise the browser's language, otherwise English. */
 export function initLocale() {
   let code = null;
   try { code = localStorage.getItem(KEY); } catch {}
   if (!code || !hasLocale(code)) {
-    for (const wunsch of navigator.languages || [navigator.language || '']) {
-      const kurz = String(wunsch).slice(0, 2).toLowerCase();
-      if (hasLocale(kurz)) { code = kurz; break; }
+    for (const wanted of navigator.languages || [navigator.language || '']) {
+      const short = String(wanted).slice(0, 2).toLowerCase();
+      if (hasLocale(short)) { code = short; break; }
     }
   }
   setLocale(code || 'en');
-  anwenden();
+  applyI18n();
   return getLocale();
 }
 
@@ -39,36 +39,36 @@ export function useLocale(code) {
   if (code === getLocale()) return;
   setLocale(code);
   try { localStorage.setItem(KEY, code); } catch {}
-  anwenden();
-  for (const fn of horcher) fn(getLocale());
+  applyI18n();
+  for (const fn of listeners) fn(getLocale());
 }
 
-/** Wird nach jedem Sprachwechsel gerufen - die Panels bauen sich dann neu. */
-export function onLocaleChange(fn) { horcher.add(fn); }
+/** Called after every language change - the panels then rebuild themselves. */
+export function onLocaleChange(fn) { listeners.add(fn); }
 
 /**
- * Füllt alles im Markup, was ausgezeichnet ist:
- *   data-i18n="schluessel"       -> Text
- *   data-i18n-html="schluessel"  -> Inhalt mit Auszeichnung (<b>, <i>)
+ * Fills everything in the markup that is marked up:
+ *   data-i18n="key"              -> text
+ *   data-i18n-html="key"         -> content with markup (<b>, <i>)
  *   data-i18n-attr="title:k;placeholder:k"
- * Werte dürfen mitkommen: data-i18n-args='{"n":5}'.
+ * Values may come along: data-i18n-args='{"n":5}'.
  */
-export function anwenden(wurzel = document) {
+export function applyI18n(root = document) {
   document.documentElement.lang = getLocale();
-  for (const el of wurzel.querySelectorAll('[data-i18n]')) {
+  for (const el of root.querySelectorAll('[data-i18n]')) {
     el.textContent = t(el.dataset.i18n, args(el));
   }
-  for (const el of wurzel.querySelectorAll('[data-i18n-html]')) {
+  for (const el of root.querySelectorAll('[data-i18n-html]')) {
     el.innerHTML = t(el.dataset.i18nHtml, args(el));
   }
-  for (const el of wurzel.querySelectorAll('[data-i18n-attr]')) {
-    for (const paar of el.dataset.i18nAttr.split(';')) {
-      const [attr, key] = paar.split(':').map(x => x.trim());
+  for (const el of root.querySelectorAll('[data-i18n-attr]')) {
+    for (const pair of el.dataset.i18nAttr.split(';')) {
+      const [attr, key] = pair.split(':').map(x => x.trim());
       if (attr && key) el.setAttribute(attr, t(key, args(el)));
     }
   }
-  const titel = document.querySelector('title');
-  if (titel) titel.textContent = t('app.title');
+  const title = document.querySelector('title');
+  if (title) title.textContent = t('app.title');
 }
 
 function args(el) {
@@ -76,7 +76,7 @@ function args(el) {
   try { return JSON.parse(el.dataset.i18nArgs); } catch { return undefined; }
 }
 
-/** Wie eine Sprache sich selbst nennt - steht in ihrem eigenen Katalog. */
+/** What a language calls itself - stored in its own catalog. */
 export function localeName(code) { return tIn(code, 'lang.name'); }
 
 export { t, n, getLocale, availableLocales, localeTag };

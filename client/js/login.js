@@ -1,135 +1,135 @@
-// Anmeldung und erster Passwortwechsel. Eine eigene, winzige Seite - der
-// Spielclient wird erst ausgeliefert, wenn die Sitzung steht.
+// Sign-in and first password change. A separate, tiny page - the game client
+// is only served once the session is established.
 import {
-  initLocale, useLocale, onLocaleChange, anwenden, localeName, availableLocales, getLocale, t
+  initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, t
 } from './i18n.js';
 
 const $ = s => document.querySelector(s);
 const NAME_KEY = 'ho-user';
 
-const anmelden = $('#form-login');
-const wechseln = $('#form-change');
+const loginForm = $('#form-login');
+const changeForm = $('#form-change');
 let minPassword = 8;
 
 initLocale();
-sprachwahl();
+languagePicker();
 
-/** Sprachwahl wie im Startmenue, nur ohne eigene Auswahlliste. */
-function sprachwahl() {
+/** Language picker as in the start menu, just without its own select list. */
+function languagePicker() {
   const sel = $('#in-lang');
   sel.innerHTML = availableLocales().map(c => `<option value="${c}"></option>`).join('');
-  const male = () => {
+  const paint = () => {
     for (const opt of sel.options) opt.textContent = localeName(opt.value);
     sel.value = getLocale();
-    // Der Hinweis zum Passwortwechsel traegt eine Zahl und wird nicht vom
-    // Markup gefuellt - er muss nach jedem Wechsel neu gesetzt werden.
+    // The password change hint carries a number and is not filled from the
+    // markup - it has to be set again after every change.
     $('#change-intro').textContent = t('auth.change.intro', { n: minPassword });
   };
-  male();
+  paint();
   sel.onchange = () => useLocale(sel.value);
-  onLocaleChange(male);
+  onLocaleChange(paint);
 }
 
-async function api(route, method, daten) {
+async function api(route, method, data) {
   const r = await fetch(`api/auth/${route}`, {
     method,
-    headers: daten ? { 'content-type': 'application/json' } : undefined,
-    body: daten ? JSON.stringify(daten) : undefined,
+    headers: data ? { 'content-type': 'application/json' } : undefined,
+    body: data ? JSON.stringify(data) : undefined,
     cache: 'no-store'
   });
   let body = {};
-  try { body = await r.json(); } catch { /* leere Antwort ist in Ordnung */ }
+  try { body = await r.json(); } catch { /* an empty response is fine */ }
   return { ok: r.ok, status: r.status, ...body };
 }
 
-function fehler(key, params) {
+function showError(key, params) {
   $('#login-error').textContent = key ? t(key, params) : '';
 }
 
-/** Nur Ziele auf diesem Server - sonst wird die Anmeldung zum Sprungbrett. */
-function ziel() {
+/** Only targets on this server - otherwise the sign-in becomes a springboard. */
+function target() {
   const next = new URLSearchParams(location.search).get('next') || '/';
-  // Der Server nennt Pfade ab seiner Wurzel; relativ gemacht bleibt man unter
-  // einem Unterpfad (/ho/), wenn ein Proxy davor sitzt.
+  // The server names paths from its root; made relative, you stay under a
+  // subpath (/ho/) when a proxy sits in front.
   return /^\/($|[^/])/.test(next) ? `.${next}` : './';
 }
 
-function zeige(welche) {
-  anmelden.classList.toggle('hidden', welche !== 'login');
-  wechseln.classList.toggle('hidden', welche !== 'change');
-  const erstes = welche === 'login'
+function show(which) {
+  loginForm.classList.toggle('hidden', which !== 'login');
+  changeForm.classList.toggle('hidden', which !== 'change');
+  const first = which === 'login'
     ? ($('#in-user').value ? $('#in-pass') : $('#in-user'))
     : ($('#in-old').value ? $('#in-new') : $('#in-old'));
-  erstes.focus();
+  first.focus();
 }
 
-// Schon angemeldet? Dann gleich weiter - sonst stand man nach dem Zurueckgehen
-// im Verlauf wieder vor dem leeren Formular.
+// Already signed in? Then move on right away - otherwise going back in the
+// history would leave you in front of the empty form again.
 const me = await api('me', 'GET');
 if (me.minPassword) minPassword = me.minPassword;
-anwenden();
-if (me.ok && !me.mustChange) location.replace(ziel());
+applyI18n();
+if (me.ok && !me.mustChange) location.replace(target());
 else {
-  try { $('#in-user').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* egal */ }
+  try { $('#in-user').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* never mind */ }
   $('#change-intro').textContent = t('auth.change.intro', { n: minPassword });
-  zeige(me.ok ? 'change' : 'login');
+  show(me.ok ? 'change' : 'login');
 }
 
-// -------------------------------------------------------------------- Anmelden
-anmelden.onsubmit = (e) => {
+// --------------------------------------------------------------------- Sign in
+loginForm.onsubmit = (e) => {
   e.preventDefault();
-  // Wie getippt merken - der Server vergleicht ohne Gross- und Kleinschreibung.
+  // Remember it as typed - the server compares case-insensitively.
   const user = $('#in-user').value.trim();
   const password = $('#in-pass').value;
-  if (!user || !password) return fehler('auth.err.needFields');
-  schick(anmelden, async () => {
+  if (!user || !password) return showError('auth.err.needFields');
+  submit(loginForm, async () => {
     const a = await api('login', 'POST', { user, password });
     if (!a.ok) return { key: a.error || 'auth.err.badLogin', params: a.params };
-    try { localStorage.setItem(NAME_KEY, user); } catch { /* egal */ }
-    if (!a.mustChange) { location.replace(ziel()); return null; }
-    // Das erste Passwort gilt nur hier - es gleich eintragen, damit es
-    // niemand aus der Mail zweimal abtippen muss.
+    try { localStorage.setItem(NAME_KEY, user); } catch { /* never mind */ }
+    if (!a.mustChange) { location.replace(target()); return null; }
+    // The first password is only valid here - fill it in right away so nobody
+    // has to type it from the mail twice.
     $('#in-old').value = password;
     $('#in-pass').value = '';
-    zeige('change');
+    show('change');
     return null;
   });
 };
 
-// ------------------------------------------------------------ Passwortwechsel
-wechseln.onsubmit = (e) => {
+// ------------------------------------------------------------- Password change
+changeForm.onsubmit = (e) => {
   e.preventDefault();
   const password = $('#in-old').value;
-  const neu = $('#in-new').value;
-  if (!password || !neu) return fehler('auth.err.needFields');
-  if (neu !== $('#in-new2').value) return fehler('auth.err.mismatch');
-  if (neu.length < minPassword) return fehler('auth.err.tooShort', { n: minPassword });
-  schick(wechseln, async () => {
-    const a = await api('change', 'POST', { password, newPassword: neu });
+  const newPassword = $('#in-new').value;
+  if (!password || !newPassword) return showError('auth.err.needFields');
+  if (newPassword !== $('#in-new2').value) return showError('auth.err.mismatch');
+  if (newPassword.length < minPassword) return showError('auth.err.tooShort', { n: minPassword });
+  submit(changeForm, async () => {
+    const a = await api('change', 'POST', { password, newPassword });
     if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
-    location.replace(ziel());
+    location.replace(target());
     return null;
   });
 };
 
 /**
- * Formular abschicken: Knopf sperren, Fehler anzeigen, Knopf wieder frei.
- * Die Aufgabe gibt null zurueck oder die Beanstandung als {key, params} -
- * der Server schickt etwa zur Sperrfrist die Sekunden mit.
+ * Submit a form: lock the button, show errors, unlock the button again.
+ * The task returns null or the complaint as {key, params} - for a lockout,
+ * for example, the server sends the seconds along.
  */
-async function schick(form, aufgabe) {
-  const knopf = form.querySelector('button');
-  const vorher = knopf.textContent;
-  knopf.disabled = true;
-  knopf.textContent = t('auth.working');
-  fehler(null);
+async function submit(form, task) {
+  const button = form.querySelector('button');
+  const before = button.textContent;
+  button.disabled = true;
+  button.textContent = t('auth.working');
+  showError(null);
   try {
-    const rüge = await aufgabe();
-    if (rüge) fehler(rüge.key, { n: minPassword, ...rüge.params });
+    const problem = await task();
+    if (problem) showError(problem.key, { n: minPassword, ...problem.params });
   } catch {
-    fehler('auth.err.network');
+    showError('auth.err.network');
   } finally {
-    knopf.disabled = false;
-    knopf.textContent = vorher;
+    button.disabled = false;
+    button.textContent = before;
   }
 }

@@ -1,4 +1,4 @@
-// Kleine Zeichenhilfen, die sich flache und räumliche Karte teilen.
+// Small drawing helpers shared by the flat and the 3D map.
 import { rgb } from '../../shared/rules.js';
 
 export function hexRgb(h) {
@@ -7,7 +7,7 @@ export function hexRgb(h) {
 }
 
 const glowCache = new Map();
-/** Weicher Fleck in der Reichsfarbe - einmal je Farbe. */
+/** Soft blob in the empire color - once per color. */
 export function glowSprite(hex) {
   let cv = glowCache.get(hex);
   if (cv) return cv;
@@ -26,41 +26,41 @@ export function glowSprite(hex) {
   return cv;
 }
 
-/** Helligkeitsstufen für Sterne, einmal als Zeichenkette vorbereitet. */
+/** Brightness levels for stars, prepared once as strings. */
 export const STAR_ALPHA = Array.from({ length: 12 },
   (_, k) => `rgba(226,236,255,${((k + 0.5) / 12).toFixed(3)})`);
 
-/** Darstellungsgröße des schwarzen Lochs: Faktor auf den Weltradius und eine
- *  Untergrenze in Bildpunkten, damit die Mitte auch von weit weg auffindbar ist. */
+/** Display size of the black hole: factor on the world radius and a lower
+ *  bound in pixels, so the center can be found even from far away. */
 export const HOLE_SCALE = 1.3;
 export const HOLE_MIN_PX = 16;
 const TAU = Math.PI * 2;
 
-// Form des Strudels - beide Ansichten rechnen damit, damit sie gleich aussehen.
-export const SWIRL = { arme: 7, drall: 2.2, innen: 0.3, aussen: 0.75, tempo: 0.3 };
+// Shape of the swirl - both views compute with it so they look the same.
+export const SWIRL = { arms: 7, twist: 2.2, inner: 0.3, outer: 0.75, speed: 0.3 };
 
 /**
- * Punkt auf einem Strudelarm: t von 0 (innen) bis 1 (außen). Die Arme
- * schleppen nach: nach außen laufen sie im Uhrzeigersinn aus, gedreht wird
- * gegen ihn - so sieht es nach Einsaugen aus, nicht nach Ausschleudern, und
- * der Strudel läuft mit dem gestrichelten Ring der Gefahrenzone.
+ * Point on a swirl arm: t from 0 (inside) to 1 (outside). The arms trail:
+ * outwards they run out clockwise, while the rotation goes counterclockwise -
+ * that way it looks like sucking in rather than flinging out, and the swirl
+ * turns along with the dashed ring of the danger zone.
  */
 export function swirlPoint(R, phase, arm, t) {
-  const a = -phase * SWIRL.tempo + arm * (TAU / SWIRL.arme) + SWIRL.drall * t;
-  const r = R * (SWIRL.innen + SWIRL.aussen * t * t);
+  const a = -phase * SWIRL.speed + arm * (TAU / SWIRL.arms) + SWIRL.twist * t;
+  const r = R * (SWIRL.inner + SWIRL.outer * t * t);
   return [Math.cos(a) * r, Math.sin(a) * r];
 }
 
-/** Farbe und Strichstärke eines Armstücks - nach außen blasser und dünner. */
+/** Color and line width of an arm segment - paler and thinner further out. */
 export function swirlStroke(ctx, R, t) {
   ctx.strokeStyle = `rgba(162,210,255,${(0.44 * Math.pow(1 - t, 1.5)).toFixed(3)})`;
   ctx.lineWidth = Math.max(0.7, R * 0.055) * (1 - 0.55 * t);
 }
 
 /**
- * Schlund und Photonenbogen - der Kern des schwarzen Lochs ohne die Arme.
- * Die Arme zeichnet jede Ansicht selbst: flach als Spirale, räumlich in der
- * Galaxienebene.
+ * Maw and photon arc - the core of the black hole without the arms.
+ * Each view draws the arms itself: flat as a spiral, in 3D in the galactic
+ * plane.
  */
 export function drawHoleCore(ctx, x, y, R) {
   ctx.save();
@@ -70,8 +70,8 @@ export function drawHoleCore(ctx, x, y, R) {
   glow.addColorStop(1, 'rgba(70,120,230,0)');
   ctx.fillStyle = glow;
   ctx.beginPath(); ctx.arc(x, y, R * 1.6, 0, TAU); ctx.fill();
-  // Weich auslaufendes Dunkel statt harter Scheibe - eine schwarze Kreisfläche
-  // sähe zwischen den glänzenden Welten aus wie ein Planet ohne Textur.
+  // Softly fading darkness instead of a hard disc - a black circle would look
+  // like a planet without a texture among the shiny worlds.
   const dark = ctx.createRadialGradient(x, y, 0, x, y, R * 0.32);
   dark.addColorStop(0, 'rgba(2,4,9,0.97)');
   dark.addColorStop(0.72, 'rgba(3,6,14,0.9)');
@@ -85,9 +85,9 @@ export function drawHoleCore(ctx, x, y, R) {
 }
 
 /**
- * Grenze der Sperrzone: ein gestrichelter Ring, der langsam dreht. Er sagt
- * dem Spieler, wie weit das Loch Schiffe abweist - ohne wuerde ein Umweg wie
- * ein Fehler der Wegfindung aussehen.
+ * Border of the exclusion zone: a dashed ring that rotates slowly. It tells
+ * the player how far the hole repels ships - without it a detour would look
+ * like a pathfinding bug.
  */
 export function drawHoleZone(ctx, x, y, R, phase = 0) {
   if (R < 6) return;
@@ -100,15 +100,15 @@ export function drawHoleZone(ctx, x, y, R, phase = 0) {
   ctx.restore();
 }
 
-/** Schwarzes Loch in der flachen Karte: Schlund plus Strudel ringsum. */
+/** Black hole on the flat map: maw plus swirl all around. */
 export function drawBlackHole(ctx, x, y, R, phase = 0) {
   drawHoleCore(ctx, x, y, R);
-  const stuecke = Math.max(6, Math.min(18, Math.round(R / 5)));
+  const pieces = Math.max(6, Math.min(18, Math.round(R / 5)));
   ctx.save();
-  for (let k = 0; k < SWIRL.arme; k++) {
+  for (let k = 0; k < SWIRL.arms; k++) {
     let vx = 0, vy = 0;
-    for (let i = 0; i <= stuecke; i++) {
-      const t = i / stuecke;
+    for (let i = 0; i <= pieces; i++) {
+      const t = i / pieces;
       const [dx, dy] = swirlPoint(R, phase, k, t);
       if (i) {
         swirlStroke(ctx, R, t);
@@ -123,22 +123,22 @@ export function drawBlackHole(ctx, x, y, R, phase = 0) {
   ctx.restore();
 }
 
-// ------------------------------------------------------------ Satellitenschild
+// ---------------------------------------------------------- Satellite shield
 
-/** Ab so vielen Satelliten zeigt eine Welt statt einzelner Satelliten den Schild. */
+/** From this many satellites on, a world shows the shield instead of individual satellites. */
 export const SHIELD_MIN = 5;
 
 const shieldCache = new Map();
-// Licht von oben links vorn - dieselbe Seite, von der die Welten beleuchtet sind.
-const LICHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v); return v.map(c => c / l); })();
+// Light from the top left front - the same side the worlds are lit from.
+const LIGHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v); return v.map(c => c / l); })();
 
 /**
- * Der Schild als Bild: eine Kugel aus Hexagonen. Das Wabennetz liegt auf der
- * Kugeloberflaeche und wird senkrecht aufs Bild projiziert - zur Mitte hin
- * sieht man die Waben von vorn, zum Rand hin schraeg und gestaucht. Licht
- * kommt von oben links: dort leuchten die Waben hell und es sitzt ein
- * Glanzlicht, die abgewandte Seite bleibt matt, und am Rand, wo man schraeg
- * durch die Huelle schaut, wird sie dicht und hell.
+ * The shield as an image: a sphere of hexagons. The honeycomb mesh lies on
+ * the sphere's surface and is projected orthogonally onto the image - towards
+ * the center you see the cells from the front, towards the edge obliquely and
+ * compressed. Light comes from the top left: there the cells glow bright and
+ * there is a highlight, the far side stays matte, and at the edge, where you
+ * look through the shell at an angle, it becomes dense and bright.
  */
 function shieldSprite(R) {
   const rr = R < 40 ? Math.max(6, Math.round(R)) : Math.round(R / 4) * 4;
@@ -151,35 +151,35 @@ function shieldSprite(R) {
   const g = cv.getContext('2d');
   const c = size / 2;
 
-  // Wabengroesse als Winkel auf der Kugel; in der Bildmitte mindestens ein
-  // paar Bildpunkte, sonst verschwimmt das Netz auf kleinen Karten.
-  // Gross im Bild (Schlachtfenster) feiner, sonst wirken die Waben grob.
+  // Cell size as an angle on the sphere; at the image center at least a few
+  // pixels, otherwise the mesh blurs on small maps.
+  // Finer when large on screen (battle window), otherwise the cells look coarse.
   const h = Math.max(rr > 120 ? 0.085 : 0.12, 4.2 / rr);
   const dx = Math.sqrt(3) * h, dy = 1.5 * h;
-  const RAND = Math.PI / 2 - h * 0.35;
-  // Punkt auf der Kugel (Abstand vom Bildmittelpunkt als Winkel) -> Bild
+  const EDGE = Math.PI / 2 - h * 0.35;
+  // Point on the sphere (distance from the image center as an angle) -> image
   const proj = (u, v) => {
     const th = Math.min(Math.hypot(u, v), Math.PI / 2);
     const k = th < 1e-6 ? 1 : Math.sin(th) / Math.hypot(u, v);
     return [c + u * k * rr, c + v * k * rr];
   };
   g.lineJoin = 'round';
-  const n = Math.ceil(RAND / dy) + 1;
+  const n = Math.ceil(EDGE / dy) + 1;
   for (let row = -n; row <= n; row++) {
     const off = (row & 1) ? dx / 2 : 0;
-    for (let col = -Math.ceil(RAND / dx) - 1; col <= Math.ceil(RAND / dx) + 1; col++) {
+    for (let col = -Math.ceil(EDGE / dx) - 1; col <= Math.ceil(EDGE / dx) + 1; col++) {
       const u = col * dx + off, v = row * dy;
       const th = Math.hypot(u, v);
-      if (th > RAND) continue;
-      // Flaechennormale der Wabe und wie sie zum Licht und zum Auge steht
+      if (th > EDGE) continue;
+      // Surface normal of the cell and how it faces the light and the eye
       const st = th < 1e-6 ? 0 : Math.sin(th) / th;
       const nx = u * st, ny = v * st, nz = Math.cos(th);
-      const licht = nx * LICHT[0] + ny * LICHT[1] + nz * LICHT[2];
-      const hell = Math.max(0, licht);
-      const rand = Math.pow(1 - nz, 1.6);                  // Fresnel: schraeg = dicht
-      const a = Math.min(0.95, (0.24 + 0.55 * rand + 0.55 * hell * hell) * (licht < 0 ? 0.6 : 1));
-      const weiss = Math.pow(hell, 6);                       // im Glanz fast weiss
-      const col3 = [Math.round(70 + 160 * weiss), Math.round(240 + 15 * weiss), Math.round(120 + 115 * weiss)];
+      const light = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+      const lit = Math.max(0, light);
+      const rim = Math.pow(1 - nz, 1.6);                   // Fresnel: oblique = dense
+      const a = Math.min(0.95, (0.24 + 0.55 * rim + 0.55 * lit * lit) * (light < 0 ? 0.6 : 1));
+      const white = Math.pow(lit, 6);                        // almost white in the highlight
+      const col3 = [Math.round(70 + 160 * white), Math.round(240 + 15 * white), Math.round(120 + 115 * white)];
       g.beginPath();
       for (let k = 0; k < 6; k++) {
         const w = Math.PI / 6 + k * Math.PI / 3;
@@ -187,49 +187,49 @@ function shieldSprite(R) {
         k ? g.lineTo(px, py) : g.moveTo(px, py);
       }
       g.closePath();
-      g.fillStyle = `rgba(${col3},${(a * 0.22 + hell * 0.06).toFixed(3)})`;
+      g.fillStyle = `rgba(${col3},${(a * 0.22 + lit * 0.06).toFixed(3)})`;
       g.fill();
-      // Linien werden zum Rand hin schmaler wie die Waben selbst
+      // Lines get thinner towards the edge, like the cells themselves
       g.lineWidth = Math.max(0.7, h * rr * 0.1 * (0.45 + 0.55 * nz));
       g.strokeStyle = `rgba(${col3},${a.toFixed(3)})`;
       g.stroke();
     }
   }
 
-  // Huelle: matter gruener Hauch, zum Licht hin heller
-  const lx = c + LICHT[0] * rr * 0.5, ly = c + LICHT[1] * rr * 0.5;
-  const huelle = g.createRadialGradient(lx, ly, rr * 0.1, c, c, rr);
-  huelle.addColorStop(0, 'rgba(120,255,170,0.10)');
-  huelle.addColorStop(0.7, 'rgba(60,200,110,0.04)');
-  huelle.addColorStop(1, 'rgba(60,200,110,0.10)');
-  g.fillStyle = huelle;
+  // Shell: a matte green haze, brighter towards the light
+  const lx = c + LIGHT[0] * rr * 0.5, ly = c + LIGHT[1] * rr * 0.5;
+  const shell = g.createRadialGradient(lx, ly, rr * 0.1, c, c, rr);
+  shell.addColorStop(0, 'rgba(120,255,170,0.10)');
+  shell.addColorStop(0.7, 'rgba(60,200,110,0.04)');
+  shell.addColorStop(1, 'rgba(60,200,110,0.10)');
+  g.fillStyle = shell;
   g.beginPath(); g.arc(c, c, rr, 0, TAU); g.fill();
 
-  // Glanzlicht oben links - weich, leicht in die Laenge gezogen
+  // Highlight at the top left - soft, slightly elongated
   g.save();
-  g.translate(c + LICHT[0] * rr * 0.52, c + LICHT[1] * rr * 0.52);
-  g.rotate(Math.atan2(LICHT[1], LICHT[0]) + Math.PI / 2);
+  g.translate(c + LIGHT[0] * rr * 0.52, c + LIGHT[1] * rr * 0.52);
+  g.rotate(Math.atan2(LIGHT[1], LIGHT[0]) + Math.PI / 2);
   g.scale(1, 0.62);
-  const glanz = g.createRadialGradient(0, 0, 0, 0, 0, rr * 0.42);
-  glanz.addColorStop(0, 'rgba(240,255,245,0.6)');
-  glanz.addColorStop(0.35, 'rgba(170,255,200,0.24)');
-  glanz.addColorStop(1, 'rgba(120,255,170,0)');
-  g.fillStyle = glanz;
+  const gloss = g.createRadialGradient(0, 0, 0, 0, 0, rr * 0.42);
+  gloss.addColorStop(0, 'rgba(240,255,245,0.6)');
+  gloss.addColorStop(0.35, 'rgba(170,255,200,0.24)');
+  gloss.addColorStop(1, 'rgba(120,255,170,0)');
+  g.fillStyle = gloss;
   g.beginPath(); g.arc(0, 0, rr * 0.42, 0, TAU); g.fill();
   g.restore();
 
-  // Leuchtender Saum, auf der Lichtseite kraeftiger
-  const saum = g.createRadialGradient(c, c, rr * 0.88, c, c, rr + pad * 0.85);
-  saum.addColorStop(0, 'rgba(90,255,140,0)');
-  saum.addColorStop(0.5, 'rgba(120,255,170,0.36)');
-  saum.addColorStop(1, 'rgba(90,255,140,0)');
-  g.fillStyle = saum;
+  // Glowing hem, stronger on the lit side
+  const hem = g.createRadialGradient(c, c, rr * 0.88, c, c, rr + pad * 0.85);
+  hem.addColorStop(0, 'rgba(90,255,140,0)');
+  hem.addColorStop(0.5, 'rgba(120,255,170,0.36)');
+  hem.addColorStop(1, 'rgba(90,255,140,0)');
+  g.fillStyle = hem;
   g.beginPath(); g.arc(c, c, rr + pad * 0.85, 0, TAU); g.fill();
-  const bogen = g.createLinearGradient(c + LICHT[0] * rr, c + LICHT[1] * rr, c - LICHT[0] * rr, c - LICHT[1] * rr);
-  bogen.addColorStop(0, 'rgba(220,255,230,0.75)');
-  bogen.addColorStop(0.45, 'rgba(140,255,180,0.12)');
-  bogen.addColorStop(1, 'rgba(140,255,180,0.28)');
-  g.strokeStyle = bogen;
+  const arc = g.createLinearGradient(c + LIGHT[0] * rr, c + LIGHT[1] * rr, c - LIGHT[0] * rr, c - LIGHT[1] * rr);
+  arc.addColorStop(0, 'rgba(220,255,230,0.75)');
+  arc.addColorStop(0.45, 'rgba(140,255,180,0.12)');
+  arc.addColorStop(1, 'rgba(140,255,180,0.28)');
+  g.strokeStyle = arc;
   g.lineWidth = Math.max(1, rr * 0.03);
   g.beginPath(); g.arc(c, c, rr - g.lineWidth / 2, 0, TAU); g.stroke();
 
@@ -240,8 +240,8 @@ function shieldSprite(R) {
 }
 
 /**
- * Schild um eine Welt. strength 0..1 macht ihn blasser - in der Schlacht
- * folgt er den Satelliten, die ihn tragen; bei 0 ist er weg.
+ * Shield around a world. strength 0..1 makes it paler - in battle it follows
+ * the satellites carrying it; at 0 it is gone.
  */
 export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1) {
   if (strength <= 0.01 || R < 4) return;
@@ -249,13 +249,13 @@ export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1) {
   const s = R / sp.rr;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // Ein schwacher Schild flackert, ein voller atmet nur leicht
-  const flimmer = strength < 0.35 ? 0.6 + 0.4 * Math.sin(phase * 31) * Math.sin(phase * 13) : 1;
-  ctx.globalAlpha *= strength * flimmer * (0.88 + 0.12 * Math.sin(phase * 1.7));
+  // A weak shield flickers, a full one only breathes slightly
+  const flicker = strength < 0.35 ? 0.6 + 0.4 * Math.sin(phase * 31) * Math.sin(phase * 13) : 1;
+  ctx.globalAlpha *= strength * flicker * (0.88 + 0.12 * Math.sin(phase * 1.7));
   ctx.drawImage(sp.canvas, x - sp.half * s, y - sp.half * s, sp.canvas.width * s, sp.canvas.height * s);
-  // Energie, die langsam ueber die Huelle wandert: ein schmaler Lichtbogen
-  // auf der Schattenseite, damit die Kugel nicht starr wirkt.
-  const a = Math.atan2(-LICHT[1], -LICHT[0]) + Math.sin(phase * 0.5) * 0.9;
+  // Energy slowly wandering across the shell: a narrow arc of light on the
+  // shadow side so the sphere does not look rigid.
+  const a = Math.atan2(-LIGHT[1], -LIGHT[0]) + Math.sin(phase * 0.5) * 0.9;
   ctx.strokeStyle = 'rgba(150,255,190,0.22)';
   ctx.lineWidth = Math.max(1, R * 0.025);
   ctx.lineCap = 'round';
@@ -263,7 +263,7 @@ export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1) {
   ctx.restore();
 }
 
-/** Treffer auf dem Schild: gruenes Aufleuchten am Einschlagpunkt, k = 0..1. */
+/** Hit on the shield: a green flash at the point of impact, k = 0..1. */
 export function drawShieldHit(ctx, x, y, size, k) {
   if (k < 0 || k > 1) return;
   const a = 1 - k;

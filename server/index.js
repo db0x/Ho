@@ -1,4 +1,4 @@
-// HTTP (statische Dateien) + WebSocket-Server.
+// HTTP (static files) + WebSocket server.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,8 +21,8 @@ import { MAX_PLAYERS } from '../shared/rules.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PORT = process.env.PORT || 8080;
-// Die Version steht nur in package.json; die Seiten bekommen sie beim
-// Ausliefern eingesetzt, statt sie an zweiter Stelle zu pflegen.
+// The version lives only in package.json; it is inserted into the pages when
+// they are served instead of being maintained in a second place.
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 const VERSION_MARK = /__HO_VERSION__/g;
 
@@ -39,19 +39,19 @@ const MIME = {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  // Erst dekodieren, dann normalisieren - und in dieser Reihenfolge: ein
-  // kodierter Schraegstrich (%2f) uebersteht den URL-Parser und wuerde sonst
-  // erst hinter allen Pruefungen zum Trenner, etwa bei /css/..%2f..%2f.
+  // Decode first, then normalize - and in this order: an encoded slash (%2f)
+  // survives the URL parser and would otherwise only become a separator after
+  // all checks, e.g. with /css/..%2f..%2f.
   let rel;
   try { rel = path.posix.normalize(decodeURIComponent(url.pathname)); } catch { rel = ''; }
   if (!rel.startsWith('/') || rel.includes('\0')) { res.writeHead(400).end('bad path'); return; }
   if (rel === '/') rel = '/index.html';
-  // Vor allem anderen der Zugang: erst die eigenen Endpunkte, dann das Tor.
-  // Ohne Sitzung gibt es nur die Anmeldeseite und was sie zum Anzeigen braucht.
+  // Access control before anything else: first its own endpoints, then the gate.
+  // Without a session there is only the sign-in page and what it needs to display.
   if (handleAuth(req, res, rel)) return;
   if (!gate(req, res, rel)) return;
   if (handleAvatar(req, res, rel)) return;
-  // /shared/* kommt aus dem gemeinsamen Verzeichnis, alles andere aus /client
+  // /shared/* comes from the shared directory, everything else from /client
   const base = rel.startsWith('/shared/') ? ROOT : path.join(ROOT, 'client');
   const file = path.normalize(path.join(base, rel));
   if (!file.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
@@ -69,13 +69,13 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (req, socket, head) => {
-  const sitzung = checkUpgrade(req);
-  if (!sitzung) {
+  const session = checkUpgrade(req);
+  if (!session) {
     socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;
   }
-  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req, sitzung));
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req, session));
 });
 
 /** @type {Map<string, any>} */
@@ -101,7 +101,7 @@ function broadcastView(game, extra = {}) {
     if (c) send(c.ws, { t: 'view', view: buildView(game, p), ...extra });
   }
   if (game.spectators.size) {
-    const view = buildSpectatorView(game);     // für alle Zuschauer dieselbe
+    const view = buildSpectatorView(game);     // the same for all spectators
     for (const id of game.spectators) {
       const c = conns.get(id);
       if (c) send(c.ws, { t: 'view', view, ...extra });
@@ -110,13 +110,13 @@ function broadcastView(game, extra = {}) {
   }
 }
 
-/** Eine Partie, der man zusehen darf: nur KI, kein menschliches Reich. */
+/** A game that may be watched: AI only, no human empire. */
 function watchable(game) {
   return !!game && game.players.length > 0 && game.players.every(p => p.isBot);
 }
 
-// Spieler schreiben Text, das System schickt { key, params } - uebersetzt
-// wird erst beim Empfaenger.
+// Players write text, the system sends { key, params } - translation only
+// happens at the recipient.
 function chat(game, from, msg) {
   const body = typeof msg === 'string' ? { text: msg } : msg;
   for (const p of game.players) {
@@ -125,17 +125,17 @@ function chat(game, from, msg) {
   }
 }
 
-wss.on('connection', (ws, req, sitzung) => {
+wss.on('connection', (ws, req, session) => {
   const connId = crypto.randomUUID();
   const c = {
-    ws, gameId: null, playerId: null, sid: sitzung.token,
-    account: sitzung.display ?? sitzung.user, accountKey: sitzung.user ?? null,
+    ws, gameId: null, playerId: null, sid: session.token,
+    account: session.display ?? session.user, accountKey: session.user ?? null,
     profile: { name: null, avatar: null }
   };
   if (c.accountKey) {
-    let konto = null;
-    try { konto = getUser(c.accountKey); } catch { /* Kontendatei unlesbar */ }
-    c.profile = { name: konto?.nick || c.account, avatar: accountAvatarUrl(c.accountKey) };
+    let account = null;
+    try { account = getUser(c.accountKey); } catch { /* account file unreadable */ }
+    c.profile = { name: account?.nick || c.account, avatar: accountAvatarUrl(c.accountKey) };
   }
   conns.set(connId, c);
   send(ws, {
@@ -157,7 +157,7 @@ wss.on('connection', (ws, req, sitzung) => {
     if (c?.gameId) {
       const game = games.get(c.gameId);
       if (game?.spectators.delete(connId) && !game.spectators.size && watchable(game)) {
-        games.delete(game.id);           // niemand sieht mehr zu
+        games.delete(game.id);           // nobody is watching anymore
       }
       const p = game?.players.find(p => p.id === c.playerId);
       if (p) {
@@ -184,36 +184,36 @@ function openGameList() {
 }
 
 /**
- * Mit Anmeldung heisst ein Spieler wie in seinem Profil - geaendert wird das
- * nur ueber 'profile', wo der Server prueft, dass niemand den Namen eines
- * anderen Kontos annimmt. Ohne Anmeldung gilt der Wunschname. In der Partie
- * bekommt ein doppelter Name eine Nummer.
+ * With sign-in a player is named as in their profile - that only changes via
+ * 'profile', where the server checks that nobody takes the name of another
+ * account. Without sign-in the requested name applies. Within a game a
+ * duplicate name gets a number.
  */
-function spielerName(c, game, wunsch, selfId) {
-  const name = c.accountKey ? c.profile.name : (cleanName(wunsch) || c.profile.name);
+function playerName(c, game, wanted, selfId) {
+  const name = c.accountKey ? c.profile.name : (cleanName(wanted) || c.profile.name);
   return uniqueName(game, name || 'Captain', selfId);
 }
 
-/** Neue Seite eines Profils annehmen. Gibt einen Fehlerschluessel zurueck oder null. */
-function profilAendern(c, msg) {
+/** Accept a new side of a profile. Returns an error key or null. */
+function changeProfile(c, msg) {
   if (msg.name !== undefined) {
     const name = cleanName(msg.name);
     if (c.accountKey) {
-      const rüge = nameAllowed(name, c.accountKey);
-      if (rüge) return rüge;
-      // Wer wieder wie sein Konto heisst, braucht keinen eigenen Eintrag.
+      const problem = nameAllowed(name, c.accountKey);
+      if (problem) return problem;
+      // Whoever is named like their account again needs no entry of their own.
       setProfile(c.accountKey, { nick: name === c.account ? null : name });
     } else if (name.length < 2) return 'profile.err.short';
     c.profile.name = name;
   }
   if (msg.avatar !== undefined) {
-    let bild = null;
+    let image = null;
     if (msg.avatar !== null) {
-      bild = parseAvatar(msg.avatar);
-      if (bild.error) return bild.error;
+      image = parseAvatar(msg.avatar);
+      if (image.error) return image.error;
     }
-    if (c.accountKey) c.profile.avatar = putAccountAvatar(c.accountKey, bild);
-    else c.profile.avatar = bild ? putGuestAvatar(bild, c.profile.avatar?.match(/avatar\/(g-[^?]+)/)?.[1]) : null;
+    if (c.accountKey) c.profile.avatar = putAccountAvatar(c.accountKey, image);
+    else c.profile.avatar = image ? putGuestAvatar(image, c.profile.avatar?.match(/avatar\/(g-[^?]+)/)?.[1]) : null;
   }
   return null;
 }
@@ -226,7 +226,7 @@ function handle(connId, ws, msg) {
   switch (msg.t) {
     case 'create': {
       const g = createGame('');
-      const name = spielerName(c, g, msg.name);
+      const name = playerName(c, g, msg.name);
       g.hostName = name;
       Object.assign(g.settings, sanitizeSettings(msg.settings));
       games.set(g.id, g);
@@ -241,7 +241,7 @@ function handle(connId, ws, msg) {
       const g = games.get((msg.code || '').toUpperCase());
       if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
       if (g.state !== 'lobby') {
-        // Eine laufende KI-Partie kann man nicht spielen, aber ansehen
+        // A running AI game cannot be played, but it can be watched
         if (!watchable(g)) return send(ws, { t: 'error', key: 'err.gameRunning' });
         c.gameId = g.id; c.playerId = null;
         g.spectators.add(connId);
@@ -252,7 +252,7 @@ function handle(connId, ws, msg) {
       }
       if (g.players.length >= MAX_PLAYERS) return send(ws, { t: 'error', key: 'err.gameFull' });
       const p = addPlayer(g, {
-        name: spielerName(c, g, msg.name), connId,
+        name: playerName(c, g, msg.name), connId,
         avatar: c.profile.avatar, account: c.accountKey ? c.account : null
       });
       p.token = crypto.randomUUID();
@@ -274,16 +274,16 @@ function handle(connId, ws, msg) {
       break;
     }
     case 'profile': {
-      const rüge = profilAendern(c, msg);
-      if (rüge) send(ws, { t: 'error', key: rüge });
+      const problem = changeProfile(c, msg);
+      if (problem) send(ws, { t: 'error', key: problem });
       send(ws, { t: 'profile', profile: { ...c.profile, account: c.accountKey ? c.account : null } });
-      if (rüge || !me) return;
-      // Das Bild geht immer mit; umbenannt wird nur vor dem Start - danach
-      // stuende der alte Name schon in Protokoll und Chat.
+      if (problem || !me) return;
+      // The image always goes along; renaming only happens before the start -
+      // afterwards the old name would already be in the log and chat.
       me.avatar = c.profile.avatar;
       if (game.state === 'lobby') {
         if (msg.name !== undefined) {
-          me.name = spielerName(c, game, c.profile.name, me.id);
+          me.name = playerName(c, game, c.profile.name, me.id);
           if (game.players[0] === me) game.hostName = me.name;
         }
         broadcastLobby(game);
@@ -292,15 +292,15 @@ function handle(connId, ws, msg) {
     }
     case 'color': {
       if (!game || !me) return;
-      // Die eigene Farbe darf jeder waehlen, die der KI-Reiche der Gastgeber.
-      const wer = msg.playerId ? game.players.find(p => p.id === msg.playerId) : me;
+      // Everyone may pick their own color, the host also those of the AI empires.
+      const who = msg.playerId ? game.players.find(p => p.id === msg.playerId) : me;
       const host = game.players[0] === me;
-      if (!wer || (wer !== me && !(wer.isBot && host))) return;
-      // Traegt ein Mitspieler die Farbe schon, wird nur getauscht, wenn der
-      // Gastgeber es will - sonst verliert jemand ungefragt seine Farbe.
-      const traeger = game.players.find(p => p !== wer && p.color === msg.color);
-      if (traeger && !traeger.isBot && !host) return send(ws, { t: 'error', key: 'lobby.colorTaken' });
-      if (setPlayerColor(game, wer, String(msg.color || ''))) broadcastLobby(game);
+      if (!who || (who !== me && !(who.isBot && host))) return;
+      // If another player already wears the color, it is only swapped if the
+      // host wants it - otherwise someone loses their color without being asked.
+      const wearer = game.players.find(p => p !== who && p.color === msg.color);
+      if (wearer && !wearer.isBot && !host) return send(ws, { t: 'error', key: 'lobby.colorTaken' });
+      if (setPlayerColor(game, who, String(msg.color || ''))) broadcastLobby(game);
       break;
     }
     case 'settings': {
@@ -342,7 +342,7 @@ function handle(connId, ws, msg) {
       if (r?.error) send(ws, { t: 'notice', key: r.error, params: r.params });
       send(ws, { t: 'view', view: buildView(game, me) });
       if (msg.move || msg.split || msg.merge) {
-        // Bewegungen aendern die Sicht anderer nicht sofort - nur Bereitschaft anzeigen
+        // Moves do not change other players' views right away - only show readiness
       }
       break;
     }
@@ -355,7 +355,7 @@ function handle(connId, ws, msg) {
     }
     case 'leave': {
       if (!game) return;
-      // Zuschauer melden sich einfach ab
+      // Spectators simply sign off
       if (game.spectators.delete(connId)) {
         c.gameId = null;
         if (!game.spectators.size && watchable(game)) games.delete(game.id);
@@ -367,8 +367,8 @@ function handle(connId, ws, msg) {
         if (!game.players.length) games.delete(game.id);
         else broadcastLobby(game);
       } else {
-        // Das Reich bleibt stehen und wird übersprungen - sonst bräche die
-        // Partie für alle anderen auseinander.
+        // The empire stays and is skipped - otherwise the game would fall
+        // apart for everyone else.
         me.connected = false;
         me.connId = null;
         me.token = null;
@@ -377,7 +377,7 @@ function handle(connId, ws, msg) {
         maybeResolve(game);
       }
       c.gameId = null; c.playerId = null;
-      // Läuft niemand mehr mit, kann die Partie weg
+      // If nobody is playing anymore, the game can go
       if (!game.players.some(p => p.connected) && !game.spectators.size) games.delete(game.id);
       break;
     }
@@ -390,9 +390,9 @@ function handle(connId, ws, msg) {
       let g = msg.code ? games.get(String(msg.code).toUpperCase()) : null;
       if (msg.code && !g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
       if (!g) {
-        // Neue reine KI-Partie aufsetzen und sofort starten
+        // Set up a new AI-only game and start it right away
         const bots = Math.min(MAX_PLAYERS, Math.max(2, Math.round(msg.bots) || 6));
-        g = createGame('KI-Partie');
+        g = createGame('AI game');
         Object.assign(g.settings, sanitizeSettings(msg.settings));
         games.set(g.id, g);
         for (let i = 0; i < bots; i++) addPlayer(g, { isBot: true });
@@ -434,7 +434,7 @@ function sanitizeSettings(s) {
   if (Number.isFinite(s.startMoney)) out.startMoney = Math.min(20000, Math.max(200, Math.round(s.startMoney)));
   if (Number.isFinite(s.startMetal)) out.startMetal = Math.min(5000, Math.max(50, Math.round(s.startMetal)));
   if (Number.isFinite(s.turnTimer)) out.turnTimer = Math.min(600, Math.max(0, Math.round(s.turnTimer)));
-  // 0 = unbegrenzt: dann endet die Partie erst, wenn nur ein Reich übrig ist.
+  // 0 = unlimited: then the game only ends when a single empire is left.
   if (Number.isFinite(s.maxTurns)) out.maxTurns = s.maxTurns === 0 ? 0 : Math.min(999, Math.max(20, Math.round(s.maxTurns)));
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
@@ -452,7 +452,7 @@ export function maybeResolve(game) {
   return true;
 }
 
-// Takt der Zuschauerpartien: hier treibt niemand die Runden an.
+// Pace of spectator games: nobody drives the turns here.
 setInterval(() => {
   const now = Date.now();
   for (const game of games.values()) {
@@ -463,12 +463,12 @@ setInterval(() => {
   }
 }, 100);
 
-// Rundentimer und Aufräumen
+// Turn timer and cleanup
 setInterval(() => {
   const now = Date.now();
   for (const [connId, c] of conns) {
     if (!sessionAlive(c.sid)) {
-      console.log('Sitzung beendet, Verbindung getrennt:', c.account ?? '?');
+      console.log('Session ended, connection closed:', c.account ?? '?');
       c.ws.close(4001);
       conns.delete(connId);
     }
@@ -478,7 +478,7 @@ setInterval(() => {
       for (const p of game.players) p.ready = true;
       maybeResolve(game);
     }
-    // Verwaiste Partien nach 2 Stunden entfernen
+    // Remove orphaned games after 2 hours
     if (!game.players.some(p => p.connected) && !game.spectators.size
       && now - game.created > 2 * 3600 * 1000) {
       games.delete(game.id);
@@ -487,16 +487,16 @@ setInterval(() => {
 }, 1000);
 
 server.listen(PORT, () => {
-  console.log(`Ho!! läuft auf http://localhost:${PORT}`);
+  console.log(`Ho!! running on http://localhost:${PORT}`);
   if (!authEnabled()) {
-    console.warn('Zugang: ABGESCHALTET (HO_AUTH=off) - jeder mit der URL kann mitspielen.');
+    console.warn('Access: DISABLED (HO_AUTH=off) - anyone with the URL can play.');
     return;
   }
   try {
     const n = listUsers().length;
-    console.log(`Zugang: Anmeldung aktiv, Konten: ${n} (${userFile()})`);
-    if (!n) console.warn('Noch kein Konto. Anlegen mit: node server/users.js add <name>');
+    console.log(`Access: sign-in active, accounts: ${n} (${userFile()})`);
+    if (!n) console.warn('No account yet. Create one with: node server/users.js add <name>');
   } catch (e) {
-    console.error('Zugang: Kontendatei unlesbar -', e.message);
+    console.error('Access: account file unreadable -', e.message);
   }
 });

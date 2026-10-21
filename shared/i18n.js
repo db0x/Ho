@@ -1,82 +1,82 @@
-// Übersetzung. Winzig und ohne Abhängigkeit, damit sie im Browser und in Node
-// gleichermaßen läuft - der Server braucht sie für Tests und Werkzeuge, die
-// Oberfläche für alles Sichtbare.
+// Translation. Tiny and without dependencies so it runs in the browser and in
+// Node alike - the server needs it for tests and tools, the UI for everything
+// visible.
 //
-// Grundregel im Projekt: Nichts, was ein Mensch liest, steht im Code. Der Code
-// kennt nur Schlüssel ('log.arrive'), die Kataloge in client/i18n/ kennen die
-// Sätze. Der Server schickt deshalb auch keine fertigen Sätze mehr, sondern
-// Schlüssel samt Werten - erst der Client setzt sie in seiner Sprache zusammen.
+// Ground rule of the project: nothing a human reads lives in the code. The code
+// only knows keys ('log.arrive'), the catalogs in client/i18n/ know the
+// sentences. That is why the server no longer sends finished sentences either,
+// but keys plus values - only the client assembles them in its language.
 
-const kataloge = new Map();
+const catalogs = new Map();
 export const FALLBACK = 'en';
-let aktuell = FALLBACK;
+let current = FALLBACK;
 
-/** Sprachtag für Zahlen und Daten - mehr als die zwei Buchstaben. */
+/** Language tag for numbers and dates - more than the two letters. */
 const TAGS = { de: 'de-DE', en: 'en-US' };
 
 export function registerLocale(code, messages) {
-  kataloge.set(code, { ...(kataloge.get(code) || {}), ...messages });
+  catalogs.set(code, { ...(catalogs.get(code) || {}), ...messages });
 }
 
 export function setLocale(code) {
-  aktuell = kataloge.has(code) ? code : FALLBACK;
-  return aktuell;
+  current = catalogs.has(code) ? code : FALLBACK;
+  return current;
 }
 
-export function getLocale() { return aktuell; }
-export function localeTag(code = aktuell) { return TAGS[code] || code; }
-export function availableLocales() { return [...kataloge.keys()]; }
-export function hasLocale(code) { return kataloge.has(code); }
+export function getLocale() { return current; }
+export function localeTag(code = current) { return TAGS[code] || code; }
+export function availableLocales() { return [...catalogs.keys()]; }
+export function hasLocale(code) { return catalogs.has(code); }
 
 /**
- * Übersetzt einen Schlüssel. Werte werden als {name} eingesetzt; steckt ein
- * `count` darin, wird vorher die Mehrzahlform gesucht (schluessel#one /
- * schluessel#other). Fehlt ein Schlüssel, kommt die Ersatzsprache, und zur Not
- * der Schlüssel selbst - sichtbar genug, um ihn nachzutragen, und nie leer.
+ * Translates a key. Values are inserted as {name}; if a `count` is among them,
+ * the plural form is looked up first (key#one / key#other). If a key is
+ * missing, the fallback language is used, and as a last resort the key
+ * itself - visible enough to add it later, and never empty.
  */
 export function t(key, params) {
-  const satz = suchen(key, params);
-  return einsetzen(satz, params);
+  const text = lookup(key, params);
+  return interpolate(text, params);
 }
 
-/** Gibt es diesen Schlüssel überhaupt? Für Fälle mit optionalem Text. */
+/** Does this key exist at all? For cases with optional text. */
 export function hasKey(key) {
-  return (kataloge.get(aktuell)?.[key] ?? kataloge.get(FALLBACK)?.[key]) != null;
+  return (catalogs.get(current)?.[key] ?? catalogs.get(FALLBACK)?.[key]) != null;
 }
 
-function suchen(key, params) {
+function lookup(key, params) {
   const form = params && params.count != null ? plural(params.count) : null;
-  // Ohne count wird die Mehrzahlform genommen - besser als der nackte
-  // Schluessel, falls ein Aufruf das count vergisst.
-  const stellen = form ? [`${key}#${form}`, key] : [key, `${key}#other`];
-  for (const code of [aktuell, FALLBACK]) {
-    const kat = kataloge.get(code);
-    if (!kat) continue;
-    for (const k of stellen) if (kat[k] != null) return kat[k];
+  // Without count the plural form is used - better than the bare key in case
+  // a call forgets the count.
+  const candidates = form ? [`${key}#${form}`, key] : [key, `${key}#other`];
+  for (const code of [current, FALLBACK]) {
+    const cat = catalogs.get(code);
+    if (!cat) continue;
+    for (const k of candidates) if (cat[k] != null) return cat[k];
   }
   return key;
 }
 
-// Deutsch und Englisch teilen sich dieselbe einfache Regel. Käme eine Sprache
-// mit mehr Formen dazu, gehört hier ein Intl.PluralRules hin.
+// German and English share the same simple rule. If a language with more
+// forms is added, an Intl.PluralRules belongs here.
 function plural(n) { return Math.abs(n) === 1 ? 'one' : 'other'; }
 
-function einsetzen(satz, params) {
-  if (!params || typeof satz !== 'string') return satz;
-  return satz.replace(/\{(\w+)\}/g, (ganz, name) =>
-    params[name] != null ? String(params[name]) : ganz);
+function interpolate(text, params) {
+  if (!params || typeof text !== 'string') return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name) =>
+    params[name] != null ? String(params[name]) : whole);
 }
 
-/** Text aus einer bestimmten Sprache, ohne die aktuelle zu wechseln. */
+/** Text from a specific language without switching the current one. */
 export function tIn(code, key, params) {
-  const kat = kataloge.get(code);
-  const satz = kat?.[key] ?? kataloge.get(FALLBACK)?.[key] ?? key;
-  return einsetzen(satz, params);
+  const cat = catalogs.get(code);
+  const text = cat?.[key] ?? catalogs.get(FALLBACK)?.[key] ?? key;
+  return interpolate(text, params);
 }
 
-/** Zahl in der Schreibweise der aktuellen Sprache (ohne Nachkommastelle). */
-export function n(wert, stellen = 0) {
-  return Number(wert).toLocaleString(localeTag(), {
-    minimumFractionDigits: stellen, maximumFractionDigits: stellen
+/** Number in the notation of the current language (no decimals by default). */
+export function n(value, digits = 0) {
+  return Number(value).toLocaleString(localeTag(), {
+    minimumFractionDigits: digits, maximumFractionDigits: digits
   });
 }

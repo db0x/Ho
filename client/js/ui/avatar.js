@@ -1,50 +1,50 @@
-// Spielerbilder: auswaehlen, verkleinern, anzeigen.
+// Player images: pick, downscale, display.
 //
-// Hochgeladen wird nie das Original - ein Handyfoto hat Megabytes. Der
-// Browser schneidet es quadratisch zu und verkleinert es auf 128 px; als WebP
-// sind das ein paar Kilobyte, die der Server noch einmal prueft.
+// The original is never uploaded - a phone photo has megabytes. The browser
+// crops it to a square and downscales it to 128 px; as WebP that is a few
+// kilobytes, which the server checks once more.
 
-const GROESSE = 128;
+const SIZE = 128;
 
-/** Oeffnet die Dateiauswahl; liefert ein verkleinertes data:-URL oder null. */
+/** Opens the file picker; returns a downscaled data: URL or null. */
 export function pickAvatar() {
   return new Promise((ok) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png,image/jpeg,image/webp,image/gif';
     input.onchange = async () => {
-      const datei = input.files?.[0];
-      if (!datei) return ok(null);
-      try { ok(await verkleinere(datei)); } catch { ok(null); }
+      const file = input.files?.[0];
+      if (!file) return ok(null);
+      try { ok(await downscale(file)); } catch { ok(null); }
     };
     input.click();
   });
 }
 
-async function verkleinere(datei) {
-  const bild = await createImageBitmap(datei);
-  const kante = Math.min(bild.width, bild.height);
+async function downscale(file) {
+  const image = await createImageBitmap(file);
+  const edge = Math.min(image.width, image.height);
   const cv = document.createElement('canvas');
-  cv.width = cv.height = GROESSE;
+  cv.width = cv.height = SIZE;
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
-  // Mitte des Bildes, quadratisch
-  ctx.drawImage(bild, (bild.width - kante) / 2, (bild.height - kante) / 2, kante, kante, 0, 0, GROESSE, GROESSE);
-  bild.close?.();
+  // Center of the image, square
+  ctx.drawImage(image, (image.width - edge) / 2, (image.height - edge) / 2, edge, edge, 0, 0, SIZE, SIZE);
+  image.close?.();
   const webp = cv.toDataURL('image/webp', 0.85);
-  // Safari kann kein WebP schreiben und liefert dann PNG - JPEG ist kleiner.
+  // Safari cannot write WebP and returns PNG instead - JPEG is smaller.
   return webp.startsWith('data:image/webp') ? webp : cv.toDataURL('image/jpeg', 0.85);
 }
 
 /**
- * Rundes Spielerbild; ohne Bild der Anfangsbuchstabe auf der Spielerfarbe.
- * Namen kommen vom Server bereits ohne Markup-Zeichen.
+ * Round player image; without an image, the initial on the player color.
+ * Names already come from the server without markup characters.
  */
 export function avatarHtml(p, size = 28, extra = '') {
-  const stil = `width:${size}px;height:${size}px;--c:${p.color || '#5b6478'};font-size:${Math.round(size * 0.46)}px`;
+  const style = `width:${size}px;height:${size}px;--c:${p.color || '#5b6478'};font-size:${Math.round(size * 0.46)}px`;
   if (p.avatar) {
-    return `<span class="avatar ${extra}" style="${stil}"><img src="${p.avatar}" alt="" loading="lazy"></span>`;
+    return `<span class="avatar ${extra}" style="${style}"><img src="${p.avatar}" alt="" loading="lazy"></span>`;
   }
-  const buchstabe = [...(p.name || '?').trim()][0]?.toUpperCase() || '?';
-  return `<span class="avatar ${extra}" style="${stil}">${buchstabe}</span>`;
+  const initial = [...(p.name || '?').trim()][0]?.toUpperCase() || '?';
+  return `<span class="avatar ${extra}" style="${style}">${initial}</span>`;
 }

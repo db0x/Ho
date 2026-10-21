@@ -7,11 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Nur lesen - der Workflow braucht keine Schreibrechte am Repo.
+# Read only - the workflow needs no write access to the repo.
 permissions:
   contents: read
 
-# Bei schneller Folge von Pushes laeuft nur der neueste Stand weiter.
+# When pushes follow in quick succession, only the latest one keeps running.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -23,8 +23,8 @@ jobs:
     timeout-minutes: 10
 
     strategy:
-      # Ein Ausfall auf einer Version soll die anderen nicht abwuergen -
-      # so ist sofort sichtbar, ob es alle Versionen trifft oder nur eine.
+      # A failure on one version should not cancel the others - that way it
+      # is obvious right away whether all versions are affected or just one.
       fail-fast: false
       matrix:
         node: ['20', '22', '24']
@@ -37,11 +37,10 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # npm ci statt npm install: installiert genau den Stand aus
-      # package-lock.json und bricht ab, wenn Lock und package.json
-      # auseinanderlaufen.
+      # npm ci instead of npm install: installs exactly what package-lock.json
+      # says and fails if the lock file and package.json drift apart.
       - run: npm ci
 
-      # i18n-Kataloge, Spiel-Engine, schwarzes Loch, Mehrspieler-Netzcode.
-      # Der Netztest startet den echten Server auf einem Zufallsport.
+      # i18n catalogs, game engine, black hole, multiplayer network code.
+      # The network test starts the real server on a random port.
       - run: npm test

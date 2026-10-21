@@ -1,5 +1,5 @@
-// Planetendarstellung im Stil des Klassikers: glaenzende, satt gefaerbte
-// Kugeln - Farbe = Temperatur, Größe = Schwerkraft.
+// Planet rendering in the style of the classic: glossy, richly colored
+// spheres - color = temperature, size = gravity.
 import { tempColor, rgb, habitability, IDEAL } from '../../shared/rules.js';
 import { t, n as n1 } from '../i18n.js';
 import { drawHexShield, SHIELD_MIN } from './fx.js';
@@ -18,7 +18,7 @@ function rngFrom(seed) {
   };
 }
 
-/** Radius eines Planeten: die Schwerkraft bestimmt die Größe. */
+/** Radius of a planet: gravity determines the size. */
 export function planetRadius(planet) {
   const g = planet.grav ?? 1;
   return 9 + Math.pow(g, 0.78) * 5.4;
@@ -36,12 +36,12 @@ function mix(a, b, f) {
 }
 
 /**
- * Rendert die Kugel eines Planeten in ein eigenes Canvas (gecacht).
+ * Renders a planet's sphere into its own canvas (cached).
  * @param {object} planet
- * @param {number} r Radius in Pixeln
+ * @param {number} r radius in pixels
  */
 export function planetSprite(planet, r) {
-  // Radius in Stufen runden, damit der Cache beim Zoomen nicht überläuft
+  // Round the radius in steps so the cache does not overflow when zooming
   const rr = r < 26 ? Math.max(4, Math.round(r)) : Math.round(r / 3) * 3;
   const tBucket = Math.round((planet.temp ?? 0) / 4) * 4;
   const gBucket = Math.round((planet.grav ?? 1) * 10);
@@ -58,89 +58,89 @@ export function planetSprite(planet, r) {
 
   const base = tempColor(planet.temp ?? 0);
   const hab = habitability(planet);
-  // Je bewohnbarer eine Welt, desto erdähnlicher: Ozeane legen sich über die
-  // Kugel, die Kontinente behalten die Temperaturfarbe. Damit bleibt die
-  // Grundregel "Farbe = Temperatur" lesbar - eine zu warme Welt hat gelbe
-  // Kontinente, eine kühle blaugrüne - und eine Eiswelt bleibt trotzdem
-  // unterscheidbar, weil ihr Blau keine Landmassen trägt.
-  const erde = Math.max(0, Math.min(1, (hab - 0.55) / 0.3));
-  const OZEAN = [30, 84, 168];
-  const basis = erde > 0 ? mix(base, OZEAN, erde * 0.82) : base;
+  // The more habitable a world, the more earth-like: oceans spread over the
+  // sphere, the continents keep the temperature color. That keeps the ground
+  // rule "color = temperature" readable - a world that is too warm has yellow
+  // continents, a cool one blue-green ones - and an ice world still stays
+  // distinguishable because its blue carries no land masses.
+  const earth = Math.max(0, Math.min(1, (hab - 0.55) / 0.3));
+  const OCEAN = [30, 84, 168];
+  const surface = earth > 0 ? mix(base, OCEAN, earth * 0.82) : base;
   const seed = planet.ringSeed ?? (planet.id * 2654435761);
   const rnd = rngFrom(seed);
   const hasRing = (seed % 11) === 0 && rr > 7;
   const memory = planet.known === 'memory';
 
-  // ---- Atmosphaere / Korona
+  // ---- Atmosphere / corona
   const glowR = rr * (1.5 + hab * 0.35);
   const glow = g.createRadialGradient(cx, cy, rr * 0.85, cx, cy, glowR);
-  const glowCol = mix(basis, [255, 255, 255], 0.25);
+  const glowCol = mix(surface, [255, 255, 255], 0.25);
   glow.addColorStop(0, rgb(glowCol, (0.3 + hab * 0.3) * (memory ? 0.4 : 1)));
   glow.addColorStop(0.45, rgb(glowCol, 0.1 * (memory ? 0.4 : 1)));
   glow.addColorStop(1, rgb(glowCol, 0));
   g.fillStyle = glow;
   g.beginPath(); g.arc(cx, cy, glowR, 0, Math.PI * 2); g.fill();
 
-  // ---- Ring (selten, rein kosmetisch)
+  // ---- Ring (rare, purely cosmetic)
   if (hasRing) {
     g.save();
     g.translate(cx, cy);
     g.rotate(-0.42);
     g.scale(1, 0.26);
     const rg = g.createLinearGradient(-rr * 1.8, 0, rr * 1.8, 0);
-    rg.addColorStop(0, rgb(shade(basis, 0.6), 0.0));
-    rg.addColorStop(0.3, rgb(mix(basis, [255, 240, 210], 0.6), 0.55));
-    rg.addColorStop(0.7, rgb(mix(basis, [255, 240, 210], 0.6), 0.55));
-    rg.addColorStop(1, rgb(shade(basis, 0.6), 0.0));
+    rg.addColorStop(0, rgb(shade(surface, 0.6), 0.0));
+    rg.addColorStop(0.3, rgb(mix(surface, [255, 240, 210], 0.6), 0.55));
+    rg.addColorStop(0.7, rgb(mix(surface, [255, 240, 210], 0.6), 0.55));
+    rg.addColorStop(1, rgb(shade(surface, 0.6), 0.0));
     g.strokeStyle = rg;
     g.lineWidth = rr * 0.34;
     g.beginPath(); g.arc(0, 0, rr * 1.55, 0, Math.PI * 2); g.stroke();
     g.restore();
   }
 
-  // ---- Kugel
+  // ---- Sphere
   g.save();
   g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.clip();
 
   const lx = cx - rr * 0.34, ly = cy - rr * 0.36;
   const body = g.createRadialGradient(lx, ly, rr * 0.08, cx, cy, rr * 1.18);
-  body.addColorStop(0, rgb(mix(basis, [255, 255, 255], 0.55)));
-  body.addColorStop(0.28, rgb(mix(basis, [255, 255, 255], 0.16)));
-  body.addColorStop(0.62, rgb(basis));
-  body.addColorStop(0.9, rgb(shade(basis, 0.52)));
-  body.addColorStop(1, rgb(shade(basis, 0.32)));
+  body.addColorStop(0, rgb(mix(surface, [255, 255, 255], 0.55)));
+  body.addColorStop(0.28, rgb(mix(surface, [255, 255, 255], 0.16)));
+  body.addColorStop(0.62, rgb(surface));
+  body.addColorStop(0.9, rgb(shade(surface, 0.52)));
+  body.addColorStop(1, rgb(shade(surface, 0.32)));
   g.fillStyle = body;
   g.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
 
-  // Oberfläche: Kontinente auf dem Ozean, sonst Flecken und Krater.
+  // Surface: continents on the ocean, otherwise spots and craters.
   const continental = hab > 0.3;
-  const blobs = Math.round(3 + rnd() * 5) + Math.round(erde * 3);
-  // Auf dem Ozean soll Land deckend sitzen, nicht durchscheinen.
-  const land = mix(base, [34, 112, 52], 0.3 + erde * 0.2);
+  const blobs = Math.round(3 + rnd() * 5) + Math.round(earth * 3);
+  // On the ocean, land should sit opaque rather than shine through.
+  const land = mix(base, [34, 112, 52], 0.3 + earth * 0.2);
   for (let i = 0; i < blobs; i++) {
     const a = rnd() * Math.PI * 2;
     const d = Math.pow(rnd(), 0.6) * rr * 0.82;
     const bx = cx + Math.cos(a) * d, by = cy + Math.sin(a) * d;
-    const br = rr * (0.16 + rnd() * 0.3) * (1 - erde * 0.3);
+    const br = rr * (0.16 + rnd() * 0.3) * (1 - earth * 0.3);
     const tint = continental ? land : shade(base, 0.74);
-    g.fillStyle = rgb(tint, continental ? 0.5 + erde * 0.42 : 0.42);
+    g.fillStyle = rgb(tint, continental ? 0.5 + earth * 0.42 : 0.42);
     g.beginPath();
-    // Unregelmäßige Umrisse; erdähnlich werden sie zerklüfteter, damit es
-    // nach Küsten aussieht und nicht nach Tupfen.
-    const steps = erde > 0 ? 15 : 9;
-    const zack = 0.56 + erde * 0.5;
+    // Irregular outlines; on earth-like worlds they get more jagged so they
+    // look like coastlines and not like dots.
+    const steps = earth > 0 ? 15 : 9;
+    const jag = 0.56 + earth * 0.5;
     for (let s = 0; s <= steps; s++) {
       const ang = (s / steps) * Math.PI * 2;
-      const wob = br * (0.72 + rngFrom(seed + i * 31 + s)() * zack);
+      const wob = br * (0.72 + rngFrom(seed + i * 31 + s)() * jag);
       const px = bx + Math.cos(ang) * wob, py = by + Math.sin(ang) * wob * 0.82;
       s === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
     }
     g.closePath(); g.fill();
   }
-  // Inseln: ein paar Tupfer, die den Küsten Gesellschaft leisten
-  if (erde > 0.35 && rr > 9) {
-    g.fillStyle = rgb(land, 0.55 + erde * 0.3);
-    for (let i = 0; i < Math.round(erde * 5); i++) {
+  // Islands: a few dots to keep the coastlines company
+  if (earth > 0.35 && rr > 9) {
+    g.fillStyle = rgb(land, 0.55 + earth * 0.3);
+    for (let i = 0; i < Math.round(earth * 5); i++) {
       const a = rnd() * Math.PI * 2, d = Math.pow(rnd(), 0.5) * rr * 0.86;
       g.beginPath();
       g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
@@ -149,25 +149,25 @@ export function planetSprite(planet, r) {
     }
   }
 
-  // Polkappen der erdähnlichen Welten: klein, aber sie machen die Kugel erst
-  // zur Erde. Eiswelten bekommen weiter unten ihre viel größeren Kappen.
-  if (erde > 0.15) {
-    const kappe = 0.26 + erde * 0.16;
+  // Polar caps of earth-like worlds: small, but they are what makes the
+  // sphere an Earth. Ice worlds get their much larger caps further below.
+  if (earth > 0.15) {
+    const cap = 0.26 + earth * 0.16;
     for (const sgn of [-1, 1]) {
       const kg = g.createRadialGradient(cx, cy + sgn * rr * 1.02, rr * 0.05,
-        cx, cy + sgn * rr * 1.02, rr * (0.5 + erde * 0.22));
-      kg.addColorStop(0, `rgba(248,252,255,${0.78 * erde})`);
-      kg.addColorStop(0.6, `rgba(236,246,255,${0.4 * erde})`);
+        cx, cy + sgn * rr * 1.02, rr * (0.5 + earth * 0.22));
+      kg.addColorStop(0, `rgba(248,252,255,${0.78 * earth})`);
+      kg.addColorStop(0.6, `rgba(236,246,255,${0.4 * earth})`);
       kg.addColorStop(1, 'rgba(236,246,255,0)');
       g.fillStyle = kg;
       g.beginPath();
-      g.ellipse(cx, cy + sgn * rr * (1 - kappe * 0.52), rr * (0.52 + erde * 0.16),
-        rr * kappe, 0, 0, Math.PI * 2);
+      g.ellipse(cx, cy + sgn * rr * (1 - cap * 0.52), rr * (0.52 + earth * 0.16),
+        rr * cap, 0, 0, Math.PI * 2);
       g.fill();
     }
   }
 
-  // Eiskappen bei Kaelte
+  // Ice caps when cold
   if ((planet.temp ?? 0) < -20) {
     const icy = Math.min(1, (-20 - planet.temp) / 120);
     g.fillStyle = `rgba(242,250,255,${0.3 + icy * 0.55})`;
@@ -177,7 +177,7 @@ export function planetSprite(planet, r) {
       g.fill();
     }
   }
-  // Glut bei Hitze
+  // Glow when hot
   if ((planet.temp ?? 0) > 110) {
     const heat = Math.min(1, (planet.temp - 110) / 110);
     g.strokeStyle = `rgba(255,228,120,${0.25 + heat * 0.45})`;
@@ -195,10 +195,10 @@ export function planetSprite(planet, r) {
     }
   }
 
-  // Wolken: erst ab einer gewissen Größe, sonst wird die Kugel nur milchig.
-  if (erde > 0.4 && rr > 13) {
-    g.fillStyle = `rgba(255,255,255,${0.13 + erde * 0.13})`;
-    for (let i = 0; i < 3 + Math.round(erde * 3); i++) {
+  // Clouds: only from a certain size on, otherwise the sphere just turns milky.
+  if (earth > 0.4 && rr > 13) {
+    g.fillStyle = `rgba(255,255,255,${0.13 + earth * 0.13})`;
+    for (let i = 0; i < 3 + Math.round(earth * 3); i++) {
       const a = rnd() * Math.PI * 2, d = Math.pow(rnd(), 0.6) * rr * 0.76;
       g.beginPath();
       g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
@@ -208,7 +208,7 @@ export function planetSprite(planet, r) {
     }
   }
 
-  // Terminator: Schatten nach unten rechts
+  // Terminator: shadow towards the bottom right
   const term = g.createRadialGradient(lx, ly, rr * 0.2, cx + rr * 0.3, cy + rr * 0.35, rr * 1.45);
   term.addColorStop(0, 'rgba(0,0,0,0)');
   term.addColorStop(0.55, 'rgba(0,0,0,0.05)');
@@ -216,7 +216,7 @@ export function planetSprite(planet, r) {
   g.fillStyle = term;
   g.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
 
-  // Glanzlicht
+  // Highlight
   const spec = g.createRadialGradient(lx, ly, 0, lx, ly, rr * 0.55);
   spec.addColorStop(0, 'rgba(255,255,255,0.62)');
   spec.addColorStop(0.45, 'rgba(255,255,255,0.12)');
@@ -226,13 +226,13 @@ export function planetSprite(planet, r) {
 
   g.restore();
 
-  // Kantenlicht
+  // Rim light
   g.strokeStyle = rgb(mix(base, [255, 255, 255], 0.45), 0.5);
   g.lineWidth = Math.max(0.6, rr * 0.055);
   g.beginPath(); g.arc(cx, cy, rr - g.lineWidth / 2, Math.PI * 0.75, Math.PI * 1.85); g.stroke();
 
   if (memory) {
-    // Letzte Sichtung: abgedunkelt, aber die Temperaturfarbe bleibt lesbar
+    // Last sighting: darkened, but the temperature color stays readable
     g.fillStyle = 'rgba(12,18,38,0.42)';
     g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill();
   }
@@ -244,7 +244,7 @@ export function planetSprite(planet, r) {
 }
 
 /**
- * Zeichnet einen Planeten samt Besitzring, Bevoelkerungs- und Metallanzeige.
+ * Draws a planet including ownership ring, population and metal indicators.
  */
 export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
   const { ownerColor = null, selected = false, hovered = false, showName = true, scale = 1 } = opts;
@@ -259,7 +259,7 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
   const sp = planetSprite(planet, r);
   ctx.drawImage(sp.canvas, x - sp.cx, y - sp.cy);
 
-  // Besitzring
+  // Ownership ring
   if (ownerColor) {
     ctx.save();
     ctx.strokeStyle = ownerColor;
@@ -270,7 +270,7 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
     ctx.restore();
   }
 
-  // Heimatwelt-Markierung
+  // Homeworld marker
   if (planet.isHomeworld) {
     ctx.save();
     ctx.strokeStyle = 'rgba(240,180,41,.75)';
@@ -284,14 +284,14 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
     ctx.save();
     ctx.strokeStyle = selected ? '#ffd877' : 'rgba(255,255,255,.5)';
     ctx.lineWidth = selected ? 2 : 1.2;
-    // Deutlich ausserhalb des gestrichelten Heimatwelt-Rings, auch wenn weit
-    // hereingezoomt ist - sonst verschmelzen die beiden zu einem Gekrakel.
+    // Clearly outside the dashed homeworld ring, even when zoomed far in -
+    // otherwise the two merge into a scribble.
     const rr = r * 1.14 + 5 + Math.min(14, Math.max(7, r * 0.07)) - (selected ? 0 : 2);
     ctx.beginPath();
     for (let i = 0; i < 4; i++) {
       const a0 = i * Math.PI / 2 + Math.PI / 4 - 0.38;
-      // Vor jedem Bogen neu ansetzen: sonst zieht die Leinwand eine Sehne vom
-      // Ende des letzten Bogens zum Anfang des naechsten.
+      // Start afresh before every arc: otherwise the canvas draws a chord from
+      // the end of the last arc to the start of the next one.
       ctx.moveTo(x + Math.cos(a0) * rr, y + Math.sin(a0) * rr);
       ctx.arc(x, y, rr, a0, a0 + 0.76);
     }
@@ -299,10 +299,10 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
     ctx.restore();
   }
 
-  // Alles außerhalb der Kugel richtet sich nach diesem Radius
+  // Everything outside the sphere is aligned to this radius
   const outer = r * 1.14 + 5;
 
-  // Bevölkerung (Balken links) und Metall (Balken rechts)
+  // Population (bar on the left) and metal (bar on the right)
   if (zoom > 0.8) {
     const bh = Math.min(26, Math.max(8, r * 1.05)), bw = Math.min(4, Math.max(2.5, r * 0.09));
     if (planet.pop > 0) {
@@ -319,23 +319,22 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
 }
 
 /**
- * Groessenfaktor fuer alles, was um eine Welt kreist. Flache und raeumliche
- * Karte rechnen damit gleich, und die Beschriftung weiss so, wie weit die
- * Umlaufbahn reicht.
+ * Size factor for everything orbiting a world. The flat and the 3D map use it
+ * the same way, and the label thereby knows how far the orbit reaches.
  */
 export function orbitScale(zoom) {
   return Math.max(0.5, Math.min(1.7, 0.7 + zoom * 0.4));
 }
 
 /**
- * Beschriftung eines Planeten. Wird von der Karte in einem eigenen Durchgang
- * gezeichnet, damit Schiffe im Orbit die Namen nicht verdecken.
+ * Label of a planet. The map draws it in a separate pass so ships in orbit do
+ * not cover the names.
  */
 export function planetLabels(planet, x, y, zoom, r) {
   if (zoom <= 0.5) return [];
   const outer = r * 1.14 + 5;
-  // Orbitalverteidigung kreist weiter aussen - dann rutscht der Name so weit
-  // nach unten, dass kein Satellit ihn auf seiner Runde ueberfaehrt.
+  // Orbital defense circles further out - then the name moves down far enough
+  // that no satellite runs over it on its round.
   const gap = planet.defenses > 0 ? Math.round(30 * orbitScale(zoom)) : 14;
   const out = [{
     text: planet.name, x, y: y + outer + gap,
@@ -386,21 +385,21 @@ export function label(ctx, text, x, y, color, zoom, size = 12.5) {
   ctx.restore();
 }
 
-/** Kleines Planetensymbol für die Seitenleiste. */
+/** Small planet icon for the side panel. */
 export function planetThumb(planet, size = 42) {
-  // In Geraetepixeln zeichnen, sonst verschwimmt das feine Wabennetz.
+  // Draw in device pixels, otherwise the fine honeycomb mesh blurs.
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const px = Math.round(size * dpr);
   const cv = document.createElement('canvas');
   cv.width = cv.height = px;
   cv.style.width = cv.style.height = size + 'px';
   const ctx = cv.getContext('2d');
-  // Wie auf der Karte: ab SHIELD_MIN Satelliten liegt der Schild um die Welt.
-  // Die Welt rueckt dann etwas kleiner, damit die Kugel ins Bild passt.
-  const schild = (planet.defenses || 0) >= SHIELD_MIN;
-  const sp = planetSprite({ ...planet, known: 'live' }, px * (schild ? 0.27 : 0.34));
+  // As on the map: from SHIELD_MIN satellites on, the shield surrounds the world.
+  // The world then gets a little smaller so the sphere fits into the picture.
+  const shielded = (planet.defenses || 0) >= SHIELD_MIN;
+  const sp = planetSprite({ ...planet, known: 'live' }, px * (shielded ? 0.27 : 0.34));
   ctx.drawImage(sp.canvas, px / 2 - sp.cx, px / 2 - sp.cy);
-  if (schild) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id);
+  if (shielded) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id);
   return cv;
 }
 
