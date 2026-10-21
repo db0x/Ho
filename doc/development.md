@@ -28,7 +28,7 @@ server/
   auth.js            Access: sessions, sign-in, password change, gate
   userstore.js       Accounts on disk: name, scrypt hash, profile – written atomically
   profile.js         Display names and profile pictures: check, store, serve
-  users.js           Tool for the host: add, del, passwd, name, list
+  users.js           Tool for the host: add, del, passwd, name, admin, list
 client/
   index.html         Start screen, lobby, game screen
   login.html         Sign-in and first password change
@@ -39,7 +39,8 @@ client/
   js/render/         planets.js, ships.js (map), shipshd.js (data sheet, battle),
                      map.js (flat), space.js (spatial), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
-                     dialog.js (windows), avatar.js, battle.js, shipinfo.js, viewport.js
+                     dialog.js (windows), avatar.js, battle.js, shipinfo.js, viewport.js,
+                     admin.js (admin panel on the start screen)
   js/audio/sfx.js    Sound effects, synthesised at runtime
 test/                see Tests
 ```

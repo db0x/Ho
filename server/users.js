@@ -5,12 +5,13 @@
 //   docker exec ho node server/users.js del captain
 //   docker exec ho node server/users.js passwd captain
 //   docker exec ho node server/users.js name captain Captain
+//   docker exec ho node server/users.js admin captain [on|off]
 //
 // It cannot do more, and it is not supposed to. New accounts get a random
 // first password that has to be changed on the first sign-in - after that
 // only the player knows it.
 import {
-  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, userFile,
+  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, setAdmin, userFile,
   checkPassword, MIN_PASSWORD
 } from './userstore.js';
 import { readFileSync } from 'node:fs';
@@ -83,6 +84,15 @@ async function run(command, name, password) {
       console.log(t('auth.cli.renamed', { user: r.name, display: r.display }));
       break;
     }
+    case 'admin': {
+      requireName(name);
+      // Here the third value is on/off; without it the flag is granted.
+      const value = String(password ?? 'on').toLowerCase();
+      if (!['on', 'off'].includes(value)) throw new Error('auth.cli.badAdminValue');
+      const r = setAdmin(name, value === 'on');
+      console.log(t(r.admin ? 'auth.cli.adminOn' : 'auth.cli.adminOff', { user: r.name }));
+      break;
+    }
     case 'list':
     case 'ls': {
       const users = listUsers();
@@ -90,7 +100,8 @@ async function run(command, name, password) {
       console.log(t('auth.cli.listHead', { count: users.length, file: userFile() }));
       const width = Math.max(...users.map(u => u.display.length));
       for (const u of users) {
-        const mark = u.mustChange ? t('auth.cli.mustChange') : '';
+        const mark = [u.admin ? t('auth.cli.isAdmin') : '', u.mustChange ? t('auth.cli.mustChange') : '']
+          .filter(Boolean).join(', ');
         console.log(`  ${u.display.padEnd(width)}  ${(u.created || '').slice(0, 10)}  ${mark}`);
       }
       break;

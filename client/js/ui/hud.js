@@ -269,6 +269,9 @@ export class Hud {
         { empires: alive, owned, total: v.planets.length })
         + (v.code ? ` · ${t('top.code', { code: v.code })}` : '');
       $('#r-turn').textContent = v.turn;
+      // No pace means an admin is watching a game with humans: the players
+      // drive the turns, so there is nothing to pause or step.
+      $('#spectate').classList.toggle('hidden', !v.pace);
       const paused = !!v.pace?.paused;
       $('#sp-play').textContent = paused ? t('spectate.resume') : t('spectate.pause');
       $('#sp-step').disabled = !paused || v.state !== 'running';

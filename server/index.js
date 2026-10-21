@@ -7,11 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
-  allReady, buildView, buildSpectatorView, lobbyView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor
+  allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile, getUser, setProfile } from './userstore.js';
+import { listUsers, userFile, getUser, setProfile, isAdmin } from './userstore.js';
 import {
   cleanName, nameAllowed, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
   accountAvatarUrl, handleAvatar
@@ -101,7 +101,7 @@ function broadcastView(game, extra = {}) {
     if (c) send(c.ws, { t: 'view', view: buildView(game, p), ...extra });
   }
   if (game.spectators.size) {
-    const view = buildSpectatorView(game);     // the same for all spectators
+    const view = spectatorView(game);          // the same for all spectators
     for (const id of game.spectators) {
       const c = conns.get(id);
       if (c) send(c.ws, { t: 'view', view, ...extra });
@@ -113,6 +113,26 @@ function broadcastView(game, extra = {}) {
 /** A game that may be watched: AI only, no human empire. */
 function watchable(game) {
   return !!game && game.players.length > 0 && game.players.every(p => p.isBot);
+}
+
+/**
+ * The spectator view, plus who controls the pace: in an AI-only game the
+ * spectators drive the turns; in a game with humans (watched by an admin)
+ * the players do, so there is no pace to hand out.
+ */
+function spectatorView(game) {
+  const view = buildSpectatorView(game);
+  if (!watchable(game)) view.pace = null;
+  return view;
+}
+
+/** Turns a connection into a spectator of `game`. */
+function attachSpectator(c, connId, game) {
+  c.gameId = game.id; c.playerId = null;
+  game.spectators.add(connId);
+  if (watchable(game)) game.nextTurnAt = Date.now() + game.pace.ms;
+  send(c.ws, { t: 'watching', code: game.id });
+  send(c.ws, { t: 'view', view: spectatorView(game), started: true });
 }
 
 // Players write text, the system sends { key, params } - translation only
@@ -128,7 +148,7 @@ function chat(game, from, msg) {
 wss.on('connection', (ws, req, session) => {
   const connId = crypto.randomUUID();
   const c = {
-    ws, gameId: null, playerId: null, sid: session.token,
+    ws, gameId: null, playerId: null, sid: session.token, since: Date.now(),
     account: session.display ?? session.user, accountKey: session.user ?? null,
     profile: { name: null, avatar: null }
   };
@@ -140,7 +160,8 @@ wss.on('connection', (ws, req, session) => {
   conns.set(connId, c);
   send(ws, {
     t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
-    profile: { ...c.profile, account: c.accountKey ? c.account : null }
+    profile: { ...c.profile, account: c.accountKey ? c.account : null },
+    admin: adminOf(c)
   });
 
   ws.on('message', (raw) => {
@@ -176,6 +197,84 @@ wss.on('connection', (ws, req, session) => {
     conns.delete(connId);
   });
 });
+
+/**
+ * Is this connection an admin? Asked anew on every request, so revoking the
+ * flag with users.js takes effect without signing out. Without sign-in
+ * (HO_AUTH=off) there are no accounts and therefore no admins.
+ */
+function adminOf(c) {
+  if (!c.accountKey) return false;
+  try { return isAdmin(c.accountKey); } catch { return false; }   // account file unreadable
+}
+
+/** Everything the admin lobby shows: all games and all accounts. */
+function adminOverview() {
+  const online = new Map();          // account -> its open connections
+  for (const c of conns.values()) {
+    if (!c.accountKey) continue;
+    if (!online.has(c.accountKey)) online.set(c.accountKey, []);
+    online.get(c.accountKey).push({ since: c.since, game: c.gameId });
+  }
+  let accounts = [];
+  try { accounts = listUsers(); } catch { /* account file unreadable - show the games anyway */ }
+  return {
+    now: Date.now(),
+    games: [...games.values()].map(adminGameView)
+      .sort((a, b) => (a.state === 'running' ? 0 : 1) - (b.state === 'running' ? 0 : 1) || a.created - b.created),
+    accounts: accounts.map(u => {
+      const sessions = online.get(u.name) || [];
+      return {
+        name: u.name, display: u.display, nick: u.nick, admin: u.admin, mustChange: u.mustChange,
+        avatar: u.avatar ? accountAvatarUrl(u.name) : null,
+        created: u.created, changed: u.changed,
+        online: sessions.length > 0,
+        onlineSince: sessions.length ? Math.min(...sessions.map(s => s.since)) : null,
+        games: [...new Set(sessions.map(s => s.game).filter(Boolean))]
+      };
+    })
+  };
+}
+
+/**
+ * Ends a game from outside (admin): everyone in it - players and spectators -
+ * is told and sent back to the start screen, then the game is gone. Their
+ * seat tokens die with it, so nobody can resume into it.
+ */
+function endGame(game, by) {
+  const notice = { t: 'ended', key: 'notice.endedByAdmin', params: { code: game.id } };
+  const ids = [...game.players.map(p => p.connId).filter(Boolean), ...game.spectators];
+  for (const id of ids) {
+    const c = conns.get(id);
+    if (!c || c.gameId !== game.id) continue;
+    send(c.ws, notice);
+    c.gameId = null; c.playerId = null;
+  }
+  games.delete(game.id);
+  console.log(`Game ${game.id} ended by admin ${by} (state ${game.state}, turn ${game.turn})`);
+}
+
+const ADMIN_MSG_MAX = 500;
+
+/**
+ * An announcement from an admin (e.g. upcoming downtime) to everyone
+ * currently connected to a game - players and spectators. The text is the
+ * admin's own words, so it travels as text, not as a catalog key.
+ * Returns the number of connections it reached.
+ */
+function adminMessage(game, from, text) {
+  const note = { t: 'adminMsg', from, text, at: Date.now(), code: game.id };
+  let delivered = 0;
+  const ids = [...game.players.map(p => p.connId).filter(Boolean), ...game.spectators];
+  for (const id of ids) {
+    const c = conns.get(id);
+    if (!c || c.gameId !== game.id) continue;
+    send(c.ws, note);
+    delivered++;
+  }
+  console.log(`Admin ${from} to game ${game.id} (${delivered} connections): ${JSON.stringify(text)}`);
+  return delivered;
+}
 
 function openGameList() {
   return [...games.values()]
@@ -243,11 +342,7 @@ function handle(connId, ws, msg) {
       if (g.state !== 'lobby') {
         // A running AI game cannot be played, but it can be watched
         if (!watchable(g)) return send(ws, { t: 'error', key: 'err.gameRunning' });
-        c.gameId = g.id; c.playerId = null;
-        g.spectators.add(connId);
-        g.nextTurnAt = Date.now() + g.pace.ms;
-        send(ws, { t: 'watching', code: g.id });
-        send(ws, { t: 'view', view: buildSpectatorView(g), started: true });
+        attachSpectator(c, connId, g);
         return;
       }
       if (g.players.length >= MAX_PLAYERS) return send(ws, { t: 'error', key: 'err.gameFull' });
@@ -400,15 +495,23 @@ function handle(connId, ws, msg) {
         if (r.error) { games.delete(g.id); return send(ws, { t: 'error', key: r.error }); }
       }
       if (!watchable(g)) return send(ws, { t: 'error', key: 'err.watchBotsOnly' });
-      c.gameId = g.id; c.playerId = null;
-      g.spectators.add(connId);
-      g.nextTurnAt = Date.now() + g.pace.ms;
-      send(ws, { t: 'watching', code: g.id });
-      send(ws, { t: 'view', view: buildSpectatorView(g), started: true });
+      attachSpectator(c, connId, g);
+      break;
+    }
+    case 'adminWatch': {
+      // Admins may watch any game that has a map - including games with
+      // humans, which nobody else can watch.
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const g = games.get(String(msg.code || '').toUpperCase());
+      if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
+      if (g.state === 'lobby') return send(ws, { t: 'error', key: 'err.notStarted' });
+      attachSpectator(c, connId, g);
+      console.log(`Admin ${c.account} watches game ${g.id}`);
       break;
     }
     case 'pace': {
-      if (!game || !game.spectators.has(connId)) return;
+      // Only AI games run at the spectators' pace - never one with humans.
+      if (!game || !game.spectators.has(connId) || !watchable(game)) return;
       if (typeof msg.paused === 'boolean') game.pace.paused = msg.paused;
       if (Number.isFinite(msg.ms)) game.pace.ms = Math.min(10000, Math.max(120, Math.round(msg.ms)));
       game.nextTurnAt = Date.now() + (game.pace.paused ? 0 : game.pace.ms);
@@ -416,8 +519,31 @@ function handle(connId, ws, msg) {
       break;
     }
     case 'step': {
-      if (!game || !game.spectators.has(connId) || game.state !== 'running') return;
+      if (!game || !game.spectators.has(connId) || game.state !== 'running' || !watchable(game)) return;
       maybeResolve(game);
+      break;
+    }
+    case 'admin': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminEnd': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const g = games.get(String(msg.code || '').toUpperCase());
+      if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
+      endGame(g, c.account);
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminMsg': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const g = games.get(String(msg.code || '').toUpperCase());
+      if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
+      const text = String(msg.text ?? '').trim();
+      if (!text || text.length > ADMIN_MSG_MAX) return send(ws, { t: 'error', key: 'err.badAdminMessage', params: { n: ADMIN_MSG_MAX } });
+      const delivered = adminMessage(g, c.account, text);
+      send(ws, { t: 'adminMsgSent', code: g.id, delivered });
       break;
     }
     case 'list': {
@@ -456,7 +582,8 @@ export function maybeResolve(game) {
 setInterval(() => {
   const now = Date.now();
   for (const game of games.values()) {
-    if (game.state !== 'running' || !game.spectators.size || game.pace.paused) continue;
+    // An admin watching a game with humans must not make it run by itself.
+    if (game.state !== 'running' || !game.spectators.size || game.pace.paused || !watchable(game)) continue;
     if (now < game.nextTurnAt) continue;
     game.nextTurnAt = now + game.pace.ms;
     maybeResolve(game);

@@ -101,6 +101,30 @@
       <a href="#" id="link-logout" data-i18n="auth.logout"></a>
     </p>
   </div>
+
+  <!-- Admins only: every game on this instance and every account. -->
+  <section id="admin-panel" class="menu-box admin-box hidden">
+    <div class="admin-head">
+      <h2 data-i18n="admin.title"></h2>
+      <span id="admin-updated" class="muted small"></span>
+      <button type="button" id="admin-refresh" class="tiny" data-i18n="admin.refresh"></button>
+    </div>
+    <h3><span data-i18n="admin.games"></span> <span id="admin-games-count" class="muted"></span></h3>
+    <div id="admin-compose" class="admin-compose hidden">
+      <div class="ac-head">
+        <b id="admin-compose-to"></b>
+        <button type="button" id="admin-compose-cancel" class="tiny" data-i18n="admin.msgCancel"></button>
+      </div>
+      <textarea id="admin-compose-text" rows="3" maxlength="500" data-i18n-attr="placeholder:admin.msgPlaceholder"></textarea>
+      <div class="ac-foot">
+        <span id="admin-compose-status" class="muted small"></span>
+        <button type="button" id="admin-compose-send" class="tiny primary" data-i18n="admin.msgSend"></button>
+      </div>
+    </div>
+    <div id="admin-games" class="admin-list"></div>
+    <h3><span data-i18n="admin.accounts"></span> <span id="admin-accounts-count" class="muted"></span></h3>
+    <div id="admin-accounts" class="admin-list"></div>
+  </section>
 </div>
 
 <!-- ================================ Lobby ================================= -->

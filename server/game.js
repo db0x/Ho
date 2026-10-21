@@ -41,6 +41,8 @@ export function createGame(hostName) {
     nextShipId: 1,
     log: [],
     turnDeadline: null,
+    startedAt: null,          // ms timestamps, for the admin overview
+    lastTurnAt: null,
     // Spectators: connections without an empire of their own. The pace belongs
     // to the game so that several spectators see the same thing.
     spectators: new Set(),
@@ -128,6 +130,7 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     isBot,
     persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
     connId,
+    joinedAt: Date.now(),
     connected: !isBot,
     alive: true,
     ready: false,
@@ -178,6 +181,7 @@ export function startGame(game) {
   game.state = 'running';
   game.turn = 1;
   game.log = [];
+  game.startedAt = Date.now();
 
   game.players.forEach((p, i) => {
     p.money = game.settings.startMoney;
@@ -774,6 +778,7 @@ export function resolveTurn(game) {
   }
 
   game.turn++;
+  game.lastTurnAt = Date.now();
   for (const p of game.players) p.ready = false;
   pushLog(game, entries);
 
@@ -1290,6 +1295,33 @@ export function lobbyView(game) {
       // whom should remain recognizable.
       account: p.account && p.account.toLowerCase() !== p.name.toLowerCase() ? p.account : null,
       isBot: p.isBot, persona: p.persona, connected: p.connected
+    }))
+  };
+}
+
+/**
+ * A game as the admin overview shows it: who plays, since when, and how far
+ * along it is. No fog-of-war data - just the bookkeeping.
+ */
+export function adminGameView(game) {
+  return {
+    id: game.id,
+    state: game.state,
+    host: game.hostName,
+    mode: game.settings.mode,
+    shape: game.settings.shape,
+    turn: game.turn,
+    maxTurns: game.settings.maxTurns || 0,
+    created: game.created,
+    startedAt: game.startedAt,
+    lastTurnAt: game.lastTurnAt,
+    spectators: game.spectators.size,
+    winner: game.winner || null,
+    players: game.players.map(p => ({
+      id: p.id, name: p.name, color: p.color, avatar: p.avatar, account: p.account,
+      isBot: p.isBot, persona: p.persona, connected: p.connected,
+      alive: p.alive, ready: p.ready, joinedAt: p.joinedAt,
+      stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     }))
   };
 }

@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   hashPassword, verifyPassword, addUser, deleteUser, listUsers, getUser,
-  setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay
+  setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay, setAdmin
 } from '../server/userstore.js';
 
 // A separate account file so no real data gets touched.
@@ -234,6 +234,123 @@ const NEW = 'myOwnPassword-2026';
   console.log('With the changed password: client and WebSocket are open.');
 }
 
+/** Opens a socket, sends `msg` after hello and collects what comes back. */
+const session = (msg) => new Promise((ok) => {
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+  const got = { hello: null, data: null, sent: null, errors: [] };
+  ws.on('message', (raw) => {
+    const m = JSON.parse(raw.toString());
+    if (m.t === 'hello') { got.hello = m; ws.send(JSON.stringify(msg)); }
+    if (m.t === 'adminData') got.data = m;
+    if (m.t === 'adminMsgSent') got.sent = m;
+    if (m.t === 'error') got.errors.push(m.key);
+    if (['adminData', 'adminMsgSent', 'error'].includes(m.t)) { ws.close(); ok(got); }
+  });
+  setTimeout(() => { ws.close(); ok(got); }, 3000);
+});
+
+// --- Admin flag: only flagged accounts get the overview, and the server asks
+//     the account file on every request - granting and revoking take effect
+//     without signing in again.
+{
+
+  const plain = await session({ t: 'admin' });
+  check(plain.hello?.admin === false, 'hello calls a normal account an admin');
+  check(!plain.data && plain.errors.includes('err.notAdmin'), 'A normal account gets the admin overview');
+
+  check(setAdmin('captain', true).admin && listUsers().find(u => u.name === 'captain')?.admin,
+    'Admin flag is not stored');
+  const admin = await session({ t: 'admin' });
+  check(admin.hello?.admin === true, 'hello does not report the admin flag');
+  check(Array.isArray(admin.data?.games), 'Admin overview has no game list');
+  const me = admin.data?.accounts.find(a => a.name === 'captain');
+  check(me && me.admin && me.online, `Admin overview does not list the own account as online admin (${JSON.stringify(me)})`);
+  check(admin.data && !JSON.stringify(admin.data).includes('scrypt'), 'Admin overview leaks password hashes');
+  check(me && me.avatar === null, `Account without an image shows an avatar (${me?.avatar})`);
+
+  // Ending a game from outside: a player sits in a running game, the admin
+  // ends it from a second connection.
+  const player = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+  let code = null, ended = null, announced = null;
+  player.on('message', (raw) => {
+    const m = JSON.parse(raw.toString());
+    if (m.t === 'hello') player.send(JSON.stringify({ t: 'create', name: 'x' }));
+    if (m.t === 'joined') { code = m.code; player.send(JSON.stringify({ t: 'addBot' })); player.send(JSON.stringify({ t: 'start' })); }
+    if (m.t === 'ended') ended = m;
+    if (m.t === 'adminMsg') announced = m;
+  });
+  for (let i = 0; i < 60 && !code; i++) await wait(50);
+  check(code, 'Test setup: no game created');
+  const listed = await session({ t: 'admin' });
+  check(listed.data?.games.some(g => g.id === code), 'The new game is missing from the admin overview');
+  // An announcement reaches everyone in the game, as the admin's own text.
+  const notice = 'Server restart at 22:00 <b>sharp</b>';
+  const sent = await session({ t: 'adminMsg', code, text: notice });
+  for (let i = 0; i < 40 && !announced; i++) await wait(50);
+  check(sent.sent?.delivered === 1, `Announcement not confirmed for exactly one connection (${JSON.stringify(sent.sent)})`);
+  check(announced?.text === notice && announced.from === 'captain' && announced.code === code,
+    `Player did not get the announcement (${JSON.stringify(announced)})`);
+  const empty = await session({ t: 'adminMsg', code, text: '   ' });
+  check(empty.errors.includes('err.badAdminMessage'), 'An empty announcement is accepted');
+  const long = await session({ t: 'adminMsg', code, text: 'x'.repeat(501) });
+  check(long.errors.includes('err.badAdminMessage'), 'An overlong announcement is accepted');
+
+  // Watching: an admin may watch a game with humans - with the full map,
+  // but without a pace, and the game must not start running by itself. The
+  // dangerous case is a game whose humans are all offline: for the server
+  // they count as ready, so a spectator pace would play it through.
+  {
+    const absent = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+    let watchCode = null;
+    absent.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.t === 'hello') absent.send(JSON.stringify({ t: 'create', name: 'y' }));
+      if (m.t === 'joined') { watchCode = m.code; absent.send(JSON.stringify({ t: 'addBot' })); absent.send(JSON.stringify({ t: 'start' })); }
+    });
+    for (let i = 0; i < 60 && !watchCode; i++) await wait(50);
+    await wait(200);
+    absent.close();
+    await wait(200);
+
+    const watcher = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+    const views = [];
+    watcher.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.t === 'hello') watcher.send(JSON.stringify({ t: 'adminWatch', code: watchCode }));
+      if (m.t === 'view') views.push(m.view);
+    });
+    for (let i = 0; i < 60 && !views.length; i++) await wait(50);
+    const v = views[0];
+    check(v?.spectator === true && v.pace === null, `Admin does not watch as a spectator without pace (${JSON.stringify(v?.pace)})`);
+    check(v && v.planets.every(p => p.known === 'live'), 'Admin view has fog of war');
+    // A pace request from the admin must not drive a game with humans.
+    watcher.send(JSON.stringify({ t: 'pace', paused: false, ms: 120 }));
+    watcher.send(JSON.stringify({ t: 'step' }));
+    await wait(1500);
+    check(views.every(x => x.turn === v?.turn), `Watched game ran by itself (turns ${views.map(x => x.turn).join(',')})`);
+    watcher.close();
+  }
+
+  const gone = await session({ t: 'adminEnd', code });
+  for (let i = 0; i < 40 && !ended; i++) await wait(50);
+  check(ended?.key === 'notice.endedByAdmin' && ended.params?.code === code, 'The player is not told that the game ended');
+  check(gone.data && !gone.data.games.some(g => g.id === code), 'The ended game is still listed');
+  const unknown = await session({ t: 'adminEnd', code });
+  check(unknown.errors.includes('err.gameNotFound'), 'Ending a game twice does not report it as gone');
+  player.close();
+
+  setAdmin('captain', false);
+  const notAllowed = await session({ t: 'adminEnd', code: 'ABCD' });
+  check(notAllowed.errors.includes('err.notAdmin'), 'A normal account may end games');
+  const notAllowedWatch = await session({ t: 'adminWatch', code: 'ABCD' });
+  check(notAllowedWatch.errors.includes('err.notAdmin'), 'A normal account may watch any game');
+  const notAllowedMsg = await session({ t: 'adminMsg', code: 'ABCD', text: 'hi' });
+  check(notAllowedMsg.errors.includes('err.notAdmin'), 'A normal account may send announcements');
+  const revoked = await session({ t: 'admin' });
+  check(!revoked.data && revoked.errors.includes('err.notAdmin'), 'Revoked admin still gets the overview');
+  console.log('Admin flag: overview, watching, announcements and ending games only for admins, granting and revoking apply immediately.');
+}
+
 // --- With sign-in you are named as in your profile: create cannot get around
 //     that, 'profile' can - but never as another account.
 {
@@ -274,6 +391,11 @@ const NEW = 'myOwnPassword-2026';
   await until(() => profile && lobby);
   check(/^api\/avatar\/u-captain\?v=/.test(profile?.avatar || ''), `No image URL in the profile (${profile?.avatar})`);
   check(lobby?.players[0]?.avatar === profile?.avatar, 'Lobby does not show the new image');
+  setAdmin('captain', true);
+  const withImage = await session({ t: 'admin' });
+  check(withImage.data?.accounts.find(u => u.name === 'captain')?.avatar === profile.avatar,
+    'Admin overview does not show the account image');
+  setAdmin('captain', false);
   const image = await request('/' + profile.avatar);
   check(image.status === 200 && image.raw.headers.get('content-type') === 'image/png', `Image does not come out (${image.status})`);
   const foreign = await fetch(`${BASE}/${profile.avatar}`, { redirect: 'manual' });

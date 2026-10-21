@@ -28,7 +28,7 @@ server/
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
   userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil – atomar geschrieben
   profile.js         Anzeigenamen und Profilbilder: prüfen, speichern, ausliefern
-  users.js           Werkzeug für den Host: add, del, passwd, name, list
+  users.js           Werkzeug für den Host: add, del, passwd, name, admin, list
 client/
   index.html         Startbildschirm, Lobby, Spielbildschirm
   login.html         Anmeldung und erster Passwortwechsel
@@ -39,7 +39,8 @@ client/
   js/render/         planets.js, ships.js (Karte), shipshd.js (Steckbrief, Schlacht),
                      map.js (flach), space.js (räumlich), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),
-                     dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, viewport.js
+                     dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, viewport.js,
+                     admin.js (Admin-Panel im Startbildschirm)
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/                siehe Tests
 ```

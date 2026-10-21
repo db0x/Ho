@@ -147,10 +147,32 @@ export function listUsers() {
   return Object.keys(users).sort().map(name => ({
     name,
     display: displayName(name, users[name]),
+    nick: users[name].nick || null,
+    avatar: users[name].avatar || null,          // image version; the image is in profile.js
+    admin: !!users[name].admin,
     mustChange: !!users[name].mustChange,
     created: users[name].created || null,
     changed: users[name].changed || null
   }));
+}
+
+/** Does this account administer the instance? Read fresh from the file every time. */
+export function isAdmin(name) {
+  return !!getUser(name)?.admin;
+}
+
+/**
+ * Grants or revokes the admin flag. Admins see all running games and all
+ * accounts in their lobby; the flag changes nothing about how they play.
+ */
+export function setAdmin(name, on) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key]) throw new Error('auth.cli.unknown');
+  if (on) db.users[key].admin = true;
+  else delete db.users[key].admin;
+  save(db);
+  return { name: key, admin: !!on };
 }
 
 /**

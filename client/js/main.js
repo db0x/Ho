@@ -3,6 +3,8 @@ import { Net } from './net.js';
 import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
+import { AdminPanel } from './ui/admin.js';
+import { showAnnouncement } from './ui/announce.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
@@ -92,6 +94,7 @@ async function account() {
 
 const net = new Net();
 const lobby = new Lobby(net);
+const admin = new AdminPanel(net);
 account();
 let map = null;
 let hud = null;
@@ -171,6 +174,8 @@ const app = {
 net.on('hello', (m) => {
   lobby.showOpenGames(m.openGames);
   if (m.profile) lobby.setProfile(m.profile, true);
+  admin.setEnabled(m.admin);
+  showPendingNotice();
   if (!net.session) lobby.show('menu');
   // Testing aid: ?solo=N starts a game against N AI empires right away
   const solo = new URLSearchParams(location.search).get('solo');
@@ -178,14 +183,39 @@ net.on('hello', (m) => {
 });
 
 net.on('games', (m) => lobby.showOpenGames(m.openGames));
+net.on('adminData', (m) => admin.update(m));
+net.on('adminMsgSent', (m) => admin.messageSent(m));
+// An admin speaks to everyone in the game: a banner that has to be
+// acknowledged, plus a line in the radio log for later.
+net.on('adminMsg', (m) => {
+  showAnnouncement(m);
+  hud?.chat(`📢 ${m.from || 'Admin'}`, m.text);
+  sfx.play('warn');
+});
 // Answer to every profile change - also to a rejected one, then with the old
 // state, so no field shows something that does not apply.
 net.on('profile', (m) => { lobby.setProfile(m.profile); lobby.relabel(); });
 net.on('lobby', (m) => lobby.update(m));
 net.on('kicked', () => { net.forget(); location.reload(); });
+// An admin ended the game: back to the start screen, and say why once it is there.
+net.on('ended', (m) => {
+  try { sessionStorage.setItem(NOTICE_KEY, JSON.stringify({ key: m.key, params: m.params })); } catch {}
+  net.forget();
+  location.reload();
+});
 
 // The server sends keys, not sentences - translation happens here.
 const message = (m) => m.key ? t(m.key, m.params) : (m.msg || '');
+
+// A message that has to survive a reload (e.g. "an admin ended your game").
+const NOTICE_KEY = 'ho-notice';
+function showPendingNotice() {
+  let notice = null;
+  try { notice = JSON.parse(sessionStorage.getItem(NOTICE_KEY) || 'null'); sessionStorage.removeItem(NOTICE_KEY); } catch {}
+  // Stays until the next message replaces it - unlike errors it must not
+  // vanish before the player has looked at the screen.
+  if (notice) $('#menu-error').textContent = message(notice);
+}
 net.on('error', (m) => {
   const txt = message(m);
   if (!$('#screen-lobby').classList.contains('hidden')) lobby.error('#lobby-error', txt);
