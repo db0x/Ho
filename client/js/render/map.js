@@ -5,6 +5,7 @@ import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from
 import { t } from '../i18n.js';
 import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN } from './fx.js';
 import { BattleFx } from './battlefx.js';
+import { orbitSlots, courseStyle, arrowHead, midpoint } from './courses.js';
 
 const ORBIT_R = 20;
 
@@ -332,29 +333,47 @@ export class MapView {
       ctx.restore();
     }
 
-    // Course lines - around the black hole, the way it is flown
+    // Where every fleet stands on screen - in orbit on the side of its course.
     const zone = holeZone(v.galaxy);
-    for (const f of v.fleets) {
-      if (f.dest == null) continue;
+    const fleetScale = Math.max(0.55, Math.min(1.8, 0.7 + this.cam.zoom * 0.45));
+    const spots = this.fleetSpots(v, zone, fleetScale);
+
+    // Course lines - from the ship, around the black hole the way it is
+    // flown, with an arrowhead at the target. The fleet in focus (selected
+    // or under the pointer) on top and in bold, the others step back.
+    const focusId = this.hover?.type === 'fleet' ? this.hover.id
+      : this.selection?.type === 'fleet' ? this.selection.id : null;
+    this._eta = null;
+    const moving = v.fleets.filter(f => f.dest != null && v.planets[f.dest])
+      .sort((a, b) => (a.id === focusId) - (b.id === focusId));
+    for (const f of moving) {
       const target = v.planets[f.dest];
-      if (!target) continue;
-      const [ax, ay] = this.w2s(f.x, f.y);
-      const [bx, by] = this.w2s(target.x, target.y);
+      const spot = spots.get(f.id);
+      const path = route(f, target, zone);
+      const pts = [[spot.x, spot.y], ...path.map(w => this.w2s(w.x, w.y))];
+      const [bx, by] = pts[pts.length - 1];
+      const st = courseStyle(f, focusId);
+      const tr = planetRadius(target) * this.cam.zoom + 15;
       ctx.save();
-      ctx.strokeStyle = f.mine ? 'rgba(255,216,119,.7)' : 'rgba(255,120,120,.5)';
-      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = st.color;
+      ctx.lineWidth = st.width;
       ctx.setLineDash([6, 5]);
       ctx.lineDashOffset = -this.phase * 22;
-      ctx.beginPath(); ctx.moveTo(ax, ay);
-      for (const w of route(f, target, zone)) { const [wx, wy] = this.w2s(w.x, w.y); ctx.lineTo(wx, wy); }
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const [wx, wy] of pts.slice(1)) ctx.lineTo(wx, wy);
       ctx.stroke();
-      ctx.restore();
-      // Target marker
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,216,119,.6)'; ctx.lineWidth = 1.2;
-      const tr = planetRadius(target) * this.cam.zoom + 15;
+      ctx.setLineDash([]);
+      // Target marker and the direction it is flown in
+      ctx.lineWidth = st.hot ? 1.8 : 1.2;
       ctx.beginPath(); ctx.arc(bx, by, tr, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+      const [fx, fy] = pts[pts.length - 2];
+      arrowHead(ctx, fx, fy, bx, by, tr, st.hot ? 11 : 8, st.color);
+      // Turns until arrival for your own fleet in focus - drawn last, above the worlds.
+      if (st.hot && f.mine && f.stats?.speed > 0) {
+        const turns = Math.max(1, Math.ceil(routeLength(f, path) / f.stats.speed));
+        this._eta = { at: midpoint(pts), text: t('word.turns', { n: turns, count: turns }) };
+      }
     }
 
     // Planets
@@ -399,18 +418,12 @@ export class MapView {
       const inOrbit = f.at !== null && f.at !== undefined;
       const col = colorOf(f.owner);
       const lead = leadType(f);
-      const scale = Math.max(0.55, Math.min(1.8, 0.7 + z * 0.45));
+      const scale = fleetScale;
       if (inOrbit) {
-        const p = v.planets[f.at];
-        if (!p) continue;
-        const [sx, sy] = this.w2s(p.x, p.y);
-        const r = planetRadius(p) * z;
-        // Spread several fleets around the same planet
-        const idx = v.fleets.filter(g => g.at === f.at).indexOf(f);
-        const a = -Math.PI / 2 + idx * 0.85 + (f.owner === v.you ? 0 : Math.PI);
-        const orr = r + ORBIT_R * scale;
-        const x = sx + Math.cos(a) * orr, y = sy + Math.sin(a) * orr;
-        drawShip(ctx, { type: lead, x, y, angle: a + Math.PI / 2, len: 24 * scale, color: col, phase: this.phase + idx });
+        const spot = spots.get(f.id);
+        if (!spot) continue;
+        const { x, y, idx } = spot;
+        drawShip(ctx, { type: lead, x, y, angle: spot.heading, len: 24 * scale, color: col, phase: this.phase + idx });
         const n = f.ships ? f.ships.length : f.count;
         if (n > 1) this.badge(ctx, x + 13 * scale, y - 11 * scale, '×' + n, col);
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, x, y, 16 * scale);
@@ -453,12 +466,16 @@ export class MapView {
       label(ctx, bh.name, bx, by + br * 1.5 + 11, '#9ec8f5', z, 12.5);
     }
 
+    if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
+
     // Course preview for the selected fleet
     if (selFleet?.mine && this.hover?.type === 'planet') {
       const target = this.view.planets[this.hover.id];
       const src = selFleet.at != null ? this.view.planets[selFleet.at] : selFleet;
       if (target && src && target.id !== selFleet.at) {
-        const [ax, ay] = this.w2s(src.x, src.y);
+        // From the ship, like the course lines.
+        const sp = spots.get(selFleet.id);
+        const [ax, ay] = sp ? [sp.x, sp.y] : this.w2s(src.x, src.y);
         const path = route(src, target, holeZone(this.view.galaxy));
         const speed = selFleet.stats.speed || 1;
         const turns = Math.max(1, Math.ceil(routeLength(src, path) / speed));
@@ -584,6 +601,45 @@ export class MapView {
     return u;
   }
 
+  /**
+   * Screen position of every fleet. In orbit each one gets a slot on the
+   * side of its course (courses.js); en route it is where it flies.
+   * @returns {Map<string, {x, y, heading, idx}>}
+   */
+  fleetSpots(v, zone, scale) {
+    const spots = new Map();
+    const byWorld = new Map();
+    for (const f of v.fleets) {
+      if (f.at == null) {
+        const [x, y] = this.w2s(f.x, f.y);
+        spots.set(f.id, { x, y, heading: 0, idx: 0 });
+      } else if (v.planets[f.at]) {
+        if (!byWorld.has(f.at)) byWorld.set(f.at, []);
+        byWorld.get(f.at).push(f);
+      }
+    }
+    for (const [pid, here] of byWorld) {
+      const p = v.planets[pid];
+      const [sx, sy] = this.w2s(p.x, p.y);
+      const orr = planetRadius(p) * this.cam.zoom + ORBIT_R * scale;
+      const headingOf = (f) => {
+        const target = f.dest != null ? v.planets[f.dest] : null;
+        if (!target) return null;
+        for (const w of route(p, target, zone)) {
+          const [wx, wy] = this.w2s(w.x, w.y);
+          if ((wx - sx) ** 2 + (wy - sy) ** 2 > 1) return Math.atan2(wy - sy, wx - sx);
+        }
+        return null;
+      };
+      const slots = orbitSlots(here, headingOf, f => f.owner === v.you);
+      here.forEach((f, idx) => {
+        const { a, heading } = slots.get(f.id);
+        spots.set(f.id, { x: sx + Math.cos(a) * orr, y: sy + Math.sin(a) * orr, heading, idx });
+      });
+    }
+    return spots;
+  }
+
   badge(ctx, x, y, text, color, center = false) {
     ctx.save();
     ctx.font = '600 12px Inter, system-ui, sans-serif';
@@ -668,7 +724,7 @@ export class MapView {
     let pinch = null;
 
     const midpoint = () => {
-      const p = [...zeiger.values()];
+      const p = [...pointers.values()];
       return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2,
         d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
     };
@@ -717,7 +773,7 @@ export class MapView {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = null;
       if (pointers.size === 1) {
-        const p = [...zeiger.values()][0];
+        const p = [...pointers.values()][0];
         last = { x: p.x, y: p.y };
         dragging = true;
       }

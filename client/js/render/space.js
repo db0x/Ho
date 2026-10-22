@@ -9,13 +9,14 @@
 //   - size and brightness by distance.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, holeZone, route, reachOutline } from '../../shared/rules.js';
+import { dist, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
   HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
+import { orbitSlots, courseStyle, arrowHead, midpoint } from './courses.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -198,6 +199,7 @@ export class SpaceView {
     const colorOf = id => (v.players.find(p => p.id === id) || {}).color || '#889';
 
     this.drawBackdrop(ctx, colorOf);
+    this._spots = this.fleetSpots(v);
     this.drawCourses(ctx);
     if (this.showRange) this.drawRange(ctx);
 
@@ -234,6 +236,7 @@ export class SpaceView {
       else this.drawFleet(ctx, it, colorOf);
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
     }
+    if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
     // Battles on top - they should stand out, even behind a nearby world.
     this.battleFx.draw(ctx, performance.now(), (id) => {
       const p = v.planets[id];
@@ -372,29 +375,91 @@ export class SpaceView {
     ctx.restore();
   }
 
+  /**
+   * Course lines from the ship along the path around the black hole, with
+   * an arrowhead at the target. The fleet in focus (selected or under the
+   * pointer) on top and in bold, the others step back.
+   */
   drawCourses(ctx) {
     const v = this.view;
-    ctx.save();
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([6, 5]);
-    ctx.lineDashOffset = -this.phase * 22;
-    // The course follows the path around the black hole, not the straight line.
     const zone = holeZone(v.galaxy);
-    for (const f of v.fleets) {
-      if (f.dest == null) continue;
-      const t = v.planets[f.dest];
-      if (!t) continue;
-      ctx.strokeStyle = f.mine ? 'rgba(255,216,119,.7)' : 'rgba(255,120,120,.5)';
+    const focusId = this.hover?.type === 'fleet' ? this.hover.id
+      : this.selection?.type === 'fleet' ? this.selection.id : null;
+    this._eta = null;
+    const moving = v.fleets.filter(f => f.dest != null && v.planets[f.dest])
+      .sort((a, b) => (a.id === focusId) - (b.id === focusId));
+    for (const f of moving) {
+      const target = v.planets[f.dest];
+      const path = route(f, target, zone);
+      const spot = this._spots.get(f.id);
+      const st = courseStyle(f, focusId);
+      ctx.save();
+      ctx.strokeStyle = st.color;
+      ctx.lineWidth = st.width;
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -this.phase * 22;
       ctx.beginPath();
+      // First piece from the ship on screen, the rest in space (clipped at
+      // the near plane).
+      const first = path[0] && this.project(path[0].x, path[0].y, path[0].z || 0);
       let prev = [f.x, f.y, f.z || 0];
-      for (const w of route(f, t, zone)) {
+      if (spot && first) {
+        ctx.moveTo(spot.x, spot.y);
+        ctx.lineTo(first.x, first.y);
+        prev = [path[0].x, path[0].y, path[0].z || 0];
+      }
+      for (const w of (spot && first ? path.slice(1) : path)) {
         const p = [w.x, w.y, w.z || 0];
         this.seg(ctx, prev, p);
         prev = p;
       }
       ctx.stroke();
+      ctx.restore();
+      // Screen points of the whole line - for the arrowhead and the label.
+      const pts = [spot ? [spot.x, spot.y] : null,
+        ...path.map(w => { const q = this.project(w.x, w.y, w.z || 0); return q && [q.x, q.y]; })].filter(Boolean);
+      const tp = this.project(target.x, target.y, target.z || 0);
+      if (tp && pts.length > 1) {
+        const [fx, fy] = pts[pts.length - 2];
+        arrowHead(ctx, fx, fy, tp.x, tp.y, planetRadius(target) * tp.s + 10, st.hot ? 11 : 8, st.color);
+      }
+      if (st.hot && f.mine && f.stats?.speed > 0 && pts.length > 1) {
+        const turns = Math.max(1, Math.ceil(routeLength(f, path) / f.stats.speed));
+        this._eta = { at: midpoint(pts), text: t('word.turns', { n: turns, count: turns }) };
+      }
     }
-    ctx.restore();
+  }
+
+  /**
+   * Screen position of every fleet: in orbit on the side of its course
+   * (courses.js), en route where it flies.
+   * @returns {Map<string, {x, y, heading, idx}>}
+   */
+  fleetSpots(v) {
+    const spots = new Map();
+    const byWorld = new Map();
+    for (const f of v.fleets) {
+      if (f.at == null) {
+        const pr = this.project(f.x, f.y, f.z || 0);
+        if (pr) spots.set(f.id, { x: pr.x, y: pr.y, heading: this.headingAngle(f, pr.x, pr.y) ?? 0, idx: 0 });
+      } else if (v.planets[f.at]) {
+        if (!byWorld.has(f.at)) byWorld.set(f.at, []);
+        byWorld.get(f.at).push(f);
+      }
+    }
+    for (const [pid, here] of byWorld) {
+      const p = v.planets[pid];
+      const pr = this.project(p.x, p.y, p.z || 0);
+      if (!pr) continue;
+      const scale = Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45));
+      const orr = planetRadius(p) * pr.s + ORBIT_R * scale;
+      const slots = orbitSlots(here, f => this.headingAngle(f, pr.x, pr.y), f => f.owner === v.you);
+      here.forEach((f, idx) => {
+        const { a, heading } = slots.get(f.id);
+        spots.set(f.id, { x: pr.x + Math.cos(a) * orr, y: pr.y + Math.sin(a) * orr, heading, idx });
+      });
+    }
+    return spots;
   }
 
   /** Range as a circle at the world's height - a sphere would be unreadable. */
@@ -527,14 +592,10 @@ export class SpaceView {
     const scale = Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45));
     ctx.save();
     ctx.globalAlpha = depthFade(pr.depth, this.cam.dist);
-    let x = pr.x, y = pr.y;
+    const spot = this._spots?.get(f.id);
+    let x = spot?.x ?? pr.x, y = spot?.y ?? pr.y;
     if (f.at != null) {
-      const idx = v.fleets.filter(g => g.at === f.at).indexOf(f);
-      const a = -Math.PI / 2 + idx * 0.85 + (f.owner === v.you ? 0 : Math.PI);
-      const rr = planetRadius(v.planets[f.at]) * pr.s + ORBIT_R * scale;
-      x += Math.cos(a) * rr;
-      y += Math.sin(a) * rr;
-      drawShip(ctx, { type: lead, x, y, angle: a + Math.PI / 2, len: 24 * scale, color: col, phase: this.phase + idx });
+      drawShip(ctx, { type: lead, x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) });
     } else {
       const ang = this.headingAngle(f, x, y) ?? 0;
       drawTrail(ctx, x, y, ang, 46 * scale, col);
@@ -702,7 +763,7 @@ export class SpaceView {
     let pinch = null;
 
     const midpoint = () => {
-      const p = [...zeiger.values()];
+      const p = [...pointers.values()];
       return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2,
         d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
     };
@@ -755,7 +816,7 @@ export class SpaceView {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = null;
       if (pointers.size === 1) {
-        const p = [...zeiger.values()][0];
+        const p = [...pointers.values()][0];
         last = { x: p.x, y: p.y };
         dragging = true;
       }

@@ -6,6 +6,7 @@ import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
+import { openPassword, bindPassword } from './ui/password.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
@@ -24,6 +25,9 @@ const narrow = compact;
 initLocale();
 languagePicker();
 bindUi();
+// Safari on iPad and iPhone ignores user-scalable: a pinch on a panel would
+// zoom the whole page. The map handles two fingers itself (pointer events).
+addEventListener('gesturestart', (e) => e.preventDefault());
 enhanceSelects();
 // Texts and select lists are in place: let the start menu float in.
 sceneReady();
@@ -71,11 +75,11 @@ async function account() {
   const row = document.querySelector('#account-row');
   const name = document.querySelector('#account-name');
   if (!row) return;
-  let who = null;
+  let who = null, me = null;
   try {
     const r = await fetch('api/auth/me', { cache: 'no-store' });
     if (!r.ok) return;
-    const me = await r.json();
+    me = await r.json();
     who = me.display || me.user;
   } catch { return; }
   if (!who) return;
@@ -87,6 +91,12 @@ async function account() {
   paint();
   onLocaleChange(paint);
   row.classList.remove('hidden');
+  bindPassword();
+  document.querySelector('#pw-user').value = me.user;
+  document.querySelector('#link-password').onclick = (e) => {
+    e.preventDefault();
+    openPassword(me.minPassword);
+  };
   document.querySelector('#link-logout').onclick = async (e) => {
     e.preventDefault();
     net.forget();
@@ -193,7 +203,7 @@ net.on('adminInviteCreated', (m) => admin.inviteCreated(m));
 // acknowledged, plus a line in the radio log for later.
 net.on('adminMsg', (m) => {
   showAnnouncement(m);
-  hud?.chat(`📢 ${m.from || 'Admin'}`, m.text);
+  hud?.chat(`📢 ${m.from || 'Admin'}`, m.text, { system: true });
   sfx.play('warn');
 });
 // Answer to every profile change - also to a rejected one, then with the old
@@ -294,11 +304,14 @@ function collectBattles(view) {
 
 net.on('chat', (m) => {
   const text = message({ key: m.key, params: m.params, msg: m.text });
-  hud?.chat(m.from, text);
-  // Only real system messages pop up - recognised by the server's flag, not
-  // by the name: a player could be called "System".
+  const mine = !!m.fromId && m.fromId === map?.view?.you;
+  hud?.chat(m.from, text, { fromId: m.fromId, system: m.system, mine });
+  // Only real system messages pop up as such - recognised by the server's
+  // flag, not by the name: a player could be called "System". Lines from
+  // other players announce themselves in hud.chat as long as the comms
+  // are out of sight.
   if (m.system) hud?.toast(text);
-  sfx.play('chat');
+  if (!mine) sfx.play('chat');
 });
 
 net.on('close', () => {
@@ -333,6 +346,12 @@ function bindGame() {
     net.send({ t: 'ready', value: !ready });
     sfx.play(ready ? 'unready' : 'ready');
   };
+  // Host: hold the game for everyone, and let it continue
+  $('#btn-pause').onclick = () => {
+    const paused = !!map.view?.paused;
+    net.send({ t: 'pause', value: !paused });
+    sfx.play(paused ? 'ready' : 'unready');
+  };
   // Spectators: pace instead of ending the turn
   $('#sp-play').onclick = () => net.send({ t: 'pace', paused: !(map.view?.pace?.paused) });
   $('#sp-step').onclick = () => net.send({ t: 'step' });
@@ -342,10 +361,17 @@ function bindGame() {
 
   // Leave the game - with confirmation, because it cannot be undone
   $('#btn-quit').onclick = () => {
-    $('#quit-text').textContent = t(app.spectator ? 'quit.spectator' : 'quit.player');
+    // Spectators do not leave a game they play in - title, text and buttons
+    // follow the role. Through data-i18n, so a language change keeps them.
+    const sp = app.spectator;
+    const say = (sel, key) => { const el = $(sel); el.dataset.i18n = key; el.textContent = t(key); };
+    say('#quit-title', sp ? 'quit.spectatorTitle' : 'quit.title');
+    // Only AI games run on the spectators' pace; without anyone watching the server drops them.
+    say('#quit-text', sp ? (map.view?.pace ? 'quit.spectatorBots' : 'quit.spectator') : 'quit.player');
+    say('#quit-yes', sp ? 'quit.spectatorYes' : 'quit.yes');
+    say('#quit-no', sp ? 'quit.spectatorNo' : 'quit.no');
     $('#quit').classList.remove('hidden');
   };
-  $('#btn-quit2').onclick = () => $('#btn-quit').onclick();
   $('#quit-no').onclick = () => $('#quit').classList.add('hidden');
   $('#quit-yes').onclick = () => {
     net.send({ t: 'leave' });
@@ -367,6 +393,7 @@ function bindGame() {
     }
     showOpts(name === 'opts');
     if (name && name !== 'opts' && hud?.view) hud.update(hud.view);
+    hud?.chatSeen();
   };
   for (const b of bar.querySelectorAll('button')) {
     b.onclick = () => showSheet(b.dataset.sheet || '');
@@ -414,6 +441,7 @@ function bindGame() {
     if (e.target.tagName === 'INPUT') return;
     if (e.key === ' ') { e.preventDefault(); $(app.spectator ? '#sp-play' : '#btn-endturn').click(); }
     if (e.key === 'f' || e.key === 'F') map.fit();
+    if ((e.key === 'p' || e.key === 'P') && !$('#btn-pause').classList.contains('hidden')) $('#btn-pause').click();
     if (e.key === 't' || e.key === 'T') map.topView?.();
     if (e.key === 'Escape') {
       if (!opts.classList.contains('hidden')) showOpts(false);

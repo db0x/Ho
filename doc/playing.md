@@ -13,7 +13,7 @@
 - [Watching](#watching)
 - [Ranking and victory](#ranking-and-victory)
 - [Controls](#controls)
-- [On a phone](#on-a-phone)
+- [On a phone or tablet](#on-a-phone-or-tablet)
 - [The look](#the-look)
 
 ## Starting a game
@@ -191,17 +191,22 @@ turn limit wins. Without a turn limit, the last empire standing wins.
 
 | Action | Input |
 |---|---|
-| Move / zoom the map | Drag, mouse wheel, `+` / `−` |
+| Move / zoom the map | Drag, mouse wheel, `+` / `−`, buttons at the top right |
 | Select | Left click on a world or fleet |
 | Set course | Pick a fleet, then **right-click** (or shift-click) the target world – or click the target world and use *Fleet here* in the panel |
-| End turn | Button at the top right or `space` |
+| See where fleets go | Each course line starts at its fleet – fleets in orbit wait on the side facing their target – and ends in an arrowhead. Select a fleet or point at it: its line stands out with the turns until arrival |
+| Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds) |
+| End turn | Button in the middle of the top bar or `space` |
 | Show the budget | Click or hover over money or metal in the top bar |
 | Fit the map | `F` |
 | Clear selection | `Esc` |
 | Help | `H` |
-| Move / resize windows | Drag the title bar, or the grip at the bottom right; double-click collapses the log |
-| Display and sound | Gear at the bottom right |
-| Leave the game | *Leave* at the top right |
+| Move / resize windows | Drag the title bar to move; drag any edge or corner to resize |
+| Minimize windows | **−** in the title bar or double-click it: the window becomes an icon in the top bar (★ research/empire/rankings, ☰ events/comms – with the count of unread comms). A click on the icon brings it back where it was. Position, size and state are remembered |
+| Comms (chat) | *Comms* tab in the log window. Messages you have not seen pop up and are counted on the tab – tap the message to reply |
+| Menu: display, sound, leaving | Gear at the top right, next to fit and zoom |
+| Pause for everyone | Host only, in games with a turn timer: pause button next to *End turn* or `P` – the timer stops and no turn resolves until the host resumes; orders and chat keep working |
+| Leave the game | *Leave the game* in the menu (gear at the top right) |
 
 Additionally on the **space** field:
 
@@ -211,10 +216,11 @@ Additionally on the **space** field:
 | Pan the focus | **Shift**+drag (or middle button) |
 | Top-down view | `T` |
 
-## On a phone
+## On a phone or tablet
 
-When the window is **narrower than 760** or **shorter than 560 points**, the
-interface rearranges itself (tested on a 21:9 device, portrait and landscape):
+When the window is **narrower than 900** or **shorter than 560 points**, the
+interface rearranges itself – phones in both orientations and tablets such as
+the iPad in portrait:
 
 - Instead of the floating windows there is a **bar along the bottom**
   (Map · Empire · Selection · Log · More); only one **sheet** is open at a time.
@@ -232,6 +238,9 @@ interface rearranges itself (tested on a 21:9 device, portrait and landscape):
 
 Setting a course needs no right click: tap the fleet, tap the target world, use
 *Fleet here* in the sheet.
+
+A tablet in landscape keeps the floating windows; on any touch screen buttons,
+tabs and grips grow to fingertip size.
 
 ## The look
 

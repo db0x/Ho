@@ -38,10 +38,10 @@ client/
   js/main.js         Wiring, game loop, turn changes
   js/net.js          WebSocket with automatic reconnect
   js/render/         planets.js, ships.js (map), shipshd.js (data sheet, battle),
-                     map.js (flat), space.js (spatial), fx.js, battlefx.js
+                     map.js (flat), space.js (spatial), courses.js (course lines, orbit slots), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
-                     dialog.js (windows), avatar.js, battle.js, shipinfo.js, viewport.js,
-                     admin.js (admin panel on the start screen), announce.js (admin banners),
+                     dialog.js (windows), avatar.js, battle.js, shipinfo.js, split.js (splitting a fleet), viewport.js,
+                     admin.js (admin panel on the start screen), announce.js (admin banners), password.js (change password),
                      scene.js (starry sky and fade between sign-in and start menu)
   js/audio/sfx.js    Sound effects, synthesised at runtime
 test/                see Tests
@@ -141,6 +141,7 @@ node test/intercept.js # interception when leaving a contested orbit
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat
 npm run test:auth      # access: hashes, accounts, profile, sign-in, rate limit
+npm run test:idle      # zombie games: discarded after the idle limit, active ones stay
 ```
 
 `test:budget` runs bot games with random, partly nonsensical orders; `HO_SEED=…`

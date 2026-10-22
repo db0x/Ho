@@ -53,7 +53,7 @@ const until = async (fn, ms = 4000) => {
 
 // --- Set up the lobby
 const host = await makeClient('Host');
-send(host, { t: 'create', name: 'Host', settings: { planetsPerPlayer: 5, turnTimer: 0 } });
+send(host, { t: 'create', name: 'Host', settings: { planetsPerPlayer: 5, turnTimer: 600 } });
 check(await until(() => host.code), 'Host gets no game code');
 const code = host.code;
 console.log(`Game ${code} opened on port ${PORT}`);
@@ -158,6 +158,56 @@ for (let t = 0; t < 8; t++) {
 }
 const vEnd = host.views.at(-1);
 console.log(`Played 8 more turns (now turn ${vEnd.turn}).`);
+
+// --- Pause: only the host, no turn resolves meanwhile, orders still count
+{
+  const guest = clients[1];
+  check(vEnd.host === host.id, `Host of the game is ${vEnd.host} instead of ${host.id}`);
+  guest.errors.length = 0;
+  send(guest, { t: 'pause', value: true });
+  check(await until(() => guest.errors.includes('err.notHost')), 'A guest could pause the game');
+  send(host, { t: 'pause', value: true });
+  check(await until(() => clients.every(c => c === extra || c.views.at(-1)?.paused?.by === host.id)),
+    'Not every player sees the pause');
+  const pausedTurn = host.views.at(-1).turn;
+  check(host.views.at(-1).deadline == null && host.views.at(-1).paused.left > 0, 'Turn timer did not freeze during the pause');
+
+  // Splitting works in orbit even with a course set - the part split off stays.
+  const v = host.views.at(-1);
+  const fleet = v.fleets.find(f => f.mine && f.at != null && f.ships.length > 1);
+  check(fleet, 'Host has no fleet in orbit with more than one ship');
+  const dest = v.planets.find(p => p.id !== fleet.at && p.owner === v.you)
+    ?? v.planets.filter(p => p.id !== fleet.at)
+      .sort((a, b) => Math.hypot(a.x - fleet.x, a.y - fleet.y) - Math.hypot(b.x - fleet.x, b.y - fleet.y))[0];
+  send(host, { t: 'orders', move: { fleetId: fleet.id, planetId: dest.id } });
+  check(await until(() => host.views.at(-1).fleets.find(f => f.id === fleet.id)?.dest === dest.id), 'Course was not accepted');
+  send(host, { t: 'orders', split: { fleetId: fleet.id, ships: [fleet.ships[0].id] } });
+  check(await until(() => host.views.at(-1).fleets.some(f => f.mine && f.ships.some(s => s.id === fleet.ships[0].id) && f.id !== fleet.id)),
+    'Split with a course set did not happen');
+  const after = host.views.at(-1).fleets;
+  const part = after.find(f => f.ships.some(s => s.id === fleet.ships[0].id));
+  check(part.at === fleet.at && part.dest == null, 'The part split off should stay in orbit without a course');
+  check(after.find(f => f.id === fleet.id).dest === dest.id, 'The rest of the fleet lost its course');
+
+  // All single: every ship a fleet of its own, the first stays in the old one.
+  const rest = after.find(f => f.id === fleet.id);
+  const mineBefore = after.filter(f => f.mine).length;
+  send(host, { t: 'orders', split: { fleetId: rest.id, ships: rest.ships.map(s => s.id), each: true } });
+  check(await until(() => host.views.at(-1).fleets.filter(f => f.mine).length === mineBefore + rest.ships.length - 1),
+    `"All single" did not give ${rest.ships.length} fleets`);
+  const singles = host.views.at(-1).fleets.filter(f => rest.ships.some(s => s.id === f.ships[0]?.id));
+  check(singles.length === rest.ships.length && singles.every(f => f.ships.length === 1 && f.at === rest.at),
+    'After "all single" every ship should be its own fleet in the same orbit');
+
+  for (const c of clients) if (c !== extra) send(c, { t: 'ready', value: true });
+  await wait(600);
+  check(host.views.at(-1).turn === pausedTurn, 'A turn resolved during the pause');
+  send(host, { t: 'pause', value: false });
+  check(await until(() => host.views.at(-1).turn === pausedTurn + 1, 4000), 'Turn did not resolve after the pause');
+  check(!host.views.at(-1).paused, 'Game still paused after resuming');
+  check(host.views.at(-1).deadline > Date.now(), 'Turn timer not running again after the pause');
+  console.log('Pause: host only, holds the turn, orders and splitting still work; resuming resolves.');
+}
 
 // --- Disconnect and rejoin
 const victim = clients[5];

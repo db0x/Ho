@@ -98,6 +98,7 @@
     <p class="ho-version">Ho!! v__HO_VERSION__ · <a href="https://github.com/db0x/Ho" class="repo-link" target="_blank" rel="noopener" data-i18n="app.repo" data-i18n-attr="title:app.repoTitle"></a></p>
     <p id="account-row" class="account-row hidden">
       <span id="account-name"></span>
+      <a href="#" id="link-password" data-i18n="auth.pw.link"></a>
       <a href="#" id="link-logout" data-i18n="auth.logout"></a>
     </p>
   </div>
@@ -209,37 +210,76 @@
 <div id="screen-game" class="screen hidden">
   <canvas id="map"></canvas>
 
+  <!-- Three groups: who you are and what you have on the left, the turn in
+       the middle, map and menu on the right. -->
   <div id="topbar">
-    <div class="emblem" id="me-emblem"></div>
-    <div class="me">
-      <div id="me-name" class="me-name">-</div>
-      <div class="me-sub"><span id="me-planets"></span></div>
+    <div class="tb-left">
+      <div class="emblem" id="me-emblem"></div>
+      <div class="me">
+        <div id="me-name" class="me-name">-</div>
+        <div class="me-sub"><span id="me-planets"></span></div>
+      </div>
+      <!-- Balance now -> after the end of the turn; broken down in the ledger. -->
+      <div class="res" id="res">
+        <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
+          <span class="lbl" data-i18n="top.money"></span><span id="r-money" class="val">0</span><span id="r-money-next" class="next"></span></button>
+        <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
+          <span class="lbl" data-i18n="top.metal"></span><span id="r-metal" class="val">0</span><span id="r-metal-next" class="next"></span></button>
+        <div id="ledger" class="ledger hidden" role="dialog" aria-labelledby="ledger-title"></div>
+      </div>
     </div>
-    <!-- Balance now -> after the end of the turn; broken down in the ledger. -->
-    <div class="res" id="res">
-      <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
-        <span class="lbl" data-i18n="top.money"></span><span id="r-money" class="val">0</span><span id="r-money-next" class="next"></span></button>
-      <button type="button" class="res-item" data-sfx="none" aria-controls="ledger" aria-expanded="false" data-i18n-attr="title:ledger.open">
-        <span class="lbl" data-i18n="top.metal"></span><span id="r-metal" class="val">0</span><span id="r-metal-next" class="next"></span></button>
-      <div id="ledger" class="ledger hidden" role="dialog" aria-labelledby="ledger-title"></div>
+
+    <div class="tb-center">
+      <div class="turnbox">
+        <div class="turn"><span data-i18n="top.turn"></span> <span id="r-turn">1</span></div>
+        <div id="r-timer" class="timer"></div>
+      </div>
+      <button id="btn-endturn" class="primary endturn" data-sfx="none" data-i18n="top.endTurn"></button>
+      <div id="spectate" class="hidden">
+        <button id="sp-play" class="primary" data-sfx="none" data-i18n-attr="title:spectate.pauseTitle" data-i18n="spectate.pause"></button>
+        <button id="sp-step" data-sfx="none" data-i18n-attr="title:spectate.stepTitle" data-i18n="spectate.step"></button>
+        <span class="sp-speeds">
+          <button data-ms="3000" data-sfx="none">½×</button>
+          <button data-ms="1500" data-sfx="none" class="active">1×</button>
+          <button data-ms="750" data-sfx="none">2×</button>
+          <button data-ms="350" data-sfx="none">4×</button>
+        </span>
+      </div>
+      <!-- Host only: holds the game for everyone. -->
+      <button id="btn-pause" class="pause hidden" data-sfx="none" aria-pressed="false"><span class="ic"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.4v9H4.5zM9.1 3.5h2.4v9H9.1z" fill="currentColor"/></svg></span><span class="lbl"></span></button>
     </div>
-    <div class="spacer"></div>
-    <div class="turnbox">
-      <div class="turn"><span data-i18n="top.turn"></span> <span id="r-turn">1</span></div>
-      <div id="r-timer" class="timer"></div>
+
+    <div class="tb-right">
+      <!-- Minimized windows wait here as icons; a click brings them back. -->
+      <div id="tray">
+        <button type="button" id="tray-left" class="tray-btn hidden" data-sfx="none" data-i18n-attr="title:dock.restoreLeft"><span class="ic"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><polygon points="8.00,1.80 9.65,6.13 14.28,6.36 10.66,9.27 11.88,13.74 8.00,11.20 4.12,13.74 5.34,9.27 1.72,6.36 6.35,6.13" fill="currentColor"/></svg></span><span class="lbl" data-i18n="dock.trayLeft"></span></button>
+        <button type="button" id="tray-log" class="tray-btn hidden" data-sfx="none" data-i18n-attr="title:dock.restoreLog"><span class="ic"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="lbl" data-i18n="dock.trayLog"></span><span class="badge chat-badge hidden"></span></button>
+      </div>
+      <!-- Fit and zoom always at hand; the gear opens the menu: language,
+           display, sound and leaving the game. On a phone the buttons sit at
+           the bottom right and the menu is a sheet (stylesheet). -->
+      <div id="mapcorner">
+        <div id="mapcontrols">
+          <button id="btn-fit" data-i18n-attr="title:map.fit"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg></button>
+          <button id="btn-zoomin" data-i18n-attr="title:map.zoomIn"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+          <button id="btn-zoomout" data-i18n-attr="title:map.zoomOut"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+          <button id="btn-mapopts" data-i18n-attr="title:map.options" aria-expanded="false" aria-haspopup="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12.60 8.00L15.20 8.00 M11.25 11.25L13.09 13.09 M8.00 12.60L8.00 15.20 M4.75 11.25L2.91 13.09 M3.40 8.00L0.80 8.00 M4.75 4.75L2.91 2.91 M8.00 3.40L8.00 0.80 M11.25 4.75L13.09 2.91" stroke="currentColor" stroke-width="2.6" stroke-linecap="butt"/></svg></button>
+        </div>
+        <div id="mapsettings" class="hidden">
+          <label class="langrow"><span data-i18n="menu.language"></span>
+            <select id="in-lang-game" class="lang-pick"></select></label>
+          <label class="chk"><input type="checkbox" id="chk-names" checked> <span data-i18n="map.names"></span></label>
+          <label class="chk"><input type="checkbox" id="chk-range"> <span data-i18n="map.ranges"></span></label>
+          <label class="chk" data-i18n-attr="title:map.territoryTitle"><input type="checkbox" id="chk-terr" checked> <span data-i18n="map.territory"></span></label>
+          <label class="chk" data-i18n-attr="title:map.starsTitle"><input type="checkbox" id="chk-stars" checked> <span data-i18n="map.stars"></span></label>
+          <label class="chk" data-i18n-attr="title:map.soundTitle"><input type="checkbox" id="chk-sound"> <span data-i18n="map.sound"></span></label>
+          <div class="volrow"><span data-i18n="map.volume"></span>
+            <input type="range" id="snd-vol" min="0" max="100" step="5" data-i18n-attr="title:map.volume"></div>
+          <button id="btn-quit" class="menu-quit" data-sfx="none" data-i18n="top.quit"></button>
+          <div class="ho-version">Ho!! v__HO_VERSION__</div>
+        </div>
+      </div>
     </div>
-    <button id="btn-endturn" class="primary endturn" data-sfx="none" data-i18n="top.endTurn"></button>
-  <div id="spectate" class="hidden">
-    <button id="sp-play" class="primary" data-sfx="none" data-i18n-attr="title:spectate.pauseTitle" data-i18n="spectate.pause"></button>
-    <button id="sp-step" data-sfx="none" data-i18n-attr="title:spectate.stepTitle" data-i18n="spectate.step"></button>
-    <span class="sp-speeds">
-      <button data-ms="3000" data-sfx="none">½×</button>
-      <button data-ms="1500" data-sfx="none" class="active">1×</button>
-      <button data-ms="750" data-sfx="none">2×</button>
-      <button data-ms="350" data-sfx="none">4×</button>
-    </span>
-  </div>
-  <button id="btn-quit" class="icon-btn quit" data-sfx="none" data-i18n-attr="title:top.quit" data-i18n="top.quitShort"></button>
   </div>
 
   <div id="leftdock" class="dock dlg">
@@ -250,7 +290,7 @@
         <button data-tab="players" data-i18n="tab.players"></button>
       </div>
       <span class="spacer"></span>
-      <span class="dlg-handle" aria-hidden="true"></span>
+      <button id="left-collapse" class="icon-btn" data-i18n-attr="title:log.collapseTitle" aria-expanded="true">&minus;</button>
     </div>
     <div id="tab-research" class="tabbody"></div>
     <div id="tab-empire" class="tabbody hidden"></div>
@@ -266,10 +306,10 @@
     <div id="log-bar" class="dlg-bar">
       <div class="tabs">
         <button data-ltab="log" class="active" data-i18n="tab.log"></button>
-        <button data-ltab="chat" data-i18n="tab.chat"></button>
+        <button data-ltab="chat"><span data-i18n="tab.chat"></span><span class="badge chat-badge hidden"></span></button>
       </div>
       <span class="spacer"></span>
-      <button id="log-collapse" class="icon-btn" data-i18n-attr="title:log.collapseTitle">&minus;</button>
+      <button id="log-collapse" class="icon-btn" data-i18n-attr="title:log.collapseTitle" aria-expanded="true">&minus;</button>
     </div>
     <div id="log-list" class="logbody"></div>
     <div id="chat-list" class="logbody hidden"></div>
@@ -277,38 +317,15 @@
     <div id="log-grip" class="dlg-grip" data-i18n-attr="title:log.resizeTitle"></div>
   </div>
 
-  <div id="toasts"></div>
-  <!-- Bottom right corner: only fit and zoom are always visible, the rest
-       folds out above them when needed. -->
-  <div id="mapcorner">
-    <div id="mapsettings" class="hidden">
-      <label class="langrow"><span data-i18n="menu.language"></span>
-        <select id="in-lang-game" class="lang-pick"></select></label>
-      <label class="chk"><input type="checkbox" id="chk-names" checked> <span data-i18n="map.names"></span></label>
-      <label class="chk"><input type="checkbox" id="chk-range"> <span data-i18n="map.ranges"></span></label>
-      <label class="chk" data-i18n-attr="title:map.territoryTitle"><input type="checkbox" id="chk-terr" checked> <span data-i18n="map.territory"></span></label>
-      <label class="chk" data-i18n-attr="title:map.starsTitle"><input type="checkbox" id="chk-stars" checked> <span data-i18n="map.stars"></span></label>
-      <label class="chk" data-i18n-attr="title:map.soundTitle"><input type="checkbox" id="chk-sound"> <span data-i18n="map.sound"></span></label>
-      <div class="volrow"><span data-i18n="map.volume"></span>
-        <input type="range" id="snd-vol" min="0" max="100" step="5" data-i18n-attr="title:map.volume"></div>
-      <button id="btn-quit2" class="only-phone" data-sfx="none" data-i18n="top.quit"></button>
-    </div>
-    <div id="mapcontrols">
-      <button id="btn-fit" data-i18n-attr="title:map.fit">&#9678;</button>
-      <button id="btn-zoomin" data-i18n-attr="title:map.zoomIn">+</button>
-      <button id="btn-zoomout" data-i18n-attr="title:map.zoomOut">&minus;</button>
-      <button id="btn-mapopts" data-i18n-attr="title:map.options" aria-expanded="false">&#9881;</button>
-    </div>
-    <div class="ho-version">v__HO_VERSION__</div>
-  </div>
-
+  <!-- The pause notice sits at the top of the message column: toasts line up beneath it. -->
+  <div id="toasts"><div id="pausebar" class="hidden" role="status"></div></div>
   <!-- On a phone there are no floating docks, but a bar at the bottom and
        one sheet each that opens above it. -->
   <nav id="tabbar" class="only-phone">
     <button data-sheet="" class="active"><span class="ic">&#9678;</span><span data-i18n="nav.map"></span></button>
     <button data-sheet="left"><span class="ic">&#9733;</span><span data-i18n="nav.empire"></span></button>
     <button data-sheet="right"><span class="ic">&#9673;</span><span data-i18n="nav.selection"></span></button>
-    <button data-sheet="log"><span class="ic">&#9776;</span><span data-i18n="nav.log"></span></button>
+    <button data-sheet="log"><span class="ic">&#9776;</span><span data-i18n="nav.log"></span><span class="badge chat-badge hidden"></span></button>
     <button data-sheet="opts"><span class="ic">&#9881;</span><span data-i18n="nav.more"></span></button>
   </nav>
 
@@ -318,11 +335,45 @@
 <!-- =============================== Leave game ============================= -->
 <div id="quit" class="modal hidden">
   <div class="modal-box narrow">
-    <h2 data-i18n="quit.title"></h2>
+    <h2 id="quit-title" data-i18n="quit.title"></h2>
     <p class="muted" id="quit-text"></p>
     <div class="row" style="margin-top:18px">
       <button id="quit-yes" class="primary" data-sfx="none" data-i18n="quit.yes"></button>
       <button id="quit-no" data-sfx="none" data-i18n="quit.no"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ Change password =========================== -->
+<div id="pwchange" class="modal hidden">
+  <div class="modal-box narrow">
+    <h2 data-i18n="auth.pw.title"></h2>
+    <form id="pw-form">
+      <p class="muted small" id="pw-intro"></p>
+      <!-- The account name helps password managers file the new password. -->
+      <input type="text" id="pw-user" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true">
+      <label class="field">
+        <span data-i18n="auth.change.current"></span>
+        <input id="pw-old" type="password" autocomplete="current-password" maxlength="200">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.change.new"></span>
+        <input id="pw-new" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <label class="field">
+        <span data-i18n="auth.change.repeat"></span>
+        <input id="pw-new2" type="password" autocomplete="new-password" maxlength="200">
+      </label>
+      <div id="pw-error" class="error"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="pw-save" class="primary" type="submit" data-i18n="auth.pw.save"></button>
+        <button id="pw-cancel" type="button" data-i18n="auth.pw.cancel"></button>
+      </div>
+    </form>
+    <div id="pw-done" class="hidden">
+      <p class="pw-ok" data-i18n="auth.pw.done"></p>
+      <p class="muted small" data-i18n="auth.pw.doneHint"></p>
+      <button id="pw-ok" class="primary" type="button" data-i18n="auth.pw.ok"></button>
     </div>
   </div>
 </div>

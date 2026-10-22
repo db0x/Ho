@@ -9,12 +9,18 @@ import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
+import { compact } from './viewport.js';
 import { openShipInfo } from './shipinfo.js';
+import { openSplit } from './split.js';
 import { forecast, refitShips } from '../../shared/budget.js';
 import { avatarHtml } from './avatar.js';
 import { t, n as num, localeTag } from '../i18n.js';
 
 const $ = s => document.querySelector(s);
+// Pause and play as SVG on the same 16 px grid as the other top bar icons -
+// text glyphs never sit quite in the middle.
+const ICON_PAUSE = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.4v9H4.5zM9.1 3.5h2.4v9H9.1z" fill="currentColor"/></svg>';
+const ICON_PLAY = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6L12.8 8z" fill="currentColor"/></svg>';
 // Numbers follow the chosen language: 1.600 or 1,600.
 const fmt = n => Math.round(n).toLocaleString(localeTag());
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(localeTag(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -23,8 +29,8 @@ export class Hud {
   constructor(app) {
     this.app = app;             // { send, map, selection, setSelection }
     this.view = null;
-    this.splitPick = {};        // ship IDs for splitting off
     this.dragging = null;       // slider currently being dragged
+    this.unread = 0;            // chat lines from others not seen yet
     // Sliders fire up to 60 times per second, and every message pulls a
     // complete new view after it - hence the throttled sending.
     this.sendSlider = throttle(m => this.app.send(m), 100);
@@ -48,25 +54,20 @@ export class Hud {
         $('#chat-list').classList.toggle('hidden', !chat);
         $('#chat-input-row').classList.toggle('hidden', !chat);
         if (chat) $('#chat-input').focus();
+        this.chatSeen();
       };
     }
-    // The log is a window: movable, resizable, collapsible.
-    const dock = $('#logdock');
-    const dlg = makeDialog(dock, {
-      handle: $('#log-bar'), grip: $('#log-grip'), key: 'ho-logdock',
-      w: 460, h: 240, minW: 320, minH: 150
+    // The log is a window: movable, resizable from every edge, minimizable.
+    this.logDlg = makeDialog($('#logdock'), {
+      handle: $('#log-bar'), grip: $('#log-grip'), collapse: $('#log-collapse'), icon: $('#tray-log'), key: 'ho-logdock',
+      w: 460, h: 240, minW: 250, minH: 110,
+      onToggle: () => this.chatSeen()
     });
-    // The dock at the top left likewise: movable and resizable.
-    makeDialog($('#leftdock'), {
-      handle: $('#left-bar'), grip: $('#left-grip'), key: 'ho-leftdock',
-      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 260, minH: 200
+    // The dock at the top left likewise.
+    this.leftDlg = makeDialog($('#leftdock'), {
+      handle: $('#left-bar'), grip: $('#left-grip'), collapse: $('#left-collapse'), icon: $('#tray-left'), key: 'ho-leftdock',
+      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 220, minH: 130
     });
-    const toggleCollapse = () => {
-      const collapsed = dock.classList.toggle('collapsed');
-      $('#log-collapse').textContent = collapsed ? '+' : '\u2212';
-      dlg.refresh();
-    };
-    $('#log-collapse').onclick = toggleCollapse;
 
     // Ledger: hover with the pointer to view it, pinned with a click.
     const res = $('#res'), ledger = $('#ledger');
@@ -88,7 +89,6 @@ export class Hud {
     addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !ledger.classList.contains('hidden')) { pinned = false; show(false); }
     });
-    $('#log-bar').ondblclick = (e) => { if (!e.target.closest('button, input')) toggleCollapse(); };
 
     // While a slider is being dragged, the panel must not be rebuilt: the
     // rebuild replaces the element and the drag breaks off.
@@ -128,6 +128,15 @@ export class Hud {
     document.querySelector('#topbar .res').classList.toggle('hidden', sp);
     const tabs = [...document.querySelectorAll('#leftdock .tabs button')];
     tabs[0].textContent = t(sp ? 'tab.empires' : 'tab.research');
+    // The icon of the minimized window is named after its tabs - when
+    // spectating there is only the one.
+    const trayLabel = $('#tray-left .lbl');
+    trayLabel.dataset.i18n = sp ? 'tab.empires' : 'dock.trayLeft';
+    trayLabel.textContent = t(trayLabel.dataset.i18n);
+    // Leaving lives in the menu - for spectators it means to stop watching.
+    const quit = $('#btn-quit');
+    quit.dataset.i18n = sp ? 'quit.spectatorYes' : 'top.quit';
+    quit.textContent = t(quit.dataset.i18n);
     for (const b of tabs.slice(1)) b.classList.toggle('hidden', sp);
     if (sp) {
       tabs[0].click();                                  // always show the table
@@ -278,6 +287,8 @@ export class Hud {
       for (const b of document.querySelectorAll('.sp-speeds button')) {
         b.classList.toggle('active', +b.dataset.ms === (v.pace?.ms ?? 1500));
       }
+      $('#btn-pause').classList.add('hidden');
+      this.pauseBar();
       return;
     }
     const me = v.me;
@@ -318,6 +329,40 @@ export class Hud {
       ? t('top.waiting', { ready: readyCount, total: others.length })
       : t('top.endTurn');
     btn.disabled = v.state !== 'running';
+
+    // The host may hold the game for everyone - only worth it with a turn
+    // timer: without one the turn waits for everybody anyway.
+    const pb = $('#btn-pause');
+    const host = v.host === v.you && v.state === 'running' && !!(v.deadline || v.paused);
+    pb.classList.toggle('hidden', !host);
+    pb.classList.toggle('active', !!v.paused);
+    pb.setAttribute('aria-pressed', String(!!v.paused));
+    pb.querySelector('.ic').innerHTML = v.paused ? ICON_PLAY : ICON_PAUSE;
+    pb.querySelector('.lbl').textContent = t(v.paused ? 'top.resume' : 'top.pause');
+    pb.title = t(v.paused ? 'top.resumeTitle' : 'top.pauseTitle');
+    this.pauseBar();
+  }
+
+  /** Notice below the top bar while the game is paused - for everyone. */
+  pauseBar() {
+    const v = this.view;
+    const bar = $('#pausebar');
+    $('#screen-game').classList.toggle('paused', !!v.paused);
+    if (!v.paused) { bar.classList.add('hidden'); bar.dataset.key = ''; return; }
+    const host = !v.spectator && v.host === v.you;
+    // Only rebuild when something changed - otherwise a click on the button
+    // could land in the middle of a rebuild.
+    const key = `${v.paused.name}|${host}|${t('pause.title')}`;
+    if (bar.dataset.key === key && !bar.classList.contains('hidden')) return;
+    bar.dataset.key = key;
+    bar.innerHTML = `<span class="pb-icon" aria-hidden="true">&#10074;&#10074;</span>
+      <div class="pb-text"><b>${t('pause.title')}</b>
+        <div class="small">${t('pause.by', { player: escapeHtml(v.paused.name) })}</div>
+        <div class="small muted">${t('pause.hint')}</div></div>
+      ${host ? `<button class="primary tiny" id="pb-resume" data-sfx="none">${t('pause.resume')}</button>` : ''}`;
+    bar.classList.remove('hidden');
+    const r = bar.querySelector('#pb-resume');
+    if (r) r.onclick = () => $('#btn-pause').click();
   }
 
   /**
@@ -364,10 +409,13 @@ export class Hud {
   timer() {
     const v = this.view;
     let txt = '';
-    if (v?.deadline) {
-      const left = Math.max(0, Math.round((v.deadline - Date.now()) / 1000));
-      txt = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
-    }
+    const clock = (ms) => {
+      const left = Math.max(0, Math.round(ms / 1000));
+      return `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+    };
+    // Paused: the timer stands still at what was left.
+    if (v?.paused) txt = t('pause.timer', { time: clock(v.paused.left ?? 0) });
+    else if (v?.deadline) txt = clock(v.deadline - Date.now());
     if (txt === this._timerTxt) return;
     this._timerTxt = txt;
     $('#r-timer').textContent = txt;
@@ -480,7 +528,8 @@ export class Hud {
         ${avatarHtml(p, 22)}
         <span class="who">
           <span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>
-          <small>${[p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '') : null,
+          <small>${[p.id === v.host ? t('rank.host') : null,
+                    p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '') : null,
                     p.connected || p.isBot ? null : t('word.offline'),
                     p.alive ? `${t('word.worlds', { n: p.stats.planets, count: p.stats.planets })} · ${t('word.ships', { n: p.stats.ships, count: p.stats.ships })}` : null
                    ].filter(Boolean).join(' · ')}</small>
@@ -923,7 +972,6 @@ export class Hud {
             ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
           ${f.ships.length > 1 && where ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
         </div>
-        <div id="splitbox"></div>
         ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
       </div>`}`;
 
@@ -939,45 +987,11 @@ export class Hud {
     const m = box.querySelector('#merge');
     if (m) m.onclick = () => this.app.send({ t: 'orders', merge: { planetId: f.at } });
     const sp = box.querySelector('#split');
-    if (sp) sp.onclick = () => this.splitUi(box.querySelector('#splitbox'), f);
+    if (sp) sp.onclick = () => openSplit(f, {
+      color: col,
+      onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
+    });
     this.wireRefit(box);
-  }
-
-  splitUi(host, f) {
-    const pick = new Set();
-    const groups = {};
-    for (const s of f.ships) (groups[s.type] || (groups[s.type] = [])).push(s);
-    host.innerHTML = `
-      <div style="margin-top:8px">
-        ${Object.entries(groups).map(([type, arr]) => `
-          <div class="buildrow" data-t="${type}">
-            <span class="bname">${t(`ship.${type}.name`)}</span>
-            <span class="bq"><button class="tiny minus">−</button><span class="n">0</span>
-            <button class="tiny plus">+</button><span class="muted small">/${arr.length}</span></span>
-          </div>`).join('')}
-        <div class="sel-actions"><button class="tiny primary" id="do-split">${t('fleet.splitDo')}</button>
-          <button class="tiny" id="cancel-split">${t('fleet.splitCancel')}</button></div>
-      </div>`;
-    const counts = {};
-    for (const row of host.querySelectorAll('[data-t]')) {
-      const type = row.dataset.t;
-      counts[type] = 0;
-      const field = row.querySelector('.n');
-      row.querySelector('.plus').onclick = () => {
-        counts[type] = Math.min(groups[type].length - (groups[type].length === f.ships.length ? 1 : 0), counts[type] + 1);
-        field.textContent = counts[type];
-      };
-      row.querySelector('.minus').onclick = () => { counts[type] = Math.max(0, counts[type] - 1); field.textContent = counts[type]; };
-    }
-    host.querySelector('#cancel-split').onclick = () => { host.innerHTML = ''; };
-    host.querySelector('#do-split').onclick = () => {
-      const ids = [];
-      for (const [type, k] of Object.entries(counts)) ids.push(...groups[type].slice(0, k).map(s => s.id));
-      if (ids.length && ids.length < f.ships.length) {
-        this.app.send({ t: 'orders', split: { fleetId: f.id, ships: ids } });
-      }
-      host.innerHTML = '';
-    };
   }
 
   // ------------------------------------------------------------------ Log
@@ -1033,17 +1047,61 @@ export class Hud {
     if (atBottom) box.scrollTop = 0;
   }
 
-  chat(from, text) {
+  /**
+   * A line on the comms. Whatever another player writes while the comms are
+   * out of sight counts as unread (badge on the tab and on the bar at the
+   * bottom) and pops up as a message - a tap opens the comms to answer.
+   * @param {{fromId?: string, system?: boolean, mine?: boolean}} o
+   */
+  chat(from, text, o = {}) {
     const box = $('#chat-list');
     const div = document.createElement('div');
-    div.className = 'logline';
-    div.innerHTML = `<b>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
+    div.className = 'logline' + (o.system ? ' sysline' : '');
+    const color = this.view?.players.find(p => p.id === o.fromId)?.color;
+    div.innerHTML = `<b${color ? ` style="color:${color}"` : ''}>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
+    if (o.system || o.mine || this.chatVisible()) return;
+    this.unread++;
+    this.paintUnread();
+    this.toast(`${from}: ${text}`, color || null, () => this.openChat(), '↩ ' + t('chat.reply'));
   }
 
-  /** @param {Function} [onClick] makes the toast clickable (watch the battle) */
-  toast(text, color, onClick) {
+  /** Are the comms on screen right now? */
+  chatVisible() {
+    if (document.hidden) return false;
+    const tab = document.querySelector('#logdock .tabs button[data-ltab="chat"]');
+    if (!tab?.classList.contains('active')) return false;
+    if (compact.matches) return $('#screen-game').dataset.sheet === 'log';
+    return !$('#logdock').classList.contains('collapsed');
+  }
+
+  /** Called whenever the comms may have come into view. */
+  chatSeen() {
+    if (!this.unread || !this.chatVisible()) return;
+    this.unread = 0;
+    this.paintUnread();
+  }
+
+  paintUnread() {
+    for (const b of document.querySelectorAll('.chat-badge')) {
+      b.textContent = this.unread > 9 ? '9+' : String(this.unread);
+      b.classList.toggle('hidden', !this.unread);
+    }
+  }
+
+  /** Show the comms with the input field - wherever they are hiding. */
+  openChat() {
+    if (compact.matches) this.app.showSheet?.('log');
+    else if (this.logDlg.collapsed()) this.logDlg.toggle(false);
+    document.querySelector('#logdock .tabs button[data-ltab="chat"]').click();
+  }
+
+  /**
+   * @param {Function} [onClick] makes the toast clickable (watch the battle)
+   * @param {string} [action]    label of the click hint
+   */
+  toast(text, color, onClick, action = '▶ ' + t('battle.watch')) {
     const host = $('#toasts');
     const d = document.createElement('div');
     d.className = 'toast';
@@ -1053,7 +1111,7 @@ export class Hud {
       d.classList.add('clickable');
       const hint = document.createElement('span');
       hint.className = 'toast-action';
-      hint.textContent = t('battle.watch');
+      hint.textContent = action;
       d.appendChild(hint);
       d.onclick = () => { d.remove(); onClick(); };
     }
