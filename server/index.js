@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
-  allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor
+  allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor,
+  hostOf, pauseGame, resumeGame
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
@@ -26,6 +27,11 @@ const PORT = process.env.PORT || 8080;
 // they are served instead of being maintained in a second place.
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 const VERSION_MARK = /__HO_VERSION__/g;
+// Games nobody has touched for this long are zombies and get discarded -
+// even if a forgotten tab is still connected.
+const IDLE_MS = (Number(process.env.HO_IDLE_HOURS) || 4) * 3600 * 1000;
+// Without anybody connected, a game goes after half that time already.
+const ORPHAN_MS = IDLE_MS / 2;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -153,10 +159,11 @@ function attachSpectator(c, connId, game) {
 
 // Players write text, the system sends { key, params } - translation only
 // happens at the recipient.
-function chat(game, from, msg) {
+function chat(game, from, msg, fromId = null) {
   // System messages (keys) are flagged as such: the client must not tell
   // them apart by the sender's name - a player could be called "System".
-  const body = typeof msg === 'string' ? { text: msg } : { ...msg, system: true };
+  // fromId names the writing empire: color, and no alert for your own lines.
+  const body = typeof msg === 'string' ? { text: msg, fromId } : { ...msg, system: true };
   for (const p of game.players) {
     const c = p.connId && conns.get(p.connId);
     if (c) send(c.ws, { t: 'chat', from, ...body });
@@ -270,8 +277,12 @@ function adminOverview() {
  * is told and sent back to the start screen, then the game is gone. Their
  * seat tokens die with it, so nobody can resume into it.
  */
-function endGame(game, by) {
-  const notice = { t: 'ended', key: 'notice.endedByAdmin', params: { code: game.id } };
+/**
+ * Removes a game; whoever is still connected to it gets the reason and goes
+ * back to the start screen.
+ */
+function closeGame(game, { key, params }) {
+  const notice = { t: 'ended', key, params: { code: game.id, ...params } };
   const ids = [...game.players.map(p => p.connId).filter(Boolean), ...game.spectators];
   for (const id of ids) {
     const c = conns.get(id);
@@ -280,6 +291,10 @@ function endGame(game, by) {
     c.gameId = null; c.playerId = null;
   }
   games.delete(game.id);
+}
+
+function endGame(game, by) {
+  closeGame(game, { key: 'notice.endedByAdmin' });
   console.log(`Game ${game.id} ended by admin ${by} (state ${game.state}, turn ${game.turn})`);
 }
 
@@ -367,6 +382,8 @@ function handle(connId, ws, msg) {
   const c = conns.get(connId);
   const game = c.gameId ? games.get(c.gameId) : null;
   const me = game ? game.players.find(p => p.id === c.playerId) : null;
+  // Every message from someone in a game counts as a sign of life for it.
+  if (game) game.lastActivity = Date.now();
 
   switch (msg.t) {
     case 'create': {
@@ -399,6 +416,7 @@ function handle(connId, ws, msg) {
         return send(ws, { t: 'error', key: 'err.alreadySeated' });
       }
       leaveLobby(c, connId);
+      g.lastActivity = Date.now();
       const p = addPlayer(g, {
         name: playerName(c, g, msg.name), connId,
         avatar: c.profile.avatar, account: c.accountKey ? c.account : null, accountKey: c.accountKey
@@ -416,6 +434,7 @@ function handle(connId, ws, msg) {
       if (!p) return send(ws, { t: 'error', key: 'err.noSeat' });
       p.connId = connId; p.connected = true;
       c.gameId = g.id; c.playerId = p.id;
+      g.lastActivity = Date.now();
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
       if (g.state === 'lobby') broadcastLobby(g);
       else { send(ws, { t: 'view', view: buildView(g, p) }); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
@@ -501,6 +520,18 @@ function handle(connId, ws, msg) {
       maybeResolve(game);
       break;
     }
+    case 'pause': {
+      // The host holds the game for everyone (someone is at the door): the
+      // timer freezes and no turn resolves. Orders and chat keep working.
+      if (!game || !me || game.state !== 'running') return;
+      if (hostOf(game) !== me) return send(ws, { t: 'error', key: 'err.notHost' });
+      const changed = msg.value ? pauseGame(game, me) : resumeGame(game);
+      if (!changed) return;
+      chat(game, 'System', { key: msg.value ? 'chat.paused' : 'chat.resumed', params: { player: me.name } });
+      broadcastView(game);
+      maybeResolve(game);
+      break;
+    }
     case 'leave': {
       if (!game) return;
       // Spectators simply sign off
@@ -531,7 +562,7 @@ function handle(connId, ws, msg) {
     }
     case 'chat': {
       if (!game || !me) return;
-      chat(game, me.name, String(msg.text || '').slice(0, 200));
+      chat(game, me.name, String(msg.text || '').slice(0, 200), me.id);
       break;
     }
     case 'watch': {
@@ -642,7 +673,7 @@ function sanitizeSettings(s) {
 }
 
 export function maybeResolve(game) {
-  if (game.state !== 'running') return false;
+  if (game.state !== 'running' || game.paused) return false;
   if (!allReady(game)) return false;
   for (const bot of game.players.filter(p => p.isBot && p.alive)) runBot(game, bot);
   const entries = resolveTurn(game);
@@ -658,7 +689,9 @@ setInterval(() => {
     if (game.state !== 'running' || !game.spectators.size || game.pace.paused || !watchable(game)) continue;
     if (now < game.nextTurnAt) continue;
     game.nextTurnAt = now + game.pace.ms;
-    maybeResolve(game);
+    // A watched AI game is alive while it runs - unlike a timer game, where
+    // turns keep resolving even after every human has gone.
+    if (maybeResolve(game)) game.lastActivity = now;
   }
 }, 100);
 
@@ -673,14 +706,16 @@ setInterval(() => {
     }
   }
   for (const game of games.values()) {
-    if (game.state === 'running' && game.turnDeadline && now >= game.turnDeadline) {
+    if (game.state === 'running' && !game.paused && game.turnDeadline && now >= game.turnDeadline) {
       for (const p of game.players) p.ready = true;
       maybeResolve(game);
     }
-    // Remove orphaned games after 2 hours
-    if (!game.players.some(p => p.connected) && !game.spectators.size
-      && now - game.created > 2 * 3600 * 1000) {
-      games.delete(game.id);
+    // Zombies: no human move for IDLE_MS - or nobody connected for half of it.
+    const idle = now - game.lastActivity;
+    const orphaned = !game.players.some(p => p.connected) && !game.spectators.size;
+    if (idle > IDLE_MS || (orphaned && idle > ORPHAN_MS)) {
+      console.log(`Game ${game.id} discarded after ${Math.round(idle / 60000)} min without activity (state ${game.state}, turn ${game.turn})`);
+      closeGame(game, { key: 'notice.endedIdle', params: { hours: +(IDLE_MS / 3600000).toFixed(2) } });
     }
   }
 }, 1000);

@@ -30,6 +30,9 @@ export function createGame(hostName) {
   return {
     id: makeGameCode(),
     created: Date.now(),
+    // Last move by a human (any message from a player or spectator of the
+    // game). Games without one for too long are discarded (server/index.js).
+    lastActivity: Date.now(),
     state: 'lobby',
     settings: { ...DEFAULT_SETTINGS },
     hostName,
@@ -41,6 +44,9 @@ export function createGame(hostName) {
     nextShipId: 1,
     log: [],
     turnDeadline: null,
+    // Paused by the host: { by, name, left } - left is what remained of the
+    // turn timer (ms) or null without one. No turn resolves while paused.
+    paused: null,
     startedAt: null,          // ms timestamps, for the admin overview
     lastTurnAt: null,
     // Spectators: connections without an empire of their own. The pace belongs
@@ -211,6 +217,43 @@ export function armTurnTimer(game) {
   game.turnDeadline = game.settings.turnTimer > 0
     ? Date.now() + game.settings.turnTimer * 1000
     : null;
+}
+
+// ------------------------------------------------------------------- Host/pause
+
+/**
+ * Who leads the game: whoever created it, as long as they are connected -
+ * otherwise the next connected human. That way a pause never gets stuck
+ * because the host's tab closed. AI-only games have no host.
+ */
+export function hostOf(game) {
+  const first = game.players[0];
+  if (first && !first.isBot && first.connected) return first;
+  return game.players.find(p => !p.isBot && p.connected) || null;
+}
+
+/**
+ * Turns stop resolving and the turn timer freezes where it stands. Only with
+ * a timer: without one no turn ends while someone is away anyway.
+ */
+export function pauseGame(game, player) {
+  if (game.state !== 'running' || game.paused || !game.turnDeadline) return false;
+  const left = game.turnDeadline ? Math.max(0, game.turnDeadline - Date.now()) : null;
+  game.paused = { by: player.id, name: player.name, left };
+  game.turnDeadline = null;
+  return true;
+}
+
+// After a pause there should be a moment to get back into the game, even if
+// the timer was about to run out.
+const RESUME_GRACE_MS = 15000;
+
+export function resumeGame(game) {
+  if (!game.paused) return false;
+  const { left } = game.paused;
+  game.paused = null;
+  game.turnDeadline = left != null ? Date.now() + Math.max(left, RESUME_GRACE_MS) : null;
+  return true;
 }
 
 // ---------------------------------------------------------------- Ships/fleets
@@ -427,15 +470,22 @@ export function setOrders(game, player, msg) {
     player.orders.moves[fleet.id] = target.id;
   }
   if (msg.split) {
+    // Only in orbit - a course may be set: the split-off part stays behind
+    // without one, the rest keeps it (movement checks the range again).
     const fleet = game.fleets.find(f => f.id === msg.split.fleetId);
-    if (!fleet || fleet.owner !== player.id || fleet.dest != null) return;
+    if (!fleet || fleet.owner !== player.id || fleet.at == null) return;
     const take = msg.split.ships || [];
-    const moved = fleet.ships.filter(s => take.includes(s.id));
+    let moved = fleet.ships.filter(s => take.includes(s.id));
+    // each: every ship becomes a fleet of its own (colony ships to several
+    // worlds). Then all ships may be named - the first stays in the fleet.
+    const each = msg.split.each === true;
+    if (each && moved.length === fleet.ships.length) moved = moved.slice(1);
     if (!moved.length || moved.length === fleet.ships.length) return;
-    fleet.ships = fleet.ships.filter(s => !take.includes(s.id));
-    const nf = newFleet(game, player.id, planetById(game, fleet.at));
-    nf.ships = moved;
-    return { newFleet: nf.id };
+    fleet.ships = fleet.ships.filter(s => !moved.includes(s));
+    const planet = planetById(game, fleet.at);
+    const parts = each ? moved.map(s => [s]) : [moved];
+    const ids = parts.map(ships => { const nf = newFleet(game, player.id, planet); nf.ships = ships; return nf.id; });
+    return { newFleet: ids[0] };
   }
   if (msg.merge) {
     const planet = planetById(game, msg.merge.planetId);
@@ -1168,6 +1218,8 @@ export function buildView(game, player) {
     winner: game.winner || null,
     you: player.id,
     deadline: game.turnDeadline,
+    host: hostOf(game)?.id ?? null,
+    paused: pauseView(game),
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     galaxy: {
@@ -1239,6 +1291,7 @@ export function buildSpectatorView(game) {
     you: null,
     me: null,
     deadline: null,
+    paused: pauseView(game),
     pace: { ...game.pace },
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
@@ -1286,6 +1339,10 @@ function visibleEntry(e, playerId) {
   return true;
 }
 
+function pauseView(game) {
+  return game.paused ? { by: game.paused.by, name: game.paused.name, left: game.paused.left } : null;
+}
+
 export function lobbyView(game) {
   return {
     id: game.id,
@@ -1318,7 +1375,9 @@ export function adminGameView(game) {
     created: game.created,
     startedAt: game.startedAt,
     lastTurnAt: game.lastTurnAt,
+    lastActivity: game.lastActivity,
     spectators: game.spectators.size,
+    paused: !!game.paused,
     winner: game.winner || null,
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, avatar: p.avatar, account: p.account,

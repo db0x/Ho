@@ -13,7 +13,7 @@
 - [Zusehen](#zusehen)
 - [Rangliste und Sieg](#rangliste-und-sieg)
 - [Steuerung](#steuerung)
-- [Auf dem Telefon](#auf-dem-telefon)
+- [Auf Telefon und Tablet](#auf-telefon-und-tablet)
 - [Die Optik](#die-optik)
 
 ## Eine Partie beginnen
@@ -197,17 +197,22 @@ Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt.
 
 | Aktion | Eingabe |
 |---|---|
-| Karte bewegen / zoomen | Ziehen, Mausrad, `+` / `−` |
+| Karte bewegen / zoomen | Ziehen, Mausrad, `+` / `−`, Knöpfe oben rechts |
 | Auswählen | Linksklick auf Welt oder Flotte |
 | Kurs setzen | Flotte wählen, dann **Rechtsklick** (oder Shift-Klick) auf die Zielwelt – oder Zielwelt anklicken und im Panel *Flotte hierher* |
-| Zug beenden | Knopf oben rechts oder `Leertaste` |
+| Sehen, wohin Flotten fliegen | Jede Kurslinie beginnt an ihrer Flotte – Flotten im Orbit warten auf der Seite zu ihrem Ziel – und endet in einer Pfeilspitze. Flotte auswählen oder darauf zeigen: Ihre Linie wird hervorgehoben, mit den Runden bis zur Ankunft |
+| Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten) |
+| Zug beenden | Knopf in der Mitte der Kopfleiste oder `Leertaste` |
 | Haushalt ansehen | Klick oder Zeiger auf Geld bzw. Metall in der Kopfleiste |
 | Karte einpassen | `F` |
 | Auswahl aufheben | `Esc` |
 | Hilfe | `H` |
-| Fenster verschieben / vergrößern | Titelleiste ziehen bzw. Griff unten rechts; Doppelklick klappt das Protokoll ein |
-| Anzeige und Ton | Zahnrad unten rechts |
-| Partie verlassen | *Verlassen* oben rechts |
+| Fenster verschieben / Größe ändern | Titelleiste ziehen zum Verschieben; an jeder Kante oder Ecke ziehen für die Größe |
+| Fenster minimieren | **−** in der Titelleiste oder Doppelklick darauf: Das Fenster wird zum Icon in der Kopfleiste (★ Forschung/Imperium/Rangliste, ☰ Ereignisse/Funk – mit der Zahl ungelesener Funksprüche). Ein Klick auf das Icon holt es an seinen Platz zurück. Position, Größe und Zustand bleiben gespeichert |
+| Funk (Chat) | Reiter *Funk* im Protokollfenster. Ungesehene Nachrichten erscheinen als Hinweis und werden am Reiter gezählt – antippen, um zu antworten |
+| Menü: Anzeige, Ton, Verlassen | Zahnrad oben rechts, neben Einpassen und Zoom |
+| Für alle anhalten | Nur der Gastgeber, in Partien mit Rundentimer: Pause-Knopf neben *Zug beenden* oder `P` – der Timer steht und keine Runde wird ausgewertet, bis es weitergeht; Befehle und Chat funktionieren weiter |
+| Partie verlassen | *Partie verlassen* im Menü (Zahnrad oben rechts) |
 
 Zusätzlich im **Raum**-Spielfeld:
 
@@ -217,10 +222,10 @@ Zusätzlich im **Raum**-Spielfeld:
 | Blickpunkt verschieben | **Shift**+Ziehen (oder mittlere Taste) |
 | Draufsicht | `T` |
 
-## Auf dem Telefon
+## Auf Telefon und Tablet
 
-Ist das Fenster **schmaler als 760** oder **niedriger als 560 Punkte**, baut sich
-die Oberfläche um (geprüft auf einem 21:9-Gerät, hoch und quer):
+Ist das Fenster **schmaler als 900** oder **niedriger als 560 Punkte**, baut sich
+die Oberfläche um – Telefone hoch und quer, Tablets wie das iPad hochkant:
 
 - Statt der schwebenden Fenster gibt es eine **Leiste am unteren Rand**
   (Karte · Reich · Auswahl · Protokoll · Mehr); immer nur ein **Blatt** ist offen.
@@ -238,6 +243,9 @@ die Oberfläche um (geprüft auf einem 21:9-Gerät, hoch und quer):
 
 Einen Kurs setzt man ohne Rechtsklick: Flotte antippen, Zielwelt antippen, im
 Blatt *Flotte hierher*.
+
+Ein Tablet im Querformat behält die schwebenden Fenster; auf jedem Touchscreen
+wachsen Knöpfe, Reiter und Griffe auf Fingerkuppengröße.
 
 ## Die Optik
 

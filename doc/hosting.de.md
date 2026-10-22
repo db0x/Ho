@@ -74,6 +74,9 @@ Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
 - `add` gibt das erste Passwort **einmal** aus – der einzige Moment, in dem es im
   Klartext existiert. Es gilt nur für die erste Anmeldung; danach wählt der Spieler
   ein eigenes, bevor er in die Lobby kommt. Nach `passwd` genauso.
+- Ihr Passwort ändern Spieler jederzeit selbst: *Passwort ändern* neben *Abmelden*
+  im Startmenü. Das bisherige Passwort wird noch einmal abgefragt; alle anderen
+  Sitzungen des Kontos enden, der benutzte Browser bleibt angemeldet.
 - `del` wirkt sofort, auch mitten in einer Partie: HTTP-Anfragen werden ab der
   nächsten abgewiesen, eine offene WebSocket binnen einer Sekunde getrennt. Das
   Profilbild des Kontos wird mit gelöscht. Ein zurückgesetztes Passwort beendet
@@ -169,6 +172,7 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | `HO_USERS_FILE` | `data/users.json` | wo die Konten liegen; Profilbilder liegen daneben in `avatars/` |
 | `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
 | `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |
+| `HO_IDLE_HOURS` | `4` | eine Partie, in der sich so lange niemand bewegt hat (Befehle, Zug beenden, Chat …), wird verworfen – auch wenn noch ein Tab offen ist; ist niemand verbunden, schon nach der halben Zeit |
 | `HO_LANG` | aus der Umgebung | Sprache des Werkzeugs `users.js` |
 | `HOST_PORT`, `HOST_BIND` | `8080`, `0.0.0.0` | nur Docker: Port und Adresse auf dem Host |
 

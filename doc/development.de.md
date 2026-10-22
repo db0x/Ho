@@ -38,10 +38,10 @@ client/
   js/main.js         Verdrahtung, Spielschleife, Rundenwechsel
   js/net.js          WebSocket mit automatischem Wiederverbinden
   js/render/         planets.js, ships.js (Karte), shipshd.js (Steckbrief, Schlacht),
-                     map.js (flach), space.js (räumlich), fx.js, battlefx.js
+                     map.js (flach), space.js (räumlich), courses.js (Kurslinien, Orbitplätze), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),
-                     dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, viewport.js,
-                     admin.js (Admin-Panel im Startbildschirm), announce.js (Admin-Banner),
+                     dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, split.js (Flotte teilen), viewport.js,
+                     admin.js (Admin-Panel im Startbildschirm), announce.js (Admin-Banner), password.js (Passwort ändern),
                      scene.js (Sternenhimmel und Überblendung zwischen Anmeldung und Startmenü)
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/                siehe Tests
@@ -142,6 +142,7 @@ node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat
 npm run test:auth      # Zugang: Hashes, Konten, Profil, Anmeldung, Rateschutz
+npm run test:idle      # Zombie-Partien: nach der Ruhefrist verworfen, aktive bleiben
 ```
 
 `test:budget` lässt Bot-Partien mit zufälligen, auch unsinnigen Aufträgen laufen;
