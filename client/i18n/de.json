@@ -417,6 +417,8 @@
   "map.sound": "Ton",
   "map.soundTitle": "Klangeffekte",
   "map.volume": "Lautstärke",
+  "map.fullscreen": "Vollbild",
+  "map.fullscreenTitle": "Ohne Browserleisten spielen",
   "map.tooltipUnknown": "unerforscht",
   "map.tooltipTemp": "{temp} °C · {grav} g",
   "map.tooltipPop": "Bev. {pop} Mio · Metall {ore}",

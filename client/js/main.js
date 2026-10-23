@@ -473,6 +473,25 @@ function bindGame() {
   snd.onchange = e => { sfx.setEnabled(e.target.checked); if (e.target.checked) sfx.play('select'); };
   vol.oninput = e => sfx.setVolume(+e.target.value / 100);
   vol.onchange = () => sfx.play('select');
+  // Full screen where the browser can do it (Android, iPad, desktop). Safari on
+  // the iPhone cannot - there only "Add to Home Screen" helps (manifest).
+  // Started from the home screen, the browser bars are gone anyway.
+  const root = document.documentElement;
+  const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsRequest = root.requestFullscreen || root.webkitRequestFullscreen;
+  const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+  const installed = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+  if (fsRequest && !installed && (document.fullscreenEnabled ?? document.webkitFullscreenEnabled)) {
+    const fs = $('#chk-fullscreen');
+    $('#row-fullscreen').classList.remove('hidden');
+    const sync = () => { fs.checked = !!fsElement(); };
+    fs.onchange = () => {
+      const p = fs.checked ? fsRequest.call(root, { navigationUI: 'hide' }) : fsExit.call(document);
+      Promise.resolve(p).catch(sync);
+    };
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+  }
   $('#chat-input').onkeydown = (e) => {
     if (e.key === 'Enter' && e.target.value.trim()) {
       net.send({ t: 'chat', text: e.target.value });

@@ -6,7 +6,16 @@
 <title>Ho!! – Galactic Expansion</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="img/mark.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="img/mark.svg">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<!-- Added to the home screen, Ho!! starts without browser chrome: Android via
+     the manifest, iOS via the apple-* tags (Safari on the iPhone has no
+     fullscreen API, so this is the only way there). -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#05060c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Ho!!">
 <!-- Preview for shared links (messengers, Mastodon, Slack ...). The image
      lives in the repository and is loaded via an absolute GitHub URL: that
      way it fits every host, and the crawlers need no session. -->
@@ -272,6 +281,7 @@
           <label class="chk"><input type="checkbox" id="chk-range"> <span data-i18n="map.ranges"></span></label>
           <label class="chk" data-i18n-attr="title:map.territoryTitle"><input type="checkbox" id="chk-terr" checked> <span data-i18n="map.territory"></span></label>
           <label class="chk" data-i18n-attr="title:map.starsTitle"><input type="checkbox" id="chk-stars" checked> <span data-i18n="map.stars"></span></label>
+          <label class="chk hidden" id="row-fullscreen" data-i18n-attr="title:map.fullscreenTitle"><input type="checkbox" id="chk-fullscreen"> <span data-i18n="map.fullscreen"></span></label>
           <label class="chk" data-i18n-attr="title:map.soundTitle"><input type="checkbox" id="chk-sound"> <span data-i18n="map.sound"></span></label>
           <div class="volrow"><span data-i18n="map.volume"></span>
             <input type="range" id="snd-vol" min="0" max="100" step="5" data-i18n-attr="title:map.volume"></div>

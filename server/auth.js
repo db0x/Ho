@@ -48,7 +48,8 @@ export function authEnabled() {
 // What goes out without sign-in: the sign-in page and what it needs to
 // display. Everything else - game client, rules, WebSocket - stays closed.
 const PUBLIC_EXACT = new Set([
-  '/login.html', '/js/login.js', '/js/i18n.js', '/js/ui/scene.js', '/shared/i18n.js', '/favicon.ico'
+  '/login.html', '/js/login.js', '/js/i18n.js', '/js/ui/scene.js', '/shared/i18n.js', '/favicon.ico',
+  '/manifest.webmanifest'
 ]);
 const PUBLIC_PREFIX = ['/css/', '/img/', '/i18n/'];
 

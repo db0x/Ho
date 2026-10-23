@@ -417,6 +417,8 @@
   "map.sound": "Sound",
   "map.soundTitle": "Sound effects",
   "map.volume": "Volume",
+  "map.fullscreen": "Full screen",
+  "map.fullscreenTitle": "Play without the browser bars",
   "map.tooltipUnknown": "unexplored",
   "map.tooltipTemp": "{temp} °C · {grav} g",
   "map.tooltipPop": "Pop. {pop}M · metal {ore}",
