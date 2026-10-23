@@ -717,7 +717,9 @@ export class MapView {
 
   _bind() {
     const cv = this.cv;
-    let dragging = false, moved = false, last = null;
+    // rightMouse: the press is a right mouse click - pointerup orders the
+    // course then, contextmenu must not do it a second time.
+    let dragging = false, moved = false, rightMouse = false, last = null;
     // Multi-touch: two fingers zoom (distance) and pan (midpoint).
     // Stored per pointer, so mouse and fingers take the same path.
     const pointers = new Map();
@@ -735,6 +737,7 @@ export class MapView {
       pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pointers.size === 2) { pinch = midpoint(); moved = true; dragging = false; return; }
       dragging = true; moved = false;
+      rightMouse = e.pointerType === 'mouse' && e.button === 2;
       last = { x: e.offsetX, y: e.offsetY };
     });
 
@@ -793,8 +796,11 @@ export class MapView {
       this.onSelect(h);
     });
 
+    // Only for a long press on touch or the menu key - a right mouse click is
+    // already handled on pointerup (before, it ordered the course twice).
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (rightMouse) return;
       const h = this.pick(e.offsetX, e.offsetY);
       this.onOrder(h);
     });
