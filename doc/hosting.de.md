@@ -12,7 +12,7 @@
 
 ## Mit Node starten
 
-Voraussetzung ist Node 20 oder neuer.
+Voraussetzung ist Node 22 oder neuer (empfohlen: 26).
 
 ```
 npm install

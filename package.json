@@ -1,6 +1,6 @@
 {
   "name": "ho-web",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "type": "module",
   "description": "Ho!! - a space strategy game in the spirit of Spaceward Ho! (web, up to 16 players)",
@@ -22,6 +22,6 @@
     "ws": "^8.18.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

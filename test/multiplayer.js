@@ -33,7 +33,7 @@ function makeClient(name) {
     ws.on('message', (raw) => {
       const m = JSON.parse(raw.toString());
       if (m.t === 'hello') resolve(c);
-      if (m.t === 'joined') { c.code = m.code; c.id = m.playerId; }
+      if (m.t === 'joined') { c.code = m.code; c.id = m.playerId; c.token = m.token; }
       if (m.t === 'lobby') { c.lobby = m.lobby; c.host = m.host; }
       if (m.t === 'view') c.views.push(m.view);
       if (m.t === 'error') c.errors.push(m.key || m.msg);
@@ -207,6 +207,23 @@ console.log(`Played 8 more turns (now turn ${vEnd.turn}).`);
   check(!host.views.at(-1).paused, 'Game still paused after resuming');
   check(host.views.at(-1).deadline > Date.now(), 'Turn timer not running again after the pause');
   console.log('Pause: host only, holds the turn, orders and splitting still work; resuming resolves.');
+}
+
+// --- Reconnect overtakes the close of the old socket (mobiles: the server
+// notices the dead socket only after the new one has resumed the seat)
+{
+  const roamer = clients[6];
+  const fresh = await makeClient(roamer.name + ' (new socket)');
+  const before = (host.chats || []).length;
+  send(fresh, { t: 'resume', code, token: roamer.token });
+  check(await until(() => fresh.views.length > 0), 'Resume on a new socket brings no view');
+  roamer.ws.close();
+  await wait(400);
+  const lines = (host.chats || []).slice(before).map(m => m.key);
+  check(!lines.includes('chat.lost'), 'The late close of the replaced socket reported the player as lost');
+  check(!lines.includes('chat.back'), 'A player who was never reported lost is announced as back');
+  check(host.views.at(-1).players.find(p => p.id === roamer.id).connected, 'The resumed player is shown as disconnected');
+  console.log('Quick reconnect: the late close of the old socket stays silent.');
 }
 
 // --- Disconnect and rejoin

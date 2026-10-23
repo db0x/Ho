@@ -12,8 +12,11 @@ export class Net {
     // Relative to the page so it also works under a subpath (/ho/).
     const url = new URL('.', location.href);
     url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.ws = new WebSocket(url);
+    const ws = this.ws = new WebSocket(url);
+    let opened = false;
     this.ws.onopen = () => {
+      opened = true;
+      this.failures = 0;
       this.emit('open');
       if (this.session?.code && this.session?.token) {
         this.send({ t: 'resume', code: this.session.code, token: this.session.token });
@@ -35,12 +38,27 @@ export class Net {
       this.emit(msg.t, msg);
       this.emit('*', msg);
     };
-    this.ws.onclose = () => {
-      this.emit('close');
+    this.ws.onclose = (ev) => {
+      if (ws !== this.ws) return;
+      // Only losing a working connection is news - failed retries stay
+      // silent, otherwise every attempt brings another toast.
+      if (opened) this.emit('close');
+      else this.failures = (this.failures || 0) + 1;
+      if (!opened || ev.code === 4001) this.checkSession();
       clearTimeout(this._retry);
-      this._retry = setTimeout(() => this.connect(), 1500);
+      this._retry = setTimeout(() => this.connect(), 1500 * 2 ** Math.min(this.failures || 0, 3));
     };
     this.ws.onerror = () => {};
+  }
+
+  // Without a valid session (expired, revoked, server restarted) the upgrade
+  // is refused, and a WebSocket cannot tell why. A page request can: it is
+  // redirected to the sign-in page then - retrying would never succeed.
+  async checkSession() {
+    try {
+      const res = await fetch(location.href, { cache: 'no-store' });
+      if (res.redirected && new URL(res.url).pathname.endsWith('/login.html')) location.reload();
+    } catch { /* server unreachable - keep retrying */ }
   }
 
   on(type, fn) {

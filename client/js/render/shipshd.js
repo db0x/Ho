@@ -302,87 +302,95 @@ const scout = {
 };
 
 /* -------------------------------------------------------------- Fighter */
+// In the style of the Viper Mk VII: slim chined fuselage with the canopy far
+// forward, short swept wings with cropped tips, and three engines side by
+// side in the tail block - the middle one the largest, under the tail fin.
 const fighter = {
   r: 62,
   engines: [
-    { x: -50, y: -13, r: 5.6, color: '#7fd8ff' },
-    { x: -50, y: 13, r: 5.6, color: '#7fd8ff' }
+    { x: -51, y: 0, r: 6.4, color: '#7fd8ff' },
+    { x: -50, y: -12.5, r: 4.8, color: '#7fd8ff' },
+    { x: -50, y: 12.5, r: 4.8, color: '#7fd8ff' }
   ],
   lights: [
-    { x: -27, y: -45, r: 1, color: RED, off: 0 },
-    { x: -27, y: 45, r: 1, color: GREEN, off: 0 },
-    { x: -44, y: 0, r: 0.9, color: WHITE, off: 0.6, strobe: true }
+    { x: -29, y: -42, r: 1, color: RED, off: 0 },
+    { x: -29, y: 42, r: 1, color: GREEN, off: 0 },
+    { x: -38, y: 0, r: 0.9, color: WHITE, off: 0.6, strobe: true }
   ],
   body(ctx, color, S) {
-    for (const s of [-1, 1]) nozzle(ctx, -50, s * 13, 5.6, 6);
-    // Delta wing
+    nozzle(ctx, -51, 0, 6.4, 7);
+    for (const s of [-1, 1]) nozzle(ctx, -50, s * 12.5, 4.8, 6);
     for (const s of [-1, 1]) {
-      const w = () => poly(ctx, [[28, s * 6], [-20, s * 45], [-30, s * 46], [-42, s * 40], [-36, s * 16]]);
+      // Swept wing with cropped tip
+      const w = () => poly(ctx, [[4, s * 7], [-22, s * 40], [-28, s * 42.5], [-35, s * 41.5], [-37, s * 9]]);
       w();
-      const g = ctx.createLinearGradient(0, s * 6, 0, s * 46);
+      const g = ctx.createLinearGradient(0, s * 7, 0, s * 42);
       g.addColorStop(0, tone(color, s < 0 ? 0.2 : -0.15));
       g.addColorStop(1, tone(color, s < 0 ? -0.2 : -0.5));
       fillShadowed(ctx, g, S);
       inside(ctx, w, () => {
         // dark inner panel
         ctx.fillStyle = 'rgba(20,26,40,.45)';
-        poly(ctx, [[10, s * 14], [-18, s * 36], [-32, s * 36], [-30, s * 18]]); ctx.fill();
-        seam(ctx, 10, s * 14, -18, s * 36); seam(ctx, -18, s * 36, -32, s * 36); seam(ctx, -30, s * 18, -32, s * 36);
-        seam(ctx, 0, s * 12, -36, s * 30, 0.3);
+        poly(ctx, [[-4, s * 15], [-20, s * 33], [-33, s * 33], [-33, s * 15]]); ctx.fill();
+        seam(ctx, -4, s * 15, -20, s * 33); seam(ctx, -20, s * 33, -33, s * 33); seam(ctx, -33, s * 15, -33, s * 33);
         // Flaps at the trailing edge
-        seam(ctx, -39, s * 30, -34, s * 18, 0.3);
+        seam(ctx, -31, s * 36, -32, s * 12, 0.3);
         // Chevron as insignia
         ctx.fillStyle = 'rgba(255,255,255,.7)';
-        poly(ctx, [[-8, s * 25], [-14, s * 30], [-16, s * 30], [-10, s * 25], [-16, s * 20], [-14, s * 20]]); ctx.fill();
+        poly(ctx, [[-14, s * 22], [-20, s * 27], [-22, s * 27], [-16, s * 22], [-22, s * 17], [-20, s * 17]]); ctx.fill();
         // Leading edge shines
         ctx.fillStyle = 'rgba(255,255,255,.14)';
-        poly(ctx, [[28, s * 6], [-20, s * 45], [-21, s * 43], [25, s * 7]]); ctx.fill();
-        rivets(ctx, -4, -26, s * 32, 5, 0.3);
+        poly(ctx, [[4, s * 7], [-22, s * 40], [-23, s * 38], [1, s * 8]]); ctx.fill();
+        rivets(ctx, -8, -28, s * 36.5, 5, 0.3);
       });
       bevel(ctx, w, 0.8);
       // Guided missile under the wing
-      for (const [yy, x0] of [[30, -16], [38, -22]]) {
-        const m = capsule(ctx, x0, x0 + 14, s * yy, 1.3, '#c9d0dc', S * 0.6);
-        inside(ctx, m, () => { ctx.fillStyle = '#e04a3a'; ctx.fillRect(x0 + 11.5, s * yy - 2, 3, 4); });
-        ctx.fillStyle = '#3a4152'; poly(ctx, [[x0, s * yy - 2.2], [x0 + 2.5, s * yy - 1], [x0 + 2.5, s * yy + 1], [x0, s * yy + 2.2]]); ctx.fill();
-      }
-      // Cannon pod
-      const pod = capsule(ctx, -6, 26, s * 22, 2.6, '#5d6578', S);
-      inside(ctx, pod, () => { seam(ctx, 6, s * 22 - 3, 6, s * 22 + 3, 0.3); vents(ctx, -3, s * 22, 4, 2, 1.3); });
-      ctx.fillStyle = '#2a303d'; ctx.fillRect(26, s * 22 - 0.8, 12, 1.6);
-      ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(38.4, s * 22, 1, 0, TAU); ctx.fill();
-      // Engine nacelle
-      const nac = () => { ctx.beginPath(); ctx.roundRect(-46, s * 13 - 6, 32, 12, 4); };
-      nac(); fillShadowed(ctx, metal(ctx, s * 13 - 6, s * 13 + 6, '#8893a8'), S);
-      inside(ctx, nac, () => {
-        seam(ctx, -38, s * 13 - 6, -38, s * 13 + 6); seam(ctx, -26, s * 13 - 6, -26, s * 13 + 6);
-        ctx.fillStyle = 'rgba(10,14,22,.8)'; ctx.fillRect(-16.5, s * 13 - 4.5, 2.5, 9);
-        vents(ctx, -36, s * 13, 5, 3.2, 1.6);
-      });
-      bevel(ctx, nac, 0.7);
+      const x0 = -26, yy = s * 27;
+      const m = capsule(ctx, x0, x0 + 14, yy, 1.3, '#c9d0dc', S * 0.6);
+      inside(ctx, m, () => { ctx.fillStyle = '#e04a3a'; ctx.fillRect(x0 + 11.5, yy - 2, 3, 4); });
+      ctx.fillStyle = '#3a4152'; poly(ctx, [[x0, yy - 2.2], [x0 + 2.5, yy - 1], [x0 + 2.5, yy + 1], [x0, yy + 2.2]]); ctx.fill();
+      // Cannon along the flank, the barrel reaching far forward
+      const gun = capsule(ctx, -16, 8, s * 12, 2.6, '#5d6578', S);
+      inside(ctx, gun, () => vents(ctx, -12, s * 12, 5, 2, 1.3));
+      ctx.fillStyle = '#2a303d'; ctx.fillRect(8, s * 12 - 0.7, 28, 1.4);
+      ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(36.4, s * 12, 0.9, 0, TAU); ctx.fill();
     }
-    // Hull
-    const hull = () => sym(ctx, [[60, 0], [46, -3.4], [24, -8.6], [-8, -11.4], [-40, -10.4], [-48, -8], [-48, 0]]);
-    hull(); fillShadowed(ctx, metal(ctx, -12, 12), S);
+    // Hull: chined nose, widening into the engine block at the tail
+    const hull = () => sym(ctx, [[62, 0], [50, -2.4], [34, -5], [16, -6.8], [-6, -7.8], [-26, -8.4],
+      [-33, -12], [-37, -17.5], [-44, -17.5], [-45, -15], [-45, 0]]);
+    hull(); fillShadowed(ctx, metal(ctx, -18, 18), S);
     inside(ctx, hull, () => {
-      for (const x of [40, 14, -12, -32]) seam(ctx, x, -12, x, 12);
-      seam(ctx, -44, -5, 14, -5, 0.3); seam(ctx, -44, 5, 14, 5, 0.3);
-      // Dorsal stripe in the empire color
-      ctx.fillStyle = color; ctx.fillRect(-44, -2, 50, 4);
-      ctx.fillStyle = tone(color, 0.45); ctx.fillRect(-44, -2, 50, 0.6);
-      ctx.fillStyle = tone(color, -0.45); ctx.fillRect(-44, 1.4, 50, 0.6);
+      for (const x of [40, 12, -14]) seam(ctx, x, -9, x, 9);
+      seam(ctx, -30, -18, -30, 18);
+      // Chines along the nose
+      seam(ctx, 52, -1.2, -26, -4.6, 0.3); seam(ctx, 52, 1.2, -26, 4.6, 0.3);
+      // Engine block: one housing per engine
+      for (const s of [-1, 1]) {
+        seam(ctx, -30, s * 7, -45, s * 7, 0.3);
+        ctx.fillStyle = 'rgba(10,14,22,.8)'; ctx.fillRect(-33, s * 12.5 - 3.5, 1.6, 7);
+        vents(ctx, -41, s * 12.5, 4, 3, 1.4);
+      }
+      // Stripe in the empire color along the spine, ahead of the fin
+      ctx.fillStyle = color; ctx.fillRect(-14, -1.6, 26, 3.2);
+      ctx.fillStyle = tone(color, 0.45); ctx.fillRect(-14, -1.6, 26, 0.5);
+      ctx.fillStyle = tone(color, -0.45); ctx.fillRect(-14, 1.1, 26, 0.5);
       ctx.fillStyle = 'rgba(255,255,255,.85)';
-      for (let i = 0; i < 3; i++) poly(ctx, [[-28 + i * 4, -2], [-26 + i * 4, 0], [-28 + i * 4, 2], [-29.4 + i * 4, 2], [-27.4 + i * 4, 0], [-29.4 + i * 4, -2]]), ctx.fill();
-      rivets(ctx, -30, 10, -8, 9, 0.32); rivets(ctx, -30, 10, 8, 9, 0.32);
+      for (let i = 0; i < 3; i++) poly(ctx, [[-10 + i * 4, -1.6], [-8 + i * 4, 0], [-10 + i * 4, 1.6], [-11.4 + i * 4, 1.6], [-9.4 + i * 4, 0], [-11.4 + i * 4, -1.6]]), ctx.fill();
+      rivets(ctx, -24, 8, -6, 8, 0.3); rivets(ctx, -24, 8, 6, 8, 0.3);
       ctx.fillStyle = 'rgba(30,36,50,.85)';
-      sym(ctx, [[60, 0], [52, -2.2], [50, 0]]); ctx.fill();
+      sym(ctx, [[62, 0], [54, -1.8], [52, 0]]); ctx.fill();
     });
     bevel(ctx, hull, 1);
+    // Tail fin above the middle engine - seen from above only a thin ridge
+    const fin = () => sym(ctx, [[-14, 0], [-22, -1.1], [-44, -1.9], [-46, 0]]);
+    fin(); fillShadowed(ctx, metal(ctx, -2, 2, '#b3bccb'), S * 0.6);
+    inside(ctx, fin, () => { ctx.fillStyle = color; ctx.fillRect(-40, -0.5, 18, 1); });
+    bevel(ctx, fin, 0.4);
     // Canopy with frame
-    const cab = () => sym(ctx, [[42, 0], [34, -3.2], [20, -5.4], [10, -4.6], [8, 0]]);
-    glass(ctx, cab, 8, 42, -5.4, 5.4, '#5fd2ff', S);
+    const cab = () => sym(ctx, [[46, 0], [40, -2.6], [28, -4.6], [16, -4.4], [12, 0]]);
+    glass(ctx, cab, 12, 46, -4.6, 4.6, '#5fd2ff', S);
     ctx.strokeStyle = 'rgba(40,46,60,.9)'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(22, -5.3); ctx.lineTo(22, 5.3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(26, -4.6); ctx.lineTo(26, 4.6); ctx.stroke();
   }
 };
 
@@ -495,9 +503,11 @@ const satellite = {
 };
 
 /* ---------------------------------------------------------- Colony ship */
-// Size of a habitat dome relative to the drawn dome (radius 15).
-// At 1 it clearly protrudes over the girder (half width 10.5).
-const DOME_SCALE = 1;
+// Habitat domes from back to front: position, rotation of the park and size
+// relative to the drawn dome (radius 15, rim 15.8). The large middle one
+// carries the ship; the domes do not overlap, and even the small ones
+// still protrude over the girder (half width 10.5).
+const DOMES = [[-37.4, 2.1, 0.77], [-7.2, -0.9, 1.07], [23, 0.5, 0.77]];
 
 const colony = {
   r: 58,
@@ -517,7 +527,11 @@ const colony = {
     // Struts to the cargo modules
     for (const s of [-1, 1]) for (const x of [-22, 4]) {
       const st = () => { ctx.beginPath(); ctx.rect(x - 1.6, s < 0 ? -26 : 12, 3.2, 14); };
-      st(); fillShadowed(ctx, metal(ctx, -2, 2, '#7d889c'), S * 0.5); bevel(ctx, st, 0.4);
+      // Shaded across the strut, not along the ship's axis - otherwise the
+      // lower struts fall into the dark end of the gradient and vanish.
+      const rod = ctx.createLinearGradient(x - 1.6, 0, x + 1.6, 0);
+      rod.addColorStop(0, tone('#7d889c', 0.5)); rod.addColorStop(0.45, '#7d889c'); rod.addColorStop(1, tone('#7d889c', -0.5));
+      st(); fillShadowed(ctx, rod, S * 0.5); bevel(ctx, st, 0.4);
       ctx.strokeStyle = 'rgba(10,14,24,.5)'; ctx.lineWidth = 0.3;
       ctx.beginPath(); ctx.moveTo(x - 1.6, s * 13); ctx.lineTo(x + 1.6, s * 25); ctx.stroke();
     }
@@ -553,9 +567,9 @@ const colony = {
     // Three large habitat domes with a park - the hallmark of the settler ship.
     // Each park is rotated a little so they do not look copied.
     // From back to front: the front one always lies on top.
-    for (const [x, dreh] of [[-33, 2.1], [-7, -0.9], [19, 0.5]]) {
+    for (const [x, dreh, size] of DOMES) {
       ctx.save();
-      ctx.translate(x, 0); ctx.scale(DOME_SCALE, DOME_SCALE); ctx.translate(-4, 0);
+      ctx.translate(x, 0); ctx.scale(size, size); ctx.translate(-4, 0);
       const dome = () => { ctx.beginPath(); ctx.arc(4, 0, 15, 0, TAU); };
       ctx.save();
       dome(); fillShadowed(ctx, '#173a2c', S);

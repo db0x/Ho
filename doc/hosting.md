@@ -12,7 +12,7 @@
 
 ## Running with Node
 
-Requires Node 20 or newer.
+Requires Node 22 or newer (26 recommended).
 
 ```
 npm install

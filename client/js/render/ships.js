@@ -113,142 +113,123 @@ function glint(ctx, x, y, rx, ry) {
 
 /* ---------------------------------------------------------------- Scout */
 function drawScout(ctx, L, color, phase) {
-  const W = L * 0.34;
+  // Same outline as the detailed drawing (shipshd.js, units of L/100), only a
+  // little wider so it still reads at map size.
+  const u = L / 100, k = 1.2;
+  const P = (pts, s = 1) => tracePath(ctx, pts.map(([x, y]) => [x * u, s * y * u * k]));
   // Engine flame
-  engineGlow(ctx, -L * 0.54, 0, L * 0.3, phase);
-  // Wings
+  engineGlow(ctx, -L * 0.54, 0, L * 0.28, phase);
+  // Swept wings in the empire color, with a pod at the tip
+  for (const s of [-1, 1]) {
+    P([[-6, 5], [-30, 26], [-38, 27.5], [-40, 25], [-30, 6]], s); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+    // Light from above: the lower wing lies in shade, both darken outwards
+    const g = ctx.createLinearGradient(0, s * 5 * u * k, 0, s * 27 * u * k);
+    g.addColorStop(0, `rgba(10,14,26,${s < 0 ? 0 : 0.2})`);
+    g.addColorStop(1, `rgba(10,14,26,${s < 0 ? 0.25 : 0.5})`);
+    ctx.fillStyle = g; ctx.fill(); outline(ctx, 0.8);
+    seam(ctx, L, [[-14 * u, s * 9 * u * k], [-33 * u, s * 25 * u * k]]);
+    ctx.fillStyle = '#9aa5ba';
+    ctx.beginPath(); ctx.roundRect(-41 * u, s * 26.5 * u * k - 1.8 * u * k, 13 * u, 3.6 * u * k, 1.8 * u * k);
+    ctx.fill(); outline(ctx, fine(L) * 0.8);
+  }
+  edgeLight(ctx, L, [[-6 * u, -5 * u * k], [-30 * u, -26 * u * k]], 0.4);
+  // Canards
+  for (const s of [-1, 1]) {
+    P([[30, 4], [22, 10.5], [19, 10], [22, 4]], s); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill(); outline(ctx, fine(L) * 0.8);
+  }
+  nozzle(ctx, L, -L * 0.46, 0, L * 0.06);
+  // Hull: long and slim, a dark sensor tip at the bow
+  const hull = [[56, 0], [44, -2.6], [26, -5.6], [4, -7.6], [-30, -7.2], [-46, -5.6], [-48, 0],
+    [-46, 5.6], [-30, 7.2], [4, 7.6], [26, 5.6], [44, 2.6]];
+  P(hull); ctx.closePath();
+  ctx.fillStyle = hullGradient(ctx, L * 0.25); ctx.fill(); outline(ctx, 0.9);
+  edgeLight(ctx, L, [[50 * u, -1.5 * u * k], [26 * u, -5 * u * k], [-44 * u, -5 * u * k]]);
+  seam(ctx, L, [[8 * u, -7 * u * k], [8 * u, 7 * u * k]]);
+  seam(ctx, L, [[-16 * u, -7 * u * k], [-16 * u, 7 * u * k]]);
+  // Identification stripe as in the detailed drawing
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(-L * 0.18, 0);
-  ctx.lineTo(-L * 0.42, -W * 0.95);
-  ctx.lineTo(-L * 0.02, -W * 0.16);
-  ctx.closePath();
-  ctx.moveTo(-L * 0.18, 0);
-  ctx.lineTo(-L * 0.42, W * 0.95);
-  ctx.lineTo(-L * 0.02, W * 0.16);
-  ctx.closePath();
-  ctx.fill(); outline(ctx, 0.8);
-  // Wing spars
-  for (const s of [-1, 1]) seam(ctx, L, [[-L * 0.12, s * W * 0.2], [-L * 0.36, s * W * 0.8]]);
-  edgeLight(ctx, L, [[-L * 0.04, -W * 0.18], [-L * 0.4, -W * 0.9]], 0.4);
-  // Nozzle
-  nozzle(ctx, L, -L * 0.45, 0, W * 0.2);
-  // Hull: a slender arrow
-  ctx.fillStyle = hullGradient(ctx, L);
-  ctx.beginPath();
-  ctx.moveTo(L * 0.52, 0);
-  ctx.lineTo(L * 0.05, -W * 0.3);
-  ctx.lineTo(-L * 0.44, -W * 0.22);
-  ctx.lineTo(-L * 0.44, W * 0.22);
-  ctx.lineTo(L * 0.05, W * 0.3);
-  ctx.closePath();
-  ctx.fill(); outline(ctx, 0.9);
-  edgeLight(ctx, L, [[L * 0.46, -W * 0.04], [L * 0.05, -W * 0.25], [-L * 0.4, -W * 0.18]]);
-  // Panel seams and color band at the bow
-  seam(ctx, L, [[-L * 0.06, -W * 0.24], [-L * 0.06, W * 0.24]]);
-  seam(ctx, L, [[-L * 0.26, -W * 0.22], [-L * 0.26, W * 0.22]]);
-  seam(ctx, L, [[-L * 0.06, 0], [-L * 0.4, 0]]);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(L * 0.4, -W * 0.08); ctx.lineTo(L * 0.34, -W * 0.13);
-  ctx.lineTo(L * 0.34, W * 0.13); ctx.lineTo(L * 0.4, W * 0.08); ctx.closePath(); ctx.fill();
-  // Canopy
+  ctx.fillRect(-34 * u, 3 * u * k, 40 * u, Math.max(0.6, 2 * u * k));
+  ctx.fillStyle = '#1e2433';
+  P([[56, 0], [48, -1.8], [46, 0], [48, 1.8]]); ctx.closePath(); ctx.fill();
+  // Canopy: long and narrow
   ctx.fillStyle = 'rgba(120,230,255,.9)';
-  ctx.beginPath(); ctx.ellipse(L * 0.18, 0, L * 0.11, W * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(24 * u, 0, 12 * u, 3.4 * u * k, 0, 0, Math.PI * 2); ctx.fill();
   outline(ctx, fine(L) * 0.8);
-  glint(ctx, L * 0.2, -W * 0.07, L * 0.035, W * 0.05);
-  // Navigation lights at the wing tips
-  navLight(ctx, L, -L * 0.4, -W * 0.9, PORT);
-  navLight(ctx, L, -L * 0.4, W * 0.9, STARBOARD);
+  glint(ctx, 26 * u, -1.2 * u * k, 4 * u, 0.9 * u * k);
+  // Navigation lights on the wing tip pods
+  navLight(ctx, L, -36 * u, -26.5 * u * k, PORT);
+  navLight(ctx, L, -36 * u, 26.5 * u * k, STARBOARD);
 }
 
 /* -------------------------------------------------------------- Fighter */
 function drawFighter(ctx, L, color, phase) {
-  const W = L * 0.46;
-  engineGlow(ctx, -L * 0.52, -W * 0.33, L * 0.26, phase);
-  engineGlow(ctx, -L * 0.52, W * 0.33, L * 0.26, phase + 1.3);
-  // Delta wing
-  const wg = ctx.createLinearGradient(0, -W, 0, W);
-  wg.addColorStop(0, color);
-  wg.addColorStop(0.5, '#55607a');
-  wg.addColorStop(1, color);
-  ctx.fillStyle = wg;
-  ctx.beginPath();
-  ctx.moveTo(L * 0.3, 0);
-  ctx.lineTo(-L * 0.24, -W);
-  ctx.lineTo(-L * 0.44, -W * 0.72);
-  ctx.lineTo(-L * 0.2, -W * 0.18);
-  ctx.lineTo(-L * 0.2, W * 0.18);
-  ctx.lineTo(-L * 0.44, W * 0.72);
-  ctx.lineTo(-L * 0.24, W);
-  ctx.closePath();
-  ctx.fill(); outline(ctx, 1);
-  // Wing plates and flaps at the trailing edge
+  // Same outline as the detailed drawing (shipshd.js, units of L/100) in the
+  // style of the Viper Mk VII - but stockier, with the cannons standing out:
+  // at map size that is what tells it apart from the slim scout.
+  const u = L / 100, kh = 1.5, kw = 1.15;     // widening of hull and wings
+  const P = (pts, k, s = 1) => tracePath(ctx, pts.map(([x, y]) => [x * u, s * y * u * k]));
+  const mirror = pts => [...pts, ...pts.slice(1, -1).reverse().map(([x, y]) => [x, -y])];
+  const side = 12.5 * u * kh;                 // side engines
+  // Three engines side by side, the middle one the largest
+  engineGlow(ctx, -L * 0.53, 0, L * 0.28, phase);
+  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.52, s * side, L * 0.22, phase + 0.9 * s);
+  // Swept wings with cropped tips in the empire color
   for (const s of [-1, 1]) {
-    seam(ctx, L, [[L * 0.08, s * W * 0.32], [-L * 0.3, s * W * 0.84]]);
-    seam(ctx, L, [[-L * 0.08, s * W * 0.3], [-L * 0.36, s * W * 0.74]]);
-    ctx.fillStyle = 'rgba(10,14,26,.45)';
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.3, s * W * 0.78); ctx.lineTo(-L * 0.4, s * W * 0.7);
-    ctx.lineTo(-L * 0.26, s * W * 0.4); ctx.lineTo(-L * 0.2, s * W * 0.45); ctx.closePath(); ctx.fill();
+    P([[4, 7], [-22, 40], [-28, 42.5], [-35, 41.5], [-37, 9]], kw, s); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+    // Light from above: the lower wing lies in shade, both darken outwards
+    const g = ctx.createLinearGradient(0, s * 7 * u * kw, 0, s * 42 * u * kw);
+    g.addColorStop(0, `rgba(10,14,26,${s < 0 ? 0 : 0.2})`);
+    g.addColorStop(1, `rgba(10,14,26,${s < 0 ? 0.25 : 0.5})`);
+    ctx.fillStyle = g; ctx.fill(); outline(ctx, 0.9);
+    // Dark inner panel and the chevron
+    P([[-8, 20], [-20, 34], [-33, 34], [-33, 20]], kw, s); ctx.closePath();
+    ctx.fillStyle = 'rgba(20,26,40,.4)'; ctx.fill();
+    P([[-16, 25], [-22, 30], [-24, 30], [-18, 25], [-24, 20], [-22, 20]], kw, s); ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fill();
   }
-  edgeLight(ctx, L, [[L * 0.26, -W * 0.04], [-L * 0.22, -W * 0.94]], 0.45);
-  // Weapon pods with barrels
+  edgeLight(ctx, L, [[4 * u, -7 * u * kw], [-22 * u, -40 * u * kw]], 0.45);
+  for (const s of [-1, 1]) nozzle(ctx, L, -46 * u, s * side, 4.8 * u * kh);
+  nozzle(ctx, L, -47 * u, 0, 6.4 * u * kh);
+  // Cannons along the flanks, the barrels reaching far forward
   for (const s of [-1, 1]) {
-    const y = s * W * 0.62;
-    ctx.strokeStyle = '#9aa6bb'; ctx.lineWidth = Math.max(0.6, L * 0.025);
-    ctx.beginPath(); ctx.moveTo(L * 0.3, y); ctx.lineTo(L * 0.44, y); ctx.stroke();
-    ctx.fillStyle = '#2f3648';
-    ctx.beginPath();
-    ctx.roundRect(L * 0.02, y - L * 0.045, L * 0.3, L * 0.09, L * 0.03);
-    ctx.fill(); outline(ctx, 0.7);
-    edgeLight(ctx, L, [[L * 0.04, y - L * 0.03], [L * 0.29, y - L * 0.03]], 0.35);
+    const y = s * 15 * u;
+    ctx.strokeStyle = '#b5bfd0'; ctx.lineWidth = Math.max(0.8, L * 0.028);
+    ctx.beginPath(); ctx.moveTo(6 * u, y); ctx.lineTo(36 * u, y); ctx.stroke();
+    ctx.fillStyle = '#3a4255';
+    ctx.beginPath(); ctx.roundRect(-16 * u, y - 3.4 * u, 24 * u, 6.8 * u, 3 * u);
+    ctx.fill(); outline(ctx, fine(L) * 0.8);
     ctx.fillStyle = '#ff7a5c';
-    ctx.beginPath(); ctx.arc(L * 0.33, y, L * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(37 * u, y, Math.max(0.5, L * 0.022), 0, Math.PI * 2); ctx.fill();
   }
-  // Nozzles
-  for (const s of [-1, 1]) nozzle(ctx, L, -L * 0.44, s * W * 0.33, W * 0.11);
-  // Hull
-  ctx.fillStyle = hullGradient(ctx, L);
-  ctx.beginPath();
-  ctx.moveTo(L * 0.56, 0);
-  ctx.lineTo(L * 0.2, -W * 0.3);
-  ctx.lineTo(-L * 0.46, -W * 0.34);
-  ctx.lineTo(-L * 0.46, W * 0.34);
-  ctx.lineTo(L * 0.2, W * 0.3);
-  ctx.closePath();
-  ctx.fill(); outline(ctx, 1);
-  edgeLight(ctx, L, [[L * 0.5, -W * 0.03], [L * 0.2, -W * 0.26], [-L * 0.42, -W * 0.3]]);
-  // Air intakes next to the canopy
-  ctx.fillStyle = '#141a28';
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(L * 0.04, s * W * 0.2); ctx.lineTo(-L * 0.1, s * W * 0.27);
-    ctx.lineTo(-L * 0.1, s * W * 0.17); ctx.closePath(); ctx.fill();
-  }
-  // Panel seams on the hull
-  seam(ctx, L, [[-L * 0.14, -W * 0.3], [-L * 0.14, W * 0.3]]);
-  seam(ctx, L, [[-L * 0.32, -W * 0.32], [-L * 0.32, W * 0.32]]);
-  // Canopy
-  const cg = ctx.createLinearGradient(L * 0.05, 0, L * 0.4, 0);
+  // Hull: chined nose, widening into the engine block at the tail
+  P(mirror([[62, 0], [50, -2.4], [34, -5], [16, -6.8], [-6, -7.8], [-26, -8.4],
+    [-33, -12], [-37, -17.5], [-44, -17.5], [-45, -15], [-45, 0]]), kh); ctx.closePath();
+  ctx.fillStyle = hullGradient(ctx, L * 0.6); ctx.fill(); outline(ctx, 1);
+  edgeLight(ctx, L, [[56 * u, -1.4 * u * kh], [16 * u, -6.4 * u * kh], [-26 * u, -8 * u * kh]]);
+  seam(ctx, L, [[-14 * u, -8 * u * kh], [-14 * u, 8 * u * kh]]);
+  seam(ctx, L, [[-30 * u, -14 * u * kh], [-30 * u, 14 * u * kh]]);
+  // Stripe in the empire color along the spine, ahead of the fin
+  ctx.fillStyle = color;
+  ctx.fillRect(-14 * u, -2 * u * kh, 26 * u, 4 * u * kh);
+  ctx.fillStyle = '#1e2433';
+  P([[62, 0], [54, -1.8], [52, 0], [54, 1.8]], kh); ctx.closePath(); ctx.fill();
+  // Tail fin above the middle engine - from above a thin light ridge
+  P([[-14, 0], [-22, -1.4], [-44, -2.2], [-46, 0], [-44, 2.2], [-22, 1.4]], kh); ctx.closePath();
+  ctx.fillStyle = '#c3cbd8'; ctx.fill(); outline(ctx, fine(L) * 0.7);
+  // Canopy far forward
+  const cg = ctx.createLinearGradient(12 * u, 0, 46 * u, 0);
   cg.addColorStop(0, 'rgba(90,200,255,.95)');
   cg.addColorStop(1, 'rgba(220,250,255,.75)');
   ctx.fillStyle = cg;
-  ctx.beginPath();
-  ctx.moveTo(L * 0.36, 0);
-  ctx.lineTo(L * 0.1, -W * 0.19);
-  ctx.lineTo(L * 0.02, 0);
-  ctx.lineTo(L * 0.1, W * 0.19);
-  ctx.closePath(); ctx.fill();
+  P(mirror([[46, 0], [40, -2.6], [28, -4.6], [16, -4.4], [12, 0]]), kh); ctx.closePath(); ctx.fill();
   outline(ctx, fine(L) * 0.8);
-  seam(ctx, L, [[L * 0.1, -W * 0.17], [L * 0.1, W * 0.17]]);
-  glint(ctx, L * 0.2, -W * 0.07, L * 0.04, W * 0.035);
-  // Keel stripe in the player color
-  ctx.fillStyle = color;
-  ctx.fillRect(-L * 0.42, -L * 0.03, L * 0.3, L * 0.06);
-  // Navigation lights
-  navLight(ctx, L, -L * 0.24, -W * 0.97, PORT);
-  navLight(ctx, L, -L * 0.24, W * 0.97, STARBOARD);
+  glint(ctx, 32 * u, -1.6 * u * kh, 5 * u, 1 * u * kh);
+  // Navigation lights at the wing tips
+  navLight(ctx, L, -29 * u, -42 * u * kw, PORT);
+  navLight(ctx, L, -29 * u, 42 * u * kw, STARBOARD);
 }
 
 /* ------------------------------------------------------------ Satellite */
@@ -325,28 +306,31 @@ function drawSatellite(ctx, L, color, phase) {
 function drawColony(ctx, L, color, phase) {
   const W = L * 0.4;
   engineGlow(ctx, -L * 0.54, 0, L * 0.3, phase, '#aaffd0');
-  // Cargo pods with frames, color mark and lit windows
+  // Struts between girder and cargo pods - light, so they still read at map size
+  ctx.strokeStyle = '#9aa5ba'; ctx.lineWidth = Math.max(1, L * 0.04);
+  for (const s of [-1, 1]) for (const x of [-L * 0.22, L * 0.04]) {
+    ctx.beginPath(); ctx.moveTo(x, s * L * 0.1); ctx.lineTo(x, s * L * 0.25); ctx.stroke();
+  }
+  // Cargo pods with color mark at the stern and lit windows
   for (const s of [-1, 1]) {
-    const y = s * W * 0.72;
-    ctx.fillStyle = metalGradient(ctx, y - L * 0.1, y + L * 0.1);
+    const y = s * L * 0.33;
+    const h = L * 0.09;
+    const pg = ctx.createLinearGradient(0, y - h, 0, y + h);
+    pg.addColorStop(0, '#c9d1de'); pg.addColorStop(0.45, '#8f9aae'); pg.addColorStop(1, '#4f586b');
+    ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.roundRect(-L * 0.3, y - L * 0.1, L * 0.42, L * 0.2, L * 0.07);
+    ctx.roundRect(-L * 0.36, y - h, L * 0.52, h * 2, h);
     ctx.fill(); outline(ctx, 0.8);
-    for (const xx of [-L * 0.13, -L * 0.01]) seam(ctx, L, [[xx, y - L * 0.09], [xx, y + L * 0.09]]);
-    edgeLight(ctx, L, [[-L * 0.26, y - L * 0.075], [L * 0.08, y - L * 0.075]], 0.4);
-    ctx.fillStyle = color;
-    ctx.fillRect(-L * 0.26, y - L * 0.03, L * 0.1, L * 0.06);
+    for (const xx of [-L * 0.2, -L * 0.04]) seam(ctx, L, [[xx, y - h * 0.9], [xx, y + h * 0.9]]);
+    edgeLight(ctx, L, [[-L * 0.32, y - h * 0.7], [L * 0.12, y - h * 0.7]], 0.4);
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(-L * 0.36, y - h, L * 0.52, h * 2, h); ctx.clip();
+    ctx.fillStyle = color; ctx.fillRect(-L * 0.36, y - h, L * 0.07, h * 2);
+    ctx.restore();
     ctx.fillStyle = '#ffe9a8';
     for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.arc(L * 0.02 + i * L * 0.035, y, Math.max(0.45, L * 0.014), 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(L * 0.03 + i * L * 0.035, y, Math.max(0.45, L * 0.013), 0, Math.PI * 2); ctx.fill();
     }
-  }
-  // Struts
-  ctx.strokeStyle = '#78839a'; ctx.lineWidth = Math.max(1, L * 0.045);
-  for (const s of [-1, 1]) {
-    ctx.beginPath(); ctx.moveTo(-L * 0.1, s * W * 0.2); ctx.lineTo(-L * 0.1, s * W * 0.72); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(L * 0.06, s * W * 0.25); ctx.lineTo(-L * 0.04, s * W * 0.62);
-    ctx.lineWidth = fine(L); ctx.stroke(); ctx.lineWidth = Math.max(1, L * 0.045);
   }
   nozzle(ctx, L, -L * 0.46, 0, W * 0.22);
   // Hull: a narrow girder - the domes should stick out on the left and right
@@ -364,11 +348,12 @@ function drawColony(ctx, L, color, phase) {
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(L * 0.5, 0); ctx.lineTo(L * 0.42, -W * 0.15); ctx.lineTo(L * 0.42, W * 0.15); ctx.closePath(); ctx.fill();
-  // Three large habitat domes protruding over the hull - the hallmark of the
-  // settler ship. From back to front, the front one lies on top.
-  for (const x of [-L * 0.29, -L * 0.02, L * 0.25]) habitatDome(ctx, L, x, L * 0.165);
-  navLight(ctx, L, -L * 0.2, -W * 0.82, PORT);
-  navLight(ctx, L, -L * 0.2, W * 0.82, STARBOARD);
+  // Three habitat domes protruding over the hull - the hallmark of the settler
+  // ship. As in the detailed drawing: a large one in the middle, a small one
+  // fore and aft, none overlapping.
+  for (const [x, r] of [[-L * 0.41, L * 0.14], [-L * 0.07, L * 0.19], [L * 0.27, L * 0.14]]) habitatDome(ctx, L, x, r);
+  navLight(ctx, L, -L * 0.2, -L * 0.33, PORT);
+  navLight(ctx, L, -L * 0.2, L * 0.33, STARBOARD);
 }
 
 /** Green glass dome with a rib and gloss. */

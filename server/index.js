@@ -214,7 +214,8 @@ wss.on('connection', (ws, req, session) => {
         games.delete(game.id);           // nobody is watching anymore
       }
       const p = game?.players.find(p => p.id === c.playerId);
-      if (p) {
+      // Only the connection holding the seat may give it up.
+      if (p && p.connId === connId) {
         p.connected = false;
         if (game.state === 'lobby') {
           removePlayer(game, p.id);
@@ -432,12 +433,20 @@ function handle(connId, ws, msg) {
       if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
       const p = g.players.find(p => p.token === msg.token);
       if (!p) return send(ws, { t: 'error', key: 'err.noSeat' });
+      // On mobiles the new socket often overtakes the close of the old one
+      // (the server notices a dead socket late): the old connection lets go
+      // of the seat, so its late close does not report the player as lost.
+      const old = p.connId && p.connId !== connId && conns.get(p.connId);
+      if (old) { old.gameId = null; old.playerId = null; }
+      const wasAway = !p.connected;
       p.connId = connId; p.connected = true;
       c.gameId = g.id; c.playerId = p.id;
       g.lastActivity = Date.now();
       send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
       if (g.state === 'lobby') broadcastLobby(g);
-      else { send(ws, { t: 'view', view: buildView(g, p) }); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
+      // Back is only news to the others if they were told about the loss.
+      else if (wasAway) { broadcastView(g); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
+      else send(ws, { t: 'view', view: buildView(g, p) });
       break;
     }
     case 'profile': {
