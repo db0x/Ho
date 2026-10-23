@@ -58,7 +58,7 @@ export function swirlStroke(ctx, R, t) {
 }
 
 /**
- * Maw and photon arc - the core of the black hole without the arms.
+ * Maw - the core of the black hole without the arms.
  * Each view draws the arms itself: flat as a spiral, in 3D in the galactic
  * plane.
  */
@@ -78,9 +78,6 @@ export function drawHoleCore(ctx, x, y, R) {
   dark.addColorStop(1, 'rgba(4,8,18,0)');
   ctx.fillStyle = dark;
   ctx.beginPath(); ctx.arc(x, y, R * 0.32, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(214,238,255,0.85)';
-  ctx.lineWidth = Math.max(0.7, R * 0.035);
-  ctx.beginPath(); ctx.arc(x, y, R * 0.34, Math.PI * 0.72, Math.PI * 1.9); ctx.stroke();
   ctx.restore();
 }
 

@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 const RD = 1.3;                       // seconds per combat round at speed 1
 const SPEEDS = [1, 2, 4];
 // Those who deal damage fight in front; those who are protected stand at the back.
-const FRONT = ['fighter', 'satellite', 'scout', 'tanker', 'colony'];
+const FRONT = ['fighter', 'satellite', 'scout', 'tanker', 'transport', 'colony'];
 
 let modal = null, frame = 0, st = null;
 

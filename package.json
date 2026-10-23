@@ -1,6 +1,6 @@
 {
   "name": "ho-web",
-  "version": "0.4.5",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Ho!! - a space strategy game in the spirit of Spaceward Ho! (web, up to 16 players)",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node test/i18n.js && node test/smoke.js && node test/blackhole.js && node test/intercept.js && node test/budget.js && node test/multiplayer.js && node test/auth.js && node test/idle.js",
+    "test": "node test/i18n.js && node test/smoke.js && node test/blackhole.js && node test/intercept.js && node test/budget.js && node test/transport.js && node test/multiplayer.js && node test/auth.js && node test/idle.js",
     "test:engine": "node test/smoke.js",
     "test:hole": "node test/blackhole.js",
     "test:i18n": "node test/i18n.js",
@@ -16,7 +16,8 @@
     "test:auth": "node test/auth.js",
     "users": "node server/users.js",
     "test:budget": "node test/budget.js",
-    "test:idle": "node test/idle.js"
+    "test:idle": "node test/idle.js",
+    "test:transport": "node test/transport.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

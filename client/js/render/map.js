@@ -809,7 +809,7 @@ export class MapView {
 }
 
 function leadType(f) {
-  const order = ['fighter', 'colony', 'tanker', 'scout', 'satellite'];
+  const order = ['fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
   const types = new Set((f.ships || []).map(s => s.type));
   for (const t of order) if (types.has(t)) return t;
   return 'fighter';
