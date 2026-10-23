@@ -176,6 +176,27 @@ nichts. Fällt ein Reich auf drei bekannte Welten zurück, wird es zum
 **Kriegsziel**: die Flotten sammeln sich und schlagen erst zu, wenn es für den
 Gnadenstoß reicht.
 
+### Schwierigkeit
+
+Jedes KI-Reich spielt auf einer von zwei Stufen. In der Lobby schaltet der Host sie
+per Tipp auf den Knopf neben der KI um; *Sofort gegen 5 KI spielen* würfelt sie für
+jeden Gegner.
+
+| Stufe | Was sie tut |
+|---|---|
+| **Normal** | spielt ihren Charakter wie oben beschrieben |
+| **Schwer** | wächst schneller und lernt aus Fehlern |
+
+Ein schweres Reich baut jedes Kolonieschiff in der Werft, die einer guten freien
+Welt am nächsten liegt, statt alle von der Hauptwelt quer durchs Reich zu schicken,
+und terraformt dort, wo ein Credit die meisten Menschen bringt. Außerdem führt es
+Kriegstagebuch. Ein gescheiterter Angriff wird nicht mit
+derselben Stärke wiederholt – diese Welt braucht beim nächsten Mal deutlich mehr,
+und ihr Besitzer gilt überall als stärker; Erfolge machen es wieder mutiger. Es
+rechnet mit feindlichen Flotten, die binnen zwei Runden zu Hilfe kommen können,
+ruft einen Angriff zurück, dessen Ziel inzwischen zu stark geworden ist, und meidet
+Welten, auf dem Weg zu denen seine Kolonieschiffe abgeschossen wurden.
+
 ## Zusehen
 
 *Beim Spielen zusehen* setzt eine Partie mit 4 bis 16 KI-Reichen auf. Es gibt

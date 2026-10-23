@@ -3,7 +3,7 @@ import { loadName, saveName, loadAvatar, saveAvatar } from '../net.js';
 import { syncSelects } from './select.js';
 import { pickAvatar, avatarHtml } from './avatar.js';
 import { startStars } from './scene.js';
-import { PLAYER_COLORS } from '../../shared/rules.js';
+import { PLAYER_COLORS, AI_LEVELS } from '../../shared/rules.js';
 import { t, n as num } from '../i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -225,7 +225,8 @@ export class Lobby {
     if (this.pendingQuickStart && msg.host) {
       const n = this.pendingQuickStart;
       this.pendingQuickStart = 0;
-      for (let i = 0; i < n; i++) this.net.send({ t: 'addBot' });
+      // The quick game rolls each opponent's level.
+      for (let i = 0; i < n; i++) this.net.send({ t: 'addBot', level: 'random' });
       setTimeout(() => this.net.send({ t: 'start' }), 120);
     }
     this.lobby = msg.lobby;
@@ -258,9 +259,17 @@ export class Lobby {
         </span>
         ${p.isBot ? `<span class="tagbot"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>`
           : (p.connected ? '' : `<span class="tagbot">${t('word.offline')}</span>`)}
+        ${p.isBot ? this.levelTag(p) : ''}
         ${this.isHost && !self ? `<button class="tiny" data-kick="${p.id}" title="${t('lobby.kick')}">×</button>` : ''}
       </li>`;
     }).join('');
+    // The host switches an AI's level with a tap - in turn through all levels.
+    for (const b of $('#lobby-players').querySelectorAll('[data-level]')) {
+      b.onclick = () => {
+        const next = AI_LEVELS[(AI_LEVELS.indexOf(b.dataset.current) + 1) % AI_LEVELS.length];
+        this.net.send({ t: 'level', playerId: b.dataset.level, level: next });
+      };
+    }
     for (const b of $('#lobby-players').querySelectorAll('[data-kick]')) {
       b.onclick = () => this.net.send({ t: 'kick', playerId: b.dataset.kick });
     }
@@ -306,6 +315,15 @@ export class Lobby {
     $('#btn-addbot').disabled = !this.isHost || msg.lobby.players.length >= 16;
     $('#btn-fill').disabled = !this.isHost || msg.lobby.players.length >= 16;
     $('#btn-start').textContent = this.isHost ? t('lobby.start') : t('lobby.waitHost');
+  }
+
+  /** How well an AI plays: a button for the host, otherwise just a label. */
+  levelTag(p) {
+    const level = p.level || 'normal';
+    const title = `${t('ai.levelTitle')} – ${t(`ai.${level}.desc`)}`;
+    return this.isHost
+      ? `<button type="button" class="tiny level ${level}" data-level="${p.id}" data-current="${level}" title="${title}">${t(`ai.${level}`)}</button>`
+      : `<span class="tagbot level ${level}" title="${title}">${t(`ai.${level}`)}</span>`;
   }
 
   /** After a language change: rewrite everything that is set here. */

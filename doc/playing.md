@@ -170,6 +170,24 @@ battery regrows from the population every turn, so a siege achieves nothing. Whe
 empire falls back to three known worlds it becomes the **war target**: the fleets
 gather and only strike once there is enough for the killing blow.
 
+### Difficulty
+
+Every AI empire plays at one of two levels. In the lobby the host switches it with a
+tap on the button next to the AI; *Play 5 AI right away* rolls it for each opponent.
+
+| Level | What it does |
+|---|---|
+| **Normal** | plays its personality as described above |
+| **Hard** | grows faster and learns from its mistakes |
+
+A hard empire builds every colony ship at the shipyard closest to a good free world
+instead of sending them all across the empire from the capital, and terraforms where
+a credit buys the most people. It also keeps a war diary. A strike that failed is not repeated with the same
+force – that world needs clearly more next time, and its owner is reckoned stronger
+everywhere; successes make it bolder again. It counts enemy fleets that can come to
+the rescue within two turns, calls back a strike whose target has grown too strong
+in the meantime, and avoids worlds where its colony ships were shot down.
+
 ## Watching
 
 *Watch a game* sets up a game with 4 to 16 AI empires. There is no empire of your

@@ -5,7 +5,7 @@ import {
   SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
-  COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
+  COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS, AI_LEVELS,
   holeZone, route, advance, travelDistance, supplyDistance, cargoOf
 } from '../shared/rules.js';
 import { forecast } from '../shared/budget.js';
@@ -119,7 +119,7 @@ export function setPlayerColor(game, player, color) {
   return true;
 }
 
-export function addPlayer(game, { name, isBot = false, connId = null, persona = null, avatar = null, account = null, accountKey = null }) {
+export function addPlayer(game, { name, isBot = false, connId = null, persona = null, level = null, avatar = null, account = null, accountKey = null }) {
   if (game.players.length >= 16) return null;
   const slot = game.players.length;
   // Ids stay unique even if someone left in between.
@@ -136,6 +136,7 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     emblem: PLAYER_EMBLEMS[slot],
     isBot,
     persona: isBot ? (AI_PERSONAS.includes(persona) ? persona : botPersona(game)) : null,
+    level: isBot ? (AI_LEVELS.includes(level) ? level : 'normal') : null,
     connId,
     joinedAt: Date.now(),
     connected: !isBot,
@@ -1379,6 +1380,7 @@ export function buildSpectatorView(game) {
     },
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
+      level: p.level,                      // spectators see how well each AI plays
       connected: p.connected, alive: p.alive, ready: p.ready,
       tech: { ...p.tech },
       money: Math.round(p.money), metal: Math.round(p.metal), income: Math.round(p.income || 0),
@@ -1429,9 +1431,16 @@ export function lobbyView(game) {
       // The account behind it if the display name differs - who plays with
       // whom should remain recognizable.
       account: p.account && p.account.toLowerCase() !== p.name.toLowerCase() ? p.account : null,
-      isBot: p.isBot, persona: p.persona, connected: p.connected
+      isBot: p.isBot, persona: p.persona, level: p.level, connected: p.connected
     }))
   };
+}
+
+/** The host sets how well an AI empire plays - only in the lobby. */
+export function setBotLevel(game, player, level) {
+  if (game.state !== 'lobby' || !player?.isBot || !AI_LEVELS.includes(level)) return false;
+  player.level = level;
+  return true;
 }
 
 /**

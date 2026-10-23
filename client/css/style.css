@@ -317,6 +317,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 #lobby-settings.readonly .chk:hover { color: var(--ink); }
 #lobby-settings.readonly .field.slim, #lobby-settings.readonly .chk { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .player-list .tagbot, .admin-account .tagbot { font-size: 12px; color: var(--ink-faint); border: 1px solid var(--line); padding: 1px 6px; border-radius: 20px; }
+/* AI level: a button for the host, a label for everyone else - hard in amber */
+.player-list .level { font-size: 12px; padding: 1px 8px; border-radius: 20px; }
+.player-list .level.hard { color: var(--gold); border-color: var(--gold-dim); }
+.level-tag { color: var(--ink-faint); border: 1px solid var(--line); border-radius: 20px; padding: 0 6px; white-space: nowrap; }
+.level-tag.hard { color: var(--gold); border-color: var(--gold-dim); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .lobby-foot { display: flex; justify-content: space-between; margin-top: 16px; }
 
@@ -703,12 +708,16 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .join-row .sel-btn { width: 100%; }
 .league { display: flex; flex-direction: column; gap: 2px; }
 /* Pin the width: otherwise the non-wrapping name pulls the row's minimum
-   width beyond the box and nothing ever gets truncated. */
-.league .row { width: 100%; box-sizing: border-box; overflow: hidden;
+   width beyond the box and nothing ever gets truncated. A plain block, not
+   the flex row of .row - as a flex item the head could not shrink below its
+   content and the name was never cut short. */
+.league .row { display: block; width: 100%; box-sizing: border-box; overflow: hidden;
   padding: 6px 8px; border-radius: 8px; background: #0b1020cc; border: 1px solid var(--line); }
 .league .row.dead { opacity: .45; }
 .league .head { display: flex; align-items: center; gap: 6px; }
 .league .head .nm { flex: 1; min-width: 0; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Personality and level stay whole - the name gets cut short first. */
+.league .head > span:not(.nm) { flex: none; }
 .league .num { margin-top: 3px; font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 .league .tech { margin-top: 3px; font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
 .league .bar { height: 3px; border-radius: 2px; margin-top: 5px; background: #ffffff14; overflow: hidden; }

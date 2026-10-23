@@ -157,6 +157,7 @@ export class Hud {
           <span class="dot" style="width:9px;height:9px;border-radius:50%;background:${p.color};box-shadow:0 0 8px ${p.color}"></span>
           <span class="nm" title="${p.name}">${p.name}</span>
           ${p.persona ? `<span class="muted small" title="${t(`persona.${p.persona}.desc`)}">${t(`persona.${p.persona}`)}</span>` : ''}
+          ${levelTag(p)}
         </div>
         <div class="num">${statsText(p.stats.planets, p.stats.pop, p.stats.ships)}</div>
         <div class="bar"><i style="width:${Math.round(p.stats.pop / maxPop * 100)}%;background:${p.color}"></i></div>
@@ -529,7 +530,8 @@ export class Hud {
         <span class="who">
           <span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>
           <small>${[p.id === v.host ? t('rank.host') : null,
-                    p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '') : null,
+                    p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '')
+                      + (p.level ? ' · ' + t(`ai.${p.level}`) : '') : null,
                     p.connected || p.isBot ? null : t('word.offline'),
                     p.alive ? `${t('word.worlds', { n: p.stats.planets, count: p.stats.planets })} · ${t('word.ships', { n: p.stats.ships, count: p.stats.ships })}` : null
                    ].filter(Boolean).join(' · ')}</small>
@@ -1170,6 +1172,12 @@ export class Hud {
     host.appendChild(d);
     setTimeout(() => d.remove(), onClick ? 7000 : 4200);
   }
+}
+
+/** How well an AI plays - only spectators learn it, hard stands out in gold. */
+function levelTag(p) {
+  if (!p.isBot || !p.level) return '';
+  return `<span class="small level-tag ${p.level}" title="${t(`ai.${p.level}.desc`)}">${t(`ai.${p.level}`)}</span>`;
 }
 
 /**
