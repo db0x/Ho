@@ -491,6 +491,7 @@
   "log.turnLimitNobody": "Rundenlimit erreicht – niemand führt.",
   "log.armsGrow": "Die Arme der Galaxie reichen weiter als gedacht: {count} neue Welten.",
   "log.mapGrows": "Die Sternkarte reicht weiter als gedacht: {count} neue Welten im {direction}.",
+  "log.galaxyComplete": "Die Galaxie ist vollständig: {count} Welten – weiter reicht die Sternkarte nicht.",
   "log.batteryBroken": "{planet}: Abwehr durchbrochen, Bevölkerung {before} → {after} Mio.",
   "log.battle": "Raumschlacht bei {planet}: {sides}.",
   "dir.left": "Westen",

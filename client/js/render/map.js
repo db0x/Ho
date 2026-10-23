@@ -362,11 +362,9 @@ export class MapView {
       ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
       for (const [wx, wy] of pts.slice(1)) ctx.lineTo(wx, wy);
       ctx.stroke();
-      ctx.setLineDash([]);
-      // Target marker and the direction it is flown in
-      ctx.lineWidth = st.hot ? 1.8 : 1.2;
-      ctx.beginPath(); ctx.arc(bx, by, tr, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+      // The arrowhead marks the target - a ring around it would only double
+      // the selection ring.
       const [fx, fy] = pts[pts.length - 2];
       arrowHead(ctx, fx, fy, bx, by, tr, st.hot ? 11 : 8, st.color);
       // Turns until arrival for your own fleet in focus - drawn last, above the worlds.

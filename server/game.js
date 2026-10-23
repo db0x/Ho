@@ -901,6 +901,9 @@ export function resolveTurn(game) {
 }
 
 const EDGE_TRIGGER = 200;    // distance to the outermost world at which the map gives way
+// The galaxy does not grow without end: at most this many worlds per empire
+// that took part (AI included), then it is complete.
+export const MAX_WORLDS_PER_PLAYER = 100;
 // The direction comes out as a keyword; it is named in the catalog
 // (dir.left ... dir.bottom).
 
@@ -912,6 +915,9 @@ const EDGE_TRIGGER = 200;    // distance to the outermost world at which the map
 function maybeExpand(game, entries) {
   if (game.settings.expanding === false) return;
   const g = game.galaxy;
+  if (g.complete) return;
+  const room = game.players.length * MAX_WORLDS_PER_PLAYER - g.planets.length;
+  if (room <= 0) { complete(); return; }
   // New land only once the old one is largely taken: as long as there are
   // more than two free habitable worlds per living empire, the map stays as
   // it is - otherwise it would grow without bounds. Uninhabitable worlds do
@@ -930,10 +936,11 @@ function maybeExpand(game, entries) {
     let maxR = 0;
     for (const e of eyes) maxR = Math.max(maxR, Math.hypot(e.x - g.field.cx, e.y - g.field.cy));
     if (maxR < g.field.rOut - EDGE_TRIGGER) return;
-    const added = expandSpiral(g);
+    const added = expandSpiral(g, room);
     if (added.length) {
       entries.push({ type: 'galaxy', key: 'log.armsGrow', params: { count: added.length } });
     }
+    if (added.length >= room) complete();
     return;
   }
 
@@ -948,10 +955,17 @@ function maybeExpand(game, entries) {
   }
   if (!best) return;
 
-  const added = expandGalaxy(g, best);
+  const added = expandGalaxy(g, best, room);
   if (!added.length) return;
   entries.push({ type: 'galaxy', key: 'log.mapGrows',
     params: { count: added.length, direction: best } });
+  if (added.length >= room) complete();
+
+  /** The limit is reached: said once, then the map stays as it is. */
+  function complete() {
+    g.complete = true;
+    entries.push({ type: 'galaxy', key: 'log.galaxyComplete', params: { count: g.planets.length } });
+  }
 }
 
 // Numbers go out unformatted - how they are written (comma or period) is

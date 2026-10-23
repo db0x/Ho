@@ -315,7 +315,7 @@ export function runBot(game, bot) {
       const unknown = planets.filter(p => !bot.explored.has(p.id));
       target = reachable(game, fleet, unknown.filter(safe), p => -far(p));
       if (!target) target = reachable(game, fleet, unknown, p => -far(p));
-      if (!target && game.settings.expanding !== false) {
+      if (!target && game.settings.expanding !== false && !game.galaxy.complete) {
         target = reachable(game, fleet, planets.filter(safe), p => dist(p, center));
       }
     } else {
@@ -426,7 +426,7 @@ export function runBot(game, bot) {
       // Only scouts that keep up with today's levels are counted.
       const farEnough = shipStats('scout', bot.tech).range * 0.75;
       const underway = myFleets.reduce((a, f) => a + f.ships.filter(s => s.type === 'scout' && s.range >= farEnough).length, 0);
-      const wanted = known.length < planets.length || game.settings.expanding !== false
+      const wanted = known.length < planets.length || (game.settings.expanding !== false && !game.galaxy.complete)
         ? (P.scouts ? 3 : 2) : 0;
       if (game.turn < 6) order.push([yard, 'scout', 2]);
       else if (underway < wanted && game.turn % 3 === 0) order.push([yard, 'scout', 1]);

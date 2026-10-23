@@ -240,7 +240,7 @@ export function harshnessAt(galaxy, x, y) {
  * further, and worlds appear in the newly added ring.
  * @returns {object[]} the new worlds
  */
-export function expandSpiral(galaxy) {
+export function expandSpiral(galaxy, limit = Infinity) {
   const g = galaxy, f = g.field;
   if (!f) return [];
   g.epoch++;
@@ -250,7 +250,7 @@ export function expandSpiral(galaxy) {
   f.rOut = rNew;                                  // arms reach further out
   // The arms do not fill the ring - correspondingly fewer worlds.
   const area = Math.PI * (rNew * rNew - rOld * rOld);
-  const count = Math.max(2, Math.round(area / AREA_PER_PLANET * 0.42));
+  const count = Math.min(limit, Math.max(2, Math.round(area / AREA_PER_PLANET * 0.42)));
 
   const near = g.planets.filter(q => {
     const r = Math.hypot(q.x - f.cx, q.y - f.cy);
@@ -294,9 +294,10 @@ export function expandSpiral(galaxy) {
  * the same density, but rougher towards the outside.
  * @param {object} galaxy
  * @param {'left'|'right'|'top'|'bottom'} dir
+ * @param {number} [limit] at most this many worlds
  * @returns {object[]} the new worlds
  */
-export function expandGalaxy(galaxy, dir) {
+export function expandGalaxy(galaxy, dir, limit = Infinity) {
   const g = galaxy;
   const M = MARGIN;
   // The strip lies MARGIN inside the new border everywhere.
@@ -310,7 +311,7 @@ export function expandGalaxy(galaxy, dir) {
 
   g.epoch++;
   const rng = makeRng(`${g.seed}:expand:${g.epoch}`);
-  const count = Math.max(1, Math.round((r.x1 - r.x0) * (r.y1 - r.y0) / AREA_PER_PLANET));
+  const count = Math.min(limit, Math.max(1, Math.round((r.x1 - r.x0) * (r.y1 - r.y0) / AREA_PER_PLANET)));
   // Only check the gap to neighbors near the strip
   const near = g.planets.filter(q =>
     q.x > r.x0 - MIN_GAP && q.x < r.x1 + MIN_GAP && q.y > r.y0 - MIN_GAP && q.y < r.y1 + MIN_GAP);

@@ -593,6 +593,8 @@ export class Hud {
         </div>
       </div>
 
+      ${this.courseButton(p)}
+
       <div class="statgrid">
         <div class="stat"><div class="k">${t('planet.temp')}</div><div class="v">${fmt1(p.temp)} °C</div>
           <div class="small muted">${dT === 0 ? t('planet.ideal')
@@ -611,8 +613,6 @@ export class Hud {
           <div class="small muted">${econ ? '+' + fmt(planetMining(p)) + ' ' + t('unit.metal')
             : t('planet.satellites', { n: p.defenses || 0, count: p.defenses || 0 })}</div></div>
       </div>
-
-      ${this.courseButton(p)}
 
       ${isMine ? this.defenseSection(p, orbit) : ''}
 
@@ -944,7 +944,7 @@ export class Hud {
               .replace('<b>', '<b style="color:var(--gold)">') : ''}</div>
         </div>
       </div>
-      <div class="statgrid">
+      <div class="statgrid cols4">
         <div class="stat"><div class="k">${t('fleet.speed')}</div><div class="v">${Math.round(st.speed)} ${t('unit.lyPerTurn')}</div></div>
         <div class="stat"><div class="k">${t('fleet.range')}</div><div class="v">${fmt(st.range)} ${t('unit.ly')}</div></div>
         <div class="stat"><div class="k">${t('fleet.attack')}</div><div class="v">${st.attack}</div></div>

@@ -135,17 +135,22 @@ const app = {
     app.selection = sel;
     if (map) map.selection = sel;
     if (hud) hud.selection();
-    // On a phone the panel is not visible alongside: tapped means opened,
-    // tapping empty map means closed. The selection moves into the part of
-    // the map that the sheet leaves free.
+    // On a phone the panel is not visible alongside: tapped means opened -
+    // at half height, so the map stays big enough to play on - and tapping
+    // empty map means closed. The selection moves into the part of the map
+    // that the sheet leaves free.
     if (narrow.matches) {
-      app.showSheet?.(sel ? 'right' : '');
-      if (sel && map) {
-        const target = sel.type === 'planet' ? map.view?.planets[sel.id]
-          : map.view?.fleets.find(f => f.id === sel.id);
-        if (target) map.focus(target, app.freeArea());
-      }
+      app.showSheet?.(sel ? 'right' : '', 'peek');
+      app.refocus();
     }
+  },
+  /** Moves the selection into the part of the map that no sheet covers. */
+  refocus() {
+    const sel = app.selection;
+    if (!sel || !map) return;
+    const target = sel.type === 'planet' ? map.view?.planets[sel.id]
+      : map.view?.fleets.find(f => f.id === sel.id);
+    if (target) map.focus(target, app.freeArea());
   },
   order(planetId) {
     if (app.spectator) return;
@@ -386,8 +391,11 @@ function bindGame() {
   // at the bottom. On wide windows the bar is hidden and data-sheet stays
   // empty - the docks then stand side by side as usual.
   const game = $('#screen-game'), bar = $('#tabbar');
-  const showSheet = (name) => {
+  // size: 'full' or 'peek' (half height) - only portrait phones tell them
+  // apart, see the stylesheet.
+  const showSheet = (name, size = 'full') => {
     game.dataset.sheet = name || '';
+    game.dataset.size = size;
     for (const b of bar.querySelectorAll('button')) {
       b.classList.toggle('active', (b.dataset.sheet || '') === (name || ''));
     }
@@ -399,6 +407,30 @@ function bindGame() {
     b.onclick = () => showSheet(b.dataset.sheet || '');
   }
   app.showSheet = showSheet;
+  // Grip at the top of every sheet: a tap switches between half and full
+  // height, dragging up opens it fully, dragging down first shrinks it and
+  // then closes it.
+  const resize = (size) => {
+    game.dataset.size = size;
+    if (game.dataset.sheet === 'right') app.refocus();
+  };
+  for (const dock of ['#leftdock', '#rightdock', '#logdock'].map($)) {
+    const grip = document.createElement('div');
+    grip.className = 'sheet-grip only-phone';
+    dock.prepend(grip);
+    let y0 = null;
+    grip.addEventListener('pointerdown', (e) => { y0 = e.clientY; grip.setPointerCapture(e.pointerId); });
+    grip.addEventListener('pointercancel', () => { y0 = null; });
+    grip.addEventListener('pointerup', (e) => {
+      if (y0 == null) return;
+      const dy = e.clientY - y0, full = game.dataset.size !== 'peek';
+      y0 = null;
+      if (Math.abs(dy) < 8) resize(full ? 'peek' : 'full');
+      else if (dy < 0) resize('full');
+      else if (full) resize('peek');
+      else showSheet('');
+    });
+  }
   // When the window gets wide, the bar disappears - then no sheet may stay
   // stuck, otherwise a dock would suddenly be missing.
   narrow.addEventListener('change', (e) => { if (!e.matches) showSheet(''); });
@@ -421,10 +453,20 @@ function bindGame() {
     if (e.target.closest('#mapcorner') || e.target.closest('#tabbar')) return;
     if (narrow.matches) showSheet(''); else showOpts(false);
   });
-  $('#chk-names').onchange = e => map.showNames = e.target.checked;
-  $('#chk-range').onchange = e => map.showRange = e.target.checked;
-  $('#chk-terr').onchange = e => map.showTerritory = e.target.checked;
-  $('#chk-stars').onchange = e => map.showStars = e.target.checked;
+  // What the map shows is remembered in the browser, like sound and language.
+  const MAP_OPTS = 'ho-map';
+  let mapOpts = {};
+  try { mapOpts = JSON.parse(localStorage.getItem(MAP_OPTS) || '{}') || {}; } catch {}
+  for (const [id, prop] of [['#chk-names', 'showNames'], ['#chk-range', 'showRange'],
+    ['#chk-terr', 'showTerritory'], ['#chk-stars', 'showStars']]) {
+    const box = $(id);
+    if (typeof mapOpts[prop] === 'boolean') box.checked = mapOpts[prop];
+    map[prop] = box.checked;
+    box.onchange = (e) => {
+      map[prop] = mapOpts[prop] = e.target.checked;
+      try { localStorage.setItem(MAP_OPTS, JSON.stringify(mapOpts)); } catch {}
+    };
+  }
   const snd = $('#chk-sound'), vol = $('#snd-vol');
   snd.checked = sfx.on;
   vol.value = Math.round(sfx.volume * 100);

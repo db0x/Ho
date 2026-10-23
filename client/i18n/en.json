@@ -491,6 +491,7 @@
   "log.turnLimitNobody": "Turn limit reached – nobody is ahead.",
   "log.armsGrow": "The galaxy’s arms reach further than thought: {count} new worlds.",
   "log.mapGrows": "The star map reaches further than thought: {count} new worlds to the {direction}.",
+  "log.galaxyComplete": "The galaxy is complete: {count} worlds – the star map reaches no further.",
   "log.batteryBroken": "{planet}: defence broken, population {before} → {after}M.",
   "log.battle": "Space battle at {planet}: {sides}.",
   "dir.left": "west",

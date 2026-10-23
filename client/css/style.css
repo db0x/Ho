@@ -978,10 +978,17 @@ select option { background: var(--panel-solid); color: var(--ink); }
      above - a class rule would not win against that. */
   #leftdock, #rightdock, #logdock {
     position: fixed; left: 0; right: 0; width: auto;
-    top: auto; bottom: var(--bar); height: 54vh; max-height: none;
+    top: auto; bottom: var(--bar); height: 78vh;
+    max-height: calc(100dvh - 54px - var(--bar) - 6px);
     border-radius: 14px 14px 0 0; border-bottom: none;
-    display: none; z-index: 11;
+    display: none; z-index: 11; padding-top: 16px;
   }
+  /* Grip at the top edge: tap toggles half and full height, drag up opens,
+     drag down shrinks and then closes (client/js/main.js). */
+  .sheet-grip { position: absolute; top: 0; left: 0; right: 0; height: 24px; z-index: 2;
+    touch-action: none; cursor: grab; }
+  .sheet-grip::before { content: ''; position: absolute; left: 50%; top: 7px;
+    width: 44px; height: 5px; margin-left: -22px; border-radius: 3px; background: var(--ink-faint); }
   #screen-game[data-sheet="left"] #leftdock,
   #screen-game[data-sheet="right"] #rightdock,
   #screen-game[data-sheet="log"] #logdock { display: flex; }
@@ -989,7 +996,7 @@ select option { background: var(--panel-solid); color: var(--ink); }
   /* The log is not a window here - the remembered geometry applies again as
      soon as the window is wide enough (see client/js/ui/dialog.js). */
   #logdock { left: 0 !important; right: 0 !important; top: auto !important;
-    bottom: var(--bar) !important; width: auto !important; height: 54vh !important; }
+    bottom: var(--bar) !important; width: auto !important; height: 78vh !important; }
   #logdock .dlg-bar, #leftdock .dlg-bar { cursor: default; }
   .dlg-grip { display: none; }
   /* Sheets are never minimized - whatever the window remembers from the desktop. */
@@ -1020,10 +1027,27 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .listrow { padding: 10px 8px; }
   .shipitem { padding: 8px 8px; }
 
+  /* Values three abreast, the four fleet values in one row: half the
+     height, so more of the panel fits into the half-height sheet. */
+  .statgrid { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; margin: 8px 0; }
+  .statgrid.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stat { padding: 5px 8px; }
+  .stat .k { font-size: 10px; }
+  .stat .v { font-size: 14px; overflow-wrap: anywhere; }
+  .stat .small { font-size: 11px; }
+
   /* Messages above the map, not above the bar */
   #toasts { top: 58px; width: min(92vw, 420px); }
   .toast { font-size: 13px; }
   #turnbanner .big { font-size: 34px; }
+}
+
+/* Half height on portrait phones: a selection on the map opens like this,
+   so the map keeps the larger part of the screen. */
+@media (max-width: 900px) {
+  #screen-game[data-size="peek"] #leftdock,
+  #screen-game[data-size="peek"] #rightdock { height: 36vh; min-height: 200px; }
+  #screen-game[data-size="peek"] #logdock { height: 36vh !important; min-height: 200px; }
 }
 
 /* Wide but low (phone in landscape, split window): there is no room
@@ -1041,6 +1065,9 @@ select option { background: var(--panel-solid); color: var(--ink); }
     width: min(54vw, 420px) !important; height: auto !important;
   }
   #mapsettings { top: auto; }
+  /* The sheet stands at the side here at full height - nothing to pull. */
+  .sheet-grip { display: none !important; }
+  #leftdock, #rightdock, #logdock { padding-top: 0; }
 }
 
 /* Very low and narrow at the same time: then the only option is to make the
