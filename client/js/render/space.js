@@ -755,7 +755,9 @@ export class SpaceView {
 
   _bind() {
     const cv = this.cv;
-    let dragging = false, moved = false, panning = false, last = null;
+    // rightMouse: the press is a right mouse click - pointerup orders the
+    // course then, contextmenu must not do it a second time.
+    let dragging = false, moved = false, panning = false, rightMouse = false, last = null;
     // Two fingers: distance zooms, the midpoint moves the target point.
     // Rotating stays with the single finger - otherwise no course could be
     // held in 3D.
@@ -775,6 +777,7 @@ export class SpaceView {
       if (pointers.size === 2) { pinch = midpoint(); moved = true; dragging = false; return; }
       dragging = true; moved = false;
       panning = e.shiftKey || e.button === 1;
+      rightMouse = e.pointerType === 'mouse' && e.button === 2;
       last = { x: e.offsetX, y: e.offsetY };
     });
 
@@ -836,8 +839,11 @@ export class SpaceView {
       this.onSelect(h);
     });
 
+    // Only for a long press on touch or the menu key - a right mouse click is
+    // already handled on pointerup (before, it ordered the course twice).
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (rightMouse) return;
       this.onOrder(this.pick(e.offsetX, e.offsetY));
     });
 

@@ -1151,8 +1151,12 @@ export class Hud {
    */
   toast(text, color, onClick, action = '▶ ' + t('battle.watch')) {
     const host = $('#toasts');
+    // The same message again says nothing new: it starts over instead of
+    // stacking up (e.g. clicking an unreachable target several times).
+    for (const old of host.querySelectorAll('.toast')) if (old.dataset.text === text) old.remove();
     const d = document.createElement('div');
     d.className = 'toast';
+    d.dataset.text = text;
     d.textContent = text;
     if (color) d.style.borderLeftColor = color;
     if (onClick) {
