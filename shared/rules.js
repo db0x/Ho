@@ -45,7 +45,7 @@ export function techCostToNext(level) {
 
 // --------------------------------------------------------------------- Ships
 
-export const SHIP_TYPES = ['scout', 'fighter', 'satellite', 'colony', 'tanker'];
+export const SHIP_TYPES = ['scout', 'fighter', 'satellite', 'colony', 'tanker', 'transport'];
 
 // Ship names and descriptions live in the catalogs under
 // ship.<type>.name / .desc; only values that hold in every language are here.
@@ -83,6 +83,15 @@ export const SHIP_DEFS = {
     techs: ['range', 'speed'],
     attackMul: 0, shieldMul: 0.5, speedMul: 0.9, rangeMul: 2.6,
     tanker: true
+  },
+  // Carries satellites from one own world to another - as far and as fast as
+  // a tanker, but without extending the fleet's range.
+  transport: {
+    icon: 'transport',
+    money: 20, metal: 8, hull: 26,
+    techs: ['range', 'speed'],
+    attackMul: 0, shieldMul: 0.6, speedMul: 0.9, rangeMul: 2.6,
+    cargo: 5
   }
 };
 
@@ -165,8 +174,22 @@ export function shipStats(type, tech) {
     maxHp: Math.round(def.hull * (1 + def.shieldMul * 0.32 * (shieldL - 1))),
     mobile: def.speedMul > 0,
     colonists: def.colonists || 0,
-    isTanker: !!def.tanker
+    isTanker: !!def.tanker,
+    cargo: def.cargo || 0
   };
+}
+
+/**
+ * Satellites a fleet carries and how many it could carry. On the server a
+ * transporter holds its cargo as a list, in the view only as a number.
+ */
+export function cargoOf(ships) {
+  let used = 0, capacity = 0;
+  for (const s of ships) {
+    capacity += SHIP_DEFS[s.type]?.cargo || 0;
+    used += Array.isArray(s.cargo) ? s.cargo.length : (s.cargo || 0);
+  }
+  return { used, capacity, room: capacity - used };
 }
 
 // --------------------------------------------------------------------- Planets

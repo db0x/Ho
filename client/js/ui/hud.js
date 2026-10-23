@@ -3,7 +3,7 @@ import {
   TECH_FIELDS, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
-  holeZone, travelDistance, supplyDistance, batteryStats
+  holeZone, travelDistance, supplyDistance, batteryStats, cargoOf
 } from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
@@ -973,7 +973,8 @@ export class Hud {
           ${f.ships.length > 1 && where ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
         </div>
         ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
-      </div>`}`;
+      </div>`}
+      ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
 
     const col = (f.mine && v.me) ? v.me.color
       : ((v.players.find(q => q.id === f.owner) || {}).color || '#9fb0c8');
@@ -992,6 +993,53 @@ export class Hud {
       onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
     });
     this.wireRefit(box);
+    this.wireCargo(box, f);
+  }
+
+  /**
+   * Hold of the transporters: what is aboard, and - in orbit of an own
+   * world - taking satellites aboard and setting them down. One number for
+   * both directions; the server takes at most what fits or is there.
+   */
+  cargoSection(f, where) {
+    const c = cargoOf(f.ships);
+    if (!c.capacity) return '';
+    const own = where && where.owner === this.view.you;
+    const here = own ? where.defenses || 0 : 0;
+    const most = Math.max(Math.min(c.room, here), c.used);
+    if (this.cargoFleet !== f.id) { this.cargoFleet = f.id; this.cargoPick = most; }
+    this.cargoPick = Math.max(1, Math.min(this.cargoPick, most || 1));
+    return `
+      <div class="sec">
+        <h4>${t('fleet.cargo')}</h4>
+        <div class="small">${t('fleet.cargoValue', { used: c.used, capacity: c.capacity })}</div>
+        <div class="meter"><i style="width:${c.used / c.capacity * 100}%;background:var(--gold)"></i></div>
+        ${own ? `
+        <p class="hint-line">${t('fleet.cargoHere', { n: here, count: here })}</p>
+        <div class="buildrow">
+          <span class="bq" style="margin-left:0">
+            <button class="tiny" id="cq-minus">−</button>
+            <span class="n" id="cq">${this.cargoPick}</span>
+            <button class="tiny" id="cq-plus">+</button>
+          </span>
+          <button class="tiny" id="cargo-load"${c.room && here ? '' : ' disabled'}>${t('fleet.load')}</button>
+          <button class="tiny" id="cargo-drop"${c.used ? '' : ' disabled'}>${t('fleet.drop')}</button>
+        </div>
+        <p class="hint-line">${t('fleet.cargoHint')}</p>`
+        : `<p class="hint-line">${t('fleet.cargoAway')}</p>`}
+      </div>`;
+  }
+
+  wireCargo(box, f) {
+    const n = box.querySelector('#cq');
+    if (!n) return;
+    const step = (d) => { this.cargoPick = Math.max(1, this.cargoPick + d); n.textContent = this.cargoPick; };
+    box.querySelector('#cq-minus').onclick = () => step(-1);
+    box.querySelector('#cq-plus').onclick = () => step(1);
+    box.querySelector('#cargo-load').onclick = () =>
+      this.app.send({ t: 'orders', load: { fleetId: f.id, count: this.cargoPick } });
+    box.querySelector('#cargo-drop').onclick = () =>
+      this.app.send({ t: 'orders', drop: { fleetId: f.id, count: this.cargoPick } });
   }
 
   // ------------------------------------------------------------------ Log

@@ -5,7 +5,7 @@
 // variance per empire, so two conquerors do not play like twins.
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
-  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance
+  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance, cargoOf
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById } from './game.js';
 
@@ -271,6 +271,11 @@ export function runBot(game, bot) {
     const rest = f.ships.filter(s => s.attack <= 0).map(s => s.id);
     if (armed.length && rest.length) setOrders(game, bot, { split: { fleetId: f.id, ships: rest } });
   }
+  // Transporters keep to themselves - they have their own errands.
+  for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
+    const holds = f.ships.filter(s => s.cargo).map(s => s.id);
+    if (holds.length && holds.length < f.ships.length) setOrders(game, bot, { split: { fleetId: f.id, ships: holds } });
+  }
   // Scouts fly alone - in a bunch they only explore one world instead of several.
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
     if (f.ships.length < 2 || !f.ships.every(s => s.type === 'scout')) continue;
@@ -285,7 +290,7 @@ export function runBot(game, bot) {
     .filter(f => f.dest != null && f.ships.some(s => s.colonists > 0)).map(f => f.dest));
   for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.length)) {
     const st = fleetStats(fleet);
-    if (st.speed <= 0) continue;
+    if (st.speed <= 0 || fleet.ships.some(s => s.cargo)) continue;
     const here = fleet.at !== null ? planetById(game, fleet.at) : fleet;
     // Distance for the AI means: the path it really has to fly.
     const far = p => travelDistance(here, p, zone);
@@ -322,6 +327,7 @@ export function runBot(game, bot) {
     }
   }
 
+  logistics();
   refit();
 
   bot.ready = true;
@@ -448,6 +454,13 @@ export function runBot(game, bot) {
         if (n > 0) order.push([p, 'satellite', n]);
       }
     };
+    const transports = () => {
+      // Whoever relies on satellites moves them where the danger is now,
+      // instead of leaving them at worlds that have gone quiet.
+      if (P.satellites < 1 || game.turn < 25 || mine.length < 3) return;
+      const have = myFleets.reduce((a, f) => a + f.ships.filter(s => s.cargo).length, 0);
+      if (have < (P.satellites >= 3 ? 2 : 1) && surplus().length) order.push([yard, 'transport', 1]);
+    };
     const warships = () => {
       // If a lot of money is lying around, it goes into ships instead of being hoarded.
       const hoard = Math.floor(Math.max(0, budget - 10 * fighterCost.money) / fighterCost.money * 0.4);
@@ -462,6 +475,7 @@ export function runBot(game, bot) {
     if (P.solo === 'prey' && game.turn >= 35 && !oreScarce) { warships(); colonies(); }
     else { colonies(); warships(); }
     if (!hit) satellites();
+    transports();
 
     // Ore is scarcer than money: as long as settling is still planned,
     // something is kept for the colony ships of the next turns.
@@ -477,6 +491,54 @@ export function runBot(game, bot) {
         k++; spentMoney += c.money; spentMetal += c.metal;
       }
       if (k > 0) setOrders(game, bot, { build: { planetId: pl.id, type, count: k } });
+    }
+  }
+
+  /**
+   * Worlds with more satellites than they need: not threatened, and none of
+   * the rival's worlds close by. What stands beyond the reserve may go.
+   */
+  function surplus() {
+    const keep = 2;
+    return mine.filter(p => !threatened.has(p.id) && (p.defenses?.length || 0) > keep
+      && !enemyWorlds.some(e => dist(e, p) < 300))
+      .map(p => ({ p, spare: p.defenses.length - keep }));
+  }
+
+  /**
+   * Transporters: fetch spare satellites and bring them to the most heavily
+   * threatened world. Loaded at a donor, set down at the target.
+   */
+  function logistics() {
+    const needy = [...threatened.entries()]
+      .map(([id, a]) => ({ p: planetById(game, id), a }))
+      .filter(x => x.p && x.p.owner === bot.id)
+      .sort((x, y) => y.a - x.a);
+    const donors = surplus();
+    for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.some(s => s.cargo))) {
+      const cargo = cargoOf(f.ships);
+      const here = f.at != null ? planetById(game, f.at) : null;
+      const far = p => travelDistance(here || f, p, zone);
+      if (cargo.used > 0) {
+        // Arrived where it is needed (or the danger has passed: then wherever it stands).
+        const goal = needy.length ? reachable(game, f, needy.map(x => x.p), p => -far(p) * 0.01 + (threatened.get(p.id) || 0)) : null;
+        if (here && here.owner === bot.id && (!goal || goal.id === here.id)) {
+          setOrders(game, bot, { drop: { fleetId: f.id } });
+        } else if (goal) {
+          setOrders(game, bot, { move: { fleetId: f.id, planetId: goal.id } });
+        }
+        continue;
+      }
+      if (!needy.length) continue;
+      const donor = here && donors.find(d => d.p.id === here.id);
+      if (donor) {
+        setOrders(game, bot, { load: { fleetId: f.id, count: donor.spare } });
+        const goal = reachable(game, f, needy.map(x => x.p), p => -far(p) * 0.01 + (threatened.get(p.id) || 0));
+        if (goal && goal.id !== here.id) setOrders(game, bot, { move: { fleetId: f.id, planetId: goal.id } });
+        continue;
+      }
+      const source = reachable(game, f, donors.map(d => d.p), p => -far(p));
+      if (source && source.id !== f.at) setOrders(game, bot, { move: { fleetId: f.id, planetId: source.id } });
     }
   }
 

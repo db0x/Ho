@@ -74,9 +74,9 @@ Kolonisierung, Wirtschaft.
 | **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit Sprungbretter; Tanker erweitern den Radius. |
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. Veraltete Schiffe lassen sich in einer Werft **umrüsten**. |
 | **Abwehrbatterie** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. |
-| **Orbitalverteidigung** | Billige, unbewegliche Satelliten, die dauerhaft im Orbit bleiben. Ab fünf Stück spannen sie einen Schild auf. |
+| **Orbitalverteidigung** | Billige Satelliten, die im Orbit bleiben. Selbst fliegen können sie nicht, aber ein **Transporter** bringt bis zu fünf davon zu einer anderen eigenen Welt. Ab fünf Stück spannen sie einen Schild auf. |
 
-Die Schiffstypen – Späher, Jäger, Orbitalverteidigung, Kolonieschiff, Tanker –
+Die Schiffstypen – Späher, Jäger, Orbitalverteidigung, Kolonieschiff, Tanker, Transporter –
 erklärt der Steckbrief im Spiel (Klick auf ein Schiff in der Werft oder
 *Schiffstypen ansehen* in der Anleitung).
 

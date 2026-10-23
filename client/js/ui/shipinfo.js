@@ -101,6 +101,7 @@ function render() {
       st.attack ? differs(st.attack, base.attack) : null, fmt1),
     row(t('fleet.hull'), `${fmt(st.maxHp)} HP`, differs(st.maxHp, base.maxHp)),
     st.colonists ? row(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
+    st.cargo ? row(t('shipinfo.cargo'), t('shipinfo.cargoValue', { n: st.cargo })) : '',
     row(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
   ].join('');
   const levels = def.techs.map(f => `${t(`tech.${f}.name`)} ${tech[f] || TECH_START_LEVEL}`).join(' · ');

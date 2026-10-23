@@ -72,9 +72,9 @@ colonisation, economy.
 | **Range** | Distance from your nearest *inhabited own* planet. New colonies are therefore stepping stones; tankers widen the radius. |
 | **Tech level** | Ships are built with the level of their build year and keep it. Higher levels make ships better *and more expensive* – **miniaturisation** brings the cost back down. Outdated ships can be **refitted** at a shipyard. |
 | **Defence battery** | Every inhabited world defends itself, in proportion to its population. |
-| **Orbital defence** | Cheap, immobile satellites that stay in orbit for good. From five upwards they raise a shield. |
+| **Orbital defence** | Cheap satellites that stay in orbit. They cannot fly themselves, but a **transporter** carries up to five of them to another world of yours. From five upwards they raise a shield. |
 
-The ship classes – scout, fighter, orbital defence, colony ship, tanker – are
+The ship classes – scout, fighter, orbital defence, colony ship, tanker, transporter – are
 explained by the in-game data sheet (click a ship in the shipyard, or *Browse
 ship types* in the help).
 

@@ -6,7 +6,7 @@ import {
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
   COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS,
-  holeZone, route, advance, travelDistance, supplyDistance
+  holeZone, route, advance, travelDistance, supplyDistance, cargoOf
 } from '../shared/rules.js';
 import { forecast } from '../shared/budget.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng, newSeed } from './galaxy.js';
@@ -287,6 +287,7 @@ function addShip(game, fleet, type, tech) {
     colonists: st.colonists,
     isTanker: st.isTanker
   };
+  if (st.cargo) ship.cargo = [];        // satellites on board
   fleet.ships.push(ship);
   return ship;
 }
@@ -427,6 +428,10 @@ export function setOrders(game, player, msg) {
       else player.orders.unload[planet.id] = true;
     }
   }
+  if (msg.load || msg.drop) {
+    const r = loadOrDrop(game, player, msg.load || msg.drop, !!msg.load);
+    if (r) return r;
+  }
   if (msg.refit) {
     // Refit: a fleet in orbit of an own shipyard, or the satellites of an own
     // world. Carried out at the end of the turn after research, so right away
@@ -539,6 +544,50 @@ function refitOrders(game, p, entries) {
       key: 'log.refitShort', params: { planet: planet.name } });
   }
   p.orders.refit = {};
+}
+
+/**
+ * Transporters take satellites aboard from the orbit of an own world or set
+ * them down there. Right away, like splitting and merging: whoever loads can
+ * set off in the same turn. Satellites keep their damage and tech level.
+ */
+function loadOrDrop(game, player, o, load) {
+  const fleet = game.fleets.find(f => f.id === o.fleetId);
+  if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
+  const planet = fleet.at != null ? planetById(game, fleet.at) : null;
+  if (!planet || planet.owner !== player.id) return { error: 'err.cargoOwnWorld' };
+  const holds = fleet.ships.filter(s => s.cargo);
+  if (!holds.length) return { error: 'err.noTransporter' };
+  const want = o.count == null ? Infinity : Math.max(0, Math.round(Number(o.count)) || 0);
+  const defenses = planet.defenses || (planet.defenses = []);
+  if (load) {
+    const n = Math.min(want, cargoOf(fleet.ships).room, defenses.length);
+    if (!defenses.length) return { error: 'err.noSatellites' };
+    if (n <= 0) return { error: 'err.cargoFull' };
+    // Spread over the transporters: if one is shot down, not everything is lost.
+    for (let i = 0; i < n; i++) {
+      const hold = holds.filter(s => s.cargo.length < SHIP_DEFS[s.type].cargo)
+        .sort((a, b) => a.cargo.length - b.cargo.length)[0];
+      hold.cargo.push(defenses.pop());
+    }
+    return;
+  }
+  const aboard = holds.reduce((a, s) => a + s.cargo.length, 0);
+  if (!aboard) return { error: 'err.cargoEmpty' };
+  const n = Math.min(want, aboard);
+  const dropped = [];
+  for (let i = 0; i < n; i++) {
+    const hold = holds.filter(s => s.cargo.length).sort((a, b) => b.cargo.length - a.cargo.length)[0];
+    const sat = hold.cargo.pop();
+    defenses.push(sat);
+    dropped.push([hold, sat]);
+  }
+  // A refit order for this world now covers more satellites - only accept
+  // that if it can still be paid for.
+  if (player.orders.refit['p:' + planet.id] && !affordable(game, player)) {
+    for (const [hold, sat] of dropped.reverse()) { defenses.splice(defenses.indexOf(sat), 1); hold.cargo.push(sat); }
+    return { error: 'notice.dropRefit' };
+  }
 }
 
 function cleanupFleets(game) {
@@ -814,7 +863,7 @@ export function resolveTurn(game) {
     const planets = game.galaxy.planets.filter(q => q.owner === p.id);
     p.stats.planets = planets.length;
     p.stats.pop = Math.round(planets.reduce((a, q) => a + q.pop, 0) * 10) / 10;
-    p.stats.ships = game.fleets.filter(f => f.owner === p.id).reduce((a, f) => a + f.ships.length, 0)
+    p.stats.ships = game.fleets.filter(f => f.owner === p.id).reduce((a, f) => a + f.ships.length + cargoOf(f.ships).used, 0)
       + game.galaxy.planets.reduce((a, q) => a + ((q.owner === p.id && q.defenses) ? q.defenses.length : 0), 0);
     // Without a world it is over: range is measured from own inhabited worlds,
     // so leftover ships could not go anywhere anymore. They vanish with the
@@ -1025,9 +1074,11 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
       key: 'log.batteryBroken',
       params: { planet: planet.name, before: round1(before), after: round1(planet.pop) } });
   }
-  // Remove the dead
+  // Remove the dead - satellites aboard go down with their transporter
   for (const f of game.fleets) {
-    if (f.at === planet.id || fleeing.includes(f)) f.ships = f.ships.filter(s => s.hp > 0);
+    if (f.at !== planet.id && !fleeing.includes(f)) continue;
+    cargoLost(f, f.ships.filter(s => s.hp <= 0), planet, entries);
+    f.ships = f.ships.filter(s => s.hp > 0);
   }
   if (planet.defenses) planet.defenses = planet.defenses.filter(s => s.hp > 0);
 
@@ -1044,6 +1095,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
         const p = playerById(game, f.owner);
         if (p) p.stats.losses += f.ships.length;
         for (const s of f.ships) if (idx.has(s)) scuttled.push(idx.get(s));
+        cargoLost(f, f.ships, planet, entries);
         f.ships = [];
       }
     }
@@ -1064,6 +1116,13 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
     battle: { sides: owners, units, rounds, scuttled, fled: [...escaping].map(s => idx.get(s)) }
   });
   cleanupFleets(game);
+}
+
+/** Satellites that went down with lost transporters - told to the owner only. */
+function cargoLost(fleet, ships, planet, entries) {
+  const n = ships.reduce((a, s) => a + (s.cargo ? s.cargo.length : 0), 0);
+  if (n) entries.push({ type: 'warn', playerIds: [fleet.owner], private: fleet.owner, planetId: planet.id,
+    key: 'log.cargoLost', params: { planet: planet.name, count: n } });
 }
 
 // ---------------------------------------------------------------- Visibility
@@ -1185,7 +1244,8 @@ export function buildView(game, player) {
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest,
         mine: true,
-        ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech })),
+        ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
+          ...(s.cargo ? { cargo: s.cargo.length } : {}) })),
         stats: fleetStats(f)
       });
       continue;
@@ -1277,7 +1337,8 @@ export function buildSpectatorView(game) {
     x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, mine: false,
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
-      attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech
+      attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
+      ...(s.cargo ? { cargo: s.cargo.length } : {})
     })),
     stats: fleetStats(f)
   }));
