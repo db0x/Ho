@@ -7,7 +7,8 @@ import { generateGalaxy } from '../server/galaxy.js';
 const game = createGame('Test');
 game.settings.seed = 20251012;
 game.settings.turnTimer = 0;
-for (let i = 0; i < 16; i++) addPlayer(game, { isBot: true, name: 'AI ' + (i + 1) });
+// Half of them hard: their learning has to hold up in a full game too.
+for (let i = 0; i < 16; i++) addPlayer(game, { isBot: true, name: 'AI ' + (i + 1), level: i % 2 ? 'hard' : 'normal' });
 const r = startGame(game);
 if (r.error) throw new Error(r.error);
 

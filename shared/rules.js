@@ -26,6 +26,13 @@ export const PLAYER_EMBLEMS = [
  */
 export const AI_PERSONAS = ['conqueror', 'settler', 'technocrat', 'raider', 'bulwark', 'vulture'];
 
+/**
+ * How well an AI empire plays. 'normal' follows its personality; 'hard' on
+ * top of that learns from its mistakes (server/bot.js). Named in the catalog
+ * under ai.<level>.
+ */
+export const AI_LEVELS = ['normal', 'hard'];
+
 // ----------------------------------------------------------------- Technology
 
 export const TECH_FIELDS = ['range', 'speed', 'weapons', 'shields', 'mini', 'radical'];

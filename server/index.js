@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
-  allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor,
+  allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor, setBotLevel,
   hostOf, pauseGame, resumeGame
 } from './game.js';
 import { runBot } from './bot.js';
@@ -18,7 +18,7 @@ import {
   cleanName, nameAllowed, reservedName, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
   accountAvatarUrl, handleAvatar
 } from './profile.js';
-import { MAX_PLAYERS } from '../shared/rules.js';
+import { MAX_PLAYERS, AI_LEVELS } from '../shared/rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -488,8 +488,16 @@ function handle(connId, ws, msg) {
     case 'addBot': {
       if (!game || game.players[0]?.id !== c.playerId) return;
       if (game.players.length >= MAX_PLAYERS) return;
-      addPlayer(game, { isBot: true, name: msg.name });
+      // 'random': the quick game rolls the level for every opponent.
+      const level = msg.level === 'random' ? AI_LEVELS[crypto.randomInt(AI_LEVELS.length)] : msg.level;
+      addPlayer(game, { isBot: true, name: msg.name, level });
       broadcastLobby(game);
+      break;
+    }
+    case 'level': {
+      if (!game || game.players[0]?.id !== c.playerId) return;
+      const bot = game.players.find(p => p.id === msg.playerId);
+      if (setBotLevel(game, bot, String(msg.level || ''))) broadcastLobby(game);
       break;
     }
     case 'kick': {
@@ -583,7 +591,8 @@ function handle(connId, ws, msg) {
         g = createGame('AI game');
         Object.assign(g.settings, sanitizeSettings(msg.settings));
         games.set(g.id, g);
-        for (let i = 0; i < bots; i++) addPlayer(g, { isBot: true });
+        // Levels rolled per empire, as in the quick game - there is something to compare.
+        for (let i = 0; i < bots; i++) addPlayer(g, { isBot: true, level: AI_LEVELS[crypto.randomInt(AI_LEVELS.length)] });
         const r = startGame(g);
         if (r.error) { games.delete(g.id); return send(ws, { t: 'error', key: r.error }); }
       }

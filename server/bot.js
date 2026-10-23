@@ -5,7 +5,8 @@
 // variance per empire, so two conquerors do not play like twins.
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
-  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance, cargoOf
+  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance, cargoOf,
+  terraformable, IDEAL
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById } from './game.js';
 
@@ -123,6 +124,9 @@ export function runBot(game, bot) {
   const early = game.turn < 30;
 
   const threatened = perceive(game, bot, ai, mine, enemyWorlds);
+  // Hard: first look at how the last strikes went, then plan.
+  const hard = bot.level === 'hard';
+  if (hard) review(game, bot, ai);
   const hit = game.turn - ai.lastHit < 8;
 
   // --- Endgame pressure: the later, the less patience. Whoever has not moved
@@ -144,7 +148,8 @@ export function runBot(game, bot) {
   // known but out of reach? For the latter, range gets researched.
   const colonyRange = shipStats('colony', bot.tech).range;
   const home = mine.filter(p => p.pop > 0.5);
-  const settleable = openWorlds.filter(p => planetCapacity(p) >= 1);
+  const settleable = openWorlds.filter(p => planetCapacity(p) >= 1
+    && !(hard && (ai.learn.danger[p.id] || 0) > game.turn));
   const inRange = settleable.filter(p => supplyDistance(home, p, zone) <= colonyRange);
   if (settleable.length > inRange.length && inRange.length < 2) weights.range += 3;
   // Ore is the hard limit: when it is scarce, the last chunks go into colonies
@@ -172,6 +177,18 @@ export function runBot(game, bot) {
     if (!pl || pl.owner !== f.owner) continue;
     homeFleet.set(f.at, (homeFleet.get(f.at) || 0) + f.ships.reduce((a, s) => a + s.maxHp, 0));
   }
+  // Hard: armed fleets of the owner that can be there within two turns count
+  // too - a world is not only defended by what sits in its orbit. Only free
+  // fleets or ones already on their way there: a fleet with another target
+  // will not turn back.
+  const rescuers = new Map();      // empire -> its armed fleets in space or orbit
+  if (hard) {
+    for (const f of game.fleets) {
+      if (f.owner === bot.id || !f.ships.some(s => s.attack > 0)) continue;
+      if (!rescuers.has(f.owner)) rescuers.set(f.owner, []);
+      rescuers.get(f.owner).push({ f, reach: 2 * fleetStats(f).speed, hp: f.ships.reduce((a, s) => a + s.maxHp, 0) });
+    }
+  }
   const defense = new Map();       // world -> hit points that have to go
   const worldsLeft = new Map();    // empire -> how many of its worlds the AI knows
   for (const p of enemyWorlds) {
@@ -179,9 +196,20 @@ export function runBot(game, bot) {
     const bs = holder ? batteryStats(p.pop, holder.tech) : null;
     let hp = bs ? bs.hp : 0;
     if (p.defenses) for (const s of p.defenses) hp += s.maxHp;
+    for (const r of rescuers.get(p.owner) || []) {
+      if (r.f.at !== p.id && (r.f.dest == null || r.f.dest === p.id) && dist(r.f, p) <= r.reach) hp += r.hp;
+    }
     defense.set(p.id, hp + (homeFleet.get(p.id) || 0));
     worldsLeft.set(p.owner, (worldsLeft.get(p.owner) || 0) + 1);
   }
+
+  // What a world really costs, as far as this empire knows: the estimate -
+  // for a hard empire corrected by what its earlier strikes taught it.
+  const price = p => {
+    const base = defense.get(p.id) || 0;
+    if (!hard) return base;
+    return Math.max(base * (ai.learn.foe[p.owner] || 1), ai.learn.world[p.id]?.need || 0);
+  };
 
   // How far is each enemy world from the nearest own base?
   const bases = mine.filter(p => p.pop >= 0.5);
@@ -227,6 +255,16 @@ export function runBot(game, bot) {
   const candidates = mine
     .map(p => ({ p, cost: terraformFullCost(p, bot.tech.radical) }))
     .sort((a, b) => a.cost - b.cost);
+  // Hard: not the cheapest first, but the most people per credit - the
+  // capacity a world gains once it is brought to the ideal.
+  if (hard) {
+    const gain = c => {
+      const ok = terraformable(c.p, bot.tech.radical);
+      const after = { ...c.p, temp: ok.temp ? IDEAL.temp : c.p.temp, grav: ok.grav ? IDEAL.grav : c.p.grav };
+      return planetCapacity(after) - planetCapacity(c.p);
+    };
+    candidates.sort((a, b) => (b.cost ? gain(b) / b.cost : 0) - (a.cost ? gain(a) / a.cost : 0));
+  }
   let left = treasury * P.terra * (early ? 0.8 : 1) * (1 - 0.5 * pressure);
   for (const c of candidates) {
     const give = c.cost > 0 ? Math.min(left, c.cost) : 0;
@@ -324,9 +362,21 @@ export function runBot(game, bot) {
     if (target && target.id !== fleet.at) {
       if (hasColonist) claimed.add(target.id);
       setOrders(game, bot, { move: { fleetId: fleet.id, planetId: target.id } });
+      // Hard: into the war diary - what was sent, against whom.
+      if (hard && fleet.dest === target.id) {
+        const L = ai.learn;
+        if (armed && target.owner && target.owner !== bot.id) {
+          L.strikes = L.strikes.filter(x => x.fleetId !== fleet.id);
+          L.strikes.push({ fleetId: fleet.id, target: target.id, owner: target.owner,
+            strike: strikePower(fleet), turn: game.turn });
+        } else if (hasColonist) {
+          L.colonies.push({ fleetId: fleet.id, target: target.id });
+        }
+      }
     }
   }
 
+  if (hard) recall();
   logistics();
   refit();
 
@@ -342,7 +392,7 @@ export function runBot(game, bot) {
       const open = z && z.owner && z.owner !== bot.id && bot.explored.has(z.id);
       // Waited too long, or the target arms faster than we can rebuild:
       // drop it and avoid it for a while.
-      const tooCostly = open && (defense.get(z.id) || 0) * margin > (power + reinforcements) * 1.5;
+      const tooCostly = open && price(z) * margin > (power + reinforcements) * 1.5;
       if (!open || tooCostly || game.turn - plan.since > 35) {
         if (open) ai.avoided[z.id] = game.turn + 25;
         plan = null;
@@ -369,7 +419,7 @@ export function runBot(game, bot) {
         const d0 = distance.get(p.id);
         if (d0 > reach || (ai.avoided[p.id] || 0) > game.turn) continue;
         if (revengeOnly && (ai.grudge[p.owner] || 0) < 2) continue;
-        const cost = defense.get(p.id) || 0;
+        const cost = price(p);
         if (!cheapest || cost < cheapest.cost) cheapest = { p, cost };
         if (cost * margin > potential) continue;
         const s = value(p) / (cost / costScale + 5) * (1 - d0 / (reach * 1.6));
@@ -381,7 +431,7 @@ export function runBot(game, bot) {
       plan = { targetId: choice.id, since: game.turn };
     }
     const target = planetById(game, plan.targetId);
-    plan.cost = defense.get(target.id) || 0;
+    plan.cost = price(target);
     plan.rally = mine.filter(p => p.pop >= 1)
       .sort((a, b) => travelDistance(a, target, zone) - travelDistance(b, target, zone))[0] || null;
     plan.target = target;
@@ -431,7 +481,19 @@ export function runBot(game, bot) {
       if (game.turn < 6) order.push([yard, 'scout', 2]);
       else if (underway < wanted && game.turn % 3 === 0) order.push([yard, 'scout', 1]);
     };
-    const colonies = () => { if (wantColony > 0) order.push([yard, 'colony', wantColony]); };
+    const colonies = () => {
+      if (wantColony <= 0) return;
+      if (!hard) { order.push([yard, 'colony', wantColony]); return; }
+      // Hard: every colony ship comes from the shipyard closest to one of the
+      // best free worlds - short trips instead of all of them crossing the
+      // empire from the capital. That alone decides most games.
+      const goals = inRange.slice().sort((a, b) => planetCapacity(b) - planetCapacity(a)).slice(0, wantColony);
+      for (const goal of goals) {
+        let best = yard, bd = Infinity;
+        for (const y of yards.slice(0, 30)) { const d = dist(y, goal); if (d < bd) { bd = d; best = y; } }
+        order.push([best, 'colony', 1]);
+      }
+    };
     const satellites = () => {
       if (!P.satellites) return;
       // Threatened worlds first, the most heavily threatened in front.
@@ -542,10 +604,29 @@ export function runBot(game, bot) {
     }
   }
 
+  /**
+   * Hard: strikes under way are checked again every turn. If the target has
+   * grown clearly stronger than the fleet on its way (reinforcements, new
+   * satellites), it turns back to the rally point instead of breaking on it.
+   */
+  function recall() {
+    for (const f of game.fleets) {
+      if (f.owner !== bot.id || f.dest == null) continue;
+      const target = planets[f.dest];
+      if (!target || !target.owner || target.owner === bot.id) continue;
+      const strike = strikePower(f);
+      if (strike <= 0 || price(target) * margin <= strike * 1.25) continue;
+      const back = (camp && camp.rally) || rallyPoint || yard;
+      if (back && back.id !== f.dest && canReach(game, f, back).ok) {
+        setOrders(game, bot, { move: { fleetId: f.id, planetId: back.id } });
+      }
+    }
+  }
+
   /** The raider splits big clusters into packs that go hunting on their own. */
   function formPacks() {
     const size = Math.max(3, Math.round(3 + game.turn / 25));
-    const prey = enemyWorlds.filter(p => (defense.get(p.id) || 0) <= size * fighterStrike).length;
+    const prey = enemyWorlds.filter(p => price(p) <= size * fighterStrike).length;
     if (prey < 2) return;
     for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
       const fighterIds = f.ships.filter(s => s.attack > 0).map(s => s.id);
@@ -567,7 +648,7 @@ export function runBot(game, bot) {
 
     // On its own: only targets this fleet cracks in one move - the defense
     // battery is back at full strength next turn.
-    const crackable = p => (defense.get(p.id) || 0) * margin <= strike;
+    const crackable = p => price(p) * margin <= strike;
     let prey = [];
     if (solo === 'prey') prey = enemyWorlds.filter(crackable);
     else if (solo === 'near') prey = enemyWorlds.filter(p => crackable(p) && distance.get(p.id) < 260);
@@ -577,7 +658,7 @@ export function runBot(game, bot) {
     }
     if (prey.length) {
       const t = reachable(game, fleet, prey,
-        p => value(p) / ((defense.get(p.id) || 0) / 100 + 5) - far(p) * 0.03);
+        p => value(p) / (price(p) / 100 + 5) - far(p) * 0.03);
       if (t) return t;
     }
 
@@ -646,7 +727,16 @@ function memory(game, bot) {
     fresh: new Map(),       // world -> turn in which it changed owner or collapsed
     lastHit: -99,
     quietSince: game.turn,  // last turn in which a world changed owner
-    guard: null             // threatened world the defenders are currently holding
+    guard: null,            // threatened world the defenders are currently holding
+    // Only used by hard empires: what earlier moves taught them.
+    learn: {
+      strikes: [],          // attacks under way: fleet, target, owner, strike power
+      colonies: [],         // colony ships under way: fleet, target
+      world: {},            // world -> { need, since, owner }: firepower that failed there
+      foe: {},              // empire -> how much stronger it turned out than estimated
+      danger: {},           // world -> until which turn colony ships avoid it
+      wins: 0, failures: 0
+    }
   };
   return bot.ai;
 }
@@ -699,6 +789,63 @@ function perceive(game, bot, ai, mine, enemyWorlds) {
   }
   for (const [id, t] of ai.fresh) if (game.turn - t > 6) ai.fresh.delete(id);
   return threatened;
+}
+
+/**
+ * Hard empires learn from their moves. Every strike was noted with what was
+ * sent; now that the outcome is known the picture gets corrected:
+ * - taken: the enemy was not stronger than thought - the empire grows bolder
+ *   against it, even a little below the plain estimate
+ * - failed (the fleet is gone, or it sits there and the world is not ours):
+ *   this world needs clearly more next time than what just broke on it, and
+ *   its owner is trusted with more strength everywhere - no second wave of
+ *   the same size against the same wall.
+ * Without new experience the picture drifts back to the plain estimate:
+ * caution that only ever grows would end in an empire that never attacks.
+ * Colony ships shot down on the way mark their target as dangerous.
+ */
+const FOE_MIN = 0.85, FOE_MAX = 3;
+const FOE_FADE = 0.97;        // per turn, towards the plain estimate
+
+function review(game, bot, ai) {
+  const L = ai.learn;
+  L.strikes = L.strikes.filter(s => {
+    const world = planetById(game, s.target);
+    const fleet = game.fleets.find(f => f.id === s.fleetId && f.owner === bot.id);
+    if (world.owner === bot.id) {
+      L.foe[s.owner] = Math.max(FOE_MIN, (L.foe[s.owner] || 1) * 0.85);
+      delete L.world[s.target];
+      L.wins++;
+      return false;
+    }
+    if (fleet && fleet.dest === s.target) return game.turn - s.turn < 40;     // still under way
+    if (fleet && fleet.at !== s.target) return false;                          // turned elsewhere
+    const before = L.world[s.target]?.need || 0;
+    L.world[s.target] = { need: Math.max(before, s.strike * 1.7), since: game.turn, owner: world.owner };
+    L.foe[s.owner] = Math.min(FOE_MAX, (L.foe[s.owner] || 1) * 1.2);
+    L.failures++;
+    return false;
+  });
+  // A lesson about a world holds until it changes hands - not just because
+  // time passed, that would mean running into the same wall again. Its
+  // population is no sign: the failed strikes themselves press it down.
+  // Very old lessons go in the end.
+  for (const [id, w] of Object.entries(L.world)) {
+    const world = planetById(game, Number(id));
+    if (!world || world.owner !== w.owner || game.turn - w.since > 150) delete L.world[id];
+  }
+  for (const [o, f] of Object.entries(L.foe)) {
+    const next = 1 + (f - 1) * FOE_FADE;
+    if (Math.abs(next - 1) < 0.01) delete L.foe[o]; else L.foe[o] = next;
+  }
+  L.colonies = L.colonies.filter(c => {
+    const world = planetById(game, c.target);
+    const fleet = game.fleets.find(f => f.id === c.fleetId && f.owner === bot.id);
+    if (world.owner === bot.id) return false;                                  // settled
+    if (fleet && fleet.dest === c.target) return true;                         // still under way
+    if (!fleet) L.danger[c.target] = game.turn + 20;                           // shot down
+    return false;
+  });
 }
 
 /**
