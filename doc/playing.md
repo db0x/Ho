@@ -4,6 +4,7 @@
 
 - [Starting a game](#starting-a-game)
 - [How it plays](#how-it-plays)
+- [The ship classes](#the-ship-classes)
 - [Money, metal and the budget](#money-metal-and-the-budget)
 - [Combat and conquest](#combat-and-conquest)
 - [Galaxy shape: scatter or spiral](#galaxy-shape-scatter-or-spiral)
@@ -74,9 +75,36 @@ colonisation, economy.
 | **Defence battery** | Every inhabited world defends itself, in proportion to its population. |
 | **Orbital defence** | Cheap satellites that stay in orbit. They cannot fly themselves, but a **transporter** carries up to five of them to another world of yours. From five upwards they raise a shield. |
 
-The ship classes – scout, fighter, orbital defence, colony ship, tanker, transporter – are
-explained by the in-game data sheet (click a ship in the shipyard, or *Browse
-ship types* in the help).
+## The ship classes
+
+Six classes, each with a job of its own. Ships are built at the shipyard of one of
+your worlds; clicking a ship there – or *Browse ship types* in the help (`H`) –
+opens its data sheet with the current values.
+
+| | |
+|---|---|
+| <img src="screenshots/ships/scout.webp" width="120" alt="Scout"> | **Scout** – the fastest class, with a long range. Only a scout reveals a world's temperature, gravity and metal reserve. Unarmed and fragile: better steer clear of enemy fleets. |
+| <img src="screenshots/ships/fighter.webp" width="120" alt="Fighter"> | **Fighter** – the backbone of every fleet, with weapons and shields. Whoever holds the orbit and breaks the defence battery and the orbital defence takes the world. Short range – send a tanker along for strikes deep in enemy space. |
+| <img src="screenshots/ships/satellite.webp" width="120" alt="Orbital defence"> | **Orbital defence** – a satellite placed straight into orbit of the world that builds it, where it stays. Cheap, tough and well armed; from five upwards they raise a shield. A world with satellites does not fall without a fight. |
+| <img src="screenshots/ships/colony.webp" width="120" alt="Colony ship"> | **Colony ship** – lands 8M settlers on a free world and is used up in the process. Over a world of yours that is not yet full, *Drop settlers here* tops up the population. Slow and defenceless – an escort pays off. |
+| <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – does not fight, but gives the whole fleet its range, more than twice that of a fighter. Every further tanker in the same fleet adds +15%. |
+| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – takes up to five satellites aboard in orbit of a world of yours and sets them down above another one, so the defence moves to wherever danger looms. Satellites aboard do not fight and are lost with the transporter. Does not extend the fleet's range. |
+
+Base values at tech level 1 – research improves them, and new ships are built at
+the current level:
+
+| Class | Cost | Attack | Hull | Speed | Range |
+|---|---|---|---|---|---|
+| Scout | 8 cr · 3 metal | – | 10 | 71 ly/t | 323 ly |
+| Fighter | 14 cr · 7 metal | 5 | 22 | 42 ly/t | 170 ly |
+| Orbital defence | 10 cr · 5 metal | 6 | 34 | – | – |
+| Colony ship | 30 cr · 12 metal | – | 16 | 34 ly/t | 221 ly |
+| Tanker | 18 cr · 6 metal | – | 20 | 38 ly/t | 442 ly |
+| Transporter | 20 cr · 8 metal | – | 26 | 38 ly/t | 442 ly |
+
+A fleet flies as fast as its slowest ship and as far as its best one (plus
+tankers). Every ship wears the colour of its empire – on the fighter, for example,
+the stripes along the fuselage.
 
 ## Money, metal and the budget
 
@@ -246,6 +274,8 @@ the iPad in portrait:
 - Tapping a world opens its sheet and moves it into the free part of the map;
   tapping empty space closes it.
 - The top bar becomes a single row; *Leave the game* lives under *More*.
+
+<p align="center"><img src="screenshots/phone-en.webp" width="640" alt="Ho!! on a phone: the map with fleets and courses on the left, the home world's sheet on the right"></p>
 
 | Gesture | Classic | Space |
 |---|---|---|

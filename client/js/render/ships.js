@@ -164,18 +164,19 @@ function drawFighter(ctx, L, color, phase) {
   // Three engines close together
   engineGlow(ctx, -L * 0.53, 0, L * 0.24, phase);
   for (const s of [-1, 1]) engineGlow(ctx, -L * 0.51, s * 4.6 * u, L * 0.17, phase + 0.9 * s);
-  // Slim delta wings in the empire color
+  // Slim silver delta wings - the empire color sits on the fuselage stripes
   for (const s of [-1, 1]) {
     P([[-0.6, 9.5], [-11.6, 28.4], [-18.6, 28.4], [-23, 11.6]], s); ctx.closePath();
-    ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = '#b4bfd0'; ctx.fill();
     // Light from above: the lower wing lies in shade, both darken outwards
     const g = ctx.createLinearGradient(0, s * 9 * u, 0, s * 28 * u);
     g.addColorStop(0, `rgba(10,14,26,${s < 0 ? 0 : 0.2})`);
     g.addColorStop(1, `rgba(10,14,26,${s < 0 ? 0.25 : 0.5})`);
     ctx.fillStyle = g; ctx.fill(); outline(ctx, 0.9);
     seam(ctx, L, [[-8 * u, s * 13 * u], [-15 * u, s * 26 * u]]);
-    // Cannon near the tip: pod and a light barrel far past the leading edge
-    const y = s * 25.5 * u;
+    // Cannon on the wing root, snug against the fuselage: pod and a light
+    // barrel far past the leading edge
+    const y = s * 12.9 * u;
     ctx.strokeStyle = '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
     ctx.beginPath(); ctx.moveTo(-3 * u, y); ctx.lineTo(9 * u, y); ctx.stroke();
     ctx.fillStyle = '#8994a8';
@@ -189,6 +190,18 @@ function drawFighter(ctx, L, color, phase) {
   P(mirror([[60, 0], [59, -1.6], [56, -2.6], [44, -3.4], [16, -6.7], [0, -9.6], [-20, -12],
     [-40, -12], [-43, -9], [-45, -6.7], [-45, 0]])); ctx.closePath();
   ctx.fillStyle = hullGradient(ctx, L * 0.3); ctx.fill(); outline(ctx, 1);
+  // Empire stripes left and right just inside the edge: a fine point behind
+  // the nose, full width from the canopy back (same as in shipshd.js). Small
+  // on the map they get wider - the empire must still be recognizable there.
+  const half = [[30, 5.0], [16, 6.7], [0, 9.6], [-20, 12], [-40, 12]];
+  const k = L < 30 ? 2 : L < 60 ? 1.5 : 1;
+  for (const s of [-1, 1]) {
+    const w = x => Math.min(1, (30 - x) / 30) * 2.4 * k;
+    P([...half.map(([x, h]) => [x, h - 1]), ...half.slice().reverse().map(([x, h]) => [x, h - 1 - w(x)])], s);
+    ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = `rgba(10,14,26,${s < 0 ? 0 : 0.2})`; ctx.fill();
+  }
   edgeLight(ctx, L, [[56 * u, -2.2 * u], [16 * u, -6.2 * u], [-38 * u, -11.4 * u]]);
   seam(ctx, L, [[-24 * u, -11.6 * u], [-24 * u, 11.6 * u]]);
   // Spine with the tail fin as a light ridge

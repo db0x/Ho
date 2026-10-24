@@ -24,6 +24,10 @@ Reiches.*
   Geld fließt.
 - **Kein Build-Schritt, keine Assets:** Grafik wird im Code gezeichnet, Klänge im
   Browser synthetisiert; einzige Abhängigkeit ist `ws`.
+- **Auch unterwegs:** auf Telefon und Tablet mit eigener Oberfläche – Leiste
+  unten, Blätter statt Fenster, Gesten für Karte und Raum.
+
+<p align="center"><img src="doc/screenshots/phone-de.webp" width="560" alt="Ho!! auf dem Telefon: links die Karte mit Flotten und Kursen, rechts das Blatt der Heimatwelt"></p>
 
 ## Schnellstart
 

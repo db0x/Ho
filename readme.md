@@ -23,6 +23,10 @@ gravity; settled worlds tint their surroundings in their empire's colour.*
   the turn.
 - **No build step, no assets:** graphics are drawn in code, sounds synthesised in
   the browser; the only dependency is `ws`.
+- **On the go too:** on phones and tablets with an interface of its own – a bar
+  along the bottom, sheets instead of windows, gestures for map and space.
+
+<p align="center"><img src="doc/screenshots/phone-en.webp" width="560" alt="Ho!! on a phone: the map with fleets and courses on the left, the home world's sheet on the right"></p>
 
 ## Quick start
 

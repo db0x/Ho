@@ -336,6 +336,18 @@ const scout = {
 // broad at the stern, the blue canopy in the middle, slim delta wings with
 // small clipped tips, cannons whose barrels reach far forward, a tail fin as
 // a thin ridge and three engines close together in a cage.
+// Silver of the fighter's wings, a touch brighter than the fuselage.
+const WING = '#b4bfd0';
+// Half width of the fighter's fuselage along its length - the points of hull() below.
+const FIGHTER_HULL = [[60, 1.6], [56, 2.6], [44, 3.4], [16, 6.7], [0, 9.6], [-20, 12], [-40, 12]];
+function fighterHalfWidth(x) {
+  for (let i = 1; i < FIGHTER_HULL.length; i++) {
+    const [x0, y0] = FIGHTER_HULL[i - 1], [x1, y1] = FIGHTER_HULL[i];
+    if (x <= x0 && x >= x1) return y0 + (y1 - y0) * (x0 - x) / (x0 - x1);
+  }
+  return 12;
+}
+
 const fighter = {
   r: 62,
   engines: [
@@ -355,26 +367,29 @@ const fighter = {
       // Slim delta with a small clipped tip and a nearly straight trailing edge
       const w = () => poly(ctx, [[-0.6, s * 9.5], [-11.6, s * 28.4], [-18.6, s * 28.4], [-23, s * 11.6]]);
       w();
+      // Silver wings - the empire color sits on the fuselage stripes instead
       const g = ctx.createLinearGradient(0, s * 9, 0, s * 28.4);
-      g.addColorStop(0, tone(color, s < 0 ? 0.2 : -0.15));
-      g.addColorStop(1, tone(color, s < 0 ? -0.2 : -0.5));
+      g.addColorStop(0, tone(WING, s < 0 ? 0.35 : -0.05));
+      g.addColorStop(1, tone(WING, s < 0 ? -0.1 : -0.42));
       fillShadowed(ctx, g, S);
       inside(ctx, w, () => {
         // Panel lines parallel to the trailing edge, as on the original
         for (const d of [0, 3.5, 7]) seam(ctx, -4 - d, s * 11, -13 - d * 0.5, s * 27, 0.3);
-        // Chevron as insignia
-        ctx.fillStyle = 'rgba(255,255,255,.7)';
+        // Chevron as insignia, embossed dark into the silver
+        ctx.fillStyle = 'rgba(40,46,60,.55)';
         poly(ctx, [[-9, s * 15.5], [-12.5, s * 19], [-14, s * 19], [-10.5, s * 15.5], [-14, s * 12], [-12.5, s * 12]]); ctx.fill();
         // Leading edge shines
         ctx.fillStyle = 'rgba(255,255,255,.16)';
         poly(ctx, [[-0.6, s * 9.5], [-11.6, s * 28.4], [-12.6, s * 27], [-1.6, s * 10]]); ctx.fill();
       });
       bevel(ctx, w, 0.8);
-      // Cannon near the tip: the barrel reaches far past the leading edge
-      const pod = capsule(ctx, -14, -3, s * 25.5, 1.3, '#9aa6b8', S * 0.6);
-      inside(ctx, pod, () => seam(ctx, -8.5, s * 25.5 - 1.5, -8.5, s * 25.5 + 1.5, 0.25));
-      ctx.fillStyle = '#2a303d'; ctx.fillRect(-3, s * 25.5 - 0.45, 12, 0.9);
-      ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(9.2, s * 25.5, 0.6, 0, TAU); ctx.fill();
+      // Cannon on the wing root, snug against the fuselage: the barrel reaches
+      // far past the leading edge, alongside the canopy
+      const cy = s * 12.9;
+      const pod = capsule(ctx, -14, -3, cy, 1.3, '#9aa6b8', S * 0.6);
+      inside(ctx, pod, () => seam(ctx, -8.5, cy - 1.5, -8.5, cy + 1.5, 0.25));
+      ctx.fillStyle = '#2a303d'; ctx.fillRect(-3, cy - 0.45, 12, 0.9);
+      ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(9.2, cy, 0.6, 0, TAU); ctx.fill();
     }
     // Engine cage around the three nozzles
     ctx.strokeStyle = '#596274'; ctx.lineWidth = 0.6;
@@ -387,6 +402,20 @@ const fighter = {
       [-40, -12], [-43, -9], [-45, -6.7], [-45, 0]]);
     hull(); fillShadowed(ctx, metal(ctx, -12, 12, '#a3b1c6'), S);
     inside(ctx, hull, () => {
+      // Empire stripes left and right, following the contour just inside the
+      // edge: a fine point behind the nose, full width from the canopy back.
+      for (const s of [-1, 1]) {
+        const xs = [30, 22, 16, 8, 0, -10, -20, -30, -40];
+        const at = (x, d) => [x, s * (fighterHalfWidth(x) - 1 - d * Math.min(1, (30 - x) / 30))];
+        ctx.beginPath();
+        xs.forEach((x, i) => i ? ctx.lineTo(...at(x, 0)) : ctx.moveTo(...at(x, 0)));
+        xs.slice().reverse().forEach(x => ctx.lineTo(...at(x, 2.4)));
+        ctx.closePath();
+        const g = ctx.createLinearGradient(0, s * 3, 0, s * 12);
+        g.addColorStop(0, tone(color, s < 0 ? 0.25 : -0.1));
+        g.addColorStop(1, tone(color, s < 0 ? -0.1 : -0.45));
+        ctx.fillStyle = g; ctx.fill();
+      }
       for (const x of [44, 28, -2, -24, -38]) seam(ctx, x, -12, x, 12);
       seam(ctx, 54, -1.4, 18, -5, 0.3); seam(ctx, 54, 1.4, 18, 5, 0.3);
       // Sensor openings at the nose

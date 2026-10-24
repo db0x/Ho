@@ -4,6 +4,7 @@
 
 - [Eine Partie beginnen](#eine-partie-beginnen)
 - [Spielprinzip](#spielprinzip)
+- [Die Schiffstypen](#die-schiffstypen)
 - [Geld, Metall und der Haushalt](#geld-metall-und-der-haushalt)
 - [Kampf und Eroberung](#kampf-und-eroberung)
 - [Form der Galaxie: Streufeld oder Spirale](#form-der-galaxie-streufeld-oder-spirale)
@@ -76,9 +77,36 @@ Kolonisierung, Wirtschaft.
 | **Abwehrbatterie** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. |
 | **Orbitalverteidigung** | Billige Satelliten, die im Orbit bleiben. Selbst fliegen können sie nicht, aber ein **Transporter** bringt bis zu fünf davon zu einer anderen eigenen Welt. Ab fünf Stück spannen sie einen Schild auf. |
 
-Die Schiffstypen – Späher, Jäger, Orbitalverteidigung, Kolonieschiff, Tanker, Transporter –
-erklärt der Steckbrief im Spiel (Klick auf ein Schiff in der Werft oder
-*Schiffstypen ansehen* in der Anleitung).
+## Die Schiffstypen
+
+Sechs Klassen, jede mit eigener Aufgabe. Gebaut wird in der Werft einer eigenen
+Welt; ein Klick auf ein Schiff dort – oder *Schiffstypen ansehen* in der Hilfe
+(`H`) – öffnet den Steckbrief mit den aktuellen Werten.
+
+| | |
+|---|---|
+| <img src="screenshots/ships/scout.webp" width="120" alt="Späher"> | **Späher** – der schnellste Typ mit großer Reichweite. Erst ein Späher deckt Temperatur, Schwerkraft und Metallvorrat einer Welt auf. Waffenlos und zerbrechlich: feindlichen Flotten lieber ausweichen. |
+| <img src="screenshots/ships/fighter.webp" width="120" alt="Jäger"> | **Jäger** – das Rückgrat jeder Flotte, mit Waffen und Schilden. Wer den Orbit hält und Abwehrbatterie und Orbitalverteidigung bricht, erobert die Welt. Kurze Reichweite – für Angriffe tief im Feindgebiet einen Tanker mitschicken. |
+| <img src="screenshots/ships/satellite.webp" width="120" alt="Orbitalverteidigung"> | **Orbitalverteidigung** – ein Satellit, der direkt im Orbit der Bauwelt entsteht und dort bleibt. Billig, zäh und kräftig bewaffnet; ab fünf Stück spannen sie einen Schild auf. Eine Welt mit Satelliten fällt nicht kampflos. |
+| <img src="screenshots/ships/colony.webp" width="120" alt="Kolonieschiff"> | **Kolonieschiff** – setzt 8 Mio. Siedler auf einer freien Welt ab und geht dabei auf. Über einer eigenen, noch nicht vollen Welt stockt *Siedler hier absetzen* die Bevölkerung auf. Langsam und wehrlos – Geleitschutz lohnt sich. |
+| <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – kämpft nicht, gibt aber der ganzen Flotte seine Reichweite, mehr als doppelt so viel wie ein Jäger. Jeder weitere Tanker in derselben Flotte bringt +15 %. |
+| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – nimmt im Orbit einer eigenen Welt bis zu fünf Satelliten an Bord und setzt sie über einer anderen eigenen Welt wieder aus; so wandert die Verteidigung dorthin, wo Gefahr droht. Geladene Satelliten kämpfen nicht und gehen mit dem Transporter verloren. Verlängert die Reichweite der Flotte nicht. |
+
+Die Grundwerte bei Technikstufe 1 – Forschung verbessert sie, Neubauten bekommen
+den jeweils aktuellen Stand:
+
+| Typ | Kosten | Angriff | Hülle | Tempo | Reichweite |
+|---|---|---|---|---|---|
+| Späher | 8 Cr · 3 Metall | – | 10 | 71 Lj/R | 323 Lj |
+| Jäger | 14 Cr · 7 Metall | 5 | 22 | 42 Lj/R | 170 Lj |
+| Orbitalverteidigung | 10 Cr · 5 Metall | 6 | 34 | – | – |
+| Kolonieschiff | 30 Cr · 12 Metall | – | 16 | 34 Lj/R | 221 Lj |
+| Tanker | 18 Cr · 6 Metall | – | 20 | 38 Lj/R | 442 Lj |
+| Transporter | 20 Cr · 8 Metall | – | 26 | 38 Lj/R | 442 Lj |
+
+Eine Flotte fliegt so schnell wie ihr langsamstes Schiff und so weit wie ihr
+bestes (plus Tanker). Jedes Schiff hat die Farbe seines Reiches – beim Jäger etwa
+die Streifen am Rumpf.
 
 ## Geld, Metall und der Haushalt
 
@@ -254,6 +282,8 @@ die Oberfläche um – Telefone hoch und quer, Tablets wie das iPad hochkant:
 - Eine Welt antippen schlägt ihr Blatt auf und rückt sie in den freien Teil der
   Karte; auf leeren Raum tippen klappt es zu.
 - Die Kopfleiste wird einzeilig; *Partie verlassen* steht unter *Mehr*.
+
+<p align="center"><img src="screenshots/phone-de.webp" width="640" alt="Ho!! auf dem Telefon: links die Karte mit Flotten und Kursen, rechts das Blatt der Heimatwelt"></p>
 
 | Geste | Klassik | Raum |
 |---|---|---|

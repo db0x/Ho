@@ -993,9 +993,10 @@ select option { background: var(--panel-solid); color: var(--ink); }
     padding: 8px 2px; font-size: 11px; color: var(--ink-dim);
     min-height: 54px;                 /* easy to hit with the thumb */
   }
-  #tabbar button .ic { font-size: 17px; line-height: 1; }
+  #tabbar button .ic { line-height: 1; }
+  #tabbar .ico { display: block; width: 19px; height: 19px; }
   #tabbar button.active { color: var(--gold); }
-  #tabbar button.active .ic { text-shadow: 0 0 10px rgba(240,180,41,.5); }
+  #tabbar button.active .ico { filter: drop-shadow(0 0 5px rgba(240,180,41,.55)); }
   #tabbar button:hover { background: none; }
 
   /* Addressed by ID, because #leftdock & co. set their fixed position by ID
@@ -1028,15 +1029,25 @@ select option { background: var(--panel-solid); color: var(--ink); }
   .tabbody, #selection { padding: 12px 14px; }
 
   /* -------------------------------------------------------- Map controls */
-  #mapcorner { position: fixed; right: 8px; bottom: calc(var(--bar) + 8px); }
+  /* A slim column at the right edge, flat like the bar below: one panel,
+     buttons without frames of their own, thin lines in between. The gear
+     is dropped - "More" in the bar opens the same menu. */
+  #mapcorner { position: fixed; right: 8px; bottom: calc(var(--bar) + 10px); }
   #mapcontrols {
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 6px; box-shadow: var(--shadow);
+    flex-direction: column; gap: 0; padding: 0; overflow: hidden;
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow);
   }
+  #mapcontrols #btn-mapopts { display: none; }
   /* Only the button bar makes way for the sheet - the settings live in the
      same container and are a sheet themselves. */
   #screen-game[data-sheet]:not([data-sheet=""]) #mapcontrols { display: none; }
-  #mapcontrols button { width: 40px; height: 40px; }
+  #mapcontrols button {
+    width: 44px; height: 44px; border: none; border-radius: 0; background: none; color: var(--ink-dim);
+  }
+  #mapcontrols button + button { border-top: 1px solid var(--line); }
+  #mapcontrols button:active { background: rgba(255,255,255,.06); color: var(--ink); }
+  #mapcontrols .ico { width: 19px; height: 19px; }
   #mapsettings {
     position: fixed; left: 0; right: 0; top: auto; bottom: var(--bar);
     border-radius: 14px 14px 0 0; padding: 14px 16px 18px;
