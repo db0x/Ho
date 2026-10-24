@@ -1,7 +1,7 @@
 // Star map generator.
 import crypto from 'node:crypto';
 import {
-  IDEAL, TEMP_RANGE, GRAV_RANGE, HOLE_BLOCK, dist, clamp, habitability, shipStats, travelDistance
+  IDEAL, TEMP_RANGE, GRAV_RANGE, HOLE_BLOCK, dist, clamp, habitability, planetCapacity, shipStats, travelDistance
 } from '../shared/rules.js';
 
 const PLANET_NAMES = [
@@ -204,6 +204,7 @@ export function generateGalaxy(opts) {
   const bounds = { x0: margin, y0: margin, x1: width - margin, y1: height - margin, halfDepth };
   const homes = chooseHomeworlds(planets, playerCount, rng, zone);
   for (const h of homes) ensureNeighbours(planets, planets[h], names, rng, zone, bounds, minGap);
+  balanceNeighbours(planets, homes.map(h => planets[h]), rng, zone);
   const galaxy = {
     seed,
     // Bounds instead of fixed dimensions: the map can grow in every direction,
@@ -492,5 +493,45 @@ function ensureNeighbours(planets, home, names, rng, zone, b, minGap) {
     // Mediocre, no paradise: only far enough towards the ideal to be worthwhile.
     q.temp = IDEAL.temp + Math.sign(q.temp - IDEAL.temp || 1) * Math.round(15 + rng() * 20);
     q.grav = clamp(Math.round((IDEAL.grav + (rng() * 2 - 1) * 0.2) * 20) / 20, GRAV_RANGE.min, GRAV_RANGE.max);
+  }
+}
+
+// The one good world every empire finds within reach of its starting ship:
+// a quarter off the ideal temperature, ideal gravity, middling size.
+const TOP_NEIGHBOUR = { tempOffset: 25, sizeFactor: 0.7 };
+// Other worlds within that reach stay at least this far below it.
+const TOP_LEAD = 6;
+
+/**
+ * Evens out the starting neighbourhoods. Left to chance, one empire found a
+ * world for 45 million next door and another only one for 20 - a lead the
+ * second never makes up. So every home gets exactly one good world of the
+ * same quality, and nothing better is within reach of the starting ship.
+ * Worlds further out stay random.
+ */
+function balanceNeighbours(planets, homes, rng, zone) {
+  const reachable = (home, q) => q !== home && !q.isHomeworld
+    && dist(home, q) <= START_REACH && travelDistance(home, q, zone) <= START_REACH;
+  const tops = new Set();
+  for (const home of homes) {
+    // Preferably a world nobody else reaches - otherwise a neighbour gets
+    // a head start on it.
+    const shared = (q) => homes.some(h => h !== home && reachable(h, q));
+    const pick = neighboursOf(planets, home, zone).filter(q => !tops.has(q))
+      .sort((a, b) => shared(a) - shared(b) || planetCapacity(b) - planetCapacity(a))[0];
+    if (!pick) continue;
+    pick.temp = IDEAL.temp + Math.sign(pick.temp - IDEAL.temp || 1) * TOP_NEIGHBOUR.tempOffset;
+    pick.grav = IDEAL.grav;
+    pick.sizeFactor = TOP_NEIGHBOUR.sizeFactor;
+    tops.add(pick);
+  }
+  const target = Math.max(...[...tops].map(planetCapacity)) - TOP_LEAD;
+  for (const q of planets) {
+    if (tops.has(q) || q.isHomeworld || planetCapacity(q) <= target) continue;
+    if (!homes.some(h => reachable(h, q))) continue;
+    // Keep size and gravity, only move the temperature away from the ideal.
+    const hab = Math.pow((target / (0.75 + 0.5 * q.sizeFactor) - 1.5) / 44, 0.8);
+    const dT = Math.max(0, 1 - hab - Math.abs(q.grav - IDEAL.grav) / 1.5);
+    q.temp = IDEAL.temp + Math.sign(q.temp - IDEAL.temp || (rng() < 0.5 ? -1 : 1)) * Math.ceil(dT * 100);
   }
 }

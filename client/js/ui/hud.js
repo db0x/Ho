@@ -470,6 +470,63 @@ export class Hud {
   }
 
   // --------------------------------------------------------------- Empire
+  /**
+   * Tooltip for a terraforming world in the world list: budget, what is
+   * still missing and what it brings - same numbers as the planet panel.
+   * @returns {string} HTML for showTip
+   */
+  terraTip(p, me) {
+    const radical = me?.tech?.radical ?? 1;
+    const allow = terraformable(p, radical);
+    const rest = terraformFullCost(p, radical);
+    const goal = { ...p, temp: allow.temp ? IDEAL.temp : p.temp, grav: allow.grav ? IDEAL.grav : p.grav };
+    const cap = planetCapacity(p), capGoal = planetCapacity(goal);
+    const turns = Math.ceil(rest / p.terraBudget);
+    const grav = g => g.toLocaleString(localeTag(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const row = (k, v) => `<span class="k">${k}</span><span class="v">${v}</span>`;
+    return `
+      <div class="tip-title">${p.name}</div>
+      <div class="tip-sub">${t('terra.tipTitle')}</div>
+      <div class="tip-grid">
+        ${row(t('terra.tipBudget'), t('terra.tipPerTurn', { budget: fmt(p.terraBudget) }))}
+        ${row(t('terra.tipEta'), rest ? t('terra.tipTurns', { n: turns, count: turns }) : t('terra.tipIdle'))}
+        ${row(t('terra.tipRest'), `${fmt(rest)} ${t('unit.cr')}`)}
+        ${row(t('terra.tipSpent'), `${fmt(p.terraSpent || 0)} ${t('unit.cr')}`)}
+        ${row(t('planet.temp'), `${fmt1(p.temp)} → ${fmt1(goal.temp)} °C`)}
+        ${row(t('planet.grav'), `${grav(p.grav)} → ${grav(goal.grav)} g`)}
+        ${row(t('terra.tipCap'), `${cap} → ${capGoal} ${t('unit.mio')}${capGoal > cap ? ` <b class="good">+${capGoal - cap}</b>` : ''}`)}
+      </div>
+      ${!allow.temp || !allow.grav ? `<div class="tip-warn">${t('terra.tipBlocked', { level: radical })}</div>` : ''}`;
+  }
+
+  /**
+   * Hover tooltips in the style of the map tooltip, for every [data-tip]
+   * element in box. The panels are rebuilt on every update - a tooltip
+   * under the mouse is shown again for the new element right away.
+   * @param {(el: HTMLElement) => string} html content for an element
+   */
+  wireTips(box, html) {
+    const tip = this.tipEl ||= document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hovertip' }));
+    const show = (el) => {
+      tip.innerHTML = html(el);
+      tip.classList.add('on');
+      const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+      // Beside the entry, preferably towards the map; never off screen.
+      let x = r.left - w - 10;
+      if (x < 8) x = Math.min(r.right + 10, innerWidth - w - 8);
+      tip.style.left = Math.max(8, x) + 'px';
+      tip.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top)) + 'px';
+    };
+    const hide = () => tip.classList.remove('on');
+    let over = null;
+    for (const el of box.querySelectorAll('[data-tip]')) {
+      el.onmouseenter = () => show(el);
+      el.onmouseleave = hide;
+      if (el.matches(':hover')) over = el;
+    }
+    if (over) show(over); else hide();
+  }
+
   empire() {
     const v = this.view;
     const mine = v.planets.filter(p => p.owner === v.you)
@@ -483,9 +540,10 @@ export class Hud {
         <div class="stat"><div class="k">${t('empire.mining')}</div><div class="v">+${fmt(mining)}</div></div>
       </div>
       <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:10px 0 6px">${t('empire.worlds', { n: mine.length })}</h4>
-      ${mine.map(p => `<div class="listrow" data-p="${p.id}">
+      ${mine.map(p => `<div class="listrow" data-p="${p.id}"${p.terraBudget ? ' data-tip' : ''}>
         <span class="dot" style="background:${tempHex(p.temp)}"></span>
-        <span class="nm">${p.name}${p.terraBudget ? ' <span class="muted small">⚙</span>' : ''}</span>
+        <span class="nm">${p.name}${p.terraBudget
+          ? ` <span class="muted small">⚙ ${t('terra.tipPerTurn', { budget: fmt(p.terraBudget) })}</span>` : ''}</span>
         <span class="num">${t('planet.popValue', { pop: fmt1(p.pop), cap: planetCapacity(p) })}</span>
       </div>`).join('') || `<p class="muted small">${t('empire.noColonies')}</p>`}
       <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:14px 0 6px">${t('empire.fleets')}</h4>
@@ -500,6 +558,7 @@ export class Hud {
         </div>`;
       }).join('') || `<p class="muted small">${t('empire.noFleets')}</p>`}
     `;
+    this.wireTips(box, row => this.terraTip(v.planets[+row.dataset.p], v.me));
     for (const row of box.querySelectorAll('[data-p]')) {
       row.onclick = () => {
         const p = v.planets[+row.dataset.p];
@@ -878,9 +937,9 @@ export class Hud {
     if (!f.stats || f.stats.speed <= 0) return t('err.fleetImmobile');
     const bases = v.planets.filter(q => q.owner === v.you && q.pop > 0.5);
     if (!bases.length) return t('err.outOfRange', { need: '∞', range: f.stats.range });
-    const need = supplyDistance(bases, target, holeZone(v.galaxy));
+    const need = Math.round(supplyDistance(bases, target, holeZone(v.galaxy)));
     if (need > f.stats.range) {
-      return t('err.outOfRange', { need: Math.round(need), range: f.stats.range });
+      return t('err.outOfRange', { need, range: f.stats.range });
     }
     return null;
   }
@@ -1000,17 +1059,31 @@ export class Hud {
 
   /**
    * Hold of the transporters: what is aboard, and - in orbit of an own
-   * world - taking satellites aboard and setting them down. One number for
-   * both directions; the server takes at most what fits or is there.
+   * world - taking satellites aboard and setting them down. Each direction
+   * has its own counter, capped by what fits or is there.
    */
   cargoSection(f, where) {
     const c = cargoOf(f.ships);
     if (!c.capacity) return '';
     const own = where && where.owner === this.view.you;
     const here = own ? where.defenses || 0 : 0;
-    const most = Math.max(Math.min(c.room, here), c.used);
-    if (this.cargoFleet !== f.id) { this.cargoFleet = f.id; this.cargoPick = most; }
-    this.cargoPick = Math.max(1, Math.min(this.cargoPick, most || 1));
+    const max = { load: Math.min(c.room, here), drop: c.used };
+    if (this.cargoFleet !== f.id) { this.cargoFleet = f.id; this.cargoPick = { ...max }; }
+    this.cargoMax = max;
+    for (const k of ['load', 'drop']) this.cargoPick[k] = Math.max(Math.min(1, max[k]), Math.min(this.cargoPick[k], max[k]));
+    const row = (k) => {
+      const off = max[k] ? '' : ' disabled';
+      return `
+        <div class="buildrow">
+          <span class="bq" style="margin-left:0">
+            <button class="tiny" id="cq-${k}-minus"${off}>−</button>
+            <span class="n" id="cq-${k}">${this.cargoPick[k]}</span>
+            <button class="tiny" id="cq-${k}-plus"${off}>+</button>
+          </span>
+          <button class="tiny" id="cargo-${k}"${off}>${t('fleet.' + k)}</button>
+          <span class="small muted">${t('fleet.' + k + 'Max', { n: max[k] })}</span>
+        </div>`;
+    };
     return `
       <div class="sec">
         <h4>${t('fleet.cargo')}</h4>
@@ -1018,30 +1091,26 @@ export class Hud {
         <div class="meter"><i style="width:${c.used / c.capacity * 100}%;background:var(--gold)"></i></div>
         ${own ? `
         <p class="hint-line">${t('fleet.cargoHere', { n: here, count: here })}</p>
-        <div class="buildrow">
-          <span class="bq" style="margin-left:0">
-            <button class="tiny" id="cq-minus">−</button>
-            <span class="n" id="cq">${this.cargoPick}</span>
-            <button class="tiny" id="cq-plus">+</button>
-          </span>
-          <button class="tiny" id="cargo-load"${c.room && here ? '' : ' disabled'}>${t('fleet.load')}</button>
-          <button class="tiny" id="cargo-drop"${c.used ? '' : ' disabled'}>${t('fleet.drop')}</button>
-        </div>
+        ${row('load')}
+        ${row('drop')}
         <p class="hint-line">${t('fleet.cargoHint')}</p>`
         : `<p class="hint-line">${t('fleet.cargoAway')}</p>`}
       </div>`;
   }
 
   wireCargo(box, f) {
-    const n = box.querySelector('#cq');
-    if (!n) return;
-    const step = (d) => { this.cargoPick = Math.max(1, this.cargoPick + d); n.textContent = this.cargoPick; };
-    box.querySelector('#cq-minus').onclick = () => step(-1);
-    box.querySelector('#cq-plus').onclick = () => step(1);
-    box.querySelector('#cargo-load').onclick = () =>
-      this.app.send({ t: 'orders', load: { fleetId: f.id, count: this.cargoPick } });
-    box.querySelector('#cargo-drop').onclick = () =>
-      this.app.send({ t: 'orders', drop: { fleetId: f.id, count: this.cargoPick } });
+    for (const k of ['load', 'drop']) {
+      const n = box.querySelector('#cq-' + k);
+      if (!n) continue;
+      const step = (d) => {
+        this.cargoPick[k] = Math.max(1, Math.min(this.cargoMax[k], this.cargoPick[k] + d));
+        n.textContent = this.cargoPick[k];
+      };
+      box.querySelector(`#cq-${k}-minus`).onclick = () => step(-1);
+      box.querySelector(`#cq-${k}-plus`).onclick = () => step(1);
+      box.querySelector('#cargo-' + k).onclick = () =>
+        this.app.send({ t: 'orders', [k]: { fleetId: f.id, count: this.cargoPick[k] } });
+    }
   }
 
   // ------------------------------------------------------------------ Log

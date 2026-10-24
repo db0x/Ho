@@ -336,9 +336,11 @@ function supplyDistanceFor(game, owner, point) {
 export function canReach(game, fleet, target) {
   const st = fleetStats(fleet);
   if (st.speed <= 0) return { ok: false, key: 'err.fleetImmobile', params: {} };
-  const need = supplyDistanceFor(game, fleet.owner, target);
+  // Range is rounded in fleetStats, so compare against the rounded distance
+  // as well - otherwise 170.3 > 170 rejects a target shown as "170 < 170".
+  const need = Math.round(supplyDistanceFor(game, fleet.owner, target));
   if (need > st.range) {
-    return { ok: false, key: 'err.outOfRange', params: { need: Math.round(need), range: st.range } };
+    return { ok: false, key: 'err.outOfRange', params: { need, range: st.range } };
   }
   return { ok: true };
 }
@@ -709,6 +711,8 @@ export function resolveTurn(game) {
     }
     p.money -= spend;
     p.ledger.terra += spend;
+    // Running total for the owner's overview; starts over with a new owner.
+    planet.terraSpent = (planet.terraSpent || 0) + spend;
     if (Math.abs(planet.temp - IDEAL.temp) < 0.05 && Math.abs(planet.grav - IDEAL.grav) < 0.002) {
       planet.temp = IDEAL.temp; planet.grav = IDEAL.grav;
       planet.terraBudget = 0;
@@ -782,6 +786,7 @@ export function resolveTurn(game) {
         planet.owner = owner;
         planet.pop = Math.max(0.5, Math.round(before * 0.65 * 10) / 10);
         planet.terraBudget = 0;
+        planet.terraSpent = 0;
         entries.push({ type: 'invade', playerIds: [owner, old ? old.id : null].filter(Boolean), planetId: planet.id,
           key: old ? 'log.invadeFrom' : 'log.invade',
           params: { player: p.name, planet: planet.name, from: old ? old.name : null } });
@@ -847,7 +852,7 @@ export function resolveTurn(game) {
     if (planet.pop <= 0.1) {
       entries.push({ type: 'lost', playerIds: [p.id], planetId: planet.id,
         key: 'log.colonyLost', params: { planet: planet.name } });
-      planet.owner = null; planet.pop = 0; planet.terraBudget = 0; planet.defenses = [];
+      planet.owner = null; planet.pop = 0; planet.terraBudget = 0; planet.terraSpent = 0; planet.defenses = [];
     }
   }
   for (const p of game.players) {
@@ -1234,6 +1239,7 @@ export function buildView(game, player) {
         defenseShips: p.owner === player.id && p.defenses ? p.defenses.map(d => ({ type: d.type, tech: d.tech })) : null,
         defenseStats: p.owner === player.id ? defenseStats(p) : null,
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
+        terraSpent: p.owner === player.id ? Math.round(p.terraSpent || 0) : 0,
         isHomeworld: !!p.isHomeworld
       };
     }
@@ -1244,7 +1250,7 @@ export function buildView(game, player) {
     // income and shipyard would count a world that is not yours.
     if (k) {
       const owner = k.owner === player.id ? p.owner : k.owner;
-      return { ...base, known: 'memory', ...k, owner, terraBudget: 0, isHomeworld: !!p.isHomeworld };
+      return { ...base, known: 'memory', ...k, owner, terraBudget: 0, terraSpent: 0, isHomeworld: !!p.isHomeworld };
     }
     return { ...base, known: 'unknown' };
   });
@@ -1344,6 +1350,7 @@ export function buildSpectatorView(game) {
     owner: p.owner, pop: p.pop,
     defenses: p.defenses ? p.defenses.length : 0,
     terraBudget: p.terraBudget || 0,
+    terraSpent: Math.round(p.terraSpent || 0),
     isHomeworld: !!p.isHomeworld
   }));
 

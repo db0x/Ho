@@ -549,6 +549,21 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .listrow .num { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
 .listrow.rdy .nm::after { content: " \2713"; color: var(--good); }
 
+/* Hover tooltip for panel entries - same look as the planet tooltip on the map. */
+.hovertip {
+  position: fixed; z-index: 50; display: none; pointer-events: none; max-width: 300px;
+  padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.35;
+  background: rgba(8, 11, 22, .93); border: 1px solid rgba(150, 175, 215, .28); box-shadow: var(--shadow);
+}
+.hovertip.on { display: block; }
+.hovertip .tip-title { font-weight: 600; font-size: 13.5px; color: #fff; }
+.hovertip .tip-sub { color: var(--ink-dim); margin-bottom: 6px; }
+.hovertip .tip-grid { display: grid; grid-template-columns: auto auto; column-gap: 14px; row-gap: 2px; }
+.hovertip .k { color: var(--ink-faint); }
+.hovertip .v { color: #d6deef; font-family: var(--mono); font-size: 12.5px; text-align: right; white-space: nowrap; }
+.hovertip .good { color: var(--good); font-weight: 600; }
+.hovertip .tip-warn { margin-top: 6px; color: #ffb347; font-size: 12.5px; }
+
 /* Log */
 .logline { padding: 2px 0; color: var(--ink-dim); }
 .logline b { color: var(--ink); font-weight: 550; }
