@@ -6,6 +6,40 @@ export function hexRgb(h) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/**
+ * Sprite cache with a pixel budget instead of a count. Mobile browsers cap
+ * the memory of all canvases together (iOS Safari a few hundred MB, Android
+ * the GPU memory); once it is used up, new canvases stay blank and worlds
+ * vanish from the map. The least recently used sprites go first, and their
+ * backing store is released right away instead of whenever the GC runs.
+ * Callers must not hold on to a sprite across frames without checking
+ * canvas.width - an evicted sprite has width 0.
+ */
+export class SpriteCache {
+  constructor(maxPixels) {
+    this.max = maxPixels;
+    this.map = new Map();
+    this.pixels = 0;
+  }
+
+  get(key) {
+    const sp = this.map.get(key);
+    if (sp) { this.map.delete(key); this.map.set(key, sp); }
+    return sp;
+  }
+
+  set(key, sp) {
+    this.map.set(key, sp);
+    this.pixels += sp.canvas.width * sp.canvas.height;
+    for (const [k, old] of this.map) {
+      if (this.pixels <= this.max || old === sp) break;
+      this.map.delete(k);
+      this.pixels -= old.canvas.width * old.canvas.height;
+      old.canvas.width = old.canvas.height = 0;
+    }
+  }
+}
+
 const glowCache = new Map();
 /** Soft blob in the empire color - once per color. */
 export function glowSprite(hex) {
@@ -125,7 +159,10 @@ export function drawBlackHole(ctx, x, y, R, phase = 0) {
 /** From this many satellites on, a world shows the shield instead of individual satellites. */
 export const SHIELD_MIN = 5;
 
-const shieldCache = new Map();
+const shieldCache = new SpriteCache(6e6);
+// Larger shields are scaled up from this one - near the camera in the 3D view
+// R is practically unbounded.
+const SHIELD_MAX = 320;
 // Light from the top left front - the same side the worlds are lit from.
 const LIGHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v); return v.map(c => c / l); })();
 
@@ -138,7 +175,7 @@ const LIGHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v
  * look through the shell at an angle, it becomes dense and bright.
  */
 function shieldSprite(R) {
-  const rr = R < 40 ? Math.max(6, Math.round(R)) : Math.round(R / 4) * 4;
+  const rr = R < 40 ? Math.max(6, Math.round(R)) : Math.min(SHIELD_MAX, Math.round(R / 4) * 4);
   let sp = shieldCache.get(rr);
   if (sp) return sp;
   const pad = Math.ceil(rr * 0.14) + 4;
@@ -231,7 +268,6 @@ function shieldSprite(R) {
   g.beginPath(); g.arc(c, c, rr - g.lineWidth / 2, 0, TAU); g.stroke();
 
   sp = { canvas: cv, half: size / 2, rr };
-  if (shieldCache.size > 60) shieldCache.clear();
   shieldCache.set(rr, sp);
   return sp;
 }

@@ -2,10 +2,21 @@
 // spheres - color = temperature, size = gravity.
 import { tempColor, rgb, habitability, IDEAL } from '../../shared/rules.js';
 import { t, n as n1 } from '../i18n.js';
-import { drawHexShield, SHIELD_MIN } from './fx.js';
+import { drawHexShield, SHIELD_MIN, SpriteCache } from './fx.js';
 
-const spriteCache = new Map();
-const MAX_CACHE = 1400;
+// About 64 MB - see SpriteCache for why the budget counts pixels.
+const spriteCache = new SpriteCache(16e6);
+// Bigger worlds are scaled up from this size. In the 3D view a world right in
+// front of the camera would otherwise get a canvas thousands of pixels wide.
+const MAX_R = 192;
+
+/** Sprite radius for a radius on screen: whole pixels while small, then
+ *  relative steps - the sprite is scaled to the exact size when drawn. */
+function radiusStep(r) {
+  if (r < 26) return Math.max(4, Math.round(r));
+  const step = Math.ceil(Math.log(r / 26) / Math.log(1.08));
+  return Math.min(MAX_R, Math.round(26 * Math.pow(1.08, step)));
+}
 
 function rngFrom(seed) {
   let a = (seed | 0) || 1;
@@ -42,7 +53,7 @@ function mix(a, b, f) {
  */
 export function planetSprite(planet, r) {
   // Round the radius in steps so the cache does not overflow when zooming
-  const rr = r < 26 ? Math.max(4, Math.round(r)) : Math.round(r / 3) * 3;
+  const rr = radiusStep(r);
   const tBucket = Math.round((planet.temp ?? 0) / 4) * 4;
   const gBucket = Math.round((planet.grav ?? 1) * 10);
   const key = `${planet.id}|${rr}|${tBucket}|${gBucket}|${planet.known || 'live'}`;
@@ -238,9 +249,14 @@ export function planetSprite(planet, r) {
   }
 
   const sprite = { canvas: cv, cx, cy, r: rr };
-  if (spriteCache.size > MAX_CACHE) spriteCache.clear();
   spriteCache.set(key, sprite);
   return sprite;
+}
+
+/** Draws a planet sprite centered at x/y with radius r on screen. */
+export function blitPlanet(ctx, sp, x, y, r) {
+  const k = r / sp.r;
+  ctx.drawImage(sp.canvas, x - sp.cx * k, y - sp.cy * k, sp.canvas.width * k, sp.canvas.height * k);
 }
 
 /**
@@ -256,8 +272,7 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
     return;
   }
 
-  const sp = planetSprite(planet, r);
-  ctx.drawImage(sp.canvas, x - sp.cx, y - sp.cy);
+  blitPlanet(ctx, planetSprite(planet, r), x, y, r);
 
   // Ownership ring
   if (ownerColor) {
@@ -397,8 +412,8 @@ export function planetThumb(planet, size = 42) {
   // As on the map: from SHIELD_MIN satellites on, the shield surrounds the world.
   // The world then gets a little smaller so the sphere fits into the picture.
   const shielded = (planet.defenses || 0) >= SHIELD_MIN;
-  const sp = planetSprite({ ...planet, known: 'live' }, px * (shielded ? 0.27 : 0.34));
-  ctx.drawImage(sp.canvas, px / 2 - sp.cx, px / 2 - sp.cy);
+  const r = px * (shielded ? 0.27 : 0.34);
+  blitPlanet(ctx, planetSprite({ ...planet, known: 'live' }, r), px / 2, px / 2, r);
   if (shielded) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id);
   return cv;
 }

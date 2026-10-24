@@ -4,7 +4,7 @@
 // and backwards works at any time: the state at every moment follows from
 // the timeline, nothing is accumulated.
 import { drawShipHD } from '../render/shipshd.js';
-import { planetSprite } from '../render/planets.js';
+import { planetSprite, blitPlanet } from '../render/planets.js';
 import { hexRgb, drawHexShield, drawShieldHit } from '../render/fx.js';
 import { timeline, hpAt, seeded, drawBolt, drawImpact, drawExplosion, shieldOf, shieldStrength, underShield, fleeing } from '../render/battlefx.js';
 import { sfx } from '../audio/sfx.js';
@@ -335,7 +335,8 @@ function onShield(a, b, c, R) {
 function drawWorld(ctx, pl) {
   const p = st.planet;
   if (!p) return;
-  if (!st.sprite || st.spriteR !== Math.round(pl.R)) {
+  // Width 0: the map's sprite cache has evicted it in the meantime.
+  if (!st.sprite || st.sprite.canvas.width === 0 || st.spriteR !== Math.round(pl.R)) {
     st.sprite = planetSprite({ ...p, known: 'live' }, Math.round(pl.R));
     st.spriteR = Math.round(pl.R);
   }
@@ -352,7 +353,7 @@ function drawWorld(ctx, pl) {
   g.addColorStop(0, `rgba(${r},${gr},${b},${owner ? 0.4 : 0.25})`); g.addColorStop(1, `rgba(${r},${gr},${b},0)`);
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.R * 1.18, 0, TAU); ctx.fill();
-  ctx.drawImage(sp.canvas, pl.x - sp.cx, pl.y - sp.cy);
+  blitPlanet(ctx, sp, pl.x, pl.y, pl.R);
   ctx.restore();
 }
 
