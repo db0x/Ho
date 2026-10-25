@@ -20,13 +20,13 @@ export const CODES = {
   cool: '😎', love: '😍', kiss: '😘', tongue: '😛', think: '🤔', neutral: '😐',
   confused: '😕', sad: '😢', cry: '😭', angry: '😠', rage: '😡', shock: '😱',
   surprised: '😮', sweat: '😅', sleep: '😴', angel: '😇', devil: '😈', clown: '🤡',
-  party: '🥳', facepalm: '🤦', shrug: '🤷', eyes: '👀', skull: '💀',
+  party: '🥳', facepalm: '🤦', womanshrug: '🤷🏼‍♀️', shrug: '🤷', eyes: '👀', skull: '💀',
   thumbsup: '👍', thumbsdown: '👎', clap: '👏', wave: '👋', pray: '🙏', muscle: '💪',
   ok: '👌', peace: '✌️', handshake: '🤝', heart: '❤️', broken: '💔',
-  fire: '🔥', boom: '💥', star: '⭐', sparkles: '✨', tada: '🎉', trophy: '🏆', crown: '👑',
+  fire: '🔥', boom: '💥', star: '⭐', sparkles: '✨', tada: '🎉', trophy: '🏆', smilewithtear: '🥲', crown: '👑',
   rocket: '🚀', ufo: '🛸', alien: '👽', robot: '🤖', planet: '🪐', earth: '🌍',
   moon: '🌙', sun: '☀️', comet: '☄️', bomb: '💣', swords: '⚔️', shield: '🛡️',
-  flag: '🏳️', money: '💰', gift: '🎁', beer: '🍺', coffee: '☕', popcorn: '🍿',
+  flag: '🏳️', money: '💰', gift: '🎁', beer: '🍺', coffee: '☕', popcorn: '🍿', poop: '💩',
   check: '✅', x: '❌', warning: '⚠️', question: '❓', zzz: '💤', hundred: '💯'
 };
 // Aliases that are common elsewhere - not in the palette.

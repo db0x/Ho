@@ -3,6 +3,7 @@ import { loadName, saveName, loadAvatar, saveAvatar } from '../net.js';
 import { syncSelects } from './select.js';
 import { pickAvatar, avatarHtml } from './avatar.js';
 import { startStars } from './scene.js';
+import { openQuickTurns, bindQuickTurns, DEFAULT_TURNS } from './quickturns.js';
 import { PLAYER_COLORS, AI_LEVELS } from '../../shared/rules.js';
 import { t, n as num } from '../i18n.js';
 
@@ -22,6 +23,25 @@ export class Lobby {
 
   bind() {
     $('#in-name').value = loadName();
+    // "Quick Game": a custom turn limit below the presets, picked
+    // through a dialog; cancelling falls back to whatever was selected
+    // before. The dialog itself remembers the number (its "merken" checkbox).
+    this.quickTurns = DEFAULT_TURNS;
+    this.lastTurnsValue = $('#in-turns').value || '300';
+    bindQuickTurns();
+    $('#in-turns').onchange = () => {
+      if ($('#in-turns').value === 'quick') this.pickQuickTurns(true);
+      else this.lastTurnsValue = $('#in-turns').value;
+    };
+    // The custom dropdown (select.js) only fires 'change' when the value
+    // actually changes - clicking "Quick Game" again while it is
+    // already selected needs its own listener, caught in the capture phase
+    // so it sees the value as it was before that click's own choose().
+    $('#in-turns').closest('.sel')?.addEventListener('click', (event) => {
+      if (event.target.closest('.sel-opt')?.dataset.value === 'quick' && $('#in-turns').value === 'quick') {
+        this.pickQuickTurns(false);
+      }
+    }, true);
     $('#btn-create').onclick = () => {
       const name = this.name();
       this.net.forget();
@@ -95,8 +115,34 @@ export class Lobby {
 
   /** Turn limit from the start screen; 0 = unlimited. */
   maxTurns() {
+    if ($('#in-turns')?.value === 'quick') return this.quickTurns;
     const v = Number($('#in-turns')?.value);
     return Number.isFinite(v) ? v : 300;
+  }
+
+  /** Opens the dialog for a custom turn count below the presets.
+   * @param {boolean} freshSelect  true right after picking "quick game" from
+   *   another value - cancelling then falls back to that previous value.
+   *   False when reopened to edit an already-chosen number - cancelling
+   *   then just closes the dialog and keeps that number. */
+  pickQuickTurns(freshSelect) {
+    openQuickTurns((turns) => {
+      this.quickTurns = turns;
+      this.labelQuickTurns(turns);
+    }, freshSelect ? () => {
+      $('#in-turns').value = this.lastTurnsValue;
+      syncSelects();
+    } : undefined);
+  }
+
+  /** After a pick: the option shows the chosen round count, "quick game" only as the tag behind it. */
+  labelQuickTurns(turns) {
+    const option = $('#in-turns')?.querySelector('option[value="quick"]');
+    if (!option) return;
+    option.dataset.i18n = 'lobby.quickGameChosen';
+    option.dataset.i18nArgs = JSON.stringify({ n: turns });
+    option.textContent = t('lobby.quickGameChosen', { n: turns });
+    syncSelects();
   }
 
   /** Opens a game, fills it with AI and starts right away. */

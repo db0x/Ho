@@ -72,6 +72,7 @@
     <label class="field" style="margin-bottom:12px">
       <span data-i18n="lobby.maxTurns"></span>
       <select id="in-turns">
+        <option value="quick" data-i18n="lobby.quickGame"></option>
         <option value="100" data-i18n="word.turns" data-i18n-args='{"n":100}'></option>
         <option value="200" data-i18n="word.turns" data-i18n-args='{"n":200}'></option>
         <option value="300" data-i18n="word.turns" data-i18n-args='{"n":300}' selected></option>
@@ -377,6 +378,42 @@
   </div>
 </div>
 
+<!-- ============================== Game over: continue? ============================== -->
+<div id="gameend" class="modal hidden">
+  <div class="modal-box narrow">
+    <div id="gameend-ask">
+      <h2 data-i18n="over.title"></h2>
+      <p class="muted" id="gameend-winner"></p>
+      <p data-i18n="over.continueQuestion"></p>
+      <div class="row" style="margin-top:18px">
+        <button id="gameend-yes" class="primary" data-i18n="over.yes"></button>
+        <button id="gameend-no" data-i18n="over.no"></button>
+      </div>
+    </div>
+    <form id="gameend-turns-form" class="hidden">
+      <h2 data-i18n="over.continueTitle"></h2>
+      <p class="muted small" data-i18n="over.continueHint"></p>
+      <label class="field">
+        <span data-i18n="over.continueField"></span>
+        <input id="gameend-turns" type="number" inputmode="numeric" min="1" max="500" step="1" value="50">
+      </label>
+      <div id="gameend-turns-error" class="error"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="gameend-turns-ok" class="primary" type="submit" data-i18n="lobby.quickGameOk"></button>
+        <button id="gameend-turns-cancel" type="button" data-i18n="auth.pw.cancel"></button>
+      </div>
+    </form>
+    <div id="gameend-leave" class="hidden">
+      <h2 data-i18n="over.title"></h2>
+      <p class="muted" data-i18n="over.leaveQuestion"></p>
+      <div class="row" style="margin-top:18px">
+        <button id="gameend-leave-yes" class="primary" data-i18n="over.newGame"></button>
+        <button id="gameend-leave-cancel" data-i18n="auth.pw.cancel"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============================ Change password =========================== -->
 <div id="pwchange" class="modal hidden">
   <div class="modal-box narrow">
@@ -408,6 +445,26 @@
       <p class="muted small" data-i18n="auth.pw.doneHint"></p>
       <button id="pw-ok" class="primary" type="button" data-i18n="auth.pw.ok"></button>
     </div>
+  </div>
+</div>
+
+<!-- ======================== Quick game: custom turn limit ======================== -->
+<div id="quickturns" class="modal hidden">
+  <div class="modal-box narrow">
+    <h2 data-i18n="lobby.quickGame"></h2>
+    <form id="quickturns-form" novalidate>
+      <p class="muted small" data-i18n="lobby.quickGameHint"></p>
+      <label class="field">
+        <span data-i18n="lobby.maxTurns"></span>
+        <input id="quickturns-turns" type="number" inputmode="numeric" min="20" max="99" step="1" value="50">
+      </label>
+      <label class="chk"><input type="checkbox" id="quickturns-remember"> <span data-i18n="lobby.quickGameRemember"></span></label>
+      <div id="quickturns-error" class="error"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="quickturns-ok" class="primary" type="submit" data-i18n="lobby.quickGameOk"></button>
+        <button id="quickturns-cancel" type="button" data-i18n="auth.pw.cancel"></button>
+      </div>
+    </form>
   </div>
 </div>
 

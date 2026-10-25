@@ -86,11 +86,16 @@ button.tiny { padding: 4px 8px; font-size: 13px; border-radius: 6px; }
 /* -------------------------------------------------------------- Fields */
 .field { display: block; margin: 14px 0; }
 .field > span { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }
-.field input[type=text], .field input[type=password], .field input:not([type]),
-input[type=text], input[type=password], input:not([type]) {
+.field input[type=text], .field input[type=password], .field input[type=number], .field input:not([type]),
+input[type=text], input[type=password], input[type=number], input:not([type]) {
   width: 100%; padding: 10px 12px;
   background: #0b1020; border: 1px solid var(--line-strong); border-radius: 8px;
 }
+/* The native up/down steppers do not fit the rest of the UI - typing or the
+   dialog's own min/max check is enough. */
+input[type=number] { -moz-appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
 /* Fixed (with sign-in the name comes from the account): visible, but
    recognizably not editable. */

@@ -11,6 +11,7 @@ import { bindEmoji } from './ui/emoji.js';
 import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
 import { openPassword, bindPassword } from './ui/password.js';
+import { openGameEnd, bindGameEnd } from './ui/gameend.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
@@ -123,6 +124,10 @@ document.querySelector('#help-ships').onclick = () => {
   else openShipInfo('scout');
 };
 let lastTurn = 0;
+// Edge-triggered: only the first "over" after a "running" pops the dialog by
+// itself - after that it only reopens through the "Weiter" button, both ways
+// landing on the same showGameEnd().
+let seenOver = false;
 
 const app = {
   selection: null,
@@ -314,7 +319,11 @@ net.on('view', (m) => {
   }
   lastTurn = view.turn;
 
-  if (view.state === 'over') showEnd(view);
+  if (view.state === 'over') {
+    if (!seenOver) { seenOver = true; showGameEnd(view); }
+  } else {
+    seenOver = false;
+  }
 });
 
 /** Take over the battle records from the view; returns the new ones. */
@@ -355,6 +364,7 @@ net.on('close', () => {
 
 // ---------------------------------------------------------------------- Game
 function bindGame() {
+  bindGameEnd();
   map.onSelect = (hit) => {
     if (!hit) { app.setSelection(null); sfx.play('deselect'); return; }
     app.setSelection({ type: hit.type, id: hit.id });
@@ -367,6 +377,7 @@ function bindGame() {
   map.onHoverChange = () => {};
 
   $('#btn-endturn').onclick = () => {
+    if (map.view?.state === 'over') return showGameEnd(map.view);
     const ready = map.view?.me.ready;
     // Last warning in case the build order cannot be paid for - the turn is
     // ended anyway, just no longer as a surprise.
@@ -615,16 +626,13 @@ function showTurnBanner(view) {
   showTurnBanner._t = setTimeout(() => b.classList.add('hidden'), 1100);
 }
 
-function showEnd(view) {
-  if (showEnd._done) return;
-  showEnd._done = true;
-  const w = view.players.find(p => p.id === view.winner);
-  const b = $('#turnbanner');
-  b.innerHTML = `<div style="text-align:center">
-    <div class="big">${t('over.winner', { player: w ? w.name : '—' })}</div>
-    <p class="muted">${t('over.title')}</p>
-    <button class="primary" onclick="localStorage.removeItem('ho-session');location.reload()">${t('over.newGame')}</button>
-  </div>`;
-  b.style.pointerEvents = 'auto';
-  b.classList.remove('hidden');
+/** The game just ended (or "Continue" was clicked again): ask whether to keep
+ * playing, with more turns, or go back to the start screen. Only the host
+ * gets asked - others only get the option to leave or dismiss the dialog. */
+function showGameEnd(view) {
+  const winner = view.players.find(p => p.id === view.winner);
+  openGameEnd(t('over.winner', { player: winner ? winner.name : '—' }), view.host === view.you,
+    (turns) => net.send({ t: 'continue', turns }),
+    () => { net.forget(); location.reload(); },
+    () => {});
 }

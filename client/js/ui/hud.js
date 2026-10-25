@@ -322,14 +322,17 @@ export class Hud {
     if (!$('#ledger').classList.contains('hidden')) this.ledger();
 
     const btn = $('#btn-endturn');
+    const over = v.state === 'over';
     const waiting = me.ready;
     btn.classList.toggle('waiting', waiting);
     const others = v.players.filter(p => p.alive && !p.isBot);
     const readyCount = others.filter(p => p.ready).length;
+    // Over: the game can still be continued - the button offers that instead
+    // of sitting there disabled.
     btn.textContent = waiting
       ? t('top.waiting', { ready: readyCount, total: others.length })
-      : t('top.endTurn');
-    btn.disabled = v.state !== 'running';
+      : over ? t('top.continue') : t('top.endTurn');
+    btn.disabled = v.state !== 'running' && !over;
 
     // The host may hold the game for everyone - only worth it with a turn
     // timer: without one the turn waits for everybody anyway.
