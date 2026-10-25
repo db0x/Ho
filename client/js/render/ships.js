@@ -155,66 +155,73 @@ function drawScout(ctx, L, color, phase) {
 
 /* -------------------------------------------------------------- Fighter */
 function drawFighter(ctx, L, color, phase) {
-  // After the Viper Mk VII in plan view (units of L/100): a long wedge of a
-  // fuselage, the blue canopy in the middle, slim delta wings with small
-  // clipped tips, cannons whose barrels reach far forward, three engines.
+  // After the Viper Mk VII in plan view (units of L/100): a straight wedge of
+  // a fuselage up to the wing roots, slimmer again at the stern, the blue
+  // canopy in front of big swept wings with straight cut tips, gun pods
+  // beneath the wings near the tips, a dorsal spine, three engines.
   const u = L / 100;
   const P = (pts, s = 1) => tracePath(ctx, pts.map(([x, y]) => [x * u, s * y * u]));
   const mirror = pts => [...pts, ...pts.slice(1, -1).reverse().map(([x, y]) => [x, -y])];
   // Three engines close together
   engineGlow(ctx, -L * 0.53, 0, L * 0.24, phase);
   for (const s of [-1, 1]) engineGlow(ctx, -L * 0.51, s * 4.6 * u, L * 0.17, phase + 0.9 * s);
-  // Slim silver delta wings - the empire color sits on the fuselage stripes
   for (const s of [-1, 1]) {
-    P([[-0.6, 9.5], [-11.6, 28.4], [-18.6, 28.4], [-23, 11.6]], s); ctx.closePath();
+    // Gun pod beneath the wing: only its front and the barrel show
+    const y = s * 26 * u;
+    ctx.strokeStyle = '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
+    ctx.beginPath(); ctx.moveTo(-4 * u, y); ctx.lineTo(0.5 * u, y); ctx.stroke();
+    ctx.fillStyle = '#8994a8';
+    ctx.beginPath(); ctx.roundRect(-17 * u, y - 1.3 * u, 13 * u, 2.6 * u, 1.3 * u); ctx.fill();
+    outline(ctx, fine(L) * 0.6);
+    // Big swept silver wings - the empire color sits on the fuselage stripes
+    P([[3, 11.5], [-12.4, 30.4], [-21.6, 30.4], [-24.6, 15.6], [-27.4, 12.4], [-31.5, 9]], s); ctx.closePath();
     ctx.fillStyle = '#b4bfd0'; ctx.fill();
     // Light from above: the lower wing lies in shade, both darken outwards
-    const g = ctx.createLinearGradient(0, s * 9 * u, 0, s * 28 * u);
+    const g = ctx.createLinearGradient(0, s * 9 * u, 0, s * 30 * u);
     g.addColorStop(0, `rgba(10,14,26,${s < 0 ? 0 : 0.2})`);
     g.addColorStop(1, `rgba(10,14,26,${s < 0 ? 0.25 : 0.5})`);
     ctx.fillStyle = g; ctx.fill(); outline(ctx, 0.9);
-    seam(ctx, L, [[-8 * u, s * 13 * u], [-15 * u, s * 26 * u]]);
-    // Cannon on the wing root, snug against the fuselage: pod and a light
-    // barrel far past the leading edge
-    const y = s * 12.9 * u;
-    ctx.strokeStyle = '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
-    ctx.beginPath(); ctx.moveTo(-3 * u, y); ctx.lineTo(9 * u, y); ctx.stroke();
-    ctx.fillStyle = '#8994a8';
-    ctx.beginPath(); ctx.roundRect(-14 * u, y - 1.3 * u, 11 * u, 2.6 * u, 1.3 * u); ctx.fill();
+    seam(ctx, L, [[-3 * u, s * 13 * u], [-17 * u, s * 29.6 * u]]);
+    // Rail along the straight wing tip
+    ctx.fillStyle = '#aab4c6';
+    ctx.beginPath(); ctx.roundRect(-22.6 * u, s * 31.1 * u - 0.8 * u, 14 * u, 1.6 * u, 0.8 * u); ctx.fill();
     outline(ctx, fine(L) * 0.6);
   }
-  edgeLight(ctx, L, [[-0.6 * u, -9.5 * u], [-11.6 * u, -28.4 * u]], 0.45);
+  edgeLight(ctx, L, [[3 * u, -11.5 * u], [-12.4 * u, -30.4 * u]], 0.45);
   nozzle(ctx, L, -47 * u, 0, 3.4 * u);
   for (const s of [-1, 1]) nozzle(ctx, L, -46 * u, s * 4.6 * u, 2.8 * u);
-  // Fuselage: narrow at the rounded nose, broad at the stern
-  P(mirror([[60, 0], [59, -1.6], [56, -2.6], [44, -3.4], [16, -6.7], [0, -9.6], [-20, -12],
-    [-40, -12], [-43, -9], [-45, -6.7], [-45, 0]])); ctx.closePath();
+  // Fuselage: a wedge from the rounded nose to the wing roots, slimmer again
+  // at the stern (same points as in shipshd.js)
+  P(mirror([[60, 0], [60, -1.1], [58, -1.9], [56, -2.1], [2, -12.4], [-10, -11.2], [-24, -10.2], [-31, -9.4],
+    [-40, -8.4], [-43, -7.4], [-45, -5.6], [-45, 0]])); ctx.closePath();
   ctx.fillStyle = hullGradient(ctx, L * 0.3); ctx.fill(); outline(ctx, 1);
   // Empire stripes left and right just inside the edge: a fine point behind
   // the nose, full width from the canopy back (same as in shipshd.js). Small
   // on the map they get wider - the empire must still be recognizable there.
-  const half = [[30, 5.0], [16, 6.7], [0, 9.6], [-20, 12], [-40, 12]];
+  const half = [[34, 6.3], [2, 12.4], [-10, 11.2], [-24, 10.2], [-31, 9.4], [-40, 8.4], [-43, 7.4]];
   const k = L < 30 ? 2 : L < 60 ? 1.5 : 1;
   for (const s of [-1, 1]) {
-    const w = x => Math.min(1, (30 - x) / 30) * 2.4 * k;
+    const w = x => Math.min(1, (34 - x) / 30) * 2.4 * k;
     P([...half.map(([x, h]) => [x, h - 1]), ...half.slice().reverse().map(([x, h]) => [x, h - 1 - w(x)])], s);
     ctx.closePath();
     ctx.fillStyle = color; ctx.fill();
     ctx.fillStyle = `rgba(10,14,26,${s < 0 ? 0 : 0.2})`; ctx.fill();
   }
-  edgeLight(ctx, L, [[56 * u, -2.2 * u], [16 * u, -6.2 * u], [-38 * u, -11.4 * u]]);
-  seam(ctx, L, [[-24 * u, -11.6 * u], [-24 * u, 11.6 * u]]);
-  // Spine with the tail fin as a light ridge
-  P([[-14, 0], [-20, -1.6], [-42, -2.2], [-44, 0], [-42, 2.2], [-20, 1.6]]); ctx.closePath();
-  ctx.fillStyle = '#c3cbd8'; ctx.fill(); outline(ctx, fine(L) * 0.7);
-  // Blue canopy in the middle
+  edgeLight(ctx, L, [[56 * u, -1.7 * u], [2 * u, -11.9 * u], [-10 * u, -10.7 * u]]);
+  seam(ctx, L, [[-22 * u, -10.2 * u], [-22 * u, 10.2 * u]]);
+  // Dorsal spine with the tail fin as a light ridge
+  P(mirror([[-1, 0], [-3, -3.4], [-28, -3.8], [-37, -3], [-44, -1.8], [-45, 0]])); ctx.closePath();
+  ctx.fillStyle = '#a2aec0'; ctx.fill(); outline(ctx, fine(L) * 0.7);
+  P(mirror([[-12, 0], [-18, -1.3], [-41, -1.7], [-43, 0]])); ctx.closePath();
+  ctx.fillStyle = '#bcc5d3'; ctx.fill(); outline(ctx, fine(L) * 0.5);
+  // Blue canopy in front of the wings
   const cg = ctx.createLinearGradient(-1 * u, 0, 16 * u, 0);
   cg.addColorStop(0, 'rgba(60,100,230,.95)');
   cg.addColorStop(1, 'rgba(140,175,255,.9)');
   ctx.fillStyle = cg;
-  P(mirror([[16, 0], [14, -3.8], [8, -5], [0, -4.6], [-1.5, 0]])); ctx.closePath(); ctx.fill();
+  P(mirror([[16.5, 0], [15.6, -2.6], [13, -3.8], [1.5, -3.8], [-0.4, -2.6], [-0.8, 0]])); ctx.closePath(); ctx.fill();
   outline(ctx, fine(L) * 0.8);
-  glint(ctx, 10 * u, -2 * u, 3.6 * u, 1 * u);
+  glint(ctx, 10 * u, -1.6 * u, 3.6 * u, 0.9 * u);
 }
 
 /* ------------------------------------------------------------ Satellite */
