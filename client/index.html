@@ -299,7 +299,11 @@
             <label class="chk" data-i18n-attr="title:voice.toggleTitle"><input type="checkbox" id="chk-voice"> <span data-i18n="voice.me"></span></label>
             <div class="keyrow"><span data-i18n="voice.key"></span><button type="button" id="voice-key" class="tiny" data-sfx="none" data-i18n-attr="title:voice.keyTitle"></button></div>
             <div id="voice-note" class="muted small hidden"></div>
-            <div id="voice-seal" class="hidden" data-i18n-attr="title:voice.sealTitle"></div>
+            <div id="voice-seal" class="hidden">
+              <div class="seal-head" data-i18n="voice.sealHead"></div>
+              <div id="voice-seal-code"></div>
+              <div class="muted small" data-i18n="voice.sealHint"></div>
+            </div>
             <div id="voice-peers"></div>
           </div>
           <button id="btn-quit" class="menu-quit" data-sfx="none" data-i18n="top.quit"></button>

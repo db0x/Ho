@@ -1,0 +1,20 @@
+{
+  "de": [
+    "📻 CB-Funk: Sprechfunk wie früher – Taste gedrückt halten, sprechen, loslassen. Alle in der Partie hören mit, es spricht immer nur einer.",
+    "Der Ton geht direkt von Spieler zu Spieler und ist verschlüsselt – der Server bekommt davon nichts mit. Zuschauer hören nie mit.",
+    "Der Spielleiter entscheidet: in der Lobby mit „Mit CB-Funk“ oder während der Partie im Zahnrad-Menü. Funk gibt es in Partien mit mindestens zwei Menschen – sofern der Server ihn anbietet.",
+    "Einschalten über das Zahnrad ⚙. Gesprochen wird mit der Mikrofon-Taste neben dem Eingabefeld oder mit der Sprechtaste auf der Tastatur – Strg rechts, im Menü frei wählbar.",
+    "Abhörschutz: Im Menü stehen sechs Zeichen. Sehen alle in der Partie dieselben, hört niemand mit – vergleicht sie einmal über Funk.",
+    "Gerätewechsel mitten in der Partie: Wer angemeldet ist, setzt ein laufendes Spiel im Startmenü mit „Hier weiterspielen“ auf einem anderen Gerät fort – vom Handy zum PC und zurück.",
+    "Auf Tablets und Handys springt beim Öffnen des Funks nicht mehr die Bildschirmtastatur auf."
+  ],
+  "en": [
+    "📻 CB radio: voice like in the old days – hold the key, speak, let go. Everyone in the game listens in, only one speaks at a time.",
+    "The sound goes straight from player to player and is encrypted – the server never hears any of it. Spectators never listen in.",
+    "The game leader decides: in the lobby with \"With CB radio\" or during the game in the gear menu. Radio exists in games with at least two people – if the server offers it.",
+    "Switch it on via the gear ⚙. Talk with the microphone button next to the input field or with the talk key on the keyboard – right Ctrl, free to choose in the menu.",
+    "Eavesdropping check: the menu shows six symbols. If everyone in the game sees the same ones, nobody is listening in – compare them once over the radio.",
+    "Switch devices mid-game: signed in, you continue a running game on another device with \"Continue here\" in the start menu – from phone to PC and back.",
+    "On tablets and phones the on-screen keyboard no longer pops up when you open the comms."
+  ]
+}

@@ -592,13 +592,15 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 #voice-opts .keyrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink-dim); }
 #voice-key { min-width: 44px; font-family: var(--mono); }
 #voice-key.picking { color: var(--gold); border-color: var(--gold); }
-#voice-seal { font-size: 15px; letter-spacing: .1em; cursor: help; }
+#voice-seal { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; max-width: 230px; }
+#voice-seal.hidden { display: none; }
+#voice-seal .seal-head { font-size: 13px; color: var(--ink); }
+#voice-seal-code { font-size: 17px; letter-spacing: .02em; white-space: nowrap; }
 #voice-peers { display: flex; flex-wrap: wrap; gap: 4px; }
 #voice-peers:empty { display: none; }
 .voice-peer { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--c); background: transparent; color: var(--c); opacity: .55; }
 .voice-peer.ok { opacity: 1; }
 .voice-peer.far { border-style: dashed; text-decoration: line-through; }
-.voice-peer.muted { opacity: .35; text-decoration: line-through; }
 .voice-peer.live { background: var(--c); color: #000; opacity: 1; }
 #chat-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
 #chat-input-row input { flex: 1; min-width: 0; }

@@ -106,14 +106,6 @@ export class Voice {
     addEventListener('keyup', (e) => { if (e.code === this.key.code) this.release(); });
     addEventListener('blur', () => this.release());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.release(); });
-    $('#voice-peers').onclick = (e) => {
-      const chip = e.target.closest('[data-peer]');
-      const link = chip && this.links.get(chip.dataset.peer);
-      if (!link) return;
-      link.muted = !link.muted;
-      link.gain.gain.value = link.muted ? 0 : 1;
-      this.paint();
-    };
     this.paint();
   }
 
@@ -152,19 +144,17 @@ export class Voice {
     $('#voice-note').textContent = note;
     $('#voice-note').classList.toggle('hidden', !note);
 
-    const seal = $('#voice-seal');
-    seal.classList.toggle('hidden', !this.on || !this.links.size);
-    seal.textContent = this.seal ? '🔒 ' + this.seal : t('voice.sealPending');
+    $('#voice-seal').classList.toggle('hidden', !this.on || !this.links.size);
+    $('#voice-seal-code').textContent = this.seal || t('voice.sealPending');
 
     const host = $('#voice-peers');
     host.replaceChildren(...[...this.links].map(([id, link]) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = `voice-peer ${link.state}${link.muted ? ' muted' : ''}${this.floor === id ? ' live' : ''}`;
-      chip.dataset.peer = id;
+      // Shows who is on the radio - nobody can be taken off it from here.
+      const chip = document.createElement('span');
+      chip.className = `voice-peer ${link.state}${this.floor === id ? ' live' : ''}`;
       chip.style.setProperty('--c', player(id)?.color || '#888');
       chip.textContent = player(id)?.name ?? '?';
-      chip.title = t(link.muted ? 'voice.peer.muted' : `voice.peer.${link.state}`) + ' · ' + t('voice.muteTitle');
+      chip.title = t(`voice.peer.${link.state}`);
       return chip;
     }));
   }
@@ -302,7 +292,7 @@ export class Voice {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers(), certificates: [this.cert] });
     const gain = this.ctx.createGain();
     gain.connect(this.voiceBus);
-    const link = { id, n, mine: this.nonce, pc, gain, state: 'connecting', muted: false, restarted: false, el: null, fp: null };
+    const link = { id, n, mine: this.nonce, pc, gain, state: 'connecting', restarted: false, el: null, fp: null };
     this.links.set(id, link);
     if (this.track) {
       const sender = pc.addTrack(this.track, this.stream);

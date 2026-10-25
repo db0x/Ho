@@ -7,3 +7,8 @@
 // other changes with it.
 export const COMPACT = '(max-width: 900px), (max-height: 560px)';
 export const compact = matchMedia(COMPACT);
+
+// Mouse and keyboard at hand (desktop, laptop): a text field may take the
+// focus by itself. On a touch screen that would pop up the on-screen
+// keyboard and cover half the game - there the player taps the field.
+export const desktop = matchMedia('(hover: hover) and (pointer: fine)');

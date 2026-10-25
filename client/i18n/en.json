@@ -639,13 +639,10 @@
   "voice.peer.connecting": "connecting …",
   "voice.peer.ok": "connected",
   "voice.peer.far": "out of range",
-  "voice.peer.muted": "muted",
-  "voice.muteTitle": "Click: mute or unmute",
   "voice.allowTitle": "As game leader, open or close the CB radio for everyone in this game",
   "voice.closed": "CB radio is closed – the game leader decides",
   "voice.closedHost": "CB radio is closed – you can open it for everyone",
-  "voice.sealPending": "🔒 Working out the seal …",
-  "voice.sealTitle": "Radio seal: everyone on the radio must see exactly the same symbols – compare them over the radio. If someone sees different ones, somebody is in between and listening: switch off right away.",
+  "voice.sealPending": "working it out …",
   "chat.voiceOn": "{player} opened the CB radio – switch it on via the gear ⚙.",
   "chat.voiceOff": "{player} closed the CB radio.",
   "err.voiceHostOnly": "Only the game leader can open the CB radio.",
@@ -668,5 +665,7 @@
   "key.MetaRight": "Right ⌘",
   "key.ContextMenu": "Menu key",
   "key.Insert": "Insert",
-  "key.Backquote": "`"
+  "key.Backquote": "`",
+  "voice.sealHead": "🔒 Eavesdropping check",
+  "voice.sealHint": "Ask over the radio: does everyone see the same symbols? Then nobody is listening in. If someone sees different ones – switch off."
 }
