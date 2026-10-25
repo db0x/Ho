@@ -577,7 +577,14 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .logturn { margin-top: 6px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 4px; }
 .logline.clickable { cursor: pointer; }
 .logline.clickable:hover { color: var(--ink); }
-#chat-input-row { padding: 8px; border-top: 1px solid var(--line); }
+#chat-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+#chat-input-row input { flex: 1; min-width: 0; }
+#chat-emoji { flex: none; font-size: 16px; line-height: 1; }
+.emoji-palette { position: fixed; z-index: 15; width: min(296px, calc(100vw - 16px));
+  max-height: 220px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 2px;
+  padding: 6px; background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.emoji-palette button { padding: 4px 0; font-size: 19px; line-height: 1.2; background: none; border: 0; border-radius: 6px; cursor: pointer; }
+.emoji-palette button:hover, .emoji-palette button:focus-visible { background: rgba(255,255,255,.08); }
 .logline.sysline { color: var(--ink-faint); font-style: italic; }
 /* Unread comms: on the tab and on the bar at the bottom. */
 .badge {

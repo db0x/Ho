@@ -621,5 +621,6 @@
   "news.title": "New in version {release}",
   "news.ok": "Got it",
   "news.titleSince": "New since version {release}",
-  "news.version": "Version {release}"
+  "news.version": "Version {release}",
+  "chat.emoji": "Insert emoji – or type: :) :( :D ;) <3 and codes like :sad: :rocket: :thumbsup:"
 }

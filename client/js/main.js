@@ -7,6 +7,8 @@ import { AdminPanel } from './ui/admin.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
 import { openNews, hasNews, newsOnHello } from './ui/news.js';
+import { bindEmoji } from './ui/emoji.js';
+import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
 import { openPassword, bindPassword } from './ui/password.js';
 import { openBattle } from './ui/battle.js';
@@ -502,9 +504,12 @@ function bindGame() {
     document.addEventListener('fullscreenchange', sync);
     document.addEventListener('webkitfullscreenchange', sync);
   }
+  const emojiPicker = bindEmoji($('#chat-input'), $('#chat-emoji'));
+  onLocaleChange(() => emojiPicker.relabel());
   $('#chat-input').onkeydown = (e) => {
     if (e.key === 'Enter' && e.target.value.trim()) {
-      net.send({ t: 'chat', text: e.target.value });
+      // A smiley at the very end only counts now that the line is finished.
+      net.send({ t: 'chat', text: emojify(e.target.value) });
       e.target.value = '';
     }
   };

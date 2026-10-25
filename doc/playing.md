@@ -257,7 +257,7 @@ turn limit wins. Without a turn limit, the last empire standing wins.
 | Help | `H` |
 | Move / resize windows | Drag the title bar to move; drag any edge or corner to resize |
 | Minimize windows | **−** in the title bar or double-click it: the window becomes an icon in the top bar (★ research/empire/rankings, ☰ events/comms – with the count of unread comms). A click on the icon brings it back where it was. Position, size and state are remembered |
-| Comms (chat) | *Comms* tab in the log window. Messages you have not seen pop up and are counted on the tab – tap the message to reply |
+| Comms (chat) | *Comms* tab in the log window. Messages you have not seen pop up and are counted on the tab – tap the message to reply. Smileys like `:)` `:(` `:D` `;)` `<3` turn into emojis, so do codes like `:sad:` `:rocket:` `:thumbsup:`; the 🙂 button next to the field shows them all |
 | Menu: display, sound, leaving | Gear at the top right, next to fit and zoom |
 | Pause for everyone | Host only, in games with a turn timer: pause button next to *End turn* or `P` – the timer stops and no turn resolves until the host resumes; orders and chat keep working |
 | Leave the game | *Leave the game* in the menu (gear at the top right) |
