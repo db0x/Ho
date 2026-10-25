@@ -54,7 +54,10 @@ saying who can change them:
 | Galaxy grows | see [A galaxy without an edge](#a-galaxy-without-an-edge); off gives a fixed map |
 
 **Connection.** A disconnected player does not block the turn – they are skipped
-and can return at any time (the seat is stored in the browser). Anyone who exits
+and can return at any time (the seat is stored in the browser). With sign-in a game can also be continued on
+another device: the start menu lists it under *Your games on another device*,
+*Continue here* brings the seat over and the first device returns to the start
+menu. The other players do not notice. Anyone who exits
 via *Leave* gives the seat up for good: the empire stays on the map and is
 skipped. Games without connected players are cleaned up after two hours.
 

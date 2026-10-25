@@ -195,6 +195,7 @@ wss.on('connection', (ws, req, session) => {
   conns.set(connId, c);
   send(ws, {
     t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
+    mySeats: seatList(c, connId),
     profile: { ...c.profile, account: c.accountKey ? c.account : null },
     admin: adminOf(c),
     // Which release's change notes this account has seen - null: none yet.
@@ -350,6 +351,40 @@ function leaveLobby(c, connId) {
   c.gameId = null; c.playerId = null;
 }
 
+/** The seat of this connection's account in `game`, if it has one. */
+function ownSeat(c, game) {
+  if (!c.accountKey || game.state === 'over') return null;
+  return game.players.find(p => !p.isBot && p.accountKey === c.accountKey) || null;
+}
+
+/** Games this account sits in on another connection - to continue them here. */
+function seatList(c, connId) {
+  return [...games.values()]
+    .map(g => ({ g, p: ownSeat(c, g) }))
+    .filter(({ p }) => p && p.connId !== connId)
+    .map(({ g }) => ({ id: g.id, state: g.state, turn: g.turn, players: g.players.length }));
+}
+
+/**
+ * Seats a connection in `p`'s place. On mobiles the new socket often
+ * overtakes the close of the old one (the server notices a dead socket
+ * late): the old connection lets go of the seat, so its late close does not
+ * report the player as lost.
+ */
+function takeSeat(c, connId, g, p) {
+  const old = p.connId && p.connId !== connId && conns.get(p.connId);
+  if (old) { old.gameId = null; old.playerId = null; }
+  const wasAway = !p.connected;
+  p.connId = connId; p.connected = true;
+  c.gameId = g.id; c.playerId = p.id;
+  g.lastActivity = Date.now();
+  send(c.ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
+  if (g.state === 'lobby') broadcastLobby(g);
+  // Back is only news to the others if they were told about the loss.
+  else if (wasAway) { broadcastView(g); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
+  else send(c.ws, { t: 'view', view: buildView(g, p) });
+}
+
 function openGameList() {
   return [...games.values()]
     .filter(g => g.state === 'lobby' && g.players.length < MAX_PLAYERS)
@@ -445,21 +480,32 @@ function handle(connId, ws, msg) {
       const g = games.get((msg.code || '').toUpperCase());
       if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
       const p = g.players.find(p => p.token === msg.token);
+      if (!p) {
+        // The account still sits in the game, but under a new key: another
+        // device took the seat over. Say so instead of a cryptic error.
+        if (ownSeat(c, g)) return send(ws, { t: 'takenOver', code: g.id });
+        return send(ws, { t: 'error', key: 'err.noSeat' });
+      }
+      takeSeat(c, connId, g, p);
+      break;
+    }
+    case 'takeover': {
+      // Moving to another device: the account picks up its seat without the
+      // key the first device holds. Only with sign-in - without accounts
+      // nothing proves whose seat it is.
+      const g = games.get(String(msg.code || '').toUpperCase());
+      if (!g) return send(ws, { t: 'error', key: 'err.gameNotFound' });
+      const p = ownSeat(c, g);
       if (!p) return send(ws, { t: 'error', key: 'err.noSeat' });
-      // On mobiles the new socket often overtakes the close of the old one
-      // (the server notices a dead socket late): the old connection lets go
-      // of the seat, so its late close does not report the player as lost.
-      const old = p.connId && p.connId !== connId && conns.get(p.connId);
-      if (old) { old.gameId = null; old.playerId = null; }
-      const wasAway = !p.connected;
-      p.connId = connId; p.connected = true;
-      c.gameId = g.id; c.playerId = p.id;
-      g.lastActivity = Date.now();
-      send(ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
-      if (g.state === 'lobby') broadcastLobby(g);
-      // Back is only news to the others if they were told about the loss.
-      else if (wasAway) { broadcastView(g); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
-      else send(ws, { t: 'view', view: buildView(g, p) });
+      if (p.connId !== connId) {
+        if (c.gameId !== g.id) leaveLobby(c, connId);
+        // A new key, so the old device cannot quietly take it back on its
+        // next reconnect - it is told and returns to the start screen.
+        p.token = crypto.randomUUID();
+        const old = p.connId && conns.get(p.connId);
+        if (old) send(old.ws, { t: 'takenOver', code: g.id });
+      }
+      takeSeat(c, connId, g, p);
       break;
     }
     case 'newsSeen': {
@@ -689,7 +735,7 @@ function handle(connId, ws, msg) {
       break;
     }
     case 'list': {
-      send(ws, { t: 'games', openGames: openGameList() });
+      send(ws, { t: 'games', openGames: openGameList(), mySeats: seatList(c, connId) });
       break;
     }
   }

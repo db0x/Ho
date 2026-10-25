@@ -214,6 +214,20 @@ export class Lobby {
     }
   }
 
+  /** Games this account plays on another device - to continue them here. */
+  showMySeats(list) {
+    this.mySeats = list;
+    const host = $('#my-games');
+    if (!list?.length) { host.innerHTML = ''; return; }
+    host.innerHTML = `<div class="small muted">${t('menu.mySeats')}</div>` + list.map(g =>
+      `<div class="og"><b>${g.id}</b><span class="muted">${g.state === 'lobby'
+        ? t('menu.mySeatLobby', { n: g.players }) : t('menu.mySeatTurn', { turn: g.turn, n: g.players })}</span>
+       <span class="spacer" style="flex:1"></span><button class="tiny" data-code="${g.id}">${t('menu.takeOver')}</button></div>`).join('');
+    for (const b of host.querySelectorAll('[data-code]')) {
+      b.onclick = () => this.net.send({ t: 'takeover', code: b.dataset.code });
+    }
+  }
+
   show(which) {
     for (const s of ['menu', 'lobby', 'game']) {
       document.querySelector('#screen-' + s).classList.toggle('hidden', s !== which);
@@ -332,6 +346,7 @@ export class Lobby {
     // you back into the lobby.
     if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId }, false);
     if (this.openGames) this.showOpenGames(this.openGames);
+    if (this.mySeats) this.showMySeats(this.mySeats);
     this.profileHint();
   }
 

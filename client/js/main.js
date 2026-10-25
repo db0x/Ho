@@ -195,6 +195,7 @@ const app = {
 // ------------------------------------------------------------------ Messages
 net.on('hello', (m) => {
   lobby.showOpenGames(m.openGames);
+  lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
   admin.setEnabled(m.admin);
   showPendingNotice();
@@ -212,7 +213,7 @@ net.on('hello', (m) => {
   if (solo && !net.session) lobby.quickStart(Math.max(1, Math.min(15, +solo)));
 });
 
-net.on('games', (m) => lobby.showOpenGames(m.openGames));
+net.on('games', (m) => { lobby.showOpenGames(m.openGames); lobby.showMySeats(m.mySeats); });
 net.on('adminData', (m) => admin.update(m));
 net.on('adminMsgSent', (m) => admin.messageSent(m));
 net.on('adminInviteCreated', (m) => admin.inviteCreated(m));
@@ -232,6 +233,13 @@ net.on('kicked', () => { net.forget(); location.reload(); });
 net.on('ended', (m) => {
   try { sessionStorage.setItem(NOTICE_KEY, JSON.stringify({ key: m.key, params: m.params })); } catch {}
   net.forget();
+  location.reload();
+});
+
+// The seat moved to another device of this account: back to the start
+// screen, where it can be taken back.
+net.on('takenOver', (m) => {
+  try { sessionStorage.setItem(NOTICE_KEY, JSON.stringify({ key: 'notice.takenOver', params: { code: m.code } })); } catch {}
   location.reload();
 });
 

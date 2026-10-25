@@ -56,7 +56,10 @@ mit dem Hinweis, wer sie ändern kann:
 
 **Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
 übersprungen und kann jederzeit zurückkehren (der Platz wird im Browser
-gespeichert). Wer über *Verlassen* aussteigt, gibt den Platz endgültig auf: das
+gespeichert). Mit Anmeldung lässt sich eine Partie auch auf einem anderen Gerät
+fortsetzen: Das Startmenü zeigt sie unter *Deine Partien auf einem anderen
+Gerät*, *Hier weiterspielen* holt den Platz herüber, und das erste Gerät kehrt
+ins Startmenü zurück. Die anderen Spieler merken davon nichts. Wer über *Verlassen* aussteigt, gibt den Platz endgültig auf: das
 Reich bleibt stehen und wird übersprungen. Partien ohne verbundene Spieler werden
 nach zwei Stunden aufgeräumt.
 

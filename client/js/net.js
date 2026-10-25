@@ -31,7 +31,7 @@ export class Net {
       }
       // The seat is gone (game removed, server restarted): forget it so the
       // next connect does not try to resume it again.
-      if (msg.t === 'kicked' || msg.t === 'ended' || (msg.t === 'error' && STALE_SESSION.includes(msg.key))) {
+      if (msg.t === 'kicked' || msg.t === 'ended' || msg.t === 'takenOver' || (msg.t === 'error' && STALE_SESSION.includes(msg.key))) {
         clearSession();
         this.session = null;
       }

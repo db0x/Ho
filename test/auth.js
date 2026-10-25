@@ -388,6 +388,77 @@ const session = (msg) => new Promise((ok) => {
   console.log(`Admin flag: all ${adminTypes.length} admin messages refused for normal accounts; granting and revoking apply immediately.`);
 }
 
+// --- Moving devices: the account continues its game on another connection,
+//     the first one lets go and cannot quietly take the seat back.
+{
+  const device = () => new Promise((ok) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
+    const d = { ws, msgs: [], send: (m) => ws.send(JSON.stringify(m)) };
+    ws.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      d.msgs.push(m);
+      if (m.t === 'hello') { d.hello = m; ok(d); }
+      if (m.t === 'joined') d.joined = m;
+    });
+  });
+  const got = async (d, t) => {
+    for (let i = 0; i < 60; i++) { const m = d.msgs.find(x => x.t === t); if (m) return m; await wait(50); }
+    return null;
+  };
+
+  const phone = await device();
+  phone.send({ t: 'create', name: 'x' });
+  await got(phone, 'joined');
+  const code = phone.joined?.code, phoneToken = phone.joined?.token;
+  phone.send({ t: 'addBot' }); phone.send({ t: 'start' });
+  await got(phone, 'view');
+
+  const pc = await device();
+  check(pc.hello.mySeats?.some(g => g.id === code && g.state === 'running'),
+    `The second device does not offer the running game (${JSON.stringify(pc.hello.mySeats)})`);
+  pc.send({ t: 'takeover', code });
+  const joined = await got(pc, 'joined');
+  check(joined?.code === code && joined.token !== phoneToken, 'Takeover does not seat the second device with a new key');
+  check(await got(pc, 'view'), 'The second device gets no view after the takeover');
+  check((await got(phone, 'takenOver'))?.code === code, 'The first device is not told about the takeover');
+
+  // The phone reconnects with its old key: no seat, but the hint why.
+  const late = await device();
+  late.send({ t: 'resume', code, token: phoneToken });
+  check(await got(late, 'takenOver'), 'An old key brings no hint that the seat moved');
+  check(!late.joined, 'The old key still gets the seat');
+  check(late.hello.mySeats?.some(g => g.id === code), 'The game is not offered back to the first device');
+
+  // And back again.
+  late.send({ t: 'takeover', code });
+  check((await got(late, 'joined'))?.code === code, 'The seat cannot be taken back');
+  check(await got(pc, 'takenOver'), 'The second device is not told when the seat goes back');
+  const chatLost = [...phone.msgs, ...pc.msgs, ...late.msgs].some(m => m.t === 'chat' && /lost|back/.test(JSON.stringify(m)));
+  check(!chatLost, 'The other players hear about the device change');
+
+  // A foreign account cannot take the seat.
+  await addUser('stranger', 'strangerPassword1', { mustChange: false });
+  const signIn = await fetch(`${BASE}/api/auth/login`, asJson({ user: 'stranger', password: 'strangerPassword1' }));
+  const strangerWs = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: signIn.headers.get('set-cookie').split(';')[0] } });
+  const refused = await new Promise((ok) => {
+    strangerWs.on('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.t === 'hello') {
+        check(!m.mySeats?.length, 'A foreign account is offered the seat');
+        strangerWs.send(JSON.stringify({ t: 'takeover', code }));
+      }
+      if (m.t === 'error' || m.t === 'joined') ok(m);
+    });
+    setTimeout(() => ok(null), 3000);
+  });
+  check(refused?.key === 'err.noSeat', `A foreign account takes the seat (${JSON.stringify(refused)})`);
+  strangerWs.close();
+  deleteUser('stranger');
+
+  for (const d of [phone, pc, late]) d.ws.close();
+  console.log('Moving devices: seat taken over and back, old key refused, foreign account refused, nobody told.');
+}
+
 // --- With sign-in you are named as in your profile: create cannot get around
 //     that, 'profile' can - but never as another account.
 {
