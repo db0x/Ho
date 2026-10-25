@@ -14,6 +14,7 @@ import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
 import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen } from './userstore.js';
 import { createInvite, listInvites, revokeInvite } from './invites.js';
+import { startStun } from './stun.js';
 import {
   cleanName, nameAllowed, reservedName, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
   accountAvatarUrl, handleAvatar
@@ -39,6 +40,16 @@ const RELEASES = (() => {
 // Games nobody has touched for this long are zombies and get discarded -
 // even if a forgotten tab is still connected.
 const IDLE_MS = (Number(process.env.HO_IDLE_HOURS) || 4) * 3600 * 1000;
+// CB radio (voice comms) is an option of the server: HO_VOICE=on. STUN helps
+// the browsers find each other, the audio flows directly between them.
+// HO_STUN_PORT=off leaves STUN out, HO_STUN_URL names the address the
+// browsers should ask if it is not the page's own host.
+const VOICE = /^(on|1|true|yes)$/i.test(process.env.HO_VOICE || '');
+const STUN_PORT = /^(off|0)$/i.test(process.env.HO_STUN_PORT || '') ? null : Number(process.env.HO_STUN_PORT) || 3478;
+const STUN_URL = process.env.HO_STUN_URL || null;
+let stunPort = null;                  // set once the socket is bound
+const FLOOR_MS = 30000;               // nobody holds the channel longer
+const RTC_MAX = 16 * 1024;            // one offer or answer with its candidates
 // Without anybody connected, a game goes after half that time already.
 const ORPHAN_MS = IDLE_MS / 2;
 
@@ -196,6 +207,7 @@ wss.on('connection', (ws, req, session) => {
   send(ws, {
     t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
     mySeats: seatList(c, connId),
+    voice: VOICE ? { stun: stunPort ? (STUN_URL || { port: stunPort }) : null } : null,
     profile: { ...c.profile, account: c.accountKey ? c.account : null },
     admin: adminOf(c),
     // Which release's change notes this account has seen - null: none yet.
@@ -231,6 +243,7 @@ wss.on('connection', (ws, req, session) => {
       // Only the connection holding the seat may give it up.
       if (p && p.connId === connId) {
         p.connected = false;
+        voiceDrop(game, p);
         if (game.state === 'lobby') {
           removePlayer(game, p.id);
           if (!game.players.length) games.delete(game.id);
@@ -374,6 +387,8 @@ function seatList(c, connId) {
 function takeSeat(c, connId, g, p) {
   const old = p.connId && p.connId !== connId && conns.get(p.connId);
   if (old) { old.gameId = null; old.playerId = null; }
+  // The voice links ran to the old connection - the new one sets up its own.
+  if (p.voice && p.voice.connId !== connId) voiceDrop(g, p);
   const wasAway = !p.connected;
   p.connId = connId; p.connected = true;
   c.gameId = g.id; c.playerId = p.id;
@@ -383,6 +398,44 @@ function takeSeat(c, connId, g, p) {
   // Back is only news to the others if they were told about the loss.
   else if (wasAway) { broadcastView(g); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
   else send(c.ws, { t: 'view', view: buildView(g, p) });
+  if (VOICE && g.state === 'running') send(c.ws, voiceState(g));
+}
+
+/** CB radio needs someone to talk to: at least two people in the game. */
+function voiceEligible(game) {
+  return VOICE && game.state === 'running' && game.players.filter(p => !p.isBot).length >= 2;
+}
+
+/**
+ * Who is on the voice comms and who holds the channel. The server only
+ * knows that someone speaks, never what: the audio runs browser to browser.
+ * The nonce changes with every switch-on, so the others notice a new device
+ * and set up a fresh link instead of talking into the old one.
+ */
+function voiceState(game) {
+  return {
+    t: 'voice',
+    allowed: !!game.voiceAllowed,
+    peers: game.players.filter(p => p.voice && p.connected).map(p => ({ id: p.id, n: p.voice.n })),
+    floor: game.floor?.id ?? null
+  };
+}
+
+function broadcastVoice(game) {
+  if (!VOICE) return;
+  const msg = voiceState(game);
+  for (const p of game.players) {
+    const c = p.connId && conns.get(p.connId);
+    if (c) send(c.ws, msg);
+  }
+}
+
+/** Takes a player off the comms - and the channel from them if they held it. */
+function voiceDrop(game, p) {
+  if (!p.voice && game.floor?.id !== p.id) return;
+  p.voice = null;
+  if (game.floor?.id === p.id) game.floor = null;
+  broadcastVoice(game);
 }
 
 function openGameList() {
@@ -584,6 +637,11 @@ function handle(connId, ws, msg) {
       const r = startGame(game);
       if (r.error) return send(ws, { t: 'error', key: r.error });
       broadcastView(game, { started: true });
+      // Chosen in the lobby: the CB radio is open from the first turn.
+      if (game.settings.voice && voiceEligible(game)) {
+        game.voiceAllowed = true;
+        broadcastVoice(game);
+      }
       break;
     }
     case 'orders': {
@@ -634,6 +692,7 @@ function handle(connId, ws, msg) {
         me.connected = false;
         me.connId = null;
         me.token = null;
+        voiceDrop(game, me);
         chat(game, 'System', { key: 'chat.left', params: { player: me.name } });
         broadcastView(game);
         maybeResolve(game);
@@ -641,6 +700,52 @@ function handle(connId, ws, msg) {
       c.gameId = null; c.playerId = null;
       // If nobody is playing anymore, the game can go
       if (!game.players.some(p => p.connected) && !game.spectators.size) games.delete(game.id);
+      break;
+    }
+    case 'voiceAllow': {
+      // The game leader opens or closes the CB radio for everyone in the game.
+      if (!game || !me || !voiceEligible(game)) return;
+      if (hostOf(game) !== me) return send(ws, { t: 'error', key: 'err.voiceHostOnly' });
+      game.voiceAllowed = game.settings.voice = !!msg.on;
+      if (!game.voiceAllowed) {
+        for (const p of game.players) p.voice = null;
+        game.floor = null;
+      }
+      chat(game, 'System', { key: game.voiceAllowed ? 'chat.voiceOn' : 'chat.voiceOff', params: { player: me.name } });
+      broadcastVoice(game);
+      break;
+    }
+    case 'voice': {
+      if (!game || !me || !voiceEligible(game)) return;
+      if (msg.on && !game.voiceAllowed) return send(ws, voiceState(game));
+      if (msg.on) me.voice = { n: crypto.randomBytes(6).toString('hex'), connId };
+      else { me.voice = null; if (game.floor?.id === me.id) game.floor = null; }
+      broadcastVoice(game);
+      break;
+    }
+    case 'rtc': {
+      // Connection setup between two players on the comms (offer, answer).
+      // Passed on unread - but only within the game and only to someone on
+      // the comms; spectators, admins included, never get any.
+      if (!game || !me?.voice || !game.voiceAllowed || !voiceEligible(game)) return;
+      const to = game.players.find(p => p.id === msg.to && p.voice && p !== me);
+      const target = to && conns.get(to.connId);
+      if (!target || JSON.stringify(msg.data ?? null).length > RTC_MAX) return;
+      send(target.ws, { t: 'rtc', from: me.id, n: me.voice.n, data: msg.data });
+      break;
+    }
+    case 'ptt': {
+      // Push to talk: one at a time, first come first served.
+      if (!game || !me?.voice || !game.voiceAllowed || !voiceEligible(game)) return;
+      if (msg.on) {
+        if (!game.floor || game.floor.id === me.id) {
+          game.floor = { id: me.id, until: Date.now() + FLOOR_MS };
+          broadcastVoice(game);
+        } else send(ws, voiceState(game));        // busy: tells who has the channel
+      } else if (game.floor?.id === me.id) {
+        game.floor = null;
+        broadcastVoice(game);
+      }
       break;
     }
     case 'chat': {
@@ -751,6 +856,7 @@ function sanitizeSettings(s) {
   // 0 = unlimited: then the game only ends when a single empire is left.
   if (Number.isFinite(s.maxTurns)) out.maxTurns = s.maxTurns === 0 ? 0 : Math.min(999, Math.max(20, Math.round(s.maxTurns)));
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
+  if (typeof s.voice === 'boolean') out.voice = s.voice;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
   return out;
@@ -790,6 +896,10 @@ setInterval(() => {
     }
   }
   for (const game of games.values()) {
+    if (game.floor && (now > game.floor.until || game.state !== 'running')) {
+      game.floor = null;
+      broadcastVoice(game);
+    }
     if (game.state === 'running' && !game.paused && game.turnDeadline && now >= game.turnDeadline) {
       for (const p of game.players) p.ready = true;
       maybeResolve(game);
@@ -804,8 +914,12 @@ setInterval(() => {
   }
 }, 1000);
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Ho!! running on http://localhost:${PORT}`);
+  if (VOICE && STUN_PORT) {
+    stunPort = await startStun(STUN_PORT);
+    if (stunPort) console.log(`CB radio: STUN on UDP ${stunPort}${STUN_URL ? ` (announced as ${STUN_URL})` : ''}`);
+  }
   if (!authEnabled()) {
     console.warn('Access: DISABLED (HO_AUTH=off) - anyone with the URL can play.');
     return;

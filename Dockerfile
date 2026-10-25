@@ -22,6 +22,6 @@ RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 
 USER node
-EXPOSE 8080
+EXPOSE 8080 3478/udp
 
 CMD ["node", "server/index.js"]

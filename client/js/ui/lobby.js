@@ -81,6 +81,9 @@ export class Lobby {
     $('#s-expand').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { expanding: $('#s-expand').checked } });
     };
+    $('#s-voice').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { voice: $('#s-voice').checked } });
+    };
     this.sliders = sliders;
   }
 
@@ -228,6 +231,9 @@ export class Lobby {
     }
   }
 
+  /** The CB radio switch only exists where the server offers CB radio. */
+  setVoice(offered) { $('#row-voice').classList.toggle('hidden', !offered); }
+
   show(which) {
     for (const s of ['menu', 'lobby', 'game']) {
       document.querySelector('#screen-' + s).classList.toggle('hidden', s !== which);
@@ -323,6 +329,9 @@ export class Lobby {
     $('#s-expand').checked = s.expanding !== false;
     $('#v-expand').textContent = t(s.expanding !== false ? 'word.yes' : 'word.no');
     $('#s-expand').disabled = !this.isHost;
+    $('#s-voice').checked = !!s.voice;
+    $('#v-voice').textContent = t(s.voice ? 'word.yes' : 'word.no');
+    $('#s-voice').disabled = !this.isHost;
     for (const sel of Object.keys(this.sliders)) $(sel).disabled = !this.isHost;
     syncSelects();            // align the buttons with the values just set
     $('#btn-start').disabled = !this.isHost;

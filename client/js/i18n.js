@@ -2,7 +2,7 @@
 // catalogs and what only the browser needs: detecting the user's language,
 // filling markup with data-i18n, remembering the choice.
 import {
-  registerLocale, setLocale, getLocale, availableLocales, hasLocale, t, tIn, n, localeTag
+  registerLocale, setLocale, getLocale, availableLocales, hasLocale, hasKey, t, tIn, n, localeTag
 } from '../shared/i18n.js';
 
 // The catalogs live as JSON under /i18n/<code>.json: keys are named by area
@@ -79,4 +79,4 @@ function args(el) {
 /** What a language calls itself - stored in its own catalog. */
 export function localeName(code) { return tIn(code, 'lang.name'); }
 
-export { t, n, getLocale, availableLocales, localeTag };
+export { t, n, hasKey, getLocale, availableLocales, localeTag };

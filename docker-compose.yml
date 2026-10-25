@@ -9,6 +9,10 @@ services:
     # it and nobody opens the port around the access control.
     ports:
       - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
+      # STUN for the voice comms (UDP, a reverse proxy does not forward it):
+      # browsers ask it for their public address, the audio itself flows
+      # directly between them. Leave it out and voice only works in one network.
+      - "${STUN_PORT:-3478}:3478/udp"
     # Accounts survive every new image and live in ./data next to this
     # file - backup = copy the directory. Create ./data yourself first,
     # otherwise Docker creates it as root and node cannot write to it.
@@ -20,6 +24,12 @@ services:
     # it means safe.
     environment:
       HO_AUTH: ${HO_AUTH:-on}
+      # CB radio (push-to-talk voice between players, peer to peer). Off
+      # unless switched on here; the game leader then opens it per game.
+      HO_VOICE: ${HO_VOICE:-off}
+      # Address the browsers should ask for STUN if it is not the page's
+      # host (e.g. behind a proxy on another machine): stun:host:port
+      HO_STUN_URL: ${HO_STUN_URL:-}
     # Otherwise node runs as PID 1 and ignores SIGTERM -> slow shutdown.
     init: true
     healthcheck:

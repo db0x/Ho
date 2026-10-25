@@ -15,6 +15,7 @@ import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
+import { Voice } from './voice.js';
 import { enhanceSelects, syncSelects } from './ui/select.js';
 import { compact } from './ui/viewport.js';
 import { initLocale, useLocale, onLocaleChange, localeName, t, availableLocales, getLocale } from './i18n.js';
@@ -111,6 +112,7 @@ async function account() {
 
 const net = new Net();
 const lobby = new Lobby(net);
+const voice = new Voice({ send: m => net.send(m) });
 const admin = new AdminPanel(net);
 account();
 let map = null;
@@ -194,6 +196,8 @@ const app = {
 
 // ------------------------------------------------------------------ Messages
 net.on('hello', (m) => {
+  voice.configure(m.voice);
+  lobby.setVoice(!!m.voice);
   lobby.showOpenGames(m.openGames);
   lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
@@ -279,6 +283,7 @@ net.on('view', (m) => {
   }
   lobby.show('game');
   map.setView(view);
+  voice.setView(view);
   map.selection = app.selection;
 
   // Clear the selection if it no longer exists
@@ -339,7 +344,11 @@ net.on('chat', (m) => {
   if (!mine) sfx.play('chat');
 });
 
+net.on('voice', (m) => voice.onState(m));
+net.on('rtc', (m) => voice.onSignal(m));
+
 net.on('close', () => {
+  voice.lost();
   hud?.toast(t('net.lost'), '#ff5f5f');
   sfx.play('offline');
 });
