@@ -205,6 +205,13 @@
           <b id="v-expand" class="ro-only"></b>
         </label>
         <p class="muted small" data-i18n="lobby.expandHint"></p>
+        <div id="row-voice" class="hidden">
+          <label class="chk" style="padding:0;margin-top:10px">
+            <input type="checkbox" id="s-voice"> <span data-i18n="lobby.voice"></span>
+            <b id="v-voice" class="ro-only"></b>
+          </label>
+          <p class="muted small" data-i18n="lobby.voiceHint"></p>
+        </div>
       </div>
     </div>
     <div class="lobby-foot">
@@ -286,6 +293,19 @@
           <label class="chk" data-i18n-attr="title:map.soundTitle"><input type="checkbox" id="chk-sound"> <span data-i18n="map.sound"></span></label>
           <div class="volrow"><span data-i18n="map.volume"></span>
             <input type="range" id="snd-vol" min="0" max="100" step="5" data-i18n-attr="title:map.volume"></div>
+          <div id="voice-opts" class="hidden">
+            <div class="voice-head" data-i18n="voice.title"></div>
+            <label class="chk hidden" id="row-voice-allow" data-i18n-attr="title:voice.allowTitle"><input type="checkbox" id="chk-voice-allow"> <span data-i18n="voice.allowAll"></span></label>
+            <label class="chk" data-i18n-attr="title:voice.toggleTitle"><input type="checkbox" id="chk-voice"> <span data-i18n="voice.me"></span></label>
+            <div class="keyrow"><span data-i18n="voice.key"></span><button type="button" id="voice-key" class="tiny" data-sfx="none" data-i18n-attr="title:voice.keyTitle"></button></div>
+            <div id="voice-note" class="muted small hidden"></div>
+            <div id="voice-seal" class="hidden">
+              <div class="seal-head" data-i18n="voice.sealHead"></div>
+              <div id="voice-seal-code"></div>
+              <div class="muted small" data-i18n="voice.sealHint"></div>
+            </div>
+            <div id="voice-peers"></div>
+          </div>
           <button id="btn-quit" class="menu-quit" data-sfx="none" data-i18n="top.quit"></button>
           <div class="ho-version">Ho!! v__HO_VERSION__</div>
         </div>
@@ -324,7 +344,7 @@
     </div>
     <div id="log-list" class="logbody"></div>
     <div id="chat-list" class="logbody hidden"></div>
-    <div id="chat-input-row" class="hidden"><input id="chat-input" data-i18n-attr="placeholder:chat.placeholder" maxlength="200"><button type="button" id="chat-emoji" class="tiny">🙂</button></div>
+    <div id="chat-input-row" class="hidden"><input id="chat-input" data-i18n-attr="placeholder:chat.placeholder" maxlength="200"><button type="button" id="chat-emoji" class="tiny">🙂</button><button type="button" id="voice-ptt" class="mic hidden" data-sfx="none" data-i18n-attr="aria-label:voice.talk"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.6" y="1.4" width="4.8" height="8.4" rx="2.4" fill="currentColor"/><path d="M3.4 7.4a4.6 4.6 0 0 0 9.2 0M8 12v2.4M5.6 14.4h4.8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button></div>
     <div id="log-grip" class="dlg-grip" data-i18n-attr="title:log.resizeTitle"></div>
   </div>
 

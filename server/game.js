@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   mode: 'classic',     // 'classic' = flat, 'space' = 3D (lens)
   shape: 'scatter',    // 'scatter' = scattered field, 'spiral' = spiral around a black hole
   maxTurns: 300,       // 0 = unlimited
+  voice: false,        // CB radio open from the start (only if the server offers it)
   seed: null
 };
 

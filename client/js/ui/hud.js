@@ -9,7 +9,7 @@ import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
-import { compact } from './viewport.js';
+import { compact, desktop } from './viewport.js';
 import { openShipInfo } from './shipinfo.js';
 import { openSplit } from './split.js';
 import { forecast, refitShips } from '../../shared/budget.js';
@@ -53,7 +53,7 @@ export class Hud {
         $('#log-list').classList.toggle('hidden', chat);
         $('#chat-list').classList.toggle('hidden', !chat);
         $('#chat-input-row').classList.toggle('hidden', !chat);
-        if (chat) $('#chat-input').focus();
+        if (chat && desktop.matches) $('#chat-input').focus();
         this.chatSeen();
       };
     }
