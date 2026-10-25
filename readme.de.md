@@ -4,7 +4,8 @@
 
 [![CI](https://github.com/db0x/Ho/actions/workflows/ci.yml/badge.svg)](https://github.com/db0x/Ho/actions/workflows/ci.yml)
 [![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/Node-%E2%89%A520-brightgreen.svg)](package.json)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A522-brightgreen.svg)](package.json)
+[![Mit Claude Code entwickelt](https://img.shields.io/badge/Entwickelt%20mit-Claude%20Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
 
 Ein Weltraum-Strategiespiel im Geist von **Spaceward Ho!** – im Browser, für bis zu
 16 Spieler gleichzeitig.

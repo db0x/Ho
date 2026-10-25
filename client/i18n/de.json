@@ -376,6 +376,8 @@
   "split.allSingle": "Alle einzeln",
   "split.allSingleTitle": "Die ganze Flotte in {n} Einzelschiffe aufteilen",
   "split.hint": "Schiffe auf die andere Seite ziehen. Antippen verschiebt ein einzelnes Schiff.",
+  "split.hintFlight": "Im Flug fliegen beide Teile weiter nach {planet} – danach der neuen Flotte ein eigenes Ziel geben.",
+  "split.hintAdrift": "Beide Teile bleiben hier im All stehen, bis sie einen Kurs bekommen.",
   "split.drop": "Schiffe hierher ziehen",
   "split.needBoth": "Auf beiden Seiten muss mindestens ein Schiff bleiben.",
   "split.stats": "{attack} ⚔ · {speed} Lj/Runde · {range} Lj",
@@ -614,5 +616,10 @@
   "err.alreadySeated": "Du sitzt bereits in dieser Partie – ein Reich pro Konto.",
   "err.watchOwnGame": "Du spielst in dieser Partie selbst mit – ihr ohne Nebel zuzusehen ist nicht erlaubt.",
   "err.notHost": "Nur der Gastgeber kann die Partie anhalten.",
-  "profile.err.reserved": "Dieser Name ist für das Spiel reserviert."
+  "profile.err.reserved": "Dieser Name ist für das Spiel reserviert.",
+  "news.link": "Neuigkeiten",
+  "news.title": "Neu in Version {release}",
+  "news.ok": "Alles klar",
+  "news.titleSince": "Neu seit Version {release}",
+  "news.version": "Version {release}"
 }

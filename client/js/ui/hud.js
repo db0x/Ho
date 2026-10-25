@@ -1031,7 +1031,7 @@ export class Hud {
           ${destP ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
           ${where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1
             ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
-          ${f.ships.length > 1 && where ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
+          ${f.ships.length > 1 ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
         </div>
         ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
       </div>`}
@@ -1051,6 +1051,8 @@ export class Hud {
     const sp = box.querySelector('#split');
     if (sp) sp.onclick = () => openSplit(f, {
       color: col,
+      // In flight both parts keep the course - say so, with the target.
+      flight: !where ? { target: destP ? destP.name : null } : null,
       onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
     });
     this.wireRefit(box);

@@ -6,6 +6,8 @@ import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
+import { openNews, hasNews, newsOnHello } from './ui/news.js';
+import { releaseOf } from '../shared/version.js';
 import { openPassword, bindPassword } from './ui/password.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
@@ -194,6 +196,14 @@ net.on('hello', (m) => {
   if (m.profile) lobby.setProfile(m.profile, true);
   admin.setEnabled(m.admin);
   showPendingNotice();
+  // What is new in this release: once by itself, any time from the menu.
+  hasNews(m.version).then(has => {
+    for (const link of document.querySelectorAll('.news-link')) {
+      link.classList.toggle('hidden', !has);
+      link.onclick = (e) => { e.preventDefault(); openNews([releaseOf(m.version)]); };
+    }
+  });
+  newsOnHello(m, msg => net.send(msg));
   if (!net.session) lobby.show('menu');
   // Testing aid: ?solo=N starts a game against N AI empires right away
   const solo = new URLSearchParams(location.search).get('solo');

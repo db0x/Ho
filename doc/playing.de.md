@@ -215,15 +215,24 @@ jeden Gegner.
 | **Normal** | spielt ihren Charakter wie oben beschrieben |
 | **Schwer** | wächst schneller und lernt aus Fehlern |
 
-Ein schweres Reich baut jedes Kolonieschiff in der Werft, die einer guten freien
-Welt am nächsten liegt, statt alle von der Hauptwelt quer durchs Reich zu schicken,
-und terraformt dort, wo ein Credit die meisten Menschen bringt. Außerdem führt es
+Ein schweres Reich baut jedes Kolonieschiff in der Werft direkt neben der freien
+Welt, für die es gedacht ist, und schickt es auf kurzem Weg dorthin – ein Schiff pro
+Welt, eine gute Welt in der Nähe vor einer etwas besseren in der Ferne –, statt alle
+von der Hauptwelt quer durchs Reich zu schicken. Es terraformt dort, wo ein Credit
+die meisten Menschen bringt. Außerdem führt es
 Kriegstagebuch. Ein gescheiterter Angriff wird nicht mit
 derselben Stärke wiederholt – diese Welt braucht beim nächsten Mal deutlich mehr,
 und ihr Besitzer gilt überall als stärker; Erfolge machen es wieder mutiger. Es
 rechnet mit feindlichen Flotten, die binnen zwei Runden zu Hilfe kommen können,
 ruft einen Angriff zurück, dessen Ziel inzwischen zu stark geworden ist, und meidet
 Welten, auf dem Weg zu denen seine Kolonieschiffe abgeschossen wurden.
+
+Außerdem teilt es Flotten im Flug. Eine Angriffsflotte mit Feuerkraft übrig
+spaltet einen Trupp gegen eine zweite, schwächere Welt ab, die er noch in derselben
+Runde erreicht – zum Reagieren bleibt keine Runde. Und eine kleine fremde Flotte
+auf dem Weg zu einer freien Welt (meist ein Kolonieschiff) trifft dort womöglich
+schon auf ein paar seiner Jäger. Es sieht dabei nur, was du auch sehen würdest:
+Kurs, Ankunft und Zahl der Schiffe, nicht deren Art.
 
 ## Zusehen
 
@@ -250,7 +259,7 @@ Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt.
 | Auswählen | Linksklick auf Welt oder Flotte |
 | Kurs setzen | Flotte wählen, dann **Rechtsklick** (oder Shift-Klick) auf die Zielwelt – oder Zielwelt anklicken und im Panel *Flotte hierher* |
 | Sehen, wohin Flotten fliegen | Jede Kurslinie beginnt an ihrer Flotte – Flotten im Orbit warten auf der Seite zu ihrem Ziel – und endet in einer Pfeilspitze. Flotte auswählen oder darauf zeigen: Ihre Linie wird hervorgehoben, mit den Runden bis zur Ankunft |
-| Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten) |
+| Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten). Das geht auch im Flug: Beide Teile fliegen weiter zum selben Ziel, bis die neue Flotte einen eigenen Kurs bekommt |
 | Zug beenden | Knopf in der Mitte der Kopfleiste oder `Leertaste` |
 | Haushalt ansehen | Klick oder Zeiger auf Geld bzw. Metall in der Kopfleiste |
 | Karte einpassen | `F` |

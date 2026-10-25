@@ -114,6 +114,17 @@ ausgezeichnet statt eingetragen:
 Eine weitere Sprache braucht eine Datei in `client/i18n/`, eine Zeile in
 `client/js/i18n.js` und gegebenenfalls eine Mehrzahlregel in `shared/i18n.js`.
 
+**Änderungsnotizen.** Eine Version im Sinne der Spieler sind die ersten beiden
+Stellen (`0.6`); Fehlerbehebungen in der dritten Stelle bleiben still. Für eine neue
+Version ein paar Stichpunkte nach `client/news/<version>.json` schreiben – getrennt
+von den Übersetzungen des Spiels, eine Liste pro Sprache:
+`{ "de": ["…", "…"], "en": ["…", "…"] }`. Wer Versionen übersprungen hat, bekommt die Notizen aller Versionen seit seinem letzten Besuch, die neueste oben; wer noch nie welche gesehen hat, nur die aktuellen. Jedes Konto sieht
+sie einmal nach der Anmeldung (der Server merkt sich die gesehene Version als
+`news` in `users.json`, ohne Anmeldung der Browser), *Neuigkeiten* neben der
+Versionsnummer im Startmenü öffnet sie wieder. Neue Konten starten bei der
+aktuellen Version. `test/news.js` schlägt fehl, wenn die Version aus `package.json`
+keine Notizen hat.
+
 ## Ton
 
 Die Effekte werden im Browser **synthetisiert** – keine Audiodateien, keine
@@ -142,6 +153,10 @@ node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat
 npm run test:auth      # Zugang: Hashes, Konten, Profil, Anmeldung, Rateschutz
+npm run test:ai        # schwere KI lernt aus gescheiterten Angriffen
+npm run test:colonies  # schwere KI: Kolonieschiffe aus der nächsten Werft, eins pro Welt
+npm run test:midflight # Teilen im Flug, Ausfälle und Hinterhalte der schweren KI
+npm run test:news      # Änderungsnotizen: einmal pro Konto, Notizen zur aktuellen Version
 npm run test:idle      # Zombie-Partien: nach der Ruhefrist verworfen, aktive bleiben
 ```
 

@@ -376,6 +376,8 @@
   "split.allSingle": "All single",
   "split.allSingleTitle": "Break the whole fleet up into {n} single ships",
   "split.hint": "Drag ships to the other side. A tap moves a single ship.",
+  "split.hintFlight": "In flight both parts fly on to {planet} – then give the new fleet a target of its own.",
+  "split.hintAdrift": "Both parts hold position here in space until they get a course.",
   "split.drop": "Drag ships here",
   "split.needBoth": "Each side needs at least one ship.",
   "split.stats": "{attack} ⚔ · {speed} ly/turn · {range} ly",
@@ -614,5 +616,10 @@
   "err.alreadySeated": "You already have a seat in this game - one empire per account.",
   "err.watchOwnGame": "You play in this game yourself - watching it without fog of war is not allowed.",
   "err.notHost": "Only the host can pause the game.",
-  "profile.err.reserved": "This name is reserved for the game."
+  "profile.err.reserved": "This name is reserved for the game.",
+  "news.link": "What's new",
+  "news.title": "New in version {release}",
+  "news.ok": "Got it",
+  "news.titleSince": "New since version {release}",
+  "news.version": "Version {release}"
 }

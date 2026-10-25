@@ -12,13 +12,14 @@ import {
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile, getUser, setProfile, isAdmin } from './userstore.js';
+import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen } from './userstore.js';
 import { createInvite, listInvites, revokeInvite } from './invites.js';
 import {
   cleanName, nameAllowed, reservedName, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
   accountAvatarUrl, handleAvatar
 } from './profile.js';
 import { MAX_PLAYERS, AI_LEVELS } from '../shared/rules.js';
+import { releaseOf, compareRelease } from '../shared/version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -27,6 +28,14 @@ const PORT = process.env.PORT || 8080;
 // they are served instead of being maintained in a second place.
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 const VERSION_MARK = /__HO_VERSION__/g;
+// Releases with change notes (client/news/<release>.json) up to the one that
+// runs - the browser cannot list the folder, so 'hello' names them.
+const RELEASES = (() => {
+  let names = [];
+  try { names = fs.readdirSync(path.join(ROOT, 'client', 'news')); } catch { /* no notes */ }
+  return names.map(n => n.match(/^(\d+\.\d+)\.json$/)?.[1]).filter(Boolean)
+    .filter(r => compareRelease(r, releaseOf(VERSION)) <= 0).sort(compareRelease);
+})();
 // Games nobody has touched for this long are zombies and get discarded -
 // even if a forgotten tab is still connected.
 const IDLE_MS = (Number(process.env.HO_IDLE_HOURS) || 4) * 3600 * 1000;
@@ -178,8 +187,8 @@ wss.on('connection', (ws, req, session) => {
     account: session.display ?? session.user, accountKey: session.user ?? null,
     profile: { name: null, avatar: null }
   };
+  let account = null;
   if (c.accountKey) {
-    let account = null;
     try { account = getUser(c.accountKey); } catch { /* account file unreadable */ }
     c.profile = { name: account?.nick || c.account, avatar: accountAvatarUrl(c.accountKey) };
   }
@@ -187,7 +196,10 @@ wss.on('connection', (ws, req, session) => {
   send(ws, {
     t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
     profile: { ...c.profile, account: c.accountKey ? c.account : null },
-    admin: adminOf(c)
+    admin: adminOf(c),
+    // Which release's change notes this account has seen - null: none yet.
+    // Without an account the browser remembers it.
+    version: VERSION, releases: RELEASES, newsSeen: c.accountKey ? (account?.news ?? null) : undefined
   });
 
   ws.on('message', (raw) => {
@@ -448,6 +460,13 @@ function handle(connId, ws, msg) {
       // Back is only news to the others if they were told about the loss.
       else if (wasAway) { broadcastView(g); chat(g, 'System', { key: 'chat.back', params: { player: p.name } }); }
       else send(ws, { t: 'view', view: buildView(g, p) });
+      break;
+    }
+    case 'newsSeen': {
+      // Always the release that runs here - not what the client claims.
+      if (c.accountKey) {
+        try { setNewsSeen(c.accountKey, releaseOf(VERSION)); } catch { /* account file unreadable */ }
+      }
       break;
     }
     case 'profile': {

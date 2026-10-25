@@ -113,6 +113,15 @@ tagged rather than typed:
 Another language needs a file in `client/i18n/`, one line in `client/js/i18n.js`
 and, if necessary, a plural rule in `shared/i18n.js`.
 
+**Change notes.** A release is the first two places of the version (`0.6`); bug-fix
+versions in the third place pass silently. For a new release, put a few bullet
+points into `client/news/<release>.json` – kept apart from the game's catalogues,
+one list per language: `{ "de": ["…", "…"], "en": ["…", "…"] }`. Whoever skipped releases gets the notes of all of them since their last visit, newest first; whoever has never seen any only gets the current ones. Every account sees them once after signing in
+(the server keeps the release seen as `news` in `users.json`; without sign-in the
+browser remembers it), and *What's new* next to the version in the start menu opens
+them again. New accounts start at the current release. `test/news.js` fails if the
+release in `package.json` has no notes.
+
 ## Sound
 
 The effects are **synthesised** in the browser – no audio files, no dependency.
@@ -141,6 +150,10 @@ node test/intercept.js # interception when leaving a contested orbit
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat
 npm run test:auth      # access: hashes, accounts, profile, sign-in, rate limit
+npm run test:ai        # hard AI learns from failed strikes
+npm run test:colonies  # hard AI: colony ships from the nearest yard, one per world
+npm run test:midflight # splitting in flight, hard AI sorties and ambushes
+npm run test:news      # change notes: once per account, notes for the current release
 npm run test:idle      # zombie games: discarded after the idle limit, active ones stay
 ```
 

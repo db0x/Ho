@@ -478,10 +478,12 @@ export function setOrders(game, player, msg) {
     player.orders.moves[fleet.id] = target.id;
   }
   if (msg.split) {
-    // Only in orbit - a course may be set: the split-off part stays behind
-    // without one, the rest keeps it (movement checks the range again).
+    // In orbit the split-off part stays behind without a course, the rest
+    // keeps it. In flight both parts fly on to the same target until the new
+    // one gets a course of its own - nobody is left adrift in deep space by
+    // accident. Movement checks the range of each part again.
     const fleet = game.fleets.find(f => f.id === msg.split.fleetId);
-    if (!fleet || fleet.owner !== player.id || fleet.at == null) return;
+    if (!fleet || fleet.owner !== player.id) return;
     const take = msg.split.ships || [];
     let moved = fleet.ships.filter(s => take.includes(s.id));
     // each: every ship becomes a fleet of its own (colony ships to several
@@ -490,9 +492,18 @@ export function setOrders(game, player, msg) {
     if (each && moved.length === fleet.ships.length) moved = moved.slice(1);
     if (!moved.length || moved.length === fleet.ships.length) return;
     fleet.ships = fleet.ships.filter(s => !moved.includes(s));
-    const planet = planetById(game, fleet.at);
+    const planet = fleet.at != null ? planetById(game, fleet.at) : null;
     const parts = each ? moved.map(s => [s]) : [moved];
-    const ids = parts.map(ships => { const nf = newFleet(game, player.id, planet); nf.ships = ships; return nf.id; });
+    const ids = parts.map(ships => {
+      const nf = newFleet(game, player.id, planet);
+      nf.ships = ships;
+      if (!planet) {
+        nf.x = fleet.x; nf.y = fleet.y; nf.z = fleet.z;
+        nf.dest = fleet.dest;
+        if (fleet.dest != null) player.orders.moves[nf.id] = fleet.dest;
+      }
+      return nf.id;
+    });
     return { newFleet: ids[0] };
   }
   if (msg.merge) {
@@ -1216,6 +1227,16 @@ function pushLog(game, entries) {
 
 // ------------------------------------------------------------- View per player
 
+/**
+ * Does this empire see a foreign fleet - near one of its worlds or fleets?
+ * Then it knows course, arrival and the number of ships, not what they are.
+ * The AI goes by the same rule.
+ */
+export function inSight(game, playerId, f) {
+  return game.galaxy.planets.some(q => q.owner === playerId && dist(q, f) < 300)
+    || game.fleets.some(g => g.owner === playerId && g.ships.length && dist(g, f) < 240);
+}
+
 export function buildView(game, player) {
   const vis = new Set();   // planets with current sight
   for (const planet of game.galaxy.planets) {
@@ -1271,10 +1292,7 @@ export function buildView(game, player) {
       });
       continue;
     }
-    const detected = (f.at !== null && vis.has(f.at))
-      || game.galaxy.planets.some(q => q.owner === player.id && dist(q, f) < 300)
-      || game.fleets.some(g => g.owner === player.id && g.ships.length && dist(g, f) < 240);
-    if (detected) {
+    if ((f.at !== null && vis.has(f.at)) || inSight(game, player.id, f)) {
       // Whoever has a foreign fleet in their own space scouts it well enough to
       // know its course and arrival - what it flies with stays hidden.
       const target = f.dest != null ? planetById(game, f.dest) : null;
