@@ -3,6 +3,7 @@
 // form one stack: dragging moves the whole stack, a tap moves a single ship.
 // The right column can also become one fleet per ship ("each"), and "all
 // single" breaks up the whole fleet at once - five colony ships, five worlds.
+// In flight both parts keep the course until the new one gets its own.
 // The window lives outside the selection panel, so a new view arriving in
 // the meantime does not throw away what has been put together.
 import { shipIcon } from '../render/ships.js';
@@ -63,13 +64,14 @@ function build() {
 
 /**
  * @param {object} fleet          own fleet from the view (ships with id, type, tech, hp ...)
- * @param {object} o              { color, onSplit(shipIds, each) }
+ * @param {object} o              { color, flight: { target } | null, onSplit(shipIds, each) }
  */
 export function openSplit(fleet, o) {
   if (!modal) build();
   current = { fleet, color: o.color, onSplit: o.onSplit, side: new Map(fleet.ships.map(s => [s.id, 'keep'])), each: false };
   modal.querySelector('.sp-title').textContent = t('split.title');
-  modal.querySelector('.sp-hint').textContent = t('split.hint');
+  modal.querySelector('.sp-hint').textContent = !o.flight ? t('split.hint')
+    : t('split.hint') + ' ' + (o.flight.target ? t('split.hintFlight', { planet: o.flight.target }) : t('split.hintAdrift'));
   modal.querySelector('[data-side="keep"] .sp-name').textContent = t('split.keep');
   modal.querySelector('[data-side="new"] .sp-name').textContent = t('split.new');
   modal.querySelector('.sp-each input').checked = false;

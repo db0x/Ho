@@ -8,7 +8,7 @@ import {
   holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance, cargoOf,
   terraformable, IDEAL
 } from '../shared/rules.js';
-import { setOrders, fleetStats, canReach, planetById, playerById } from './game.js';
+import { setOrders, fleetStats, canReach, planetById, playerById, inSight } from './game.js';
 
 // Share of the firepower that really lands over twelve combat rounds - the
 // rest is lost to own casualties and overkill on targets already destroyed.
@@ -152,6 +152,21 @@ export function runBot(game, bot) {
     && !(hard && (ai.learn.danger[p.id] || 0) > game.turn));
   const inRange = settleable.filter(p => supplyDistance(home, p, zone) <= colonyRange);
   if (settleable.length > inRange.length && inRange.length < 2) weights.range += 3;
+  // How good a free world is for a colony ship from `from`. Whoever wants to
+  // settle accepts long trips for a good world. Hard: every turn under way is
+  // a turn of growth lost - a good world next door beats a slightly better
+  // one across the galaxy.
+  const greed = P.settlers >= 4 ? 10 : 8;
+  const colonySpeed = shipStats('colony', bot.tech).speed || 1;
+  const settleScore = (p, from) => hard
+    ? planetCapacity(p) * greed / (1 + travelDistance(from, p, zone) / colonySpeed)
+    : planetCapacity(p) * greed - travelDistance(from, p, zone) * 0.1;
+  // Hard: which colony ship was built at which shipyard for which world - it
+  // takes exactly that world once it is done. Plans that never turned into a
+  // ship (money ran short) or whose world is gone expire.
+  if (hard) {
+    ai.colonyPlans = (ai.colonyPlans || []).filter(x => game.turn - x.turn <= 3 && !planets[x.goal]?.owner);
+  }
   // Ore is the hard limit: when it is scarce, the last chunks go into colonies
   // on ore-rich worlds instead of warships.
   const oreScarce = bot.metal < shipCost('colony', bot.tech).metal * 4;
@@ -314,6 +329,15 @@ export function runBot(game, bot) {
     const holds = f.ships.filter(s => s.cargo).map(s => s.id);
     if (holds.length && holds.length < f.ships.length) setOrders(game, bot, { split: { fleetId: f.id, ships: holds } });
   }
+  // Hard: colony ships fly alone too - each was built for a world of its own.
+  if (hard) {
+    for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
+      const settlers = f.ships.filter(s => s.colonists > 0);
+      if (settlers.length > 1 && settlers.length === f.ships.length) {
+        setOrders(game, bot, { split: { fleetId: f.id, ships: settlers.map(s => s.id), each: true } });
+      }
+    }
+  }
   // Scouts fly alone - in a bunch they only explore one world instead of several.
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.at != null)) {
     if (f.ships.length < 2 || !f.ships.every(s => s.type === 'scout')) continue;
@@ -337,12 +361,20 @@ export function runBot(game, bot) {
     let target = null;
 
     if (hasColonist) {
-      // Settlers: the best possible free world. Whoever wants to settle also
-      // accepts long trips for a good world.
-      const greed = P.settlers >= 4 ? 10 : 8;
-      target = reachable(game, fleet, settleable.filter(p => p.id !== fleet.at && !claimed.has(p.id)),
-        p => planetCapacity(p) * greed - far(p) * 0.1
-          + (oreScarce ? Math.min(p.metalReserve, 2000) * 0.05 : 0));
+      // Hard: the world this ship was built for, if it is still free.
+      if (hard && fleet.at != null) {
+        const i = ai.colonyPlans.findIndex(x => x.yard === fleet.at && x.turn < game.turn && !claimed.has(x.goal));
+        if (i >= 0) {
+          const goal = planets[ai.colonyPlans[i].goal];
+          ai.colonyPlans.splice(i, 1);
+          if (goal && !goal.owner && canReach(game, fleet, goal).ok) target = goal;
+        }
+      }
+      // Otherwise the best free world from here.
+      if (!target) {
+        target = reachable(game, fleet, settleable.filter(p => p.id !== fleet.at && !claimed.has(p.id)),
+          p => settleScore(p, here) + (oreScarce ? Math.min(p.metalReserve, 2000) * 0.05 : 0));
+      }
     } else if (!armed) {
       // Scouts: nearest unexplored world. If everything around is known, they
       // head for the edge - only there does the map grow, and the ore with it.
@@ -377,6 +409,7 @@ export function runBot(game, bot) {
   }
 
   if (hard) recall();
+  if (hard) detach();
   logistics();
   refit();
 
@@ -484,14 +517,20 @@ export function runBot(game, bot) {
     const colonies = () => {
       if (wantColony <= 0) return;
       if (!hard) { order.push([yard, 'colony', wantColony]); return; }
-      // Hard: every colony ship comes from the shipyard closest to one of the
-      // best free worlds - short trips instead of all of them crossing the
-      // empire from the capital. That alone decides most games.
-      const goals = inRange.slice().sort((a, b) => planetCapacity(b) - planetCapacity(a)).slice(0, wantColony);
-      for (const goal of goals) {
+      // Hard: every colony ship comes from the shipyard right next to the
+      // world it is meant for - short trips instead of all of them crossing
+      // the empire from the capital. That alone decides most games. Worlds a
+      // colony ship already heads for, or one is being built for, are taken.
+      const taken = new Set(ai.colonyPlans.map(x => x.goal));
+      for (const f of myFleets) if (f.dest != null && f.ships.some(s => s.colonists > 0)) taken.add(f.dest);
+      const options = inRange.filter(p => !taken.has(p.id)).map(p => {
         let best = yard, bd = Infinity;
-        for (const y of yards.slice(0, 30)) { const d = dist(y, goal); if (d < bd) { bd = d; best = y; } }
-        order.push([best, 'colony', 1]);
+        for (const y of yards.slice(0, 30)) { const d = travelDistance(y, p, zone); if (d < bd) { bd = d; best = y; } }
+        return { p, yard: best, s: settleScore(p, best) };
+      }).sort((a, b) => b.s - a.s).slice(0, wantColony);
+      for (const o of options) {
+        order.push([o.yard, 'colony', 1]);
+        ai.colonyPlans.push({ yard: o.yard.id, goal: o.p.id, turn: game.turn });
       }
     };
     const satellites = () => {
@@ -619,6 +658,92 @@ export function runBot(game, bot) {
       const back = (camp && camp.rally) || rallyPoint || yard;
       if (back && back.id !== f.dest && canReach(game, f, back).ok) {
         setOrders(game, bot, { move: { fleetId: f.id, planetId: back.id } });
+      }
+    }
+  }
+
+  /**
+   * Hard: splitting in flight. An armed fleet under way peels off part of
+   * itself where nobody sees it coming - what it has beyond the needs of its
+   * own target:
+   * - sortie: the detachment cracks a second enemy world that it reaches in
+   *   this very turn, so the defender gets no turn to react
+   * - ambush: a small foreign fleet heading for a free world - most likely a
+   *   colony ship - is met there by fighters that arrive no later than it
+   * At most one detachment per fleet and turn; the main fleet flies on.
+   */
+  function detach() {
+    const ambushed = new Set(myFleets.filter(f => f.dest != null).map(f => f.dest));
+    for (const f of game.fleets.filter(f => f.owner === bot.id && f.at == null && f.dest != null)) {
+      const goal = planets[f.dest];
+      if (!goal) continue;
+      const armed = f.ships.filter(s => s.attack > 0 && s.speed > 0);
+      if (armed.length < 2) continue;
+      // What the own target still needs - a free or own world needs nothing,
+      // but a ship stays with the fleet in any case.
+      const need = goal.owner && goal.owner !== bot.id ? price(goal) * margin * 1.1 : 0;
+      const spare = strikePower(f) - need;
+      if (spare <= 0) continue;
+      const weakFirst = armed.slice().sort((x, y) => x.attack - y.attack);
+      // The fewest ships that bring this much firepower without cutting into
+      // what the main fleet needs.
+      const pick = (want) => {
+        const out = [];
+        let fire = 0;
+        for (const s of weakFirst) {
+          if (fire >= want) break;
+          out.push(s); fire += s.attack * COMBAT_ROUNDS * HIT_RATE;
+        }
+        if (fire < want || fire > spare || out.length >= f.ships.length) return null;
+        return out;
+      };
+      const turnsFor = (ships, p) => {
+        const speed = Math.min(...ships.map(s => s.speed));
+        return Math.ceil(travelDistance(f, p, zone) / speed);
+      };
+      // Splits off and sets the course; the new fleet or null.
+      const send = (ships, p) => {
+        if (!canReach(game, { owner: bot.id, ships }, p).ok) return null;
+        const r = setOrders(game, bot, { split: { fleetId: f.id, ships: ships.map(s => s.id) } });
+        const nf = r?.newFleet && game.fleets.find(x => x.id === r.newFleet);
+        if (!nf) return null;
+        setOrders(game, bot, { move: { fleetId: nf.id, planetId: p.id } });
+        // The main fleet is weaker now - its entry in the war diary too.
+        const own = ai.learn.strikes.find(x => x.fleetId === f.id);
+        if (own) own.strike = strikePower(f);
+        return nf;
+      };
+
+      // Sortie: the most valuable world that a detachment cracks right away.
+      const sorties = enemyWorlds
+        .filter(p => p.id !== goal.id && (ai.avoided[p.id] || 0) <= game.turn && price(p) * margin <= spare)
+        .sort((x, y) => value(y) / (price(y) / 100 + 5) - value(x) / (price(x) / 100 + 5));
+      let done = false;
+      for (const p of sorties.slice(0, 8)) {
+        const ships = pick(price(p) * margin);
+        if (!ships || turnsFor(ships, p) > 1) continue;
+        const nf = send(ships, p);
+        if (!nf) continue;
+        ai.learn.strikes.push({ fleetId: nf.id, target: p.id, owner: p.owner, strike: strikePower(nf), turn: game.turn });
+        done = true;
+        break;
+      }
+      if (done) continue;
+
+      // Ambush: only what a human would see as well - course, arrival and
+      // number of ships, not their kind.
+      for (const e of game.fleets) {
+        if (e.owner === bot.id || e.dest == null || e.ships.length > 3) continue;
+        const w = planets[e.dest];
+        if (!w || w.owner || ambushed.has(w.id) || !inSight(game, bot.id, e)) continue;
+        const eSpeed = fleetStats(e).speed;
+        if (eSpeed <= 0) continue;
+        const theirs = Math.ceil(travelDistance(e, w, zone) / eSpeed);
+        // Unknown ships: reckon with fighters as tough as our own.
+        const ships = pick(e.ships.length * fighter.maxHp * 1.5);
+        if (!ships || turnsFor(ships, w) > theirs || !send(ships, w)) continue;
+        ambushed.add(w.id);
+        break;
       }
     }
   }

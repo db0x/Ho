@@ -208,13 +208,21 @@ tap on the button next to the AI; *Play 5 AI right away* rolls it for each oppon
 | **Normal** | plays its personality as described above |
 | **Hard** | grows faster and learns from its mistakes |
 
-A hard empire builds every colony ship at the shipyard closest to a good free world
-instead of sending them all across the empire from the capital, and terraforms where
+A hard empire builds every colony ship at the shipyard right next to the free world
+it is meant for and sends it there on the short way – one ship per world, a good
+world nearby before a slightly better one far away – instead of sending them all
+across the empire from the capital. It terraforms where
 a credit buys the most people. It also keeps a war diary. A strike that failed is not repeated with the same
 force – that world needs clearly more next time, and its owner is reckoned stronger
 everywhere; successes make it bolder again. It counts enemy fleets that can come to
 the rescue within two turns, calls back a strike whose target has grown too strong
 in the meantime, and avoids worlds where its colony ships were shot down.
+
+It also splits fleets in flight. A strike fleet with firepower to spare peels off a
+detachment against a second, weaker world it reaches in the same turn – so there is
+no turn left to react. And a small foreign fleet heading for a free world (most
+likely a colony ship) may find a few of its fighters waiting there. It only sees
+what you would see: course, arrival and number of ships, not what they are.
 
 ## Watching
 
@@ -241,7 +249,7 @@ turn limit wins. Without a turn limit, the last empire standing wins.
 | Select | Left click on a world or fleet |
 | Set course | Pick a fleet, then **right-click** (or shift-click) the target world – or click the target world and use *Fleet here* in the panel |
 | See where fleets go | Each course line starts at its fleet – fleets in orbit wait on the side facing their target – and ends in an arrowhead. Select a fleet or point at it: its line stands out with the turns until arrival |
-| Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds) |
+| Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds). This works in flight too: both parts fly on to the same target until you give the new fleet a course of its own |
 | End turn | Button in the middle of the top bar or `space` |
 | Show the budget | Click or hover over money or metal in the top bar |
 | Fit the map | `F` |

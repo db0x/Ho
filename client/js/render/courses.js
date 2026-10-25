@@ -51,6 +51,29 @@ export function orbitSlots(fleets, headingOf, isMine) {
   return out;
 }
 
+/**
+ * Fleets in space that stand on the same spot - split in flight, or launched
+ * together - fan out side by side across their heading, so each one can be
+ * picked on its own. Changes the spots in place.
+ * @param {{x: number, y: number, heading: number}[]} spots  in-space spots only
+ * @param {number} gap  distance between two neighbours in screen pixels
+ */
+export function fanOut(spots, gap) {
+  const groups = [];
+  for (const s of spots) {
+    const g = groups.find(g => Math.abs(g[0].x - s.x) < 3 && Math.abs(g[0].y - s.y) < 3);
+    if (g) g.push(s); else groups.push([s]);
+  }
+  for (const g of groups) {
+    if (g.length < 2) continue;
+    const nx = -Math.sin(g[0].heading), ny = Math.cos(g[0].heading);
+    g.forEach((s, i) => {
+      const k = (i - (g.length - 1) / 2) * gap;
+      s.x += nx * k; s.y += ny * k;
+    });
+  }
+}
+
 /** Line style: the fleet in focus stands out, the others step back. */
 export function courseStyle(f, focusId) {
   const hot = f.id === focusId;

@@ -10,8 +10,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { releaseOf } from '../shared/version.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// The release new accounts start at - they have nothing to catch up on.
+const RELEASE = releaseOf(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
 
 // scrypt with N=16384: about 40 ms and 16 MB per check. Enough of a brake
 // against guessing and still below the maxmem Node allows by default.
@@ -201,6 +204,7 @@ export async function addUser(name, password, { mustChange = true, invitedBy = n
     mustChange,
     created: new Date().toISOString(),
     changed: null,
+    news: RELEASE,
     ...(spelling !== key ? { display: spelling } : {}),
     ...(invitedBy ? { invitedBy } : {})
   };
@@ -242,6 +246,18 @@ export function setProfile(name, { nick, avatar } = {}) {
   }
   save(db);
   return { name: key, nick: user.nick || null, avatar: user.avatar || null };
+}
+
+/**
+ * The change notes of this release have been shown to the account - they
+ * appear once per account, not once per browser.
+ */
+export function setNewsSeen(name, release) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key] || db.users[key].news === release) return;
+  db.users[key].news = release;
+  save(db);
 }
 
 export function deleteUser(name) {

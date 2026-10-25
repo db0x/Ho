@@ -16,7 +16,7 @@ import {
   HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
-import { orbitSlots, courseStyle, arrowHead, midpoint } from './courses.js';
+import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -447,6 +447,8 @@ export class SpaceView {
         byWorld.get(f.at).push(f);
       }
     }
+    // Fanned out at the size of a ship near the middle of the depth range.
+    fanOut(v.fleets.filter(f => f.at == null && spots.has(f.id)).map(f => spots.get(f.id)), 30);
     for (const [pid, here] of byWorld) {
       const p = v.planets[pid];
       const pr = this.project(p.x, p.y, p.z || 0);
@@ -597,7 +599,7 @@ export class SpaceView {
     if (f.at != null) {
       drawShip(ctx, { type: lead, x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) });
     } else {
-      const ang = this.headingAngle(f, x, y) ?? 0;
+      const ang = spot?.heading ?? this.headingAngle(f, x, y) ?? 0;
       drawTrail(ctx, x, y, ang, 46 * scale, col);
       drawShip(ctx, { type: lead, x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase });
     }

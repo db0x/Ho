@@ -5,7 +5,7 @@ import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from
 import { t } from '../i18n.js';
 import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN } from './fx.js';
 import { BattleFx } from './battlefx.js';
-import { orbitSlots, courseStyle, arrowHead, midpoint } from './courses.js';
+import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
 
 const ORBIT_R = 20;
 
@@ -427,16 +427,8 @@ export class MapView {
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, x, y, 16 * scale);
         this.hit.push({ type: 'fleet', id: f.id, x, y, r: 14 * scale });
       } else {
-        const [sx, sy] = this.w2s(f.x, f.y);
-        let ang = 0;
-        if (f.dest != null && v.planets[f.dest]) {
-          // First path segment that is long enough - on the arc around the
-          // black hole the fleet flies at an angle to the target.
-          for (const w of route(f, v.planets[f.dest], zone)) {
-            const dx = w.x - f.x, dy = w.y - f.y;
-            if (dx * dx + dy * dy > 1e-6) { ang = Math.atan2(dy, dx); break; }
-          }
-        }
+        const spot = spots.get(f.id);
+        const sx = spot.x, sy = spot.y, ang = spot.heading;
         drawTrail(ctx, sx, sy, ang, 46 * scale, col);
         drawShip(ctx, { type: lead, x: sx, y: sy, angle: ang, len: 26 * scale, color: col, phase: this.phase });
         const n = f.ships ? f.ships.length : f.count;
@@ -610,12 +602,22 @@ export class MapView {
     for (const f of v.fleets) {
       if (f.at == null) {
         const [x, y] = this.w2s(f.x, f.y);
-        spots.set(f.id, { x, y, heading: 0, idx: 0 });
+        let heading = 0;
+        if (f.dest != null && v.planets[f.dest]) {
+          // First path segment that is long enough - on the arc around the
+          // black hole the fleet flies at an angle to the target.
+          for (const w of route(f, v.planets[f.dest], zone)) {
+            const dx = w.x - f.x, dy = w.y - f.y;
+            if (dx * dx + dy * dy > 1e-6) { heading = Math.atan2(dy, dx); break; }
+          }
+        }
+        spots.set(f.id, { x, y, heading, idx: 0 });
       } else if (v.planets[f.at]) {
         if (!byWorld.has(f.at)) byWorld.set(f.at, []);
         byWorld.get(f.at).push(f);
       }
     }
+    fanOut(v.fleets.filter(f => f.at == null).map(f => spots.get(f.id)), 30 * scale);
     for (const [pid, here] of byWorld) {
       const p = v.planets[pid];
       const [sx, sy] = this.w2s(p.x, p.y);
