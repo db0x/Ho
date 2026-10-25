@@ -96,8 +96,17 @@ export class Lobby {
       if (this.isHost) this.net.send({ t: 'settings', settings: { mode: $('#s-mode').value } });
     };
     $('#s-turns').onchange = () => {
-      if (this.isHost) this.net.send({ t: 'settings', settings: { maxTurns: +$('#s-turns').value } });
+      if (!this.isHost) return;
+      if ($('#s-turns').value === 'quick') this.pickSettingsQuickTurns(true);
+      else this.net.send({ t: 'settings', settings: { maxTurns: +$('#s-turns').value } });
     };
+    // Same reasoning as for the start screen's turn-limit select: reselecting
+    // "Schnelles Spiel" while it is already chosen needs its own listener.
+    $('#s-turns').closest('.sel')?.addEventListener('click', (event) => {
+      if (this.isHost && event.target.closest('.sel-opt')?.dataset.value === 'quick' && $('#s-turns').value === 'quick') {
+        this.pickSettingsQuickTurns(false);
+      }
+    }, true);
     $('#s-expand').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { expanding: $('#s-expand').checked } });
     };
@@ -128,21 +137,45 @@ export class Lobby {
   pickQuickTurns(freshSelect) {
     openQuickTurns((turns) => {
       this.quickTurns = turns;
-      this.labelQuickTurns(turns);
+      this.labelQuickTurns('#in-turns', turns);
     }, freshSelect ? () => {
       $('#in-turns').value = this.lastTurnsValue;
       syncSelects();
     } : undefined);
   }
 
-  /** After a pick: the option shows the chosen round count, "quick game" only as the tag behind it. */
-  labelQuickTurns(turns) {
-    const option = $('#in-turns')?.querySelector('option[value="quick"]');
+  /** After a pick: the option shows the chosen round count, "quick game" only
+   * as the tag behind it. Used for both turn-limit selects - the start
+   * screen's and the live lobby settings' - each with its own option. */
+  labelQuickTurns(selector, turns) {
+    const option = $(selector)?.querySelector('option[value="quick"]');
     if (!option) return;
     option.dataset.i18n = 'lobby.quickGameChosen';
     option.dataset.i18nArgs = JSON.stringify({ n: turns });
     option.textContent = t('lobby.quickGameChosen', { n: turns });
     syncSelects();
+  }
+
+  /** The option value a turn-limit select should show for a given maxTurns:
+   * a preset if it matches one exactly, "0" for unlimited, otherwise "quick" -
+   * a custom number from that dialog, labelled with it by labelQuickTurns(). */
+  turnsSelectValue(maxTurns) {
+    if (!maxTurns) return '0';
+    return [100, 200, 300, 500].includes(maxTurns) ? String(maxTurns) : 'quick';
+  }
+
+  /** Same dialog as the start screen's, but for the live lobby: a pick sends
+   * the setting right away instead of waiting for "create".
+   * @param {boolean} freshSelect  true right after picking "quick game" from
+   *   another value - cancelling then falls back to that value. */
+  pickSettingsQuickTurns(freshSelect) {
+    openQuickTurns((turns) => {
+      this.labelQuickTurns('#s-turns', turns);
+      this.net.send({ t: 'settings', settings: { maxTurns: turns } });
+    }, freshSelect ? () => {
+      $('#s-turns').value = this.turnsSelectValue(this.settings?.maxTurns);
+      syncSelects();
+    } : undefined);
   }
 
   /** Opens a game, fills it with AI and starts right away. */
@@ -368,9 +401,10 @@ export class Lobby {
     $('#s-mode').disabled = !this.isHost;
     $('#s-shape').value = s.shape === 'spiral' ? 'spiral' : 'scatter';
     $('#s-shape').disabled = !this.isHost;
-    // Values that do not exist in the selection land on the next larger one.
-    const limits = [100, 200, 300, 500];
-    $('#s-turns').value = s.maxTurns ? String(limits.find(n => n >= s.maxTurns) || 500) : '0';
+    // A value that is not one of the presets is a custom round count, shown
+    // as "Schnelles Spiel" with that number.
+    $('#s-turns').value = this.turnsSelectValue(s.maxTurns);
+    if ($('#s-turns').value === 'quick') this.labelQuickTurns('#s-turns', s.maxTurns);
     $('#s-turns').disabled = !this.isHost;
     $('#s-expand').checked = s.expanding !== false;
     $('#v-expand').textContent = t(s.expanding !== false ? 'word.yes' : 'word.no');

@@ -48,7 +48,7 @@ mit dem Hinweis, wer sie ändern kann:
 |---|---|
 | Spielfeld | *Klassik* (flach) oder *Raum* (dreidimensional) |
 | Form der Galaxie | *Streufeld* oder *Spirale* mit schwarzem Loch |
-| Rundenlimit | 100, 200, 300, 500 oder unbegrenzt |
+| Rundenlimit | 100, 200, 300, 500, unbegrenzt oder *Schnelles Spiel* mit einer eigenen Zahl von 20 bis 99 |
 | Welten pro Spieler | 3–14 |
 | Startkapital, Startmetall | Kasse zu Beginn |
 | Zugzeit | 0 = es wird gewartet, bis alle fertig sind |
@@ -253,6 +253,11 @@ reinen KI-Partien – sonst sähe ein Zuschauer die Karten aller Spieler.
 Die Rangliste ordnet die Reiche nach **Bevölkerung**, bei Gleichstand nach Welten,
 dann nach Schiffen. Danach wird auch gewertet: Wer beim Rundenlimit die meisten
 Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt.
+
+Ist die Partie beendet, steht der Gewinner für alle auf dem Bildschirm. *Weiter*
+öffnet einen Dialog dazu, wie es weitergeht: Nur der Gastgeber kann die Partie
+um weitere Runden verlängern, statt sie enden zu lassen; alle anderen können
+nur zwischen Rückkehr zur Startseite und Bleiben wählen.
 
 ## Steuerung
 

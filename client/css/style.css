@@ -819,6 +819,18 @@ select option { background: var(--panel-solid); color: var(--ink); }
 }
 #turnbanner .big { font-size: 50px; font-weight: 800; letter-spacing: .02em; color: var(--gold); text-shadow: 0 0 40px rgba(240,180,41,.4); }
 
+/* Game over: same spot as the turn banner, but it stays - and only its own
+   box catches clicks, so the map underneath stays visible and the rest of
+   the screen is not blocked while it is up. */
+#winnerbanner { position: absolute; inset: 0; display: grid; place-items: center; z-index: 8; pointer-events: none; }
+#winnerbanner .winner-box {
+  pointer-events: auto; text-align: center;
+  background: rgba(10, 14, 26, .92); border: 1px solid var(--line-strong);
+  border-radius: 14px; padding: 26px 34px; box-shadow: var(--shadow);
+}
+#winnerbanner .big { font-size: 38px; font-weight: 800; letter-spacing: .02em; color: var(--gold); text-shadow: 0 0 40px rgba(240,180,41,.4); margin-bottom: 6px; }
+#winnerbanner .muted { margin: 0 0 18px; }
+
 /* Modal */
 .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(2, 3, 8, .72); }
 .modal-box {
@@ -1117,6 +1129,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
   #toasts { top: 58px; width: min(92vw, 420px); }
   .toast { font-size: 13px; }
   #turnbanner .big { font-size: 34px; }
+  #winnerbanner .big { font-size: 28px; }
+  #winnerbanner .winner-box { padding: 20px 22px; }
 }
 
 /* Half height on portrait phones: a selection on the map opens like this,

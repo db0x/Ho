@@ -47,7 +47,7 @@ saying who can change them:
 |---|---|
 | Playing field | *Classic* (flat) or *Space* (three-dimensional) |
 | Galaxy shape | *Scatter* or *Spiral* with a black hole |
-| Turn limit | 100, 200, 300, 500 or unlimited |
+| Turn limit | 100, 200, 300, 500, unlimited, or *Quick game* for a custom number from 20 to 99 |
 | Worlds per player | 3–14 |
 | Starting capital, starting metal | Treasury at the start |
 | Turn timer | 0 = the game waits until everyone is done |
@@ -243,6 +243,11 @@ spectator would see everyone's cards.
 The ranking orders the empires by **population**, ties broken by worlds, then by
 ships. That is also how the game is decided: whoever has the most people at the
 turn limit wins. Without a turn limit, the last empire standing wins.
+
+When a game ends, who won stays up on the screen for everyone. *Weiter* opens
+a dialog about what happens next: only the host can extend the game by more
+turns instead of ending it there; everyone else only chooses between
+returning to the start screen and staying as they are.
 
 ## Controls
 

@@ -124,10 +124,6 @@ document.querySelector('#help-ships').onclick = () => {
   else openShipInfo('scout');
 };
 let lastTurn = 0;
-// Edge-triggered: only the first "over" after a "running" pops the dialog by
-// itself - after that it only reopens through the "Weiter" button, both ways
-// landing on the same showGameEnd().
-let seenOver = false;
 
 const app = {
   selection: null,
@@ -319,11 +315,8 @@ net.on('view', (m) => {
   }
   lastTurn = view.turn;
 
-  if (view.state === 'over') {
-    if (!seenOver) { seenOver = true; showGameEnd(view); }
-  } else {
-    seenOver = false;
-  }
+  if (view.state === 'over') showWinnerBanner(view);
+  else hideWinnerBanner();
 });
 
 /** Take over the battle records from the view; returns the new ones. */
@@ -365,6 +358,7 @@ net.on('close', () => {
 // ---------------------------------------------------------------------- Game
 function bindGame() {
   bindGameEnd();
+  $('#winnerbanner-continue').onclick = () => showGameEnd(map.view);
   map.onSelect = (hit) => {
     if (!hit) { app.setSelection(null); sfx.play('deselect'); return; }
     app.setSelection({ type: hit.type, id: hit.id });
@@ -626,13 +620,33 @@ function showTurnBanner(view) {
   showTurnBanner._t = setTimeout(() => b.classList.add('hidden'), 1100);
 }
 
-/** The game just ended (or "Continue" was clicked again): ask whether to keep
- * playing, with more turns, or go back to the start screen. Only the host
- * gets asked - others only get the option to leave or dismiss the dialog. */
+/** Who won, right on the screen - stays up until the game is left or
+ * continued; "Weiter" (bound in bindGame()) is what opens the dialog about
+ * either of those. */
+function showWinnerBanner(view) {
+  const winner = view.players.find(p => p.id === view.winner);
+  $('#winnerbanner-text').textContent = t('over.winner', { player: winner ? winner.name : '—' });
+  $('#winnerbanner').classList.remove('hidden');
+}
+
+function hideWinnerBanner() {
+  $('#winnerbanner').classList.add('hidden');
+}
+
+/** Opens the dialog about a game that has ended: ask whether to keep playing,
+ * with more turns, or go back to the start screen. Triggered by "Weiter" -
+ * on the winner banner, or the same button at the top once the game is over.
+ * Only the host gets asked - others only get the option to leave or dismiss. */
 function showGameEnd(view) {
   const winner = view.players.find(p => p.id === view.winner);
-  openGameEnd(t('over.winner', { player: winner ? winner.name : '—' }), view.host === view.you,
-    (turns) => net.send({ t: 'continue', turns }),
-    () => { net.forget(); location.reload(); },
-    () => {});
+  openGameEnd({
+    winnerText: t('over.winner', { player: winner ? winner.name : '—' }),
+    isHost: view.host === view.you,
+    // Staying without going back to the start screen: the same wording the
+    // leave-game dialog uses for "never mind" - by role, same as there.
+    stayLabel: t(view.spectator ? 'quit.spectatorNo' : 'quit.no'),
+    continueCallback: (turns) => net.send({ t: 'continue', turns }),
+    leaveCallback: () => { net.forget(); location.reload(); },
+    dismissCallback: () => {}
+  });
 }

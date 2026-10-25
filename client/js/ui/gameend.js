@@ -19,17 +19,22 @@ function steps(name) {
 }
 
 /**
- * @param {string} winnerText    "{player} herrscht ..." or the no-winner text
- * @param {boolean} isHost       only the host may extend the game - others
- *   only get the option to leave or to dismiss the dialog
- * @param {(turns: number) => void} continueCallback   called with the chosen round count
- * @param {() => void} leaveCallback                   called to actually go back to the start screen
- * @param {() => void} dismissCallback                 called on every other way out
+ * @param {object} options
+ * @param {string} options.winnerText        "{player} herrscht ..." or the no-winner text - stays
+ *   visible through every step, not just the one it is set on
+ * @param {boolean} options.isHost           only the host may extend the game - others go
+ *   straight to the choice between leaving and staying
+ * @param {string} options.stayLabel         label for "stay, don't go back to the start screen" -
+ *   "Weiterspielen" for players, "Weiter zusehen" for spectators, decided by the caller
+ * @param {(turns: number) => void} options.continueCallback   called with the chosen round count
+ * @param {() => void} options.leaveCallback                   called to actually go back to the start screen
+ * @param {() => void} options.dismissCallback                 called on every other way out
  */
-export function openGameEnd(winnerText, isHost, continueCallback, leaveCallback, dismissCallback) {
-  onContinue = continueCallback; onLeave = leaveCallback; onDismiss = dismissCallback;
-  $('#gameend-winner').textContent = winnerText;
-  steps(isHost ? 'ask' : 'leave');
+export function openGameEnd(options) {
+  onContinue = options.continueCallback; onLeave = options.leaveCallback; onDismiss = options.dismissCallback;
+  $('#gameend-winner').textContent = options.winnerText;
+  $('#gameend-leave-cancel').textContent = options.stayLabel;
+  steps(options.isHost ? 'ask' : 'leave');
   $('#gameend').classList.remove('hidden');
 }
 
