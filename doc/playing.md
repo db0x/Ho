@@ -261,6 +261,7 @@ returning to the start screen and staying as they are.
 | End turn | Button in the middle of the top bar or `space` |
 | Show the budget | Click or hover over money or metal in the top bar |
 | Fit the map | `F` |
+| Bring only your own forward | Hold `E` – everything that is not yours fades far back. Or the flag button at the top right: a tap toggles it (the way on a phone), holding shows it only while held |
 | Clear selection | `Esc` |
 | Help | `H` |
 | Move / resize windows | Drag the title bar to move; drag any edge or corner to resize |

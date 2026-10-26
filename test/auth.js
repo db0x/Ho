@@ -594,6 +594,85 @@ const session = (msg) => new Promise((ok) => {
   console.log('Invites: once only, 24 h at most, revocable, token never stored or shown again.');
 }
 
+// --- Deleting your own account (right to erasure): only with a session and
+//     the current password, the profile image goes with it, every session
+//     ends - and the last admin cannot leave the server without one.
+{
+  const signIn = async (user, password) => {
+    const r = await fetch(`${BASE}/api/auth/login`, asJson({ user, password }));
+    return r.headers.get('set-cookie')?.split(';')[0] || null;
+  };
+  const del = (jar, data, type = 'application/json') => fetch(`${BASE}/api/auth/delete`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': type, ...(jar ? { cookie: jar } : {}) },
+    body: type === 'application/json' ? JSON.stringify(data) : new URLSearchParams(data).toString()
+  });
+
+  await addUser('leaver', 'leaverPassword1', { mustChange: false });
+  const jar = await signIn('leaver', 'leaverPassword1');
+  const avatars = path.join(dir, 'avatars');
+  fs.mkdirSync(avatars, { recursive: true });
+  fs.writeFileSync(path.join(avatars, 'leaver.png'), 'not really a picture');
+
+  check((await del(null, { password: 'leaverPassword1' })).status === 401, 'An account can be deleted without a session');
+  check((await del(jar, { password: 'wrong' })).status === 401 && getUser('leaver'), 'A wrong password deletes the account');
+  check((await del(jar, {})).status === 401 && getUser('leaver'), 'Deleting works without any password');
+  check((await del(jar, { password: 'leaverPassword1' }, 'application/x-www-form-urlencoded')).status === 400 && getUser('leaver'),
+    'A form from a foreign page deletes the account');
+
+  const gone = await del(jar, { password: 'leaverPassword1' });
+  check(gone.status === 200, `Deleting with the right password fails (${gone.status})`);
+  check(!getUser('leaver'), 'The account is still in the account file');
+  check(!fs.existsSync(path.join(avatars, 'leaver.png')), 'The profile image outlives the account');
+  check(/Max-Age=0/i.test(gone.headers.get('set-cookie') || ''), 'The session cookie is not cleared');
+  const after = await fetch(`${BASE}/api/auth/me`, { headers: { cookie: jar } });
+  check(after.status === 401, 'The session of the deleted account still works');
+
+  // Nobody deletes anyone else - whatever the request names. The account
+  // always comes from the session, the body only carries the password.
+  {
+    await addUser('alice', 'alicePassword1', { mustChange: false });
+    await addUser('bob', 'bobPassword123', { mustChange: false });
+    const alice = await signIn('alice', 'alicePassword1');
+    const bob = await signIn('bob', 'bobPassword123');
+    // Alice's session with Bob's password, naming Bob in several ways. Few
+    // tries only: from the sixth failure on the lockout would answer instead.
+    for (const extra of [{ user: 'bob' }, { name: 'bob' }, { account: 'bob' }]) {
+      const r = await del(alice, { password: 'bobPassword123', ...extra });
+      check(r.status === 401 && getUser('bob') && getUser('alice'), `Alice deletes with Bob's password (${JSON.stringify(extra)})`);
+    }
+    // Without a session, with Bob's name and password: no way in either
+    const anon = await del(null, { user: 'bob', password: 'bobPassword123' });
+    check(anon.status === 401 && getUser('bob'), 'Bob is deleted without any session');
+    // A WebSocket offers no way at all - not even for something that looks like one
+    const sock = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: alice } });
+    await new Promise(r => sock.on('message', r));
+    for (const t of ['delete', 'deleteUser', 'deleteAccount', 'adminDelete', 'adminDeleteUser', 'removeUser'])
+      sock.send(JSON.stringify({ t, user: 'bob', name: 'bob', account: 'bob', password: 'alicePassword1' }));
+    await wait(300);
+    sock.close();
+    check(getUser('bob'), 'A WebSocket message deletes Bob');
+    // With her own password, naming Bob: only Alice goes
+    const own = await del(alice, { password: 'alicePassword1', user: 'bob', name: 'bob' });
+    check(own.status === 200 && !getUser('alice') && getUser('bob'), 'Naming Bob in her own deletion takes Bob along');
+    const bobStill = await fetch(`${BASE}/api/auth/me`, { headers: { cookie: bob } });
+    check(bobStill.status === 200, "Bob's session ends when Alice deletes herself");
+    deleteUser('bob');
+  }
+
+  // Admins never delete themselves - not even with another admin around.
+  await addUser('anadmin', 'anAdminPass12', { mustChange: false });
+  setAdmin('anadmin', true);
+  setAdmin('captain', true);
+  const adminJar = await signIn('anadmin', 'anAdminPass12');
+  const refused = await del(adminJar, { password: 'anAdminPass12' });
+  const body = await refused.json().catch(() => ({}));
+  check(refused.status === 403 && body.error === 'auth.err.adminDelete' && getUser('anadmin'), 'An admin can delete themselves');
+  setAdmin('captain', false);
+  deleteUser('anadmin');
+  console.log('Own account: deleted only with session and password, image and sessions gone, never for admins, never anyone else.');
+}
+
 // --- A deleted account is out immediately, even from an open session
 {
   const open = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });

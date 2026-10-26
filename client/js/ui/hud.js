@@ -735,7 +735,7 @@ export class Hud {
     `;
 
     const th = box.querySelector('#thumb');
-    if (th) th.appendChild(planetThumb(p, 46));
+    if (th) th.appendChild(planetThumb(p, 46, this.view.players.find(q => q.id === p.owner)?.color));
     // shipIcon keeps every image only once - one copy per row, otherwise it
     // wanders into the last fleet of the same color.
     for (const g of box.querySelectorAll('.ci')) {

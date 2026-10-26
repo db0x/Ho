@@ -13,7 +13,7 @@ import { dist, holeZone, route, routeLength, reachOutline } from '../../shared/r
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
-  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN
+  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
 import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
@@ -37,6 +37,7 @@ export class SpaceView {
     // Target point, view direction and distance - the camera needs nothing more.
     this.cam = { tx: 0, ty: 0, tz: 0, yaw: -0.9, pitch: 0.62, dist: 2600 };
     this.view = null;
+    this.focusMine = false;     // key held: everything not yours steps back
     this.hit = [];
     this.hover = null;
     this.selection = null;
@@ -165,6 +166,18 @@ export class SpaceView {
   /** Top-down view - matches the classic view. */
   topView() { this.cam.pitch = PITCH_MAX; this.cam.yaw = -Math.PI / 2; this.poke(); }
 
+  /** Only your own worlds and fleets at full strength - everything else at half. */
+  setFocusMine(on) {
+    if (this.focusMine === !!on) return;
+    this.focusMine = !!on;
+    this._skyKey = null;
+  }
+
+  /** Alpha for something belonging to owner while the focus is on. */
+  dim(owner) {
+    return this.focusMine && owner !== this.view?.you ? FOCUS_DIM : 1;
+  }
+
   setView(view) {
     const first = !this.view;
     this.view = view;
@@ -232,9 +245,13 @@ export class SpaceView {
     for (const it of items) {
       const labels = [];
       if (it.kind === 'planet') this.drawWorld(ctx, it, colorOf, labels);
-      else if (it.kind === 'hole') this.drawHole(ctx, it, labels);
-      else this.drawFleet(ctx, it, colorOf);
+      else if (it.kind === 'hole') {
+        ctx.globalAlpha = this.dim(null);
+        this.drawHole(ctx, it, labels);
+      } else this.drawFleet(ctx, it, colorOf);
+      ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : it.kind === 'hole' ? this.dim(null) : 1;
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
+      ctx.globalAlpha = 1;
     }
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
     // Battles on top - they should stand out, even behind a nearby world.
@@ -258,13 +275,15 @@ export class SpaceView {
     const c = this.cam;
     const key = `${c.tx.toFixed(1)}|${c.ty.toFixed(1)}|${c.tz.toFixed(1)}`
       + `|${c.yaw.toFixed(4)}|${c.pitch.toFixed(4)}|${c.dist.toFixed(1)}`
-      + `|${this.w}|${this.h}|${this.view.turn}|${this.showTerritory ? 1 : 0}`;
+      + `|${this.w}|${this.h}|${this.view.turn}|${this.showTerritory ? 1 : 0}|${this.focusMine ? 1 : 0}`;
     if (this._skyKey !== key) {
       this._skyKey = key;
       this.renderBackdrop(colorOf);
     }
     ctx.drawImage(this._sky, 0, 0, this.w, this.h);
+    ctx.globalAlpha = this.dim(null);           // the sky belongs to nobody
     if (this.showStars) this.drawSky(ctx);    // live, keeps rotating
+    ctx.globalAlpha = 1;
   }
 
   renderBackdrop(colorOf) {
@@ -276,7 +295,9 @@ export class SpaceView {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = '#04060f';
     ctx.fillRect(0, 0, this.w, this.h);
+    ctx.globalAlpha = this.dim(null);
     this.drawGrid(ctx);
+    ctx.globalAlpha = 1;
     if (this.showTerritory) this.drawTerritory(ctx, colorOf);
   }
 
@@ -369,7 +390,7 @@ export class SpaceView {
       // single world paints half the screen.
       const r = Math.min(480, (230 + Math.min(45, p.pop || 0) * 4.5) * pr.s);
       if (pr.x + r < 0 || pr.y + r < 0 || pr.x - r > this.w || pr.y - r > this.h) continue;
-      ctx.globalAlpha = p.known === 'memory' ? 0.45 : 1;
+      ctx.globalAlpha = (p.known === 'memory' ? 0.45 : 1) * this.dim(p.owner);
       ctx.drawImage(glowSprite(colorOf(p.owner)), pr.x - r, pr.y - r, r * 2, r * 2);
     }
     ctx.restore();
@@ -393,6 +414,7 @@ export class SpaceView {
       const path = route(f, target, zone);
       const spot = this._spots.get(f.id);
       const st = courseStyle(f, focusId);
+      ctx.globalAlpha = this.dim(f.owner);
       ctx.save();
       ctx.strokeStyle = st.color;
       ctx.lineWidth = st.width;
@@ -423,6 +445,7 @@ export class SpaceView {
         const [fx, fy] = pts[pts.length - 2];
         arrowHead(ctx, fx, fy, tp.x, tp.y, planetRadius(target) * tp.s + 10, st.hot ? 11 : 8, st.color);
       }
+      ctx.globalAlpha = 1;
       if (st.hot && f.mine && f.stats?.speed > 0 && pts.length > 1) {
         const turns = Math.max(1, Math.ceil(routeLength(f, path) / f.stats.speed));
         this._eta = { at: midpoint(pts), text: t('word.turns', { n: turns, count: turns }) };
@@ -499,7 +522,7 @@ export class SpaceView {
 
   drawWorld(ctx, it, colorOf, labels) {
     const { p, pr } = it;
-    const ctxAlpha = depthFade(pr.depth, this.cam.dist);
+    const ctxAlpha = depthFade(pr.depth, this.cam.dist) * this.dim(p.owner);
     // Plumb line to the mid-plane: only that shows how high the world lies
     if (Math.abs(p.z || 0) > 1) {
       const foot = this.project(p.x, p.y, 0);
@@ -539,7 +562,7 @@ export class SpaceView {
     if (p.defenses >= SHIELD_MIN) {
       ctx.save();
       ctx.globalAlpha = ctxAlpha;
-      drawHexShield(ctx, pr.x, pr.y, r * 1.14 + 20 * orbitScale(scale), this.phase + p.id);
+      drawHexShield(ctx, pr.x, pr.y, r * 1.14 + 20 * orbitScale(scale), this.phase + p.id, 1, colorOf(p.owner));
       this.badge(ctx, pr.x + r + 16, pr.y - r - 10, '×' + p.defenses, colorOf(p.owner));
       ctx.restore();
     } else if (p.defenses > 0) {
@@ -593,7 +616,7 @@ export class SpaceView {
     const lead = leadType(f);
     const scale = Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45));
     ctx.save();
-    ctx.globalAlpha = depthFade(pr.depth, this.cam.dist);
+    ctx.globalAlpha = depthFade(pr.depth, this.cam.dist) * this.dim(f.owner);
     const spot = this._spots?.get(f.id);
     let x = spot?.x ?? pr.x, y = spot?.y ?? pr.y;
     if (f.at != null) {

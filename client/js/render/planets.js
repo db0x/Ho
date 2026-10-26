@@ -400,8 +400,8 @@ export function label(ctx, text, x, y, color, zoom, size = 12.5) {
   ctx.restore();
 }
 
-/** Small planet icon for the side panel. */
-export function planetThumb(planet, size = 42) {
+/** Small planet icon for the side panel; color: the owner's, for the shield. */
+export function planetThumb(planet, size = 42, color = null) {
   // Draw in device pixels, otherwise the fine honeycomb mesh blurs.
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const px = Math.round(size * dpr);
@@ -414,7 +414,7 @@ export function planetThumb(planet, size = 42) {
   const shielded = (planet.defenses || 0) >= SHIELD_MIN;
   const r = px * (shielded ? 0.27 : 0.34);
   blitPlanet(ctx, planetSprite({ ...planet, known: 'live' }, r), px / 2, px / 2, r);
-  if (shielded) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id);
+  if (shielded) drawHexShield(ctx, px / 2, px / 2, px * 0.4, planet.id, 1, color);
   return cv;
 }
 

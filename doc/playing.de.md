@@ -271,6 +271,7 @@ nur zwischen Rückkehr zur Startseite und Bleiben wählen.
 | Zug beenden | Knopf in der Mitte der Kopfleiste oder `Leertaste` |
 | Haushalt ansehen | Klick oder Zeiger auf Geld bzw. Metall in der Kopfleiste |
 | Karte einpassen | `F` |
+| Nur Eigenes hervorheben | `E` gedrückt halten – alles, was dir nicht gehört, tritt weit zurück. Oder der Flaggen-Knopf oben rechts: Antippen schaltet um (so am Handy), Gedrückthalten nur solange |
 | Auswahl aufheben | `Esc` |
 | Hilfe | `H` |
 | Fenster verschieben / Größe ändern | Titelleiste ziehen zum Verschieben; an jeder Kante oder Ecke ziehen für die Größe |

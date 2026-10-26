@@ -77,6 +77,10 @@ Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
 - Ihr Passwort ändern Spieler jederzeit selbst: *Passwort ändern* neben *Abmelden*
   im Startmenü. Das bisherige Passwort wird noch einmal abgefragt; alle anderen
   Sitzungen des Kontos enden, der benutzte Browser bleibt angemeldet.
+- Ihr Konto löschen Spieler ebenfalls selbst (Recht auf Löschung): *Konto löschen*
+  im Startmenü, nach zweifacher Nachfrage und mit ihrem Passwort. Gelöscht werden
+  Konto und Profilbild, alle Sitzungen enden. Admins können sich nicht selbst
+  löschen – ihnen nimmt man vorher das Admin-Recht oder entfernt sie mit `del`.
 - `del` wirkt sofort, auch mitten in einer Partie: HTTP-Anfragen werden ab der
   nächsten abgewiesen, eine offene WebSocket binnen einer Sekunde getrennt. Das
   Profilbild des Kontos wird mit gelöscht. Ein zurückgesetztes Passwort beendet
