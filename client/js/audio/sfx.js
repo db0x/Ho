@@ -211,9 +211,9 @@ const RENDER_VARIANTS = 4;
  * One explosion as a buffer: brown noise for the rumble, white noise behind
  * a filter that is wide open at the bang and then closes, crackle in the
  * first half second, a low thump - and everything driven into saturation,
- * which is what makes it sound big. Full level for a moment, then a long tail.
+ * which is what makes it sound big. Full level for a moment, then a tail of about a second.
  */
-function renderBlast(ctx, dur = 2.2) {
+function renderBlast(ctx, dur = 1.4) {
   const sr = ctx.sampleRate, n = Math.floor(sr * dur);
   const buf = ctx.createBuffer(1, n, sr);
   const d = buf.getChannelData(0);
@@ -227,9 +227,9 @@ function renderBlast(ctx, dur = 2.2) {
     const fc = 180 + 6000 * Math.exp(-t / 0.09);
     lp += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (w - lp);
     lp2 += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (lp - lp2);
-    const env = t < 0.004 ? t / 0.004 : t < 0.07 ? 1 : Math.exp(-(t - 0.07) / 0.42);
-    // Crackle: sparse, bright bursts, thinning out over the first 0.7 s
-    if (t < 0.7 && Math.random() < 90 * (1 - t / 0.7) / sr) crack = 0.3 + Math.random() * 0.6;
+    const env = t < 0.004 ? t / 0.004 : t < 0.07 ? 1 : Math.exp(-(t - 0.07) / 0.26);
+    // Crackle: sparse, bright bursts, thinning out over the first 0.45 s
+    if (t < 0.45 && Math.random() < 90 * (1 - t / 0.45) / sr) crack = 0.3 + Math.random() * 0.6;
     crack *= crackFade;
     // Thump: 62 -> 42 Hz, gone after a quarter second
     phase += 2 * Math.PI * (42 + 20 * Math.exp(-t / 0.08)) / sr;
