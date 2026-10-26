@@ -165,7 +165,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 }
 .admin-head { display: flex; align-items: baseline; gap: 12px; }
 .admin-head h2 { margin: 0; font-size: 20px; color: var(--gold); }
-.admin-head #admin-refresh { margin-left: auto; }
+.admin-head #admin-debug { margin-left: auto; }
 .admin-box h3 { margin: 18px 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
 .admin-list { display: flex; flex-direction: column; gap: 8px; }
 .admin-game { padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #0b1020; }
@@ -1241,3 +1241,14 @@ select option { background: var(--panel-solid); color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
   #screen-login > .menu-box, #screen-menu > .menu-box { opacity: 1; animation: none !important; }
 }
+
+/* Admin debug dialog: test battle and sound board */
+.debug-box { width: min(560px, 94vw); }
+.debug-box h3 { margin: 16px 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.debug-grid { border-collapse: collapse; width: 100%; }
+.debug-grid th, .debug-grid td { padding: 3px 8px; text-align: left; font-weight: normal; }
+.debug-grid thead th { color: var(--ink-dim); font-size: 13px; }
+.debug-grid input { width: 70px; }
+.debug-grid .bt-dot { display: inline-block; }
+.debug-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.debug-sounds { display: flex; flex-wrap: wrap; gap: 6px; }

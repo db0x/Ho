@@ -6,6 +6,7 @@
 import { drawShip } from './ships.js';
 import { hexRgb, drawHexShield, drawShieldHit, SHIELD_MIN } from './fx.js';
 import { INTERCEPT_ROUNDS } from '../../shared/rules.js';
+import { sfx } from '../audio/sfx.js';
 
 const TAU = Math.PI * 2;
 
@@ -217,10 +218,31 @@ export class BattleFx {
       const T = sec - it.t0;
       if (T < 0) continue;
       const pl = place(it.planetId);
+      soundtrack(it, T, pl, ctx.canvas.clientWidth);
       if (!pl) continue;
       drawMapBattle(ctx, it, T, pl, colorOf);
     }
   }
+}
+
+/**
+ * The same shots and explosions you hear in the battle window, in step with
+ * the picture. A battle off screen is still heard, but quieter and centered.
+ * After a long gap (tab in the background) nothing is made up for.
+ */
+function soundtrack(it, T, pl, W) {
+  const last = it.heard ?? 0;
+  it.heard = T;
+  if (T <= last || T - last > 0.25) return;
+  const pan = pl && W ? Math.max(-1, Math.min(1, (pl.x / W * 2 - 1) * 0.8)) : 0;
+  const gain = pl ? 1 : 0.4;
+  for (const s of it.tl.shots) {
+    if (s.tf > T) break;
+    if (s.tf > last) sfx.play('laser', { pan, gain: 0.5 * gain });
+  }
+  it.tl.death.forEach((d) => {
+    if (d > last && d <= T) sfx.play('boom', { pan, gain: 0.8 * gain });
+  });
 }
 
 function mapLayout(battle, you, shield) {

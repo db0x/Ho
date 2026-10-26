@@ -695,5 +695,17 @@
   "auth.del.done": "Your account has been deleted.",
   "auth.err.adminDelete": "Admins cannot delete their own account. Ask another admin to take away your admin rights – or the operator to remove the account.",
   "auth.del.password": "Password",
-  "auth.del.wrong": "The password is not right."
+  "auth.del.wrong": "The password is not right.",
+  "admin.debug": "Debug",
+  "admin.debugTitle": "Test battle and sounds (Ctrl+Shift+D)",
+  "debug.title": "Debug",
+  "debug.battle": "Test battle",
+  "debug.attacker": "Attacker",
+  "debug.defender": "Defender",
+  "debug.tech": "Weapons/shields level",
+  "debug.pop": "Population (defense)",
+  "debug.battleHint": "Rolled only in the browser, with the server's combat rules. No game is touched.",
+  "debug.reset": "Reset",
+  "debug.fight": "Start battle",
+  "debug.sounds": "Sounds"
 }

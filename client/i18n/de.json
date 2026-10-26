@@ -695,5 +695,17 @@
   "auth.del.done": "Dein Konto ist gelöscht.",
   "auth.err.adminDelete": "Admins können ihr Konto nicht selbst löschen. Bitte einen anderen Admin, dir die Admin-Rechte zu nehmen – oder den Betreiber, das Konto zu entfernen.",
   "auth.del.password": "Passwort",
-  "auth.del.wrong": "Das Passwort stimmt nicht."
+  "auth.del.wrong": "Das Passwort stimmt nicht.",
+  "admin.debug": "Debug",
+  "admin.debugTitle": "Testkampf und Sounds (Strg+Umschalt+D)",
+  "debug.title": "Debug",
+  "debug.battle": "Testkampf",
+  "debug.attacker": "Angreifer",
+  "debug.defender": "Verteidiger",
+  "debug.tech": "Waffen-/Schildstufe",
+  "debug.pop": "Bevölkerung (Abwehr)",
+  "debug.battleHint": "Wird nur im Browser ausgewürfelt, mit den Kampfregeln des Servers. Keine Partie wird berührt.",
+  "debug.reset": "Zurücksetzen",
+  "debug.fight": "Kampf starten",
+  "debug.sounds": "Sounds"
 }

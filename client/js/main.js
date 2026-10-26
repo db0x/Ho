@@ -4,6 +4,7 @@ import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
+import { DebugDialog } from './ui/debug.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
 import { openNews, hasNews, newsOnHello } from './ui/news.js';
@@ -124,6 +125,8 @@ const net = new Net();
 const lobby = new Lobby(net);
 const voice = new Voice({ send: m => net.send(m) });
 const admin = new AdminPanel(net);
+const debug = new DebugDialog();
+$('#admin-debug').onclick = () => debug.toggle(true);
 account();
 let map = null;
 let hud = null;
@@ -212,6 +215,7 @@ net.on('hello', (m) => {
   lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
   admin.setEnabled(m.admin);
+  debug.setEnabled(m.admin);
   // Admins cannot delete their own account (the server refuses it too).
   $('#link-delete').classList.toggle('hidden', !!m.admin);
   showPendingNotice();
@@ -625,6 +629,9 @@ function playTurnSounds(view) {
   for (const l of settled(view)) {
     for (const e of l.entries) {
       const name = LOG_SFX[e.type];
+      // A battle with a record is heard shot by shot along with its
+      // animation on the map (BattleFx) - not as one summary sound.
+      if (e.battle) continue;
       if (name) picks.push({ name, pan: panOf(e.planetId) });
     }
   }

@@ -25,6 +25,7 @@ export class Sfx {
     this._recent = new Map();   // recipe name -> {last, n, since}
     this._pitch = 1;            // random spread of the current sound
     this._idle = null;          // suspend timer
+    this._rendered = new Map(); // render function -> cached buffer variants
     this._everRan = false;
   }
 
@@ -175,6 +176,23 @@ export class Sfx {
     freqs.forEach((f, i) => this.tone(bus, at + i * step, { ...opts, from: f, to: opts.to ?? f }));
   }
 
+  /** A sound rendered sample by sample, from one of a few cached variants; pitch via playback rate. */
+  rendered(bus, at, render, { gain = 0.3 } = {}) {
+    const ctx = this.ctx;
+    if (!this._rendered.has(render)) this._rendered.set(render, []);
+    const set = this._rendered.get(render);
+    const k = Math.floor(Math.random() * RENDER_VARIANTS);
+    set[k] ??= render(ctx);
+    const src = ctx.createBufferSource();
+    src.buffer = set[k];
+    src.playbackRate.value = this._pitch;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(bus);
+    src.start(at);
+  }
+
   noiseBuffer() {
     if (!this._noise) {
       const n = Math.floor(this.ctx.sampleRate * 0.8);
@@ -185,6 +203,85 @@ export class Sfx {
     }
     return this._noise;
   }
+}
+
+const RENDER_VARIANTS = 4;
+
+/**
+ * One explosion as a buffer: brown noise for the rumble, white noise behind
+ * a filter that is wide open at the bang and then closes, crackle in the
+ * first half second, a low thump - and everything driven into saturation,
+ * which is what makes it sound big. Full level for a moment, then a long tail.
+ */
+function renderBlast(ctx, dur = 2.2) {
+  const sr = ctx.sampleRate, n = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, n, sr);
+  const d = buf.getChannelData(0);
+  let brown = 0, lp = 0, lp2 = 0, crack = 0, phase = 0, peak = 0;
+  const crackFade = Math.exp(-1 / (0.005 * sr));
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const w = Math.random() * 2 - 1;
+    brown = (brown + 0.02 * w) / 1.02;
+    // Filter: from about 6 kHz at the bang down to a dull 180 Hz
+    const fc = 180 + 6000 * Math.exp(-t / 0.09);
+    lp += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (w - lp);
+    lp2 += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (lp - lp2);
+    const env = t < 0.004 ? t / 0.004 : t < 0.07 ? 1 : Math.exp(-(t - 0.07) / 0.42);
+    // Crackle: sparse, bright bursts, thinning out over the first 0.7 s
+    if (t < 0.7 && Math.random() < 90 * (1 - t / 0.7) / sr) crack = 0.3 + Math.random() * 0.6;
+    crack *= crackFade;
+    // Thump: 62 -> 42 Hz, gone after a quarter second
+    phase += 2 * Math.PI * (42 + 20 * Math.exp(-t / 0.08)) / sr;
+    const thump = Math.sin(phase) * Math.exp(-t / 0.13);
+    const x = (brown * 3.2 + lp2 * 1.4) * env + crack * w + thump * 0.9;
+    d[i] = Math.tanh(x * 2.2);
+    peak = Math.max(peak, Math.abs(d[i]));
+  }
+  // Fade the last 50 ms so the tail does not click off
+  const fade = Math.floor(sr * 0.05);
+  for (let i = 0; i < fade; i++) d[n - 1 - i] *= i / fade;
+  if (peak > 0) for (let i = 0; i < n; i++) d[i] /= peak;
+  return buf;
+}
+
+/**
+ * A blaster shot in the style of the struck steel cable: in a wire the high
+ * frequencies travel faster than the low ones, so a hit arrives as a very
+ * fast falling chirp with a metallic sheen - "pew". The wave runs back along
+ * the wire and comes again, softer and duller - the "-ew".
+ */
+function renderLaser(ctx, dur = 0.26) {
+  const sr = ctx.sampleRate, n = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, n, sr);
+  const d = buf.getChannelData(0);
+  const f0 = 3600 + Math.random() * 900, f1 = 170 + Math.random() * 60;
+  const tau = 0.04 + Math.random() * 0.012;
+  const wobble = 55 + Math.random() * 25;            // the cable's own vibration
+  const chirp = (t, ph) => {
+    const f = f1 + (f0 - f1) * Math.exp(-t / tau);
+    ph.p += 2 * Math.PI * f * (1 + 0.04 * Math.sin(2 * Math.PI * wobble * t)) / sr;
+    // Fundamental plus a slightly inharmonic overtone: metal, not a pure beep
+    return Math.sin(ph.p) + 0.35 * Math.sin(ph.p * 2.76) + 0.15 * Math.sin(ph.p * 5.4);
+  };
+  const echo = 0.034, a = { p: 0 }, b = { p: 0 };
+  let peak = 0, lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const env = (t < 0.002 ? t / 0.002 : 1) * Math.exp(-t / 0.06);
+    let x = chirp(t, a) * env;
+    if (t >= echo) {
+      const te = t - echo;
+      x += chirp(te, b) * 0.45 * Math.exp(-te / 0.07);
+    }
+    lp += 0.45 * (x - lp);                            // takes the edge off the overtones
+    d[i] = Math.tanh(lp * 1.6);
+    peak = Math.max(peak, Math.abs(d[i]));
+  }
+  const fade = Math.floor(sr * 0.02);
+  for (let i = 0; i < fade; i++) d[n - 1 - i] *= i / fade;
+  if (peak > 0) for (let i = 0; i < n; i++) d[i] /= peak;
+  return buf;
 }
 
 function env(ctx, at, dur, gain, attack) {
@@ -259,12 +356,14 @@ const RECIPES = {
     }
   } },
   // Battle window: a single shot and a perishing ship
-  laser: { max: 7, gap: 0.035, vary: 0.25, build: (s, b, t) => {
-    s.tone(b, t, { type: 'sawtooth', from: 1900, to: 520, dur: 0.07, gain: 0.035, filter: 3000 });
+  // In the spirit of the classic blaster "pew": see renderLaser
+  laser: { max: 7, gap: 0.035, vary: 0.18, build: (s, b, t) => {
+    s.rendered(b, t, renderLaser, { gain: 0.07 });
   } },
-  boom: { max: 3, gap: 0.09, vary: 0.2, build: (s, b, t) => {
-    s.noise(b, t, { dur: 0.55, type: 'lowpass', from: 1500, to: 120, q: 0.8, gain: 0.16 });
-    s.tone(b, t, { type: 'sine', from: 140, to: 38, dur: 0.5, gain: 0.14 });
+  // Rendered sample by sample (see renderBlast) - assembled from tones and
+  // filtered white noise it only ever sounded like a balloon or a hiss.
+  boom: { max: 3, gap: 0.09, vary: 0.16, build: (s, b, t) => {
+    s.rendered(b, t, renderBlast, { gain: 0.34 });
   } },
   invade: { max: 2, gap: 0.2, build: (s, b, t) => {
     s.tone(b, t, { type: 'square', from: 110, to: 42, dur: 0.75, gain: 0.2, filter: 700 });
@@ -320,6 +419,9 @@ const RECIPES = {
     s.tone(b, t + 0.45, { type: 'sine', from: 1318, dur: 1.2, gain: 0.07, attack: 0.03 });
   } }
 };
+
+/** Every effect by name - for the admins' debug dialog. */
+export const SFX_NAMES = Object.keys(RECIPES);
 
 /** Event type from the turn log -> effect. */
 export const LOG_SFX = {
