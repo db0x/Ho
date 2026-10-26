@@ -682,5 +682,18 @@
   "key.Insert": "Insert",
   "key.Backquote": "`",
   "voice.sealHead": "🔒 Eavesdropping check",
-  "voice.sealHint": "Ask over the radio: does everyone see the same symbols? Then nobody is listening in. If someone sees different ones – switch off."
+  "voice.sealHint": "Ask over the radio: does everyone see the same symbols? Then nobody is listening in. If someone sees different ones – switch off.",
+  "map.mineTitle": "Bring only your own forward – tap to toggle, hold (or key E) for as long as you hold",
+  "auth.del.link": "Delete account",
+  "auth.del.title": "Delete account",
+  "auth.del.what": "Your account will be deleted – with sign-in name, password, nickname and profile picture. You are signed out of running games; your empire stays there without you.",
+  "auth.del.final": "This cannot be undone. To play again afterwards you need a new invite.",
+  "auth.del.next": "Continue",
+  "auth.del.sure": "Are you sure? Enter your password to confirm.",
+  "auth.del.submit": "Delete account for good",
+  "auth.del.needPassword": "Please enter your password.",
+  "auth.del.done": "Your account has been deleted.",
+  "auth.err.adminDelete": "Admins cannot delete their own account. Ask another admin to take away your admin rights – or the operator to remove the account.",
+  "auth.del.password": "Password",
+  "auth.del.wrong": "The password is not right."
 }

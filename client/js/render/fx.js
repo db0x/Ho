@@ -154,6 +154,9 @@ export function drawBlackHole(ctx, x, y, R, phase = 0) {
   ctx.restore();
 }
 
+/** How far everything not yours steps back while "only mine" is held. */
+export const FOCUS_DIM = 0.2;
+
 // ---------------------------------------------------------- Satellite shield
 
 /** From this many satellites on, a world shows the shield instead of individual satellites. */
@@ -167,16 +170,19 @@ const SHIELD_MAX = 320;
 const LIGHT = (() => { const v = [-0.48, -0.58, 0.66]; const l = Math.hypot(...v); return v.map(c => c / l); })();
 
 /**
- * The shield as an image: a sphere of hexagons. The honeycomb mesh lies on
- * the sphere's surface and is projected orthogonally onto the image - towards
- * the center you see the cells from the front, towards the edge obliquely and
- * compressed. Light comes from the top left: there the cells glow bright and
- * there is a highlight, the far side stays matte, and at the edge, where you
- * look through the shell at an angle, it becomes dense and bright.
+ * The shield as an image: a sphere of hexagons in the owner's color. The
+ * honeycomb mesh lies on the sphere's surface and is projected orthogonally
+ * onto the image - towards the center you see the cells from the front,
+ * towards the edge obliquely and compressed. Light comes from the top left:
+ * there the cells glow a little brighter, the far side stays matte, and at
+ * the edge, where you look through the shell at an angle, it becomes denser.
+ * Kept faint on purpose: the world inside and its owner ring must stay the
+ * eye-catcher, not the shield - late in a game many worlds carry one.
  */
-function shieldSprite(R) {
+function shieldSprite(R, color) {
   const rr = R < 40 ? Math.max(6, Math.round(R)) : Math.min(SHIELD_MAX, Math.round(R / 4) * 4);
-  let sp = shieldCache.get(rr);
+  const key = rr + color;
+  let sp = shieldCache.get(key);
   if (sp) return sp;
   const pad = Math.ceil(rr * 0.14) + 4;
   const size = (rr + pad) * 2;
@@ -184,6 +190,10 @@ function shieldSprite(R) {
   cv.width = cv.height = size;
   const g = cv.getContext('2d');
   const c = size / 2;
+  // The empire color, lifted a little: drawn additively, dark colors
+  // (navy, purple) would otherwise hardly show.
+  const base = shieldTone(color, 0.25);
+  const tone = (f, a) => `rgba(${shieldTone(color, f)},${a.toFixed(3)})`;
 
   // Cell size as an angle on the sphere; at the image center at least a few
   // pixels, otherwise the mesh blurs on small maps.
@@ -211,9 +221,9 @@ function shieldSprite(R) {
       const light = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
       const lit = Math.max(0, light);
       const rim = Math.pow(1 - nz, 1.6);                   // Fresnel: oblique = dense
-      const a = Math.min(0.95, (0.24 + 0.55 * rim + 0.55 * lit * lit) * (light < 0 ? 0.6 : 1));
-      const white = Math.pow(lit, 6);                        // almost white in the highlight
-      const col3 = [Math.round(70 + 160 * white), Math.round(240 + 15 * white), Math.round(120 + 115 * white)];
+      const a = Math.min(0.55, (0.12 + 0.36 * rim + 0.3 * lit * lit) * (light < 0 ? 0.55 : 1));
+      const white = Math.pow(lit, 6) * 0.6;                  // only a hint of white in the highlight
+      const col3 = base.map(v => Math.round(v + (255 - v) * white));
       g.beginPath();
       for (let k = 0; k < 6; k++) {
         const w = Math.PI / 6 + k * Math.PI / 3;
@@ -221,21 +231,21 @@ function shieldSprite(R) {
         k ? g.lineTo(px, py) : g.moveTo(px, py);
       }
       g.closePath();
-      g.fillStyle = `rgba(${col3},${(a * 0.22 + lit * 0.06).toFixed(3)})`;
+      g.fillStyle = `rgba(${col3},${(a * 0.12 + lit * 0.025).toFixed(3)})`;
       g.fill();
       // Lines get thinner towards the edge, like the cells themselves
-      g.lineWidth = Math.max(0.7, h * rr * 0.1 * (0.45 + 0.55 * nz));
+      g.lineWidth = Math.max(0.6, h * rr * 0.07 * (0.45 + 0.55 * nz));
       g.strokeStyle = `rgba(${col3},${a.toFixed(3)})`;
       g.stroke();
     }
   }
 
-  // Shell: a matte green haze, brighter towards the light
+  // Shell: a faint haze, a touch brighter towards the light
   const lx = c + LIGHT[0] * rr * 0.5, ly = c + LIGHT[1] * rr * 0.5;
   const shell = g.createRadialGradient(lx, ly, rr * 0.1, c, c, rr);
-  shell.addColorStop(0, 'rgba(120,255,170,0.10)');
-  shell.addColorStop(0.7, 'rgba(60,200,110,0.04)');
-  shell.addColorStop(1, 'rgba(60,200,110,0.10)');
+  shell.addColorStop(0, tone(0.4, 0.05));
+  shell.addColorStop(0.7, tone(0, 0.015));
+  shell.addColorStop(1, tone(0, 0.05));
   g.fillStyle = shell;
   g.beginPath(); g.arc(c, c, rr, 0, TAU); g.fill();
 
@@ -245,68 +255,76 @@ function shieldSprite(R) {
   g.rotate(Math.atan2(LIGHT[1], LIGHT[0]) + Math.PI / 2);
   g.scale(1, 0.62);
   const gloss = g.createRadialGradient(0, 0, 0, 0, 0, rr * 0.42);
-  gloss.addColorStop(0, 'rgba(240,255,245,0.6)');
-  gloss.addColorStop(0.35, 'rgba(170,255,200,0.24)');
-  gloss.addColorStop(1, 'rgba(120,255,170,0)');
+  gloss.addColorStop(0, tone(0.8, 0.22));
+  gloss.addColorStop(0.35, tone(0.5, 0.08));
+  gloss.addColorStop(1, tone(0.4, 0));
   g.fillStyle = gloss;
   g.beginPath(); g.arc(0, 0, rr * 0.42, 0, TAU); g.fill();
   g.restore();
 
-  // Glowing hem, stronger on the lit side
-  const hem = g.createRadialGradient(c, c, rr * 0.88, c, c, rr + pad * 0.85);
-  hem.addColorStop(0, 'rgba(90,255,140,0)');
-  hem.addColorStop(0.5, 'rgba(120,255,170,0.36)');
-  hem.addColorStop(1, 'rgba(90,255,140,0)');
+  // Thin glowing hem, stronger on the lit side
+  const hem = g.createRadialGradient(c, c, rr * 0.9, c, c, rr + pad * 0.7);
+  hem.addColorStop(0, tone(0.3, 0));
+  hem.addColorStop(0.5, tone(0.4, 0.16));
+  hem.addColorStop(1, tone(0.3, 0));
   g.fillStyle = hem;
-  g.beginPath(); g.arc(c, c, rr + pad * 0.85, 0, TAU); g.fill();
+  g.beginPath(); g.arc(c, c, rr + pad * 0.7, 0, TAU); g.fill();
   const arc = g.createLinearGradient(c + LIGHT[0] * rr, c + LIGHT[1] * rr, c - LIGHT[0] * rr, c - LIGHT[1] * rr);
-  arc.addColorStop(0, 'rgba(220,255,230,0.75)');
-  arc.addColorStop(0.45, 'rgba(140,255,180,0.12)');
-  arc.addColorStop(1, 'rgba(140,255,180,0.28)');
+  arc.addColorStop(0, tone(0.7, 0.4));
+  arc.addColorStop(0.45, tone(0.4, 0.05));
+  arc.addColorStop(1, tone(0.4, 0.14));
   g.strokeStyle = arc;
-  g.lineWidth = Math.max(1, rr * 0.03);
+  g.lineWidth = Math.max(0.8, rr * 0.02);
   g.beginPath(); g.arc(c, c, rr - g.lineWidth / 2, 0, TAU); g.stroke();
 
   sp = { canvas: cv, half: size / 2, rr };
-  shieldCache.set(rr, sp);
+  shieldCache.set(key, sp);
   return sp;
 }
 
+// Default when the owner is not known (e.g. a remembered world).
+const SHIELD_COLOR = '#5af08c';
+
+/** The shield color lifted towards white by f (0..1), as "r,g,b". */
+function shieldTone(color, f) {
+  return hexRgb(color || SHIELD_COLOR).map(v => Math.round(v + (255 - v) * f));
+}
+
 /**
- * Shield around a world. strength 0..1 makes it paler - in battle it follows
- * the satellites carrying it; at 0 it is gone.
+ * Shield around a world, in the color of its owner. strength 0..1 makes it
+ * paler - in battle it follows the satellites carrying it; at 0 it is gone.
  */
-export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1) {
+export function drawHexShield(ctx, x, y, R, phase = 0, strength = 1, color = SHIELD_COLOR) {
   if (strength <= 0.01 || R < 4) return;
-  const sp = shieldSprite(R);
+  const sp = shieldSprite(R, color || SHIELD_COLOR);
   const s = R / sp.rr;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   // A weak shield flickers, a full one only breathes slightly
   const flicker = strength < 0.35 ? 0.6 + 0.4 * Math.sin(phase * 31) * Math.sin(phase * 13) : 1;
-  ctx.globalAlpha *= strength * flicker * (0.88 + 0.12 * Math.sin(phase * 1.7));
+  ctx.globalAlpha *= strength * flicker * (0.9 + 0.1 * Math.sin(phase * 1.7));
   ctx.drawImage(sp.canvas, x - sp.half * s, y - sp.half * s, sp.canvas.width * s, sp.canvas.height * s);
   // Energy slowly wandering across the shell: a narrow arc of light on the
   // shadow side so the sphere does not look rigid.
   const a = Math.atan2(-LIGHT[1], -LIGHT[0]) + Math.sin(phase * 0.5) * 0.9;
-  ctx.strokeStyle = 'rgba(150,255,190,0.22)';
-  ctx.lineWidth = Math.max(1, R * 0.025);
+  ctx.strokeStyle = `rgba(${shieldTone(color, 0.5)},0.12)`;
+  ctx.lineWidth = Math.max(1, R * 0.02);
   ctx.lineCap = 'round';
   ctx.beginPath(); ctx.arc(x, y, R * 0.96, a - 0.35, a + 0.35); ctx.stroke();
   ctx.restore();
 }
 
-/** Hit on the shield: a green flash at the point of impact, k = 0..1. */
-export function drawShieldHit(ctx, x, y, size, k) {
+/** Hit on the shield: a flash in the shield's color at the point of impact, k = 0..1. */
+export function drawShieldHit(ctx, x, y, size, k, color = SHIELD_COLOR) {
   if (k < 0 || k > 1) return;
   const a = 1 - k;
   const r = size * (0.6 + 0.6 * k);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, `rgba(220,255,230,${(a * 0.9).toFixed(3)})`);
-  g.addColorStop(0.35, `rgba(110,255,160,${(a * 0.55).toFixed(3)})`);
-  g.addColorStop(1, 'rgba(60,220,110,0)');
+  g.addColorStop(0, `rgba(${shieldTone(color, 0.8)},${(a * 0.9).toFixed(3)})`);
+  g.addColorStop(0.35, `rgba(${shieldTone(color, 0.35)},${(a * 0.55).toFixed(3)})`);
+  g.addColorStop(1, `rgba(${shieldTone(color, 0)},0)`);
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
   ctx.restore();

@@ -238,7 +238,7 @@ function paint(ms) {
     // Large in the picture, the full shield would otherwise cover the world.
     ctx.save();
     ctx.globalAlpha = 0.55;
-    drawHexShield(ctx, L.planet.x, L.planet.y, L.shield.R, ms / 1000, shieldStrength(L.shield, tl, T));
+    drawHexShield(ctx, L.planet.x, L.planet.y, L.shield.R, ms / 1000, shieldStrength(L.shield, tl, T), player(battle.sides[L.shield.k]).color);
     ctx.restore();
   }
 
@@ -295,7 +295,7 @@ function paint(ms) {
       ? onShield(nose, b, L.planet, L.shield.R) : null;
     const target = shieldHit || b;
     if (T <= s.th) drawBolt(ctx, nose[0], nose[1], target[0], target[1], (T - s.tf) / (s.th - s.tf), Math.max(16, lf * 0.7), color(s.from), Math.max(1.2, lf * 0.04));
-    else if (shieldHit) drawShieldHit(ctx, shieldHit[0], shieldHit[1], Math.max(14, L.shield.R * 0.1), (T - s.th) / 0.3);
+    else if (shieldHit) drawShieldHit(ctx, shieldHit[0], shieldHit[1], Math.max(14, L.shield.R * 0.1), (T - s.th) / 0.3, player(battle.sides[L.shield.k]).color);
     else drawImpact(ctx, b[0] + Math.sin(s.tf * 99) * L.len[s.to] * 0.15, b[1] + Math.cos(s.tf * 77) * L.len[s.to] * 0.15,
       Math.max(6, L.len[s.to] * 0.3), (T - s.th) / 0.2, color(s.from));
   }

@@ -503,7 +503,7 @@ function typing(el) {
 // game already uses cannot be taken.
 const KEY_STORE = 'ho-ptt-key';
 const DEFAULT_KEY = { code: 'ControlRight', label: null };
-const RESERVED = [' ', 'enter', 'escape', 'tab', 'f', 'p', 't', 'h', '+', '-'];
+const RESERVED = [' ', 'enter', 'escape', 'tab', 'f', 'p', 't', 'h', 'e', '+', '-'];
 function loadKey() {
   try { const k = JSON.parse(localStorage.getItem(KEY_STORE) || 'null'); if (k?.code) return k; } catch {}
   return DEFAULT_KEY;

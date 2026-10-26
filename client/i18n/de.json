@@ -682,5 +682,18 @@
   "key.Insert": "Einfg",
   "key.Backquote": "^",
   "voice.sealHead": "🔒 Abhörschutz",
-  "voice.sealHint": "Fragt kurz über Funk: Sehen alle dieselben Zeichen? Dann hört niemand mit. Sieht jemand andere – Funk aus."
+  "voice.sealHint": "Fragt kurz über Funk: Sehen alle dieselben Zeichen? Dann hört niemand mit. Sieht jemand andere – Funk aus.",
+  "map.mineTitle": "Nur Eigenes hervorheben – antippen schaltet um, gedrückt halten (oder Taste E) nur solange",
+  "auth.del.link": "Konto löschen",
+  "auth.del.title": "Konto löschen",
+  "auth.del.what": "Dein Konto wird gelöscht – mit Anmeldename, Passwort, Spitzname und Profilbild. Aus laufenden Partien wirst du abgemeldet; dein Reich bleibt dort ohne dich stehen.",
+  "auth.del.final": "Das lässt sich nicht rückgängig machen. Spielen kannst du danach nur mit einer neuen Einladung.",
+  "auth.del.next": "Weiter",
+  "auth.del.sure": "Bist du sicher? Gib zur Bestätigung dein Passwort ein.",
+  "auth.del.submit": "Konto endgültig löschen",
+  "auth.del.needPassword": "Bitte dein Passwort eingeben.",
+  "auth.del.done": "Dein Konto ist gelöscht.",
+  "auth.err.adminDelete": "Admins können ihr Konto nicht selbst löschen. Bitte einen anderen Admin, dir die Admin-Rechte zu nehmen – oder den Betreiber, das Konto zu entfernen.",
+  "auth.del.password": "Passwort",
+  "auth.del.wrong": "Das Passwort stimmt nicht."
 }

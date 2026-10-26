@@ -12,6 +12,8 @@ const loginForm = $('#form-login');
 const changeForm = $('#form-change');
 const inviteForm = $('#form-invite');
 const inviteToken = new URLSearchParams(location.search).get('invite');
+// Back here after deleting your own account: say that it worked, once.
+const justDeleted = new URLSearchParams(location.search).get('deleted') === '1';
 let minPassword = 8;
 let invite = null;           // {expires, by, note} of an invite link being redeemed
 
@@ -49,6 +51,7 @@ async function api(route, method, data) {
 }
 
 function showError(key, params) {
+  $('#login-error').classList.remove('ok');
   $('#login-error').textContent = key ? t(key, params) : '';
 }
 
@@ -108,6 +111,11 @@ if (inviteToken) {
   try { $('#in-user').value = localStorage.getItem(NAME_KEY) || ''; } catch { /* never mind */ }
   $('#change-intro').textContent = t('auth.change.intro', { n: minPassword });
   show(me.ok ? 'change' : 'login');
+  if (justDeleted) {
+    showError('auth.del.done');
+    $('#login-error').classList.add('ok');
+    history.replaceState(null, '', location.pathname);      // not again after a reload
+  }
 }
 
 // --------------------------------------------------------------------- Sign in

@@ -3,7 +3,7 @@ import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale 
 import { drawShip, drawTrail } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
 import { t } from '../i18n.js';
-import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN } from './fx.js';
+import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM } from './fx.js';
 import { BattleFx } from './battlefx.js';
 import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
 
@@ -65,6 +65,7 @@ export class MapView {
     this.view = null;
     this.hit = [];
     this.hover = null;
+    this.focusMine = false;     // key held: everything not yours steps back
     this.selection = null;     // {type:'planet'|'fleet', id}
     this.showNames = true;
     this.showRange = false;
@@ -156,6 +157,18 @@ export class MapView {
     this.cam.x += wx - nx;
     this.cam.y += wy - ny;
     this.poke();
+  }
+
+  /** Only your own worlds and fleets at full strength - everything else at half. */
+  setFocusMine(on) {
+    if (this.focusMine === !!on) return;
+    this.focusMine = !!on;
+    this._skyKey = null;
+  }
+
+  /** Alpha for something belonging to owner while the focus is on. */
+  dim(owner) {
+    return this.focusMine && owner !== this.view?.you ? FOCUS_DIM : 1;
   }
 
   setView(view) {
@@ -354,6 +367,7 @@ export class MapView {
       const [bx, by] = pts[pts.length - 1];
       const st = courseStyle(f, focusId);
       const tr = planetRadius(target) * this.cam.zoom + 15;
+      ctx.globalAlpha = this.dim(f.owner);
       ctx.save();
       ctx.strokeStyle = st.color;
       ctx.lineWidth = st.width;
@@ -367,6 +381,7 @@ export class MapView {
       // the selection ring.
       const [fx, fy] = pts[pts.length - 2];
       arrowHead(ctx, fx, fy, bx, by, tr, st.hot ? 11 : 8, st.color);
+      ctx.globalAlpha = 1;
       // Turns until arrival for your own fleet in focus - drawn last, above the worlds.
       if (st.hot && f.mine && f.stats?.speed > 0) {
         const turns = Math.max(1, Math.ceil(routeLength(f, path) / f.stats.speed));
@@ -381,6 +396,8 @@ export class MapView {
       const [sx, sy] = this.w2s(p.x, p.y);
       const r = planetRadius(p) * z;
       if (sx < -80 || sy < -80 || sx > this.w + 80 || sy > this.h + 80) continue;
+      const alpha = this.dim(p.owner);
+      ctx.globalAlpha = alpha;
       drawPlanet(ctx, p, sx, sy, z, {
         scale: z,
         ownerColor: p.owner ? colorOf(p.owner) : null,
@@ -388,13 +405,13 @@ export class MapView {
         hovered: this.hover?.type === 'planet' && this.hover.id === p.id,
         showName: false
       });
-      if (this.showNames) labels.push(...planetLabels(p, sx, sy, z, planetRadius(p) * z));
+      if (this.showNames) labels.push(...planetLabels(p, sx, sy, z, planetRadius(p) * z).map(l => ({ ...l, alpha })));
       this.hit.push({ type: 'planet', id: p.id, x: sx, y: sy, r: Math.max(12, r + 6) });
 
       // Orbital defense: a few satellites circle individually, from
       // SHIELD_MIN on they close ranks into a shield around the world.
       if (p.defenses >= SHIELD_MIN) {
-        drawHexShield(ctx, sx, sy, r * 1.14 + 20 * orbitScale(z), this.phase + p.id);
+        drawHexShield(ctx, sx, sy, r * 1.14 + 20 * orbitScale(z), this.phase + p.id, 1, colorOf(p.owner));
         this.badge(ctx, sx + r + 16, sy - r - 10, '×' + p.defenses, colorOf(p.owner));
       } else if (p.defenses > 0) {
         const n = p.defenses;
@@ -409,10 +426,12 @@ export class MapView {
           });
         }
       }
+      ctx.globalAlpha = 1;
     }
 
     // Fleets
     for (const f of v.fleets) {
+      ctx.globalAlpha = this.dim(f.owner);
       const inOrbit = f.at !== null && f.at !== undefined;
       const col = colorOf(f.owner);
       const lead = leadType(f);
@@ -437,6 +456,7 @@ export class MapView {
         this.hit.push({ type: 'fleet', id: f.id, x: sx, y: sy, r: 15 * scale });
       }
     }
+    ctx.globalAlpha = 1;
 
     this.battleFx.draw(ctx, performance.now(), (id) => {
       const p = v.planets[id];
@@ -448,13 +468,18 @@ export class MapView {
     }, colorOf);
 
     // Labels last, so ships in orbit do not cover them
-    for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, z, l.size);
+    for (const l of labels) {
+      ctx.globalAlpha = l.alpha;
+      label(ctx, l.text, l.x, l.y, l.color, z, l.size);
+    }
+    ctx.globalAlpha = this.dim(null);
     const bh = v.galaxy.blackHole;
     if (bh && this.showNames) {
       const [bx, by] = this.w2s(bh.x, bh.y);
       const br = Math.max(HOLE_MIN_PX, bh.r * z * HOLE_SCALE);
       label(ctx, bh.name, bx, by + br * 1.5 + 11, '#9ec8f5', z, 12.5);
     }
+    ctx.globalAlpha = 1;
 
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
 
@@ -506,12 +531,15 @@ export class MapView {
   drawBackdrop() {
     const ctx = this.ctx;
     const key = `${Math.round(this.cam.x * 2)}|${Math.round(this.cam.y * 2)}|${this.cam.zoom.toFixed(4)}`
-      + `|${this.w}|${this.h}|${this.view.turn}|${this.showTerritory ? 1 : 0}`;
+      + `|${this.w}|${this.h}|${this.view.turn}|${this.showTerritory ? 1 : 0}|${this.focusMine ? 1 : 0}`;
     if (this._skyKey !== key) {
       this._skyKey = key;
       this.renderOverlay();
     }
     ctx.drawImage(this._sky, 0, 0, this.w, this.h);
+    // Sky, stars and the black hole belong to nobody - with the focus on
+    // they step back like everything else that is not yours.
+    ctx.globalAlpha = this.dim(null);
     if (this.showStars) this.drawStars(ctx);
 
     const bh = this.view.galaxy.blackHole;
@@ -521,6 +549,7 @@ export class MapView {
       drawBlackHole(ctx, bx, by, br, this.phase);
       drawHoleZone(ctx, bx, by, holeZone(this.view.galaxy).r * this.cam.zoom, this.phase);
     }
+    ctx.globalAlpha = 1;
   }
 
   renderOverlay() {
@@ -544,8 +573,10 @@ export class MapView {
       const [sx, sy] = this.w2s(n.x, n.y);
       const r = n.r * z;
       if (sx + r < 0 || sy + r < 0 || sx - r > this.w || sy - r > this.h) return;
+      ctx.globalAlpha = this.dim(null);
       ctx.drawImage(nebulaSprite(n.hue), sx - r, sy - r, r * 2, r * 2);
     });
+    ctx.globalAlpha = 1;
     this.drawTerritory(ctx);
   }
 
@@ -568,7 +599,7 @@ export class MapView {
       const [sx, sy] = this.w2s(p.x, p.y);
       if (sx + r < 0 || sy + r < 0 || sx - r > this.w || sy - r > this.h) continue;
       // Only remembered worlds paler - the ownership there may be outdated
-      ctx.globalAlpha = p.known === 'memory' ? 0.45 : 1;
+      ctx.globalAlpha = (p.known === 'memory' ? 0.45 : 1) * this.dim(p.owner);
       ctx.drawImage(glowSprite(colors.get(p.owner) || '#8899aa'), sx - r, sy - r, r * 2, r * 2);
     }
     ctx.restore();

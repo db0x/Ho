@@ -7,7 +7,8 @@
 // bearable, since all games are gone with it too.
 import crypto from 'node:crypto';
 import {
-  verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, validName, addUser, MIN_PASSWORD
+  verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, validName, addUser, MIN_PASSWORD,
+  deleteUser
 } from './userstore.js';
 import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
 import { nameAllowed } from './profile.js';
@@ -237,6 +238,7 @@ export function handleAuth(req, res, urlPath) {
   }
   if (route === 'login' && req.method === 'POST') { login(req, res); return true; }
   if (route === 'change' && req.method === 'POST') { change(req, res); return true; }
+  if (route === 'delete' && req.method === 'POST') { remove(req, res); return true; }
   if (route.startsWith('invite') && req.method === 'GET') { checkInvite(req, res); return true; }
   if (route === 'redeem' && req.method === 'POST') { redeem(req, res); return true; }
   if (route === 'logout' && req.method === 'POST') {
@@ -400,6 +402,48 @@ async function change(req, res) {
   setCookie(req, res, newSession({ name: s.user, stamp: stampOf(fresh.hash), mustChange: false }));
   console.log(`Password changed: ${s.user}`);
   json(res, 200, { ok: true, user: s.user, mustChange: false });
+}
+
+/**
+ * POST /api/auth/delete {password} - deletes your own account (right to
+ * erasure). The browser has asked twice before; here the current password
+ * decides, so a session left open somewhere is not enough. The account goes
+ * with its profile image, every session ends. Not for admins.
+ */
+async function remove(req, res) {
+  const s = sessionOf(req);
+  if (!s) return json(res, 401, { error: 'auth.err.noSession' });
+  let data;
+  try { data = await body(req); } catch (e) {
+    console.warn('Account deletion not understood:', e.message);
+    return json(res, 400, { error: 'auth.err.badRequest' });
+  }
+  const ip = origin(req);
+  const wait = lockedFor(`u:${s.user}`, `i:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
+
+  let user = null;
+  try { user = await verifyUser(s.user, String(data.password ?? '')); } catch (e) {
+    console.error('Password check failed:', e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  if (!user) {
+    failedAttempt(`u:${s.user}`, `i:${ip}`);
+    return json(res, 401, { error: 'auth.err.badLogin' });
+  }
+  // Admins run the server: they cannot delete themselves here. Whoever no
+  // longer wants to be one is taken off the flag or removed on the command
+  // line (server/users.js).
+  if (getUser(s.user)?.admin) return json(res, 403, { error: 'auth.err.adminDelete' });
+  try { deleteUser(s.user); } catch (e) {
+    console.error('Account deletion failed:', e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  succeeded(`u:${s.user}`, `i:${ip}`);
+  revoke(s.user);
+  clearCookie(req, res);
+  console.log(`Account deleted by its owner: ${s.user}`);
+  json(res, 200, { ok: true });
 }
 
 // ------------------------------------------------------------ Gatekeeper

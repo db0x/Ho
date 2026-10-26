@@ -41,7 +41,7 @@ client/
                      map.js (flach), space.js (räumlich), courses.js (Kurslinien, Orbitplätze), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),
                      dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, split.js (Flotte teilen), viewport.js,
-                     admin.js (Admin-Panel im Startbildschirm), announce.js (Admin-Banner), password.js (Passwort ändern),
+                     admin.js (Admin-Panel im Startbildschirm), announce.js (Admin-Banner), password.js (Passwort ändern), delete.js (eigenes Konto löschen),
                      scene.js (Sternenhimmel und Überblendung zwischen Anmeldung und Startmenü)
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/                siehe Tests

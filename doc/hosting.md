@@ -78,6 +78,10 @@ Without Docker it is the same, only shorter: `npm run users -- add captain`.
 - Players change their password themselves at any time: *Change password* next to
   *Sign out* in the start menu. The current password is asked for again; every
   other session of the account ends, the browser in use stays signed in.
+- Players also delete their account themselves (right to erasure): *Delete
+  account* in the start menu, after asking twice and with their password. The
+  account and its profile picture are deleted, every session ends. Admins cannot
+  delete themselves – take away the admin flag first or remove them with `del`.
 - `del` takes effect right away, even mid-game: HTTP requests are refused from the
   next one on, and an open WebSocket is dropped within a second. The account's
   profile picture is deleted with it. Resetting a password likewise ends every

@@ -11,6 +11,7 @@ import { bindEmoji } from './ui/emoji.js';
 import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
 import { openPassword, bindPassword } from './ui/password.js';
+import { openDelete, bindDelete } from './ui/delete.js';
 import { openGameEnd, bindGameEnd } from './ui/gameend.js';
 import { openBattle } from './ui/battle.js';
 import { MapView } from './render/map.js';
@@ -19,6 +20,7 @@ import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
 import { Voice } from './voice.js';
 import { enhanceSelects, syncSelects } from './ui/select.js';
 import { compact } from './ui/viewport.js';
+import { bindTips } from './ui/tips.js';
 import { initLocale, useLocale, onLocaleChange, localeName, t, availableLocales, getLocale } from './i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -31,6 +33,7 @@ const narrow = compact;
 initLocale();
 languagePicker();
 bindUi();
+bindTips();
 // Safari on iPad and iPhone ignores user-scalable: a pinch on a panel would
 // zoom the whole page. The map handles two fingers itself (pointer events).
 addEventListener('gesturestart', (e) => e.preventDefault());
@@ -102,6 +105,12 @@ async function account() {
   document.querySelector('#link-password').onclick = (e) => {
     e.preventDefault();
     openPassword(me.minPassword);
+  };
+  bindDelete(() => net.forget());
+  document.querySelector('#del-user').value = me.user;
+  document.querySelector('#link-delete').onclick = (e) => {
+    e.preventDefault();
+    openDelete();
   };
   document.querySelector('#link-logout').onclick = async (e) => {
     e.preventDefault();
@@ -203,6 +212,8 @@ net.on('hello', (m) => {
   lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
   admin.setEnabled(m.admin);
+  // Admins cannot delete their own account (the server refuses it too).
+  $('#link-delete').classList.toggle('hidden', !!m.admin);
   showPendingNotice();
   // What is new in this release: once by itself, any time from the menu.
   hasNews(m.version).then(has => {
@@ -285,6 +296,8 @@ net.on('view', (m) => {
   lobby.show('game');
   map.setView(view);
   voice.setView(view);
+  // Spectators have nothing of their own to bring forward.
+  $('#btn-mine').classList.toggle('hidden', !!view.spectator);
   map.selection = app.selection;
 
   // Clear the selection if it no longer exists
@@ -535,8 +548,39 @@ function bindGame() {
       e.target.value = '';
     }
   };
+  // "Only mine": everything that is not yours steps back to half strength.
+  // Hold E, or the flag button - a tap latches it (the way on a phone, where
+  // there are no keys), holding the button shows it only while held.
+  const mineBtn = $('#btn-mine');
+  let mineKey = false, mineTouch = false, mineLatched = false, mineDown = 0;
+  const applyMine = () => {
+    const on = mineKey || mineTouch || mineLatched;
+    map?.setFocusMine(on);
+    mineBtn.classList.toggle('active', on);
+    mineBtn.setAttribute('aria-pressed', String(on));
+  };
+  mineBtn.addEventListener('pointerdown', (e) => {
+    mineDown = performance.now();
+    mineTouch = true;
+    mineBtn.setPointerCapture?.(e.pointerId);
+    applyMine();
+  });
+  mineBtn.addEventListener('pointerup', () => {
+    if (!mineTouch) return;
+    mineTouch = false;
+    if (performance.now() - mineDown < 300) mineLatched = !mineLatched;
+    applyMine();
+  });
+  mineBtn.addEventListener('pointercancel', () => { mineTouch = false; applyMine(); });
+  mineBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Enter or space on the focused button: no pointer involved, just toggle.
+  mineBtn.addEventListener('click', (e) => { if (e.detail === 0) { mineLatched = !mineLatched; applyMine(); } });
+  addEventListener('keyup', (e) => { if (e.key === 'e' || e.key === 'E') { mineKey = false; applyMine(); } });
+  addEventListener('blur', () => { mineKey = false; mineTouch = false; applyMine(); });
+
   addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
+    if ((e.key === 'e' || e.key === 'E') && !e.repeat && !app.spectator) { mineKey = true; applyMine(); }
     if (e.key === ' ') { e.preventDefault(); $(app.spectator ? '#sp-play' : '#btn-endturn').click(); }
     if (e.key === 'f' || e.key === 'F') map.fit();
     if ((e.key === 'p' || e.key === 'P') && !$('#btn-pause').classList.contains('hidden')) $('#btn-pause').click();

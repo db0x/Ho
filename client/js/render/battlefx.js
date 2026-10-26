@@ -285,7 +285,7 @@ function drawMapBattle(ctx, it, T, pl, colorOf) {
   // The shield: if it still stands after the turn, the map draws it itself -
   // otherwise here, fading with its satellites.
   const strength = shieldStrength(shield, tl, T);
-  if (shield && !pl.shielded) drawHexShield(ctx, x, y, pl.shieldR, T + it.planetId, strength);
+  if (shield && !pl.shielded) drawHexShield(ctx, x, y, pl.shieldR, T + it.planetId, strength, color(shield.k));
 
   // Ships, as long as they live - per slot only the first one occupying it
   battle.units.forEach((u, i) => {
@@ -318,7 +318,7 @@ function drawMapBattle(ctx, it, T, pl, colorOf) {
       bx = x + Math.cos(w) * pl.shieldR; by = y + Math.sin(w) * pl.shieldR;
     }
     if (T <= sh.th) drawBolt(ctx, ax, ay, bx, by, (T - sh.tf) / (sh.th - sh.tf), 10 * s, col, 1.1 * s);
-    else if (atShield) drawShieldHit(ctx, bx, by, 7 * s, (T - sh.th) / 0.15);
+    else if (atShield) drawShieldHit(ctx, bx, by, 7 * s, (T - sh.th) / 0.15, color(shield.k));
     else drawImpact(ctx, bx, by, 5 * s, (T - sh.th) / 0.15, col);
   }
   ctx.globalCompositeOperation = 'source-over';

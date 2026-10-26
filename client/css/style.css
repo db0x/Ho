@@ -80,6 +80,12 @@ button.primary {
 }
 button.primary:hover { background: linear-gradient(#ffcd55, #e8a61d); }
 button.ghost { background: transparent; }
+/* Something that cannot be undone (deleting the account). */
+button.danger { border-color: var(--bad); color: var(--bad); }
+button.danger:hover { background: rgba(255, 95, 95, .12); }
+.account-row a.danger-link { color: var(--ink-faint); }
+.account-row a.danger-link:hover { color: var(--bad); }
+.error.ok { color: var(--good); }
 button.tiny { padding: 4px 8px; font-size: 13px; border-radius: 6px; }
 .icon-btn { background: none; border: none; padding: 2px 8px; color: var(--ink-faint); }
 
@@ -561,6 +567,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: rgba(8, 11, 22, .93); border: 1px solid rgba(150, 175, 215, .28); box-shadow: var(--shadow);
 }
 .hovertip.on { display: block; }
+/* The same box for every title in the app (ui/tips.js) - one line of text. */
+.hovertip.simple { z-index: 300; max-width: 280px; padding: 5px 9px; font-size: 12.5px; color: #d6deef; }
 .hovertip .tip-title { font-weight: 600; font-size: 13.5px; color: #fff; }
 .hovertip .tip-sub { color: var(--ink-dim); margin-bottom: 6px; }
 .hovertip .tip-grid { display: grid; grid-template-columns: auto auto; column-gap: 14px; row-gap: 2px; }
@@ -642,6 +650,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 }
 #mapcontrols .ico { display: block; width: 16px; height: 16px; }
 #btn-mapopts.open { border-color: var(--gold-dim); color: var(--gold); }
+#btn-mine { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#btn-mine.active { border-color: var(--gold); color: var(--gold); background: rgba(240, 180, 41, .12); }
 
 /* The menu drops down from the gear. Solid: a blur inside the blurred top
    bar would only see the bar. */
