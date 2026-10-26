@@ -258,6 +258,25 @@ export function resumeGame(game) {
   return true;
 }
 
+export const MINIMUM_CONTINUE_TURNS = 1, MAXIMUM_CONTINUE_TURNS = 500;
+
+/**
+ * Extends a game that just ended by more turns instead of ending it there -
+ * the host's call, right after "over" (turn limit reached or one empire
+ * left). The new limit replaces the old one even if that game was endless.
+ */
+export function continueGame(game, extraTurns) {
+  if (game.state !== 'over') return false;
+  const roundedTurns = Math.round(Number(extraTurns));
+  if (!Number.isFinite(roundedTurns) || roundedTurns < MINIMUM_CONTINUE_TURNS || roundedTurns > MAXIMUM_CONTINUE_TURNS) return false;
+  game.settings.maxTurns = Math.min(999, game.turn + roundedTurns - 1);
+  game.state = 'running';
+  game.winner = null;
+  for (const player of game.players) player.ready = false;
+  armTurnTimer(game);
+  return true;
+}
+
 // ---------------------------------------------------------------- Ships/fleets
 
 function newFleet(game, owner, planet) {

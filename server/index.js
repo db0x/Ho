@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
   allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor, setBotLevel,
-  hostOf, pauseGame, resumeGame
+  hostOf, pauseGame, resumeGame, continueGame
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
@@ -671,6 +671,16 @@ function handle(connId, ws, msg) {
       chat(game, 'System', { key: msg.value ? 'chat.paused' : 'chat.resumed', params: { player: me.name } });
       broadcastView(game);
       maybeResolve(game);
+      break;
+    }
+    case 'continue': {
+      // Extends a finished game by more turns instead of ending it - the
+      // host's call, right after the game ended.
+      if (!game || !me || game.state !== 'over') return;
+      if (hostOf(game) !== me) return send(ws, { t: 'error', key: 'err.notHostContinue' });
+      if (!continueGame(game, msg.turns)) return;
+      chat(game, 'System', { key: 'chat.continued', params: { player: me.name } });
+      broadcastView(game);
       break;
     }
     case 'leave': {

@@ -98,6 +98,19 @@ export function saveName(n) {
   try { localStorage.setItem('ho-name', n); } catch {}
 }
 
+// Custom round count for "Quick Game", kept only when the "remember"
+// checkbox in that dialog is ticked - otherwise the field starts empty again
+// next time.
+export function loadQuickTurns() {
+  try { return Number(localStorage.getItem('ho-quickturns')) || null; } catch { return null; }
+}
+export function saveQuickTurns(n) {
+  try { localStorage.setItem('ho-quickturns', String(n)); } catch {}
+}
+export function clearQuickTurns() {
+  try { localStorage.removeItem('ho-quickturns'); } catch {}
+}
+
 // Without an account the browser keeps the image itself and hands it in when
 // connecting; with an account it is stored on the server.
 export function loadAvatar() {
