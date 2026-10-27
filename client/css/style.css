@@ -176,9 +176,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
     grid-template-columns: auto; row-gap: 16px; justify-items: center; align-content: start;
   }
   #screen-menu.with-admin.with-friends > .admin-box { grid-column: auto; }
-  .admin-box { max-height: none; width: min(480px, 92vw); }
+  /* The page scrolls here, not the boxes. A scrolling box would also let its
+     grid row shrink below its content, and the next box would slide over it. */
+  .admin-box { max-height: none; overflow: visible; width: min(480px, 92vw); }
   /* One below the other, all as wide as the start menu. */
-  #screen-menu > .friends-box { max-height: none; width: min(480px, 92vw); }
+  #screen-menu > .friends-box { max-height: none; overflow: visible; width: min(480px, 92vw); }
 }
 
 /* Friends */
