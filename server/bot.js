@@ -5,7 +5,7 @@
 // variance per empire, so two conquerors do not play like twins.
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
-  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, TECH_MAX_LEVEL, supplyDistance, cargoOf,
+  holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, techMaxLevel, recycleValue, supplyDistance, cargoOf,
   terraformable, IDEAL
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById, inSight } from './game.js';
@@ -46,8 +46,8 @@ const PERSONAS = {
   // Picks a neighbor as rival and rolls it up world by world.
   conqueror: {
     research: [32, 25],
-    weights: [{ range: 3, speed: 2, weapons: 3, shields: 2, mini: 2, radical: 1 },
-              { range: 2, speed: 2, weapons: 4, shields: 3, mini: 2, radical: 1 }],
+    weights: [{ range: 3, speed: 2, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 0 },
+              { range: 2, speed: 2, weapons: 4, shields: 3, mini: 2, radical: 1, recycling: 0 }],
     build: 0.72, terra: 0.25, settlers: 3, fleet: 1.5, fighters: 6, satellites: 2,
     campaign: 'always', from: 15, margin: 1.15, solo: 'prey',
     vengeance: 1.5, vsLeader: 0.4, garrison: 0
@@ -55,8 +55,8 @@ const PERSONAS = {
   // Spreads out, terraforms and defends itself - war only as an answer.
   settler: {
     research: [36, 32],
-    weights: [{ range: 4, speed: 2, weapons: 1, shields: 1, mini: 2, radical: 4 },
-              { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3 }],
+    weights: [{ range: 4, speed: 2, weapons: 1, shields: 1, mini: 2, radical: 4, recycling: 0 },
+              { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3, recycling: 1 }],
     build: 0.6, terra: 0.45, settlers: 5, fleet: 0.8, fighters: 3, satellites: 2,
     campaign: 'retaliation', from: 45, margin: 1.4, solo: 'near',
     vengeance: 0.8, vsLeader: 0.3, garrison: 0.4
@@ -64,8 +64,8 @@ const PERSONAS = {
   // Researches a lot, builds little, refits - and then strikes with quality.
   technocrat: {
     research: [50, 40],
-    weights: [{ range: 2, speed: 2, weapons: 3, shields: 3, mini: 3, radical: 2 },
-              { range: 2, speed: 2, weapons: 4, shields: 4, mini: 3, radical: 1 }],
+    weights: [{ range: 2, speed: 2, weapons: 3, shields: 3, mini: 3, radical: 2, recycling: 0 },
+              { range: 2, speed: 2, weapons: 4, shields: 4, mini: 3, radical: 1, recycling: 1 }],
     build: 0.65, terra: 0.3, settlers: 3, fleet: 0.8, fighters: 4, satellites: 1,
     campaign: 'always', from: 70, margin: 1.3, solo: 'never',
     vengeance: 1.0, vsLeader: 1.0, garrison: 0.2, refits: true
@@ -74,8 +74,8 @@ const PERSONAS = {
   // big worlds until there is nothing else left.
   raider: {
     research: [30, 26],
-    weights: [{ range: 3, speed: 4, weapons: 2, shields: 1, mini: 2, radical: 1 },
-              { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1 }],
+    weights: [{ range: 3, speed: 4, weapons: 2, shields: 1, mini: 2, radical: 1, recycling: 0 },
+              { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 0 }],
     build: 0.75, terra: 0.2, settlers: 2, fleet: 1.4, fighters: 5, satellites: 0,
     campaign: 'pressure', from: 8, margin: 1.0, solo: 'prey',
     vengeance: 1.2, vsLeader: 1.0, garrison: 0, packs: true, scouts: 5
@@ -84,8 +84,8 @@ const PERSONAS = {
   // is tight, it breaks out with a big fleet.
   bulwark: {
     research: [38, 32],
-    weights: [{ range: 2, speed: 1, weapons: 2, shields: 4, mini: 2, radical: 3 },
-              { range: 2, speed: 2, weapons: 3, shields: 4, mini: 2, radical: 2 }],
+    weights: [{ range: 2, speed: 1, weapons: 2, shields: 4, mini: 2, radical: 3, recycling: 0 },
+              { range: 2, speed: 2, weapons: 3, shields: 4, mini: 2, radical: 2, recycling: 1 }],
     build: 0.6, terra: 0.45, settlers: 3, fleet: 0.9, fighters: 3, satellites: 3,
     campaign: 'always', from: 100, margin: 1.25, solo: 'near',
     vengeance: 1.0, vsLeader: 0.5, garrison: 0.5, refits: true
@@ -94,8 +94,8 @@ const PERSONAS = {
   // freshly conquered worlds, broken batteries, empires on the ground.
   vulture: {
     research: [32, 28],
-    weights: [{ range: 3, speed: 3, weapons: 2, shields: 2, mini: 2, radical: 2 },
-              { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1 }],
+    weights: [{ range: 3, speed: 3, weapons: 2, shields: 2, mini: 2, radical: 2, recycling: 0 },
+              { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 2 }],
     build: 0.7, terra: 0.3, settlers: 2, fleet: 1.2, fighters: 4, satellites: 1,
     campaign: 'always', from: 25, margin: 1.0, solo: 'carrion',
     vengeance: 0.5, vsLeader: 0.8, garrison: 0.1, carrion: true, scouts: 5
@@ -176,10 +176,12 @@ export function runBot(game, bot) {
   }
   // Maxed-out fields get nothing more - and if everything is maxed out, the
   // money goes entirely into ships instead of research that yields nothing.
-  for (const f of TECH_FIELDS) if (bot.tech[f] >= TECH_MAX_LEVEL) weights[f] = 0;
+  for (const f of TECH_FIELDS) if (bot.tech[f] >= techMaxLevel(f)) weights[f] = 0;
   const open = TECH_FIELDS.some(f => weights[f] > 0);
   research = open ? Math.round(clamp(research, 10, 60)) : 0;
   setOrders(game, bot, { research: { budgetPct: research, weights } });
+  // Short of ore: old junk goes into the scrap press before anything is built.
+  if (oreScarce) scrap();
   const treasury = bot.money * (1 - research / 100);
 
   // --- Situation report: what does each enemy world cost, and who is down?
@@ -793,6 +795,29 @@ export function runBot(game, bot) {
     if (!rally) rally = rallyPoint;
     if (rally && rally.id !== fleet.at && canReach(game, fleet, rally).ok) return rally;
     return null;
+  }
+
+  /**
+   * Recycle idle fleets at quiet shipyards that consist of hopelessly
+   * outdated ships only - they would not get anywhere or win anything.
+   */
+  function scrap() {
+    let free = bot.money * 0.2;
+    const junk = s => {
+      const now = shipStats(s.type, bot.tech);
+      return now.range > s.range * 1.6 || now.attack > s.attack * 1.6;
+    };
+    for (const f of [...myFleets]) {
+      if (f.dest != null || f.at == null || threatened.has(f.at)) continue;
+      const pl = planetById(game, f.at);
+      if (!pl || pl.owner !== bot.id || pl.pop < 1) continue;
+      if (f.ships.some(s => s.colonists > 0 || s.cargo?.length || !junk(s))) continue;
+      const v = recycleValue(f.ships, bot.tech.recycling);
+      if (!v || v.money > free) continue;
+      if (setOrders(game, bot, { recycle: { fleetId: f.id } })?.error) continue;
+      free -= v.money;
+      myFleets.splice(myFleets.indexOf(f), 1);
+    }
   }
 
   /** Refit outdated ships and satellites if the money suffices. */

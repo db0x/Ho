@@ -35,7 +35,7 @@ export const AI_LEVELS = ['normal', 'hard'];
 
 // ----------------------------------------------------------------- Technology
 
-export const TECH_FIELDS = ['range', 'speed', 'weapons', 'shields', 'mini', 'radical'];
+export const TECH_FIELDS = ['range', 'speed', 'weapons', 'shields', 'mini', 'radical', 'recycling'];
 
 // Names, abbreviations and descriptions of the tech fields live in the catalogs
 // (client/i18n/*.js) under tech.<field>.name / .short / .desc - only what has
@@ -44,6 +44,15 @@ export const techKey = (field, part = 'name') => `tech.${field}.${part}`;
 
 export const TECH_START_LEVEL = 1;
 export const TECH_MAX_LEVEL = 40;
+
+/**
+ * Highest level that still brings something. Recycling reaches its limits
+ * (see recycleRates) well before the general maximum - research beyond that
+ * would be money down the drain.
+ */
+export function techMaxLevel(field) {
+  return field === 'recycling' ? RECYCLE_FULL_LEVEL : TECH_MAX_LEVEL;
+}
 
 /** Research points needed to get from `level` to `level + 1`. */
 export function techCostToNext(level) {
@@ -155,6 +164,55 @@ export function refitCost(type, shipTech, tech) {
     tech: next,
     money: Math.max(1, Math.round(extra * mf)),
     metal: Math.max(1, Math.round(extra * 0.35 * mf))
+  };
+}
+
+// ------------------------------------------------------------------ Recycling
+
+/**
+ * Recycling takes ships apart again at an own shipyard: it costs money and
+ * returns part of the metal. Level 1 means not yet researched; from level 2
+ * on it is possible, and every level makes it cheaper and more thorough -
+ * fast at first, then more slowly, until RECYCLE_FULL_LEVEL reaches the
+ * limits: never more than 80% of the metal back, never cheaper than 5% of
+ * the build price.
+ */
+export const RECYCLE_MIN_LEVEL = 2;
+export const RECYCLE_FULL_LEVEL = 16;
+export const RECYCLE_MAX_METAL = 0.8;
+export const RECYCLE_MIN_COST = 0.05;
+
+/**
+ * Shares of the build price at this level: `cost` of the money is charged,
+ * `metal` of the metal comes back. Null while not yet researched.
+ */
+export function recycleRates(level) {
+  if (!(level >= RECYCLE_MIN_LEVEL)) return null;
+  const x = Math.min(1, Math.sqrt((level - RECYCLE_MIN_LEVEL) / (RECYCLE_FULL_LEVEL - RECYCLE_MIN_LEVEL)));
+  return {
+    metal: 0.25 + (RECYCLE_MAX_METAL - 0.25) * x,
+    cost: 0.5 - (0.5 - RECYCLE_MIN_COST) * x
+  };
+}
+
+/**
+ * What recycling these ships costs and yields. The basis is what each ship
+ * cost when it was built - with the levels it carries. Rounded so the limits
+ * hold: the cost up, the metal down.
+ * @returns {{money: number, metal: number, count: number} | null} null while not researched
+ */
+export function recycleValue(ships, level) {
+  const r = recycleRates(level);
+  if (!r) return null;
+  let money = 0, metal = 0;
+  for (const s of ships) {
+    const c = shipCost(s.type, s.tech || {});
+    money += c.money; metal += c.metal;
+  }
+  return {
+    money: ships.length ? Math.max(1, Math.ceil(money * r.cost - 1e-9)) : 0,
+    metal: Math.floor(metal * r.metal + 1e-9),
+    count: ships.length
   };
 }
 

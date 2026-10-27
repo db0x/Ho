@@ -11,6 +11,7 @@ import {
   deleteUser
 } from './userstore.js';
 import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
+import { forget as forgetFriends } from './friends.js';
 import { nameAllowed } from './profile.js';
 
 /**
@@ -439,6 +440,8 @@ async function remove(req, res) {
     console.error('Account deletion failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
+  // Friendships and messages go with the account.
+  try { forgetFriends(s.user); } catch (e) { console.error('Friends cleanup failed:', e.message); }
   succeeded(`u:${s.user}`, `i:${ip}`);
   revoke(s.user);
   clearCookie(req, res);

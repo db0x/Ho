@@ -49,6 +49,7 @@
       </div>
       <div class="profile-hint">
         <span id="profile-account" class="muted small"></span>
+        <button type="button" id="profile-handle" class="handle hidden" data-i18n-attr="title:profile.handleTip"></button>
         <a href="#" id="link-avatar-off" class="small hidden" data-i18n="profile.remove"></a>
       </div>
     </div>
@@ -114,6 +115,34 @@
       <a href="#" id="link-delete" class="danger-link" data-i18n="auth.del.link"></a>
     </p>
   </div>
+
+  <!-- Accounts only: friends found by their handle, their status and messages. -->
+  <section id="friends-panel" class="menu-box friends-box hidden">
+    <div class="friends-list-view">
+      <h2 data-i18n="friends.title"></h2>
+      <div class="friends-search">
+        <input id="friends-handle" maxlength="7" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:friends.searchPlaceholder">
+        <button type="button" id="friends-find" data-i18n="friends.search"></button>
+      </div>
+      <div id="friends-result"></div>
+      <div id="friends-incoming"></div>
+      <div id="friends-list"></div>
+      <div id="friends-outgoing"></div>
+    </div>
+    <div class="friends-chat hidden">
+      <div class="fc-head">
+        <button type="button" id="fc-back" class="tiny" data-i18n="friends.back"></button>
+        <span id="fc-who"></span>
+        <button type="button" id="fc-lock" class="tiny fc-lock"></button>
+      </div>
+      <div id="fc-code" class="fc-code hidden"></div>
+      <div id="fc-log" class="fc-log"></div>
+      <div class="fc-input">
+        <input id="fc-text" maxlength="500" autocomplete="off" data-i18n-attr="placeholder:friends.writePlaceholder">
+        <button type="button" id="fc-send" class="primary" data-i18n="friends.send"></button>
+      </div>
+    </div>
+  </section>
 
   <!-- Admins only: every game on this instance and every account. -->
   <section id="admin-panel" class="menu-box admin-box hidden">

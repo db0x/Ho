@@ -4,6 +4,7 @@ import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
+import { FriendsPanel } from './ui/friends.js';
 import { DebugDialog } from './ui/debug.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
@@ -125,6 +126,7 @@ const net = new Net();
 const lobby = new Lobby(net);
 const voice = new Voice({ send: m => net.send(m) });
 const admin = new AdminPanel(net);
+const friends = new FriendsPanel(net);
 const debug = new DebugDialog();
 $('#admin-debug').onclick = () => debug.toggle(true);
 account();
@@ -214,6 +216,8 @@ net.on('hello', (m) => {
   lobby.showOpenGames(m.openGames);
   lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
+  // Friends need an account - the handle only exists with one.
+  friends.setEnabled(m.profile?.handle || null);
   admin.setEnabled(m.admin);
   debug.setEnabled(m.admin);
   // Admins cannot delete their own account (the server refuses it too).
@@ -235,6 +239,17 @@ net.on('hello', (m) => {
 
 net.on('games', (m) => { lobby.showOpenGames(m.openGames); lobby.showMySeats(m.mySeats); });
 net.on('adminData', (m) => admin.update(m));
+net.on('friends', (m) => friends.update(m));
+net.on('friendLookup', (m) => friends.onLookup(m));
+net.on('friendHistory', (m) => friends.onHistory(m));
+net.on('friendMsg', async (m) => {
+  const text = await friends.onMessage(m);
+  // In a game the start menu is out of sight - a toast says who wrote.
+  if (!m.msg.mine && text != null && hud && $('#screen-menu').classList.contains('hidden')) {
+    const who = friends.data.friends.find(p => p.handle === m.with)?.name || '#' + m.with;
+    hud.toast(t('friends.toast', { name: who, text: text.slice(0, 80) }), '#8ad6ff');
+  }
+});
 net.on('adminMsgSent', (m) => admin.messageSent(m));
 net.on('adminInviteCreated', (m) => admin.inviteCreated(m));
 // An admin speaks to everyone in the game: a banner that has to be
@@ -283,6 +298,10 @@ net.on('error', (m) => {
   sfx.play('deny');
 });
 net.on('notice', (m) => { hud?.toast(message(m), '#ffb347'); sfx.play('warn'); });
+net.on('recycled', (m) => {
+  hud?.toast(t('recycle.done', { n: m.count, count: m.count, money: Math.round(m.money), metal: Math.round(m.metal) }), '#7fd99a');
+  sfx.play('recycle', { pan: panOf(m.planetId) });
+});
 
 net.on('view', (m) => {
   const view = m.view;

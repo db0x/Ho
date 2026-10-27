@@ -238,7 +238,7 @@ export class AdminPanel {
   }
 
   accountRow(a) {
-    const name = esc(a.display) + (a.nick && a.nick !== a.display ? ` <small class="muted">${t('admin.nick', { nick: esc(a.nick) })}</small>` : '')
+    const name = esc(a.display) + (a.handle ? ` <small class="muted">#${esc(a.handle)}</small>` : '') + (a.nick && a.nick !== a.display ? ` <small class="muted">${t('admin.nick', { nick: esc(a.nick) })}</small>` : '')
       + (a.invitedBy ? ` <small class="muted">${t('admin.invitedBy', { admin: esc(a.invitedBy) })}</small>` : '');
     const status = a.online
       ? t('admin.online', { ago: this.ago(a.onlineSince) })

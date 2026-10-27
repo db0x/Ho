@@ -1,14 +1,14 @@
 // Game state and turn resolution. The server is authoritative - the client
 // only sends orders, never results.
 import {
-  TECH_FIELDS, TECH_MAX_LEVEL, TECH_START_LEVEL, techCostToNext,
+  TECH_FIELDS, techMaxLevel, TECH_START_LEVEL, techCostToNext,
   SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, refitCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
   COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS, AI_LEVELS,
-  holeZone, route, advance, travelDistance, supplyDistance, cargoOf
+  holeZone, route, advance, travelDistance, supplyDistance, cargoOf, recycleValue
 } from '../shared/rules.js';
-import { forecast } from '../shared/budget.js';
+import { forecast, researchWeight } from '../shared/budget.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng, newSeed } from './galaxy.js';
 
 export const DEFAULT_SETTINGS = {
@@ -477,6 +477,10 @@ export function setOrders(game, player, msg) {
       return { error: 'notice.refitUnaffordable' };
     }
   }
+  if (msg.recycle) {
+    const r = recycle(game, player, msg.recycle);
+    if (r) return r;
+  }
   if (msg.terraform) {
     const planet = planetById(game, msg.terraform.planetId);
     if (planet && planet.owner === player.id) {
@@ -581,6 +585,56 @@ function refitOrders(game, p, entries) {
 }
 
 /**
+ * Recycling: a fleet in orbit of an own shipyard, or satellites of an own
+ * world, are taken apart right away - like loading and splitting, so the
+ * metal can go into ships in the same turn. Satellites aboard a recycled
+ * transporter are set down first, they are not part of the deal. Only
+ * accepted if the orders placed so far can still be paid for afterwards.
+ */
+function recycle(game, player, o) {
+  let planet, fleet = null, ships;
+  if (o.fleetId != null) {
+    fleet = game.fleets.find(f => f.id === o.fleetId);
+    if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
+    planet = fleet.at != null ? planetById(game, fleet.at) : null;
+    ships = fleet.ships;
+  } else {
+    planet = planetById(game, o.planetId);
+    const sats = planet?.defenses || [];
+    const want = o.count == null ? sats.length : Math.max(0, Math.round(Number(o.count)) || 0);
+    // The oldest first - those are the ones worth the least in battle.
+    ships = [...sats].sort((a, b) => techSum(a) - techSum(b)).slice(0, want);
+  }
+  if (!planet || planet.owner !== player.id || planet.pop < 1) return { error: 'err.recycleNoYard' };
+  if (!ships.length) return { error: 'err.recycleNothing' };
+  const v = recycleValue(ships, player.tech.recycling);
+  if (!v) return { error: 'err.recycleLocked' };
+  if (player.money < v.money) return { error: 'notice.recycleUnaffordable' };
+  const money = player.money, metal = player.metal;
+  player.money -= v.money;
+  player.metal += v.metal;
+  if (!affordable(game, player)) {
+    player.money = money; player.metal = metal;
+    return { error: 'notice.recycleUnaffordable' };
+  }
+  if (fleet) {
+    const defenses = planet.defenses || (planet.defenses = []);
+    for (const s of ships) if (s.cargo?.length) defenses.push(...s.cargo);
+    fleet.ships = [];
+    delete player.orders.moves[fleet.id];
+    delete player.orders.refit['f:' + fleet.id];
+    cleanupFleets(game);
+  } else {
+    planet.defenses = planet.defenses.filter(s => !ships.includes(s));
+  }
+  return { recycled: { count: v.count, money: v.money, metal: v.metal, planetId: planet.id } };
+}
+
+function techSum(s) {
+  return Object.values(s.tech || {}).reduce((a, x) => a + x, 0);
+}
+
+/**
  * Transporters take satellites aboard from the orbit of an own world or set
  * them down there. Right away, like splitting and merging: whoever loads can
  * set off in the same turn. Satellites keep their damage and tech level.
@@ -650,17 +704,17 @@ export function resolveTurn(game) {
     if (!p.alive) continue;
     const budget = Math.min(p.money, Math.floor(p.money * p.research.budgetPct / 100));
     if (budget <= 0) continue;
-    const total = TECH_FIELDS.reduce((a, f) => a + p.research.weights[f], 0);
+    const total = TECH_FIELDS.reduce((a, f) => a + researchWeight(p, f), 0);
     if (total <= 0) continue;
     p.money -= budget;
     p.ledger.research = budget;
     const before = { ...p.tech };
     const advanced = [];
     for (const f of TECH_FIELDS) {
-      const share = budget * p.research.weights[f] / total;
+      const share = budget * researchWeight(p, f) / total;
       if (share <= 0) continue;
       p.researchPoints[f] += share;
-      while (p.tech[f] < TECH_MAX_LEVEL && p.researchPoints[f] >= techCostToNext(p.tech[f])) {
+      while (p.tech[f] < techMaxLevel(f) && p.researchPoints[f] >= techCostToNext(p.tech[f])) {
         p.researchPoints[f] -= techCostToNext(p.tech[f]);
         p.tech[f]++;
       }

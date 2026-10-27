@@ -29,6 +29,7 @@ server/
   userstore.js       Accounts on disk: name, scrypt hash, profile – written atomically
   profile.js         Display names and profile pictures: check, store, serve
   invites.js         One-time invite links: create, check, use up, expire (hashes only)
+  friends.js         Friendships and direct messages between accounts (friends.json)
   users.js           Tool for the host: add, del, passwd, name, admin, list
 client/
   index.html         Start screen, lobby, game screen
@@ -41,7 +42,7 @@ client/
                      map.js (flat), space.js (spatial), courses.js (course lines, orbit slots), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
                      dialog.js (windows), avatar.js, battle.js, shipinfo.js, split.js (splitting a fleet), viewport.js,
-                     admin.js (admin panel on the start screen), announce.js (admin banners), password.js (change password), delete.js (delete your own account),
+                     admin.js (admin panel on the start screen), friends.js (friends next to the start menu), announce.js (admin banners), password.js (change password), delete.js (delete your own account),
                      scene.js (starry sky and fade between sign-in and start menu)
   js/audio/sfx.js    Sound effects, synthesised at runtime
 test/                see Tests

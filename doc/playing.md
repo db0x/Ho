@@ -77,6 +77,7 @@ colonisation, economy.
 | **Tech level** | Ships are built with the level of their build year and keep it. Higher levels make ships better *and more expensive* – **miniaturisation** brings the cost back down. Outdated ships can be **refitted** at a shipyard. |
 | **Defence battery** | Every inhabited world defends itself, in proportion to its population. |
 | **Orbital defence** | Cheap satellites that stay in orbit. They cannot fly themselves, but a **transporter** carries up to five of them to another world of yours. From five upwards they raise a shield. |
+| **Recycling** | A research field of its own. From level 2 on, ships and satellites at one of your shipyards can be taken apart right away: that costs money and brings back part of the metal of their build price. Level 2 returns 25% of the metal for 50% of the money; every level improves that until level 16 reaches the limit – 80% of the metal for 5% of the money. The fleet goes as a whole (split it first), satellites by count, the oldest first. |
 
 ## The ship classes
 

@@ -3,7 +3,8 @@ import {
   TECH_FIELDS, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
-  holeZone, travelDistance, supplyDistance, batteryStats, cargoOf
+  holeZone, travelDistance, supplyDistance, batteryStats, cargoOf,
+  recycleRates, recycleValue, techMaxLevel
 } from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
 import { shipIcon } from '../render/ships.js';
@@ -12,7 +13,7 @@ import { makeDialog } from './dialog.js';
 import { compact, desktop } from './viewport.js';
 import { openShipInfo } from './shipinfo.js';
 import { openSplit } from './split.js';
-import { forecast, refitShips } from '../../shared/budget.js';
+import { forecast, refitShips, researchWeight } from '../../shared/budget.js';
 import { avatarHtml } from './avatar.js';
 import { t, n as num, localeTag } from '../i18n.js';
 
@@ -265,6 +266,88 @@ export class Hud {
     }
   }
 
+  /**
+   * The ships a recycling at 'f:<fleet>' or 'p:<world>' would take apart -
+   * satellites the oldest first, like the server. Empty without a shipyard.
+   */
+  recycleShips(key, count) {
+    const ships = refitShips(this.view, key);
+    if (key.startsWith('f:')) return ships;
+    const techSum = s => Object.values(s.tech || {}).reduce((a, x) => a + x, 0);
+    return [...ships].sort((a, b) => techSum(a) - techSum(b)).slice(0, count);
+  }
+
+  /**
+   * Recycling: button, price and yield. Happens right away and cannot be
+   * undone - so the first click only arms it, the second one recycles.
+   * Satellites get a counter; a fleet goes as a whole (split it first).
+   */
+  recycleBlock(key) {
+    const v = this.view, me = v.me;
+    if (!recycleRates(me.tech.recycling)) return '';
+    const sats = key.startsWith('p:');
+    const all = refitShips(v, key).length;
+    if (!all) return '';
+    if (sats) {
+      if (this.recycleKey !== key) { this.recycleKey = key; this.recyclePick = all; }
+      this.recyclePick = Math.max(1, Math.min(all, this.recyclePick));
+    }
+    const ships = this.recycleShips(key, sats ? this.recyclePick : all);
+    const r = recycleValue(ships, me.tech.recycling);
+    const ok = this.recycleAffordable(r);
+    const armed = this.recycleArmed === key;
+    const text = t('recycle.value', { n: r.count, count: r.count, money: fmt(r.money), metal: fmt(r.metal) });
+    return `<div class="${sats ? 'buildrow' : 'sel-actions'}" style="margin-top:6px">
+        ${sats ? `<span class="bq" style="margin-left:0">
+          <button class="tiny" id="rq-minus"${all > 1 ? '' : ' disabled'}>−</button>
+          <span class="n" id="rq">${this.recyclePick}</span>
+          <button class="tiny" id="rq-plus"${all > 1 ? '' : ' disabled'}>+</button>
+        </span>` : ''}
+        <button class="tiny${armed ? ' danger' : ''}" data-recycle="${key}" data-sfx="${armed ? 'none' : 'click'}"${ok ? '' : ` disabled title="${t('recycle.cantAfford')}"`}>${t(armed ? 'recycle.confirm' : (sats ? 'recycle.satellites' : 'recycle.fleet'))}</button>
+      </div>
+      <p class="small oneline" style="margin-top:4px;color:${armed ? 'var(--gold)' : 'var(--ink-faint)'}" title="${text}">${text}</p>`;
+  }
+
+  /** Would the orders placed so far still work out after this recycling? Same check as the server. */
+  recycleAffordable(r) {
+    const me = this.view.me;
+    if (me.money < r.money) return false;
+    const f = forecast({ ...this.view, me: { ...me, money: me.money - r.money, metal: me.metal + r.metal } });
+    return f.build.planned.n === f.build.booked.n && f.refit.planned.n === f.refit.booked.n;
+  }
+
+  wireRecycle(box) {
+    const n = box.querySelector('#rq');
+    if (n) {
+      const step = (d) => {
+        const all = refitShips(this.view, this.recycleKey).length;
+        this.recyclePick = Math.max(1, Math.min(all, this.recyclePick + d));
+        this.recycleArmed = null;
+        this.selection();
+      };
+      box.querySelector('#rq-minus').onclick = () => step(-1);
+      box.querySelector('#rq-plus').onclick = () => step(1);
+    }
+    for (const b of box.querySelectorAll('[data-recycle]')) {
+      const key = b.dataset.recycle;
+      b.onclick = () => {
+        clearTimeout(this.recycleTimer);
+        if (this.recycleArmed !== key) {
+          // Disarms itself if the second click does not come
+          this.recycleArmed = key;
+          this.recycleTimer = setTimeout(() => { this.recycleArmed = null; this.selection(); }, 4000);
+          this.selection();
+          return;
+        }
+        this.recycleArmed = null;
+        const target = key.startsWith('f:')
+          ? { fleetId: key.slice(2) }
+          : { planetId: Number(key.slice(2)), count: this.recyclePick };
+        this.app.send({ t: 'orders', recycle: target });
+      };
+    }
+  }
+
   // --------------------------------------------------------------- Topbar
   topbar() {
     const v = this.view;
@@ -428,7 +511,7 @@ export class Hud {
   // ------------------------------------------------------------- Research
   research() {
     const v = this.view, me = v.me;
-    const total = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0) || 1;
+    const total = TECH_FIELDS.reduce((a, f) => a + researchWeight(me, f), 0) || 1;
     // The same number as in the ledger (rounded down, no weights means no research).
     const budget = this.plan().research;
     const box = $('#tab-research');
@@ -443,15 +526,17 @@ export class Hud {
       ${TECH_FIELDS.map(f => {
         const lvl = me.tech[f];
         const pr = me.techProgress[f];
-        const share = me.research.weights[f] / total;
+        const maxed = lvl >= techMaxLevel(f);
+        const share = researchWeight(me, f) / total;
         return `<div class="tech-row" data-f="${f}">
           <div class="tech-head"><span class="nm">${t(`tech.${f}.name`)}</span>
-            <span class="lvl">${t('tech.level', { n: lvl })}</span></div>
-          <div class="tech-bar"><i style="width:${Math.min(100, pr.points / pr.next * 100).toFixed(1)}%"></i></div>
+            <span class="lvl">${t(maxed ? 'tech.levelMax' : 'tech.level', { n: lvl })}</span></div>
+          <div class="tech-bar"><i style="width:${maxed ? 100 : Math.min(100, pr.points / pr.next * 100).toFixed(1)}%"></i></div>
           <div class="wrow">
-            <input type="range" class="wt" min="0" max="10" step="1" value="${me.research.weights[f]}">
+            <input type="range" class="wt" min="0" max="10" step="1" value="${me.research.weights[f]}"${maxed ? ' disabled' : ''}>
             <span class="pct">${Math.round(share * 100)}%</span>
           </div>
+          ${f === 'recycling' ? `<div class="small muted">${this.recycleLine(lvl)}</div>` : ''}
         </div>`;
       }).join('')}
       <p class="hint-line">${t('research.keepsTech')}</p>
@@ -470,6 +555,15 @@ export class Hud {
       wt.onchange = (e) => this.app.send({ t: 'orders', research: { weights: { [f]: +e.target.value } } });
       row.querySelector('.tech-head').title = t(`tech.${f}.desc`);
     }
+  }
+
+  /** What recycling yields at this level - and what the next one brings. */
+  recycleLine(level) {
+    const pct = x => Math.round(x * 100);
+    const now = recycleRates(level);
+    const next = level < techMaxLevel('recycling') ? recycleRates(level + 1) : null;
+    const line = now ? t('recycle.rates', { metal: pct(now.metal), cost: pct(now.cost) }) : t('recycle.locked');
+    return next ? `${line} ${t('recycle.next', { metal: pct(next.metal), cost: pct(next.cost) })}` : line;
   }
 
   // --------------------------------------------------------------- Empire
@@ -712,6 +806,7 @@ export class Hud {
         <div id="buildrows"></div>
         <div class="small muted" id="buildsum"></div>
         ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
+        ${this.recycleBlock('p:' + p.id)}
       </div>` : `<div class="sec"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`}
       ` : ''}
 
@@ -767,6 +862,7 @@ export class Hud {
     if (rows) this.buildRows(rows, box.querySelector('#buildsum'), p);
 
     this.wireRefit(box);
+    this.wireRecycle(box);
     const ul = box.querySelector('#unload');
     if (ul) ul.onclick = () => {
       this.app.send({ t: 'orders', unload: { planetId: p.id } });
@@ -1037,6 +1133,7 @@ export class Hud {
           ${f.ships.length > 1 ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
         </div>
         ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
+        ${where ? this.recycleBlock('f:' + f.id) : ''}
       </div>`}
       ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
 
@@ -1059,6 +1156,7 @@ export class Hud {
       onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
     });
     this.wireRefit(box);
+    this.wireRecycle(box);
     this.wireCargo(box, f);
   }
 

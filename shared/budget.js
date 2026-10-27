@@ -9,7 +9,7 @@
 // What cannot be foreseen here: combat, conquest and new colonies between
 // building and settlement - they only change the income.
 import {
-  TECH_FIELDS, TECH_MAX_LEVEL, techCostToNext, SHIP_TYPES, shipCost, refitCost,
+  TECH_FIELDS, techMaxLevel, techCostToNext, SHIP_TYPES, shipCost, refitCost,
   terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining
 } from './rules.js';
 
@@ -18,23 +18,31 @@ import {
  * levels at build time, and the server researches before building.
  */
 export function researchStep(me) {
-  const weights = TECH_FIELDS.reduce((a, f) => a + me.research.weights[f], 0);
+  const weights = TECH_FIELDS.reduce((a, f) => a + researchWeight(me, f), 0);
   const budget = Math.min(me.money, Math.floor(me.money * me.research.budgetPct / 100));
   const tech = { ...me.tech };
   // Without weights the server releases the budget again.
   if (budget <= 0 || weights <= 0) return { tech, budget: 0, breakthrough: false };
   let breakthrough = false;
   for (const f of TECH_FIELDS) {
-    const share = budget * me.research.weights[f] / weights;
+    const share = budget * researchWeight(me, f) / weights;
     if (share <= 0) continue;
     let points = (me.techProgress?.[f]?.points || 0) + share;
-    while (tech[f] < TECH_MAX_LEVEL && points >= techCostToNext(tech[f])) {
+    while (tech[f] < techMaxLevel(f) && points >= techCostToNext(tech[f])) {
       points -= techCostToNext(tech[f]);
       tech[f]++;
       breakthrough = true;
     }
   }
   return { tech, budget, breakthrough };
+}
+
+/**
+ * Weight a field really gets: a field at its highest level gets nothing, its
+ * share goes to the others instead of disappearing.
+ */
+export function researchWeight(me, f) {
+  return me.tech[f] >= techMaxLevel(f) ? 0 : (me.research.weights[f] || 0);
 }
 
 /** Can ships be built or refitted on this world? Same as the server. */
