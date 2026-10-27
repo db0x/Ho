@@ -284,6 +284,51 @@ function renderLaser(ctx, dur = 0.26) {
   return buf;
 }
 
+/**
+ * A ship goes into the scrap press: the hydraulics groan, the hull crunches
+ * in grainy bursts behind a filter that closes as the metal gets denser,
+ * and in between plates fall off and ring - inharmonic partials, like
+ * struck sheet metal. Ends in silence for the chime of the recovered metal.
+ */
+function renderRecycle(ctx, dur = 0.85) {
+  const sr = ctx.sampleRate, n = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, n, sr);
+  const d = buf.getChannelData(0);
+  // Falling plates: when, pitch, loudness
+  const clanks = [0.06, 0.19, 0.31, 0.47].map((at, i) => ({
+    at: at + Math.random() * 0.03, f: (980 - i * 150) * (0.92 + Math.random() * 0.16), g: 0.55 - i * 0.08
+  }));
+  const partials = [1, 2.76, 5.4, 8.93];
+  let bp1 = 0, bp2 = 0, grain = 0, motor = 0, peak = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const w = Math.random() * 2 - 1;
+    // Crunching: short grains of noise, densest at the start
+    if (Math.random() < 260 * Math.exp(-t / 0.35) / sr) grain = 0.4 + Math.random() * 0.6;
+    grain *= Math.exp(-1 / (0.012 * sr));
+    // Resonant band-pass (state variable), sweeping from 2.4 kHz down to 500 Hz
+    const fc = 500 + 1900 * Math.exp(-t / 0.22);
+    const k = 2 * Math.sin(Math.PI * fc / sr);
+    bp2 += k * bp1;
+    bp1 += k * (w * grain - bp2 - 0.35 * bp1);
+    // The press: a low saw that sags under the load
+    motor = (motor + (48 + 22 * Math.exp(-t / 0.3)) / sr) % 1;
+    const press = (motor * 2 - 1) * 0.35 * Math.min(1, t / 0.03) * Math.exp(-t / 0.4);
+    let ring = 0;
+    for (const c of clanks) {
+      const tc = t - c.at;
+      if (tc < 0) continue;
+      const e = c.g * Math.exp(-tc / 0.09);
+      partials.forEach((m, j) => { ring += e * Math.sin(2 * Math.PI * c.f * m * tc) / (1 + j * 1.3); });
+    }
+    const fadeOut = t > dur - 0.25 ? (dur - t) / 0.25 : 1;
+    d[i] = Math.tanh((bp1 * 1.6 + press + ring * 0.8) * 1.4) * fadeOut;
+    peak = Math.max(peak, Math.abs(d[i]));
+  }
+  if (peak > 0) for (let i = 0; i < n; i++) d[i] /= peak;
+  return buf;
+}
+
 function env(ctx, at, dur, gain, attack) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, at);
@@ -364,6 +409,14 @@ const RECIPES = {
   // filtered white noise it only ever sounded like a balloon or a hiss.
   boom: { max: 3, gap: 0.09, vary: 0.16, build: (s, b, t) => {
     s.rendered(b, t, renderBlast, { gain: 0.34 });
+  } },
+  // Ships into the scrap press (renderRecycle), then the metal is booked:
+  // a magnetic rise and a bright chime.
+  recycle: { max: 2, gap: 0.3, vary: 0.08, build: (s, b, t) => {
+    s.rendered(b, t, renderRecycle, { gain: 0.22 });
+    s.noise(b, t + 0.62, { dur: 0.4, type: 'bandpass', from: 500, to: 3200, q: 3, gain: 0.05, attack: 0.3 });
+    s.seq(b, t + 0.78, [659, 988, 1319], 0.07, { type: 'triangle', dur: 0.45, gain: 0.07 });
+    s.tone(b, t + 0.92, { type: 'sine', from: 2637, dur: 0.6, gain: 0.025, attack: 0.01 });
   } },
   invade: { max: 2, gap: 0.2, build: (s, b, t) => {
     s.tone(b, t, { type: 'square', from: 110, to: 42, dur: 0.75, gain: 0.2, filter: 700 });

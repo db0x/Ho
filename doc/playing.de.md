@@ -79,6 +79,7 @@ Kolonisierung, Wirtschaft.
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. Veraltete Schiffe lassen sich in einer Werft **umrüsten**. |
 | **Abwehrbatterie** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. |
 | **Orbitalverteidigung** | Billige Satelliten, die im Orbit bleiben. Selbst fliegen können sie nicht, aber ein **Transporter** bringt bis zu fünf davon zu einer anderen eigenen Welt. Ab fünf Stück spannen sie einen Schild auf. |
+| **Recycling** | Ein eigenes Forschungsfeld. Ab Stufe 2 lassen sich Schiffe und Satelliten an einer eigenen Werft sofort wieder zerlegen: Das kostet Geld und bringt einen Teil des Metalls ihres Baupreises zurück. Stufe 2 gibt 25 % des Metalls für 50 % des Geldes; jede Stufe verbessert das, bis Stufe 16 die Grenze erreicht – 80 % des Metalls für 5 % des Geldes. Eine Flotte geht als Ganzes (vorher teilen), Satelliten nach Stückzahl, die ältesten zuerst. |
 
 ## Die Schiffstypen
 

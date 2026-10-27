@@ -648,6 +648,7 @@ function handle(connId, ws, msg) {
       if (!game || !me || game.state !== 'running') return;
       const r = setOrders(game, me, msg);
       if (r?.error) send(ws, { t: 'notice', key: r.error, params: r.params });
+      if (r?.recycled) send(ws, { t: 'recycled', ...r.recycled });
       send(ws, { t: 'view', view: buildView(game, me) });
       if (msg.move || msg.split || msg.merge) {
         // Moves do not change other players' views right away - only show readiness

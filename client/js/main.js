@@ -283,6 +283,10 @@ net.on('error', (m) => {
   sfx.play('deny');
 });
 net.on('notice', (m) => { hud?.toast(message(m), '#ffb347'); sfx.play('warn'); });
+net.on('recycled', (m) => {
+  hud?.toast(t('recycle.done', { n: m.count, count: m.count, money: Math.round(m.money), metal: Math.round(m.metal) }), '#7fd99a');
+  sfx.play('recycle', { pan: panOf(m.planetId) });
+});
 
 net.on('view', (m) => {
   const view = m.view;
