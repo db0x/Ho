@@ -12,7 +12,8 @@ import {
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen, ensureHandles } from './userstore.js';
+import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen, ensureHandles, userByHandle } from './userstore.js';
+import * as friends from './friends.js';
 import { createInvite, listInvites, revokeInvite } from './invites.js';
 import { startStun } from './stun.js';
 import {
@@ -215,6 +216,7 @@ wss.on('connection', (ws, req, session) => {
     // Without an account the browser remembers it.
     version: VERSION, releases: RELEASES, newsSeen: c.accountKey ? (account?.news ?? null) : undefined
   });
+  if (c.accountKey && authEnabled()) sendFriends(c);
 
   ws.on('message', (raw) => {
     const conn = conns.get(connId);
@@ -259,6 +261,129 @@ wss.on('connection', (ws, req, session) => {
     conns.delete(connId);
   });
 });
+
+// ------------------------------------------------------------------ Friends
+
+// Looking up handles is limited per connection: a handle is no secret, but
+// nobody should be able to walk through all of them.
+const LOOKUPS = { perMinute: 12 };
+
+/** What others see of an account: never the sign-in name, only the handle. */
+function publicOf(key) {
+  const u = getUser(key);
+  if (!u?.handle) return null;
+  return { handle: u.handle, name: u.nick || u.display || key, avatar: accountAvatarUrl(key) };
+}
+
+/**
+ * 'playing' with a seat in a game, 'watching' as a spectator, 'online' when
+ * connected, else 'offline'. With several devices the busiest one counts.
+ */
+const STATUS_RANK = ['offline', 'online', 'watching', 'playing'];
+function statusOf(key) {
+  let status = 'offline';
+  for (const c of conns.values()) {
+    if (c.accountKey !== key) continue;
+    const s = !c.gameId || !games.has(c.gameId) ? 'online' : c.playerId != null ? 'playing' : 'watching';
+    if (STATUS_RANK.indexOf(s) > STATUS_RANK.indexOf(status)) status = s;
+  }
+  return status;
+}
+
+function friendsView(key) {
+  const links = friends.linksOf(key);
+  const people = (list, extra) => list.map(l => {
+    const p = publicOf(l.name);
+    return p && { ...p, ...extra(l) };
+  }).filter(Boolean);
+  // The keys to encrypt for: every device of a friend, and our own.
+  const lastAt = (name) => friends.history(key, name).at(-1)?.at || 0;
+  return {
+    devices: friends.devicesOf(key),
+    friends: people(links.friends, l => ({
+      status: statusOf(l.name), unread: friends.unread(key, l.name), last: lastAt(l.name),
+      devices: friends.devicesOf(l.name)
+    })).sort((a, b) => (a.status === 'offline') - (b.status === 'offline') || b.last - a.last || a.name.localeCompare(b.name)),
+    incoming: people(links.incoming, l => ({ since: l.since })),
+    outgoing: people(links.outgoing, l => ({ since: l.since }))
+  };
+}
+
+/** Sends the friends list - only if it changed since the last time, unless forced. */
+function sendFriends(c, force = true) {
+  let view;
+  try { view = friendsView(c.accountKey); } catch (e) { console.error('Friends:', e.message); return; }
+  const sig = JSON.stringify(view);
+  if (!force && sig === c.friendsSig) return;
+  c.friendsSig = sig;
+  send(c.ws, { t: 'friends', ...view });
+}
+
+/** To every connection of these accounts. */
+function pushFriends(...keys) {
+  for (const c of conns.values()) if (keys.includes(c.accountKey)) sendFriends(c);
+}
+
+function friendMessage(c, ws, msg) {
+  const me = c.accountKey;
+  if (msg.t === 'e2eDevice') {
+    // This browser's public key. A new one changes the safety codes of all
+    // friends - they get the new list right away.
+    try {
+      const changed = friends.addDevice(me, msg.id, msg.pub);
+      c.device = msg.id;
+      if (changed) pushFriends(me, ...friends.linksOf(me).friends.map(f => f.name));
+      else sendFriends(c);
+    } catch (e) {
+      send(ws, { t: 'error', key: e.message });
+    }
+    return;
+  }
+  const target = userByHandle(msg.handle);
+  if (msg.t === 'friendLookup') {
+    const now = Date.now();
+    c.lookups = (c.lookups || []).filter(at => now - at < 60000);
+    if (c.lookups.length >= LOOKUPS.perMinute) return send(ws, { t: 'error', key: 'friends.err.slowDown' });
+    c.lookups.push(now);
+    const found = target && publicOf(target.name);
+    return send(ws, { t: 'friendLookup', handle: String(msg.handle ?? '').trim().replace(/^#/, '').toUpperCase(),
+      user: found || null, relation: found ? friends.relation(me, target.name) : null });
+  }
+  if (!target) return send(ws, { t: 'error', key: 'friends.err.unknown' });
+  const them = target.name;
+  try {
+    switch (msg.t) {
+      case 'friendRequest': friends.request(me, them); break;
+      case 'friendAnswer': friends.answer(me, them, !!msg.accept); break;
+      case 'friendRemove': friends.remove(me, them); break;
+      case 'friendMsg': {
+        const m = friends.addMessage(me, them, msg.env);
+        for (const x of conns.values()) {
+          if (x.accountKey === me || x.accountKey === them) {
+            const withHandle = x.accountKey === me ? target.handle : getUser(me)?.handle;
+            send(x.ws, { t: 'friendMsg', with: withHandle, msg: { mine: x.accountKey === me, env: m.env, at: m.at } });
+          }
+        }
+        break;
+      }
+      case 'friendHistory':
+      case 'friendRead': {
+        if (friends.relation(me, them) !== 'friends') return send(ws, { t: 'error', key: 'friends.err.notFriends' });
+        if (msg.t === 'friendHistory') {
+          send(ws, { t: 'friendHistory', with: target.handle,
+            messages: friends.history(me, them).map(m => ({ mine: m.from === me, env: m.env, at: m.at })) });
+        }
+        friends.markRead(me, them);
+        pushFriends(me);
+        return;
+      }
+    }
+  } catch (e) {
+    if (!String(e.message).startsWith('friends.err.')) throw e;
+    return send(ws, { t: 'error', key: e.message });
+  }
+  pushFriends(me, them);
+}
 
 /**
  * Is this connection an admin? Asked anew on every request, so revoking the
@@ -560,6 +685,19 @@ function handle(connId, ws, msg) {
         if (old) send(old.ws, { t: 'takenOver', code: g.id });
       }
       takeSeat(c, connId, g, p);
+      break;
+    }
+    case 'friendLookup':
+    case 'friendRequest':
+    case 'friendAnswer':
+    case 'friendRemove':
+    case 'friendMsg':
+    case 'friendHistory':
+    case 'friendRead':
+    case 'e2eDevice': {
+      // Friends exist only between accounts - guests have nobody to find.
+      if (!c.accountKey || !authEnabled()) return send(ws, { t: 'error', key: 'friends.err.account' });
+      friendMessage(c, ws, msg);
       break;
     }
     case 'newsSeen': {
@@ -898,6 +1036,7 @@ setInterval(() => {
 }, 100);
 
 // Turn timer and cleanup
+let friendTick = 0;
 setInterval(() => {
   const now = Date.now();
   for (const [connId, c] of conns) {
@@ -907,6 +1046,13 @@ setInterval(() => {
       conns.delete(connId);
     }
   }
+  // Friends coming online, going offline or into a game: whoever is in the
+  // start menu sees it within a few seconds.
+  if (authEnabled() && ++friendTick % 3 === 0) {
+    for (const c of conns.values()) if (c.accountKey) sendFriends(c, false);
+  }
+  // Once an hour, old messages leave friends.json for good.
+  if (authEnabled() && friendTick % 3600 === 0) friends.expire(now);
   for (const game of games.values()) {
     if (game.floor && (now > game.floor.until || game.state !== 'running')) {
       game.floor = null;
@@ -932,6 +1078,10 @@ server.listen(PORT, async () => {
   try {
     const n = ensureHandles();
     if (n) console.log(`Accounts: handle assigned to ${n} account(s) (${userFile()})`);
+    // Accounts deleted on the command line take their friendships along.
+    friends.purge(listUsers().map(u => u.name));
+    const expired = friends.expire();
+    if (expired) console.log(`Friends: ${expired} message(s) older than 14 days deleted`);
   } catch (e) {
     console.error('Accounts: could not assign handles -', e.message);
   }
