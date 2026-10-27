@@ -12,7 +12,7 @@ import {
 } from './game.js';
 import { runBot } from './bot.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen } from './userstore.js';
+import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen, ensureHandles } from './userstore.js';
 import { createInvite, listInvites, revokeInvite } from './invites.js';
 import { startStun } from './stun.js';
 import {
@@ -202,13 +202,14 @@ wss.on('connection', (ws, req, session) => {
   if (c.accountKey) {
     try { account = getUser(c.accountKey); } catch { /* account file unreadable */ }
     c.profile = { name: account?.nick || c.account, avatar: accountAvatarUrl(c.accountKey) };
+    c.handle = account?.handle || null;
   }
   conns.set(connId, c);
   send(ws, {
     t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
     mySeats: seatList(c, connId),
     voice: VOICE ? { stun: stunPort ? (STUN_URL || { port: stunPort }) : null } : null,
-    profile: { ...c.profile, account: c.accountKey ? c.account : null },
+    profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null },
     admin: adminOf(c),
     // Which release's change notes this account has seen - null: none yet.
     // Without an account the browser remembers it.
@@ -287,7 +288,7 @@ function adminOverview() {
     accounts: accounts.map(u => {
       const sessions = online.get(u.name) || [];
       return {
-        name: u.name, display: u.display, nick: u.nick, admin: u.admin, mustChange: u.mustChange,
+        name: u.name, handle: u.handle, display: u.display, nick: u.nick, admin: u.admin, mustChange: u.mustChange,
         invitedBy: u.invitedBy,
         avatar: u.avatar ? accountAvatarUrl(u.name) : null,
         created: u.created, changed: u.changed,
@@ -571,7 +572,7 @@ function handle(connId, ws, msg) {
     case 'profile': {
       const problem = changeProfile(c, msg);
       if (problem) send(ws, { t: 'error', key: problem });
-      send(ws, { t: 'profile', profile: { ...c.profile, account: c.accountKey ? c.account : null } });
+      send(ws, { t: 'profile', profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null } });
       if (problem || !me) return;
       // The image always goes along; renaming only happens before the start -
       // afterwards the old name would already be in the log and chat.
@@ -927,6 +928,13 @@ setInterval(() => {
 
 server.listen(PORT, async () => {
   console.log(`Ho!! running on http://localhost:${PORT}`);
+  // Before anything else: accounts from before handles existed get theirs now.
+  try {
+    const n = ensureHandles();
+    if (n) console.log(`Accounts: handle assigned to ${n} account(s) (${userFile()})`);
+  } catch (e) {
+    console.error('Accounts: could not assign handles -', e.message);
+  }
   if (VOICE && STUN_PORT) {
     stunPort = await startStun(STUN_PORT);
     if (stunPort) console.log(`CB radio: STUN on UDP ${stunPort}${STUN_URL ? ` (announced as ${STUN_URL})` : ''}`);

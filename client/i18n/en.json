@@ -43,6 +43,8 @@
   "profile.pick": "Choose a picture",
   "profile.remove": "Remove picture",
   "profile.account": "Signed in as {account}",
+  "profile.handleTip": "Your ID on this instance – others find you by it. Click to copy.",
+  "profile.handleCopied": "Copied ✓",
   "profile.err.short": "The name needs at least 2 characters.",
   "profile.err.taken": "Another account already goes by that name – please pick a different one.",
   "profile.err.image": "The picture could not be read (PNG, JPEG or WebP).",

@@ -218,6 +218,18 @@ export class Lobby {
   profileHint() {
     const a = this.profile?.account;
     $('#profile-account').textContent = a ? t('profile.account', { account: a }) : '';
+    // The handle: how others on this instance can find you. A click copies it.
+    const h = $('#profile-handle');
+    const handle = this.profile?.handle;
+    h.classList.toggle('hidden', !handle);
+    if (!handle) return;
+    h.textContent = '#' + handle;
+    h.onclick = () => {
+      navigator.clipboard?.writeText(handle).then(() => {
+        h.textContent = t('profile.handleCopied');
+        setTimeout(() => { h.textContent = '#' + handle; }, 1200);
+      }).catch(() => {});
+    };
   }
 
   rename(value) {

@@ -219,6 +219,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .avatar-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .profile-hint { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; min-height: 0; }
 .profile-hint a { color: var(--ink-faint); margin-left: auto; }
+.profile-hint .handle {
+  padding: 0 6px; min-height: 0; border: 1px solid var(--line-strong); border-radius: 4px;
+  background: none; color: var(--gold); font: 600 11px/1.6 ui-monospace, monospace; letter-spacing: .08em; cursor: copy;
+}
+.profile-hint .handle:hover { border-color: var(--gold); }
 .hint { margin: 18px 0 0; font-size: 13px; color: var(--ink-faint); text-align: center; }
 /* Language picker below the hint: that is where people look for it, and it does not push itself forward. */
 /* Version number: small and unobtrusive, but always there */

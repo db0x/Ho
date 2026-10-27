@@ -43,6 +43,8 @@
   "profile.pick": "Profilbild wählen",
   "profile.remove": "Bild entfernen",
   "profile.account": "Angemeldet als {account}",
+  "profile.handleTip": "Deine ID auf dieser Instanz – darüber finden dich andere. Klicken kopiert sie.",
+  "profile.handleCopied": "Kopiert ✓",
   "profile.err.short": "Der Name braucht mindestens 2 Zeichen.",
   "profile.err.taken": "So heißt schon ein anderes Konto – bitte einen anderen Namen wählen.",
   "profile.err.image": "Das Bild konnte nicht gelesen werden (PNG, JPEG oder WebP).",

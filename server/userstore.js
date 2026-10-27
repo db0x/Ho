@@ -59,6 +59,45 @@ export function checkPassword(password, name) {
   return null;
 }
 
+/**
+ * Handle: a short, unique ID per account that says nothing about it - shown
+ * in the lobby so players of an instance can find each other. Drawn at random
+ * rather than derived from the name: a hash of a short name could be found
+ * again simply by trying names. Capital letters and digits without the
+ * look-alikes 0/O and 1/I: 32^6, about a billion possibilities.
+ */
+const HANDLE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+export const HANDLE_RE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/;
+
+/** Gives every account without a valid handle one. Returns how many. */
+function assignHandles(db) {
+  const missing = Object.values(db.users).filter(u => !HANDLE_RE.test(u.handle || ''));
+  for (const u of missing) u.handle = newHandle(db.users);
+  return missing.length;
+}
+
+/**
+ * On boot: accounts from before 0.9.0 get their handle once and for good, so
+ * it is there before anyone signs in. Returns how many were assigned.
+ */
+export function ensureHandles() {
+  const file = userFile();
+  if (!fs.existsSync(file)) return 0;
+  const db = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!db?.users || typeof db.users !== 'object') return 0;
+  const n = assignHandles(db);
+  if (n) save(db);
+  return n;
+}
+
+function newHandle(users) {
+  const taken = new Set(Object.values(users).map(u => u.handle));
+  for (;;) {
+    const h = Array.from({ length: 6 }, () => HANDLE_ALPHABET[crypto.randomInt(HANDLE_ALPHABET.length)]).join('');
+    if (!taken.has(h)) return h;
+  }
+}
+
 /** First password: three groups of five characters, about 73 bits. */
 export function generatePassword() {
   const char = () => ALPHABET[crypto.randomInt(ALPHABET.length)];
@@ -124,6 +163,10 @@ export function load() {
     // let everyone in.
     throw new Error(`users.json is unreadable (${file}): ${e.message}`);
   }
+  // Accounts from before handles existed get theirs on the first read -
+  // the server does that on boot (ensureHandles), this catches whatever is
+  // added to the file by hand while it runs.
+  if (assignHandles(db)) { save(db); return load(); }
   cache = { db, mtimeMs: st.mtimeMs, size: st.size };
   return db;
 }
@@ -145,10 +188,20 @@ export function getUser(name) {
   return load().users[normalizeName(name)] || null;
 }
 
+/** The account behind a handle, or null. */
+export function userByHandle(handle) {
+  const h = String(handle ?? '').trim().replace(/^#/, '').toUpperCase();
+  if (!HANDLE_RE.test(h)) return null;
+  const users = load().users;
+  const name = Object.keys(users).find(k => users[k].handle === h);
+  return name ? { name, ...users[name] } : null;
+}
+
 export function listUsers() {
   const users = load().users;
   return Object.keys(users).sort().map(name => ({
     name,
+    handle: users[name].handle,
     display: displayName(name, users[name]),
     nick: users[name].nick || null,
     invitedBy: users[name].invitedBy || null,
@@ -201,6 +254,7 @@ export async function addUser(name, password, { mustChange = true, invitedBy = n
   if (db.users[key]) throw new Error('auth.cli.exists');
   db.users[key] = {
     hash,
+    handle: newHandle(db.users),
     mustChange,
     created: new Date().toISOString(),
     changed: null,

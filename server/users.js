@@ -102,7 +102,7 @@ async function run(command, name, password) {
       for (const u of users) {
         const mark = [u.admin ? t('auth.cli.isAdmin') : '', u.mustChange ? t('auth.cli.mustChange') : '']
           .filter(Boolean).join(', ');
-        console.log(`  ${u.display.padEnd(width)}  ${(u.created || '').slice(0, 10)}  ${mark}`);
+        console.log(`  ${u.handle}  ${u.display.padEnd(width)}  ${(u.created || '').slice(0, 10)}  ${mark}`);
       }
       break;
     }
