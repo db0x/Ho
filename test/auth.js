@@ -492,6 +492,13 @@ const session = (msg) => new Promise((ok) => {
   check(errorKeys.includes('profile.err.taken'), 'Name of another account is accepted');
   check(profile?.name === 'Señor bNemo/b', `Rejected name ends up in the profile anyway ('${profile?.name}')`);
 
+  // Cyrillic works, and an apostrophe becomes the letter apostrophe ʼ instead of vanishing.
+  lobby = null;
+  ws.send(JSON.stringify({ t: 'profile', name: "Мар'яна `Ї`" }));
+  await until(() => lobby);
+  check(myName() === 'Марʼяна ʼЇʼ', `Apostrophes not turned into ʼ ('${myName()}')`);
+  check(getUser('captain').nick === 'Марʼяна ʼЇʼ', 'Cyrillic display name is not stored');
+
   // Image: a tiny PNG goes through, nonsense does not
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   profile = null; lobby = null;

@@ -1,10 +1,17 @@
 {
   "de": [
     "Wurmlöcher: Im Lauf einer Partie öffnet sich ab und zu ein Wurmloch – zwei Mündungen, weit auseinander. Flotte hineinschicken, und sie kommt am anderen Ende heraus; wohin es führt, zeigt erst der erste Sprung. Solange es offen ist, reicht die Versorgung hindurch. Flackert es rot, bricht es bald zusammen – wer dann drüben ist, ist abgeschnitten. Auch einige KI-Reiche wagen den Sprung. In der Lobby abschaltbar.",
-    "Kleinigkeiten: Im Freunde-Chat werden Smileys und Codes jetzt zu Emojis wie im Funk, mit derselben 🙂-Auswahl. Im Spiel zeigt ? alle Tasten auf einen Blick, und S teilt die gewählte Flotte sofort in Einzelschiffe."
+    "Kleinigkeiten: Im Freunde-Chat werden Smileys und Codes jetzt zu Emojis wie im Funk, mit derselben 🙂-Auswahl. Im Spiel zeigt ? alle Tasten auf einen Blick, und S teilt die gewählte Flotte sofort in Einzelschiffe.",
+    "Ho!! spricht jetzt auch Ukrainisch – umschaltbar im Startmenü und im Spiel."
   ],
   "en": [
     "Wormholes: now and then in the course of a game a wormhole opens – two mouths, far apart. Send a fleet in and it comes out at the other end; where it leads only the first jump tells. As long as it is open, supply reaches through it. Once it flickers red it will soon collapse – whoever is on the far side then is cut off. Some AI empires dare the jump too. Can be switched off in the lobby.",
-    "Small things: in the friends chat smileys and codes now turn into emojis as in the comms, with the same 🙂 palette. In a game, ? shows all keys at a glance, and S splits the selected fleet into single ships right away."
+    "Small things: in the friends chat smileys and codes now turn into emojis as in the comms, with the same 🙂 palette. In a game, ? shows all keys at a glance, and S splits the selected fleet into single ships right away.",
+    "Ho!! now speaks Ukrainian too – switch in the start menu or in the game."
+  ],
+  "uk": [
+    "Червоточини: під час гри час від часу відкривається червоточина – два входи далеко один від одного. Пошліть флот усередину, і він вийде з іншого кінця; куди вона веде, покаже лише перший стрибок. Поки вона відкрита, постачання проходить крізь неї. Коли вона мерехтить червоним, то скоро схлопнеться – хто тоді по той бік, той відрізаний. Дехто з імперій ШІ теж наважується на стрибок. Можна вимкнути в лобі.",
+    "Дрібниці: у чаті друзів смайлики й коди тепер перетворюються на емодзі, як у зв’язку, з тією ж 🙂-панеллю. У грі ? показує всі клавіші одним поглядом, а S одразу розділяє вибраний флот на окремі кораблі.",
+    "Ho!! тепер розмовляє й українською – перемикається в стартовому меню та в грі."
   ]
 }

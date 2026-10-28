@@ -5,26 +5,45 @@ import { readFileSync } from 'node:fs';
 const catalog = (code) => JSON.parse(readFileSync(new URL(`../client/i18n/${code}.json`, import.meta.url), 'utf8'));
 const de = catalog('de');
 const en = catalog('en');
-import { registerLocale, setLocale, t } from '../shared/i18n.js';
+const uk = catalog('uk');
+import { registerLocale, setLocale, t, pluralForms } from '../shared/i18n.js';
 
-const catalogs = { de, en };
+const catalogs = { de, en, uk };
 let errors = 0;
 const fail = (txt) => { console.log('  ' + txt); errors++; };
 
-// 1) Same set of keys
-const all = new Set([...Object.keys(de), ...Object.keys(en)]);
+// 1) Same set of keys. Plural keys (key#form) count once by their base -
+//    each language has the forms its own rule needs: one/other in German
+//    and English, one/few/many/other in Ukrainian.
+const base = (k) => k.split('#')[0];
+const bases = (cat) => new Set(Object.keys(cat).map(base));
+const all = new Set(Object.values(catalogs).flatMap(cat => [...bases(cat)]));
 for (const [name, cat] of Object.entries(catalogs)) {
-  const missing = [...all].filter(k => cat[k] == null);
+  const have = bases(cat);
+  const missing = [...all].filter(k => !have.has(k));
   if (missing.length) fail(`${name}: ${missing.length} keys missing: ${missing.slice(0, 5).join(', ')}`);
+  const plurals = new Set(Object.keys(en).filter(k => k.includes('#')).map(base));
+  for (const k of plurals) {
+    const lacking = pluralForms(name).filter(f => cat[`${k}#${f}`] == null);
+    if (lacking.length && have.has(k)) fail(`${name}: ${k} lacks the plural forms ${lacking.join(', ')}`);
+  }
 }
 console.log(`${all.size} keys, ${Object.keys(catalogs).length} languages.`);
 
-// 2) Same placeholders per key
-const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+// 2) Same placeholders per key - over all forms of a plural key together
+const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]);
+const index = Object.fromEntries(Object.entries(catalogs).map(([name, cat]) => {
+  const m = new Map();
+  for (const x of Object.keys(cat)) { const k = base(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); }
+  return [name, m];
+}));
+const usedIn = (name, k) => [...new Set((index[name].get(k) || []).flatMap(x => placeholders(catalogs[name][x])))].sort().join(',');
 for (const k of all) {
-  if (de[k] == null || en[k] == null) continue;
-  if (placeholders(de[k]) !== placeholders(en[k])) {
-    fail(`${k}: placeholders differ (de: ${placeholders(de[k]) || '–'}, en: ${placeholders(en[k]) || '–'})`);
+  const ref = usedIn('en', k);
+  for (const name of Object.keys(catalogs)) {
+    if (!index[name].has(k) || !index.en.has(k)) continue;
+    const mine = usedIn(name, k);
+    if (mine !== ref) fail(`${k}: placeholders differ (${name}: ${mine || '–'}, en: ${ref || '–'})`);
   }
 }
 
@@ -53,12 +72,18 @@ for (const k of used) {
 console.log(`${used.size} keys come from the server.`);
 
 // 4) Plurals and placeholders work in both languages
-registerLocale('de', de); registerLocale('en', en);
+registerLocale('de', de); registerLocale('en', en); registerLocale('uk', uk);
 for (const [code, expected] of [['de', 'Flotte (1 Schiff) erreicht Sirrah.'],
                                 ['en', 'Fleet (1 ship) reaches Sirrah.']]) {
   setLocale(code);
   const got = t('log.arrive', { count: 1, planet: 'Sirrah' });
   if (got !== expected) fail(`${code}: '${got}' instead of '${expected}'`);
+}
+registerLocale('uk', uk);
+setLocale('uk');
+for (const n of [1, 2, 5, 21, 22, 25]) {
+  const got = t('word.ships', { n, count: n });
+  if (!got || got.startsWith('word.')) fail(`uk: no plural for ${n}`);
 }
 
 // 5) The UI only names keys that exist - a typo in the markup would otherwise
