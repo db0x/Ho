@@ -154,6 +154,228 @@ export function drawBlackHole(ctx, x, y, R, phase = 0) {
   ctx.restore();
 }
 
+// ------------------------------------------------------------------ Wormhole
+
+/** Display size of a mouth: lower bound in pixels, so it can be found from far away. */
+export const WORMHOLE_MIN_PX = 10;
+
+// Colors: violet at the rim, ice blue in the throat. Unstable it turns to
+// embers - that is the warning that it will soon be gone.
+const HOLE_TINT = {
+  calm: { rim: [176, 112, 255], core: [150, 236, 255], ring: [205, 240, 255] },
+  shaky: { rim: [255, 104, 74], core: [255, 196, 120], ring: [255, 226, 190] }
+};
+
+const holeSprites = new Map();
+/** Soft halo, once per tint. */
+function holeHalo(tint) {
+  const key = 'halo' + tint.rim;
+  let cv = holeSprites.get(key);
+  if (cv) return cv;
+  const S = 192;
+  cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  grad.addColorStop(0, rgb(tint.core, 0.16));
+  grad.addColorStop(0.22, rgb(tint.rim, 0.10));
+  grad.addColorStop(0.5, rgb(tint.rim, 0.03));
+  grad.addColorStop(1, rgb(tint.rim, 0));
+  g.fillStyle = grad;
+  g.fillRect(0, 0, S, S);
+  holeSprites.set(key, cv);
+  return cv;
+}
+
+/**
+ * The view through the throat: a starry sky of its own with a nebula in a
+ * hue that belongs to this wormhole - another place, seen from here. Once
+ * per wormhole, then only rotated and copied.
+ */
+function holeThroat(seed) {
+  const key = 'throat' + seed;
+  let cv = holeSprites.get(key);
+  if (cv) return cv;
+  let h = 0;
+  for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 0x9e3779b1);
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) + 0x6d2b79f5 | 0; return ((h >>> 0) % 10007) / 10007; };
+  const S = 128, c = S / 2;
+  cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#03030c';
+  g.fillRect(0, 0, S, S);
+  const hue = Math.floor(rnd() * 360);
+  for (let i = 0; i < 3; i++) {
+    const nx = c + (rnd() - 0.5) * S * 0.6, ny = c + (rnd() - 0.5) * S * 0.6;
+    const neb = g.createRadialGradient(nx, ny, 0, nx, ny, S * (0.25 + rnd() * 0.25));
+    neb.addColorStop(0, `hsla(${hue + i * 25},80%,58%,0.42)`);
+    neb.addColorStop(1, `hsla(${hue + i * 25},80%,40%,0)`);
+    g.fillStyle = neb;
+    g.fillRect(0, 0, S, S);
+  }
+  for (let i = 0; i < 70; i++) {
+    const r = rnd() < 0.85 ? 0.6 : 1.3;
+    g.fillStyle = `rgba(235,240,255,${(0.35 + rnd() * 0.65).toFixed(2)})`;
+    g.beginPath(); g.arc(rnd() * S, rnd() * S, r, 0, TAU); g.fill();
+  }
+  // Toward the rim the tunnel swallows the light.
+  const vignette = g.createRadialGradient(c, c, 0, c, c, c);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(0.6, 'rgba(0,0,0,0.15)');
+  vignette.addColorStop(1, 'rgba(2,0,10,0.96)');
+  g.fillStyle = vignette;
+  g.fillRect(0, 0, S, S);
+  holeSprites.set(key, cv);
+  return cv;
+}
+
+const easeOutBack = (t) => 1 + 2.4 * Math.pow(t - 1, 3) + 1.4 * Math.pow(t - 1, 2);
+
+/**
+ * A wormhole mouth: a halo, matter spiralling in along three arms, a bright
+ * lensing ring and in the middle the throat with a view of the far side,
+ * where rings sink away into the tunnel. Unstable it flickers, trembles and
+ * throws sparks. While it opens it unfolds from a point with a shock wave.
+ * @param {{seed: string, unstable?: boolean, open?: number, alpha?: number}} o
+ *   open: 0..1 while it unfolds, 1 afterwards
+ */
+export function drawWormhole(ctx, x, y, R, phase, o) {
+  const open = Math.max(0, Math.min(1, o.open ?? 1));
+  const tint = o.unstable ? HOLE_TINT.shaky : HOLE_TINT.calm;
+  // Unstable: an uneven flicker made of two detuned waves, and a tremble.
+  const flicker = o.unstable ? 0.62 + 0.38 * Math.abs(Math.sin(phase * 7.3) * Math.sin(phase * 3.1 + 1)) : 1;
+  const r = R * easeOutBack(open) * (o.unstable ? 1 + 0.06 * Math.sin(phase * 17) : 1);
+  const alpha = (o.alpha ?? 1) * flicker;
+  if (r < 0.5) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Shock wave while it opens
+  if (open < 1) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgb(tint.ring, 0.45 * (1 - open));
+    ctx.lineWidth = Math.max(1, R * 0.12 * (1 - open));
+    ctx.beginPath(); ctx.arc(x, y, R * (0.4 + 3.2 * open), 0, TAU); ctx.stroke();
+  }
+
+  // Halo
+  ctx.globalCompositeOperation = 'lighter';
+  const hr = r * 2.0;
+  ctx.drawImage(holeHalo(tint), x - hr, y - hr, hr * 2, hr * 2);
+
+  // Throat: the far side, slowly turning, tunnel rings sinking away into it.
+  ctx.globalCompositeOperation = 'source-over';
+  const tr = r * 0.56;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, tr, 0, TAU); ctx.clip();
+  ctx.translate(x, y);
+  ctx.rotate(phase * 0.12);
+  ctx.drawImage(holeThroat(o.seed), -tr, -tr, tr * 2, tr * 2);
+  ctx.rotate(-phase * 0.12);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 4; k++) {
+    const f = ((k / 4) + phase * 0.22) % 1;
+    const rr = tr * (1 - f);
+    ctx.strokeStyle = rgb(tint.core, 0.2 * (1 - f) * (1 - f));
+    ctx.lineWidth = Math.max(0.6, tr * 0.08 * (1 - f));
+    ctx.beginPath(); ctx.arc(0, 0, rr, 0, TAU); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Matter falling in along three arms; each grain drifts inwards and
+  // brightens until the throat swallows it.
+  ctx.globalCompositeOperation = 'lighter';
+  const grains = r > 26 ? 16 : r > 12 ? 11 : 7;
+  for (let arm = 0; arm < 3; arm++) {
+    for (let i = 0; i < grains; i++) {
+      const f = ((i / grains) + phase * 0.16 + arm * 0.13) % 1;           // 0 outside, 1 at the throat
+      const rad = r * (1.35 - 0.8 * f);
+      const ang = arm * (TAU / 3) - phase * 0.55 + 2.6 * f * f + (i % 3) * 0.06;
+      const px = x + Math.cos(ang) * rad, py = y + Math.sin(ang) * rad;
+      const c = [0, 1, 2].map(j => tint.rim[j] + (tint.core[j] - tint.rim[j]) * f);
+      const a = Math.min(1, f * 2.2) * (f > 0.9 ? (1 - f) * 10 : 1);
+      const s = Math.max(0.6, r * 0.04) * (0.6 + f * 0.7);
+      ctx.fillStyle = rgb(c, 0.07 * a);
+      ctx.beginPath(); ctx.arc(px, py, s * 2.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = rgb(c, 0.5 * a);
+      ctx.beginPath(); ctx.arc(px, py, s, 0, TAU); ctx.fill();
+    }
+  }
+
+  // Lensing ring: bright, with three slowly wandering highlights.
+  const lw = Math.max(0.8, r * 0.055);
+  ctx.strokeStyle = rgb(tint.rim, 0.16);
+  ctx.lineWidth = lw * 2.5;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.6, 0, TAU); ctx.stroke();
+  const SEG = 36;
+  ctx.lineWidth = lw;
+  for (let i = 0; i < SEG; i++) {
+    const a0 = (i / SEG) * TAU, a1 = ((i + 1.05) / SEG) * TAU;
+    const shine = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(a0 * 3 + phase * 1.7), 3);
+    ctx.strokeStyle = rgb(tint.ring, 0.6 * shine);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.6, a0, a1); ctx.stroke();
+  }
+
+  // Unstable: sparks jump off the ring - a new pattern several times a second.
+  if (o.unstable) {
+    const tick = Math.floor(phase * 9);
+    let h = tick * 2654435761 >>> 0;
+    const rnd = () => { h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0; return h / 4294967296; };
+    ctx.strokeStyle = rgb(tint.ring, 0.55);
+    ctx.lineWidth = Math.max(0.7, r * 0.03);
+    for (let k = 0; k < 3; k++) {
+      if (rnd() < 0.35) continue;
+      let ang = rnd() * TAU, rad = r * 0.6;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad);
+      for (let j = 0; j < 4; j++) {
+        ang += (rnd() - 0.5) * 0.5; rad += r * (0.12 + rnd() * 0.12);
+        ctx.lineTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * The tunnel between two mouths an empire knows: a faint arc with sparks
+ * running along it, in both directions. a and b are screen points.
+ */
+export function drawWormLink(ctx, a, b, phase, unstable) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 30) return;
+  // Bent to one side, so it does not look like a course line.
+  const cx = (a.x + b.x) / 2 - dy * 0.18, cy = (a.y + b.y) / 2 + dx * 0.18;
+  const at = (t) => [(1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * cx + t * t * b.x,
+                     (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * cy + t * t * b.y];
+  const tint = unstable ? HOLE_TINT.shaky : HOLE_TINT.calm;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgb(tint.rim, 0.08);
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(cx, cy, b.x, b.y); ctx.stroke();
+  ctx.strokeStyle = rgb(tint.ring, 0.14);
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 9]);
+  ctx.lineDashOffset = -phase * 30;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const n = Math.max(2, Math.min(8, Math.round(len / 140)));
+  for (let i = 0; i < n; i++) {
+    for (const dir of [1, -1]) {
+      let t = ((i / n) + phase * 0.07 * dir) % 1;
+      if (t < 0) t += 1;
+      const [px, py] = at(t);
+      const fade = Math.sin(Math.PI * t);
+      ctx.fillStyle = rgb(dir > 0 ? tint.core : tint.rim, 0.35 * fade);
+      ctx.beginPath(); ctx.arc(px, py, 1.3, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 /** How far everything not yours steps back while "only mine" is held. */
 export const FOCUS_DIM = 0.2;
 

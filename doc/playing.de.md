@@ -10,6 +10,7 @@
 - [Form der Galaxie: Streufeld oder Spirale](#form-der-galaxie-streufeld-oder-spirale)
 - [Zwei Spielfelder: Klassik und Raum](#zwei-spielfelder-klassik-und-raum)
 - [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand)
+- [Wurmlöcher](#wurmlöcher)
 - [Die KI-Reiche](#die-ki-reiche)
 - [Zusehen](#zusehen)
 - [Rangliste und Sieg](#rangliste-und-sieg)
@@ -53,6 +54,7 @@ mit dem Hinweis, wer sie ändern kann:
 | Startkapital, Startmetall | Kasse zu Beginn |
 | Zugzeit | 0 = es wird gewartet, bis alle fertig sind |
 | Galaxie wächst | siehe [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand); aus ergibt eine feste Karte |
+| Wurmlöcher | siehe [Wurmlöcher](#wurmlöcher) |
 
 **Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
 übersprungen und kann jederzeit zurückkehren (der Platz wird im Browser
@@ -184,6 +186,32 @@ Schwerkraft), dafür mit mehr und besserem Metall. Draußen zu siedeln lohnt sic
 kostet aber Terraforming und Radikaltechnik. Mit 16 KI wächst die Karte von 96
 auf rund 390 Welten in 120 Runden. Abschaltbar in der Lobby.
 
+## Wurmlöcher
+
+Ab Runde 12 öffnen sich ab und zu Wurmlöcher: zwei Mündungen weit auseinander –
+mindestens die halbe längere Kartenseite –, beide mit Welten in der Nähe. Eine
+Mündung kommt wie eine Welt in Sicht: in Scannerreichweite deiner Welten und
+Flotten. Es ist immer höchstens eines offen.
+
+- **Springen:** Flotte auswählen, dann die Mündung anklicken (oder *Hineinfliegen*
+  in ihrem Panel). Die Flotte fliegt hin, springt und steht an der anderen Mündung.
+- **Wohin:** Das zeigt erst der erste Sprung. Danach kennst du beide Enden, die
+  Karte zeichnet den Tunnel dazwischen, und der Rückweg geht auch. Andere Reiche
+  wissen es weiterhin nicht.
+- **Versorgung:** Die Reichweite misst wie immer ab deinen bewohnten Welten. Ein
+  offenes Wurmloch, das du kennst, trägt sie auf seine andere Seite – eine Flotte
+  dort fliegt so weit, wie nach dem Weg von daheim bis zum Eingang übrig ist (der
+  violette Umriss). Von daheim direkt hinüber, durch unbekannten Raum, gibt es
+  keinen Weg.
+- **Zusammenbruch:** Ein Wurmloch lebt 16–28 Runden; in den letzten drei flackert
+  es rot. Flotten auf dem Weg dorthin bleiben stehen; wer drüben ist, ist
+  abgeschnitten – es sei denn, ein Kolonieschiff gründet dort eine neue Welt.
+
+Wurmlöcher lassen sich in der Lobby abschalten. Die neugierigen KI-Charaktere –
+Siedler, Plünderer und Aasgeier – nutzen sie: Erst schaut ein Späher nach, dann
+folgen Kolonieschiffe zu freien Welten oder ein Rudel geht drüben auf Jagd; der
+Plünderer springt auch blind. Bevor das Wurmloch zusammenbricht, kehren sie heim.
+
 ## Die KI-Reiche
 
 KI-Reiche treten unter eigenem Namen an – von *Admiral Wobblebeard* bis *Czarina
@@ -268,13 +296,14 @@ nur zwischen Rückkehr zur Startseite und Bleiben wählen.
 | Auswählen | Linksklick auf Welt oder Flotte |
 | Kurs setzen | Flotte wählen, dann **Rechtsklick** (oder Shift-Klick) auf die Zielwelt – oder Zielwelt anklicken und im Panel *Flotte hierher* |
 | Sehen, wohin Flotten fliegen | Jede Kurslinie beginnt an ihrer Flotte – Flotten im Orbit warten auf der Seite zu ihrem Ziel – und endet in einer Pfeilspitze. Flotte auswählen oder darauf zeigen: Ihre Linie wird hervorgehoben, mit den Runden bis zur Ankunft |
-| Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten). Das geht auch im Flug: Beide Teile fliegen weiter zum selben Ziel, bis die neue Flotte einen eigenen Kurs bekommt |
+| Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten). Das geht auch im Flug: Beide Teile fliegen weiter zum selben Ziel, bis die neue Flotte einen eigenen Kurs bekommt. Schneller: Flotte wählen und `S` drücken – sie zerfällt sofort in Einzelschiffe, ohne Dialog |
 | Zug beenden | Knopf in der Mitte der Kopfleiste oder `Leertaste` |
 | Haushalt ansehen | Klick oder Zeiger auf Geld bzw. Metall in der Kopfleiste |
 | Karte einpassen | `F` |
 | Nur Eigenes hervorheben | `E` gedrückt halten – alles, was dir nicht gehört, tritt weit zurück. Oder der Flaggen-Knopf oben rechts: Antippen schaltet um (so am Handy), Gedrückthalten nur solange |
 | Auswahl aufheben | `Esc` |
 | Hilfe | `H` |
+| Übersicht aller Tasten | `?` – oder *Tasten* im Menü (Zahnrad) und in der Hilfe |
 | Fenster verschieben / Größe ändern | Titelleiste ziehen zum Verschieben; an jeder Kante oder Ecke ziehen für die Größe |
 | Fenster minimieren | **−** in der Titelleiste oder Doppelklick darauf: Das Fenster wird zum Icon in der Kopfleiste (★ Forschung/Imperium/Rangliste, ☰ Ereignisse/Funk – mit der Zahl ungelesener Funksprüche). Ein Klick auf das Icon holt es an seinen Platz zurück. Position, Größe und Zustand bleiben gespeichert |
 | Funk (Chat) | Reiter *Funk* im Protokollfenster. Ungesehene Nachrichten erscheinen als Hinweis und werden am Reiter gezählt – antippen, um zu antworten. Smileys wie `:)` `:(` `:D` `;)` `<3` werden zu Emojis, ebenso Codes wie `:sad:` `:rocket:` `:thumbsup:`; der 🙂-Knopf neben dem Feld zeigt alle |

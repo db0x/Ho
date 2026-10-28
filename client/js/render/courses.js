@@ -122,3 +122,36 @@ export function midpoint(pts) {
   }
   return pts[pts.length - 1];
 }
+
+/** A wormhole mouth rather than a world? Mouth ids are strings, world ids numbers. */
+export const isMouth = (target) => typeof target?.id === 'string';
+
+/**
+ * Where a fleet is heading: a world or a wormhole mouth - null without a
+ * course, or if the target is not in the view.
+ */
+export function courseTarget(view, f) {
+  if (f.hole) return view.wormholes?.find(m => m.id === f.hole) || null;
+  return f.dest != null ? view.planets[f.dest] || null : null;
+}
+
+/** The wormholes this empire knows both ends of, as supply links (shared/rules.js supplyNeed). */
+export function portalsOf(view) {
+  const list = view.wormholes || [];
+  const out = [];
+  for (const m of list) {
+    const b = m.link && list.find(x => x.id === m.link);
+    if (b) out.push({ a: m, b });
+  }
+  return out;
+}
+
+/** The world closest to a point - to name where a mouth lies. */
+export function nearestPlanet(view, point) {
+  let best = null, bd = Infinity;
+  for (const p of view.planets) {
+    const d = (p.x - point.x) ** 2 + (p.y - point.y) ** 2 + ((p.z || 0) - (point.z || 0)) ** 2;
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}

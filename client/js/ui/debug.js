@@ -1,7 +1,9 @@
-// Debug dialog for admins: start a test battle or play any sound effect
-// without having to play towards it. Purely in the browser - the battle is
-// rolled here with the server's combat rules, nothing goes over the wire.
-// Opened from the admin panel or with Ctrl+Shift+D (also in a game).
+// Debug dialog of the dev mode (HO_DEV on the server; admins, or everyone
+// without sign-in): start a test battle or play any sound effect without
+// having to play towards it - purely in the browser, the battle is rolled
+// here with the server's combat rules. In a running game it also steps in:
+// opening and closing wormholes - that does go to the server.
+// Opened with Ctrl+Shift+D, in the start menu as in a game.
 import { SHIP_TYPES, shipStats, batteryStats, COMBAT_ROUNDS, PLAYER_COLORS } from '../../shared/rules.js';
 import { openBattle } from './battle.js';
 import { sfx, SFX_NAMES } from '../audio/sfx.js';
@@ -19,6 +21,7 @@ const round1 = v => Math.round(v * 10) / 10;
 export class DebugDialog {
   constructor() {
     this.enabled = false;
+    this.app = null;            // set in dev mode: the game it may step into
     this.cfg = structuredClone(DEFAULTS);
     this.modal = null;
     addEventListener('keydown', (e) => {
@@ -34,10 +37,33 @@ export class DebugDialog {
     if (!this.enabled) this.modal?.classList.add('hidden');
   }
 
+  /** Dev mode: the app whose game the wormhole tools act on, or null. */
+  setDev(app) {
+    this.app = app;
+  }
+
   toggle(show = this.modal?.classList.contains('hidden') ?? true) {
     if (!this.enabled) return;
     if (!this.modal) this.build();
+    else if (show) this.render();        // the game may have started meanwhile
     this.modal.classList.toggle('hidden', !show);
+  }
+
+  /** Where the selection on the map is - a wormhole may open next to it. */
+  selectionPoint() {
+    const sel = this.app?.selection, v = this.app?.map?.view;
+    if (!sel || !v) return null;
+    const it = sel.type === 'planet' ? v.planets[sel.id]
+      : sel.type === 'hole' ? v.wormholes?.find(m => m.id === sel.id)
+      : v.fleets.find(f => f.id === sel.id);
+    return it ? { x: it.x, y: it.y, z: it.z || 0 } : null;
+  }
+
+  hole(action) {
+    const at = action === 'openHere' ? this.selectionPoint() : null;
+    if (action === 'openHere' && !at) { sfx.play('deny'); return; }
+    this.app.send({ t: 'dev', action: action === 'openHere' ? 'open' : action, at });
+    this.toggle(false);
   }
 
   build() {
@@ -51,6 +77,8 @@ export class DebugDialog {
       if (a === 'close') this.toggle(false);
       if (a === 'reset') { this.cfg = structuredClone(DEFAULTS); this.render(); }
       if (a === 'fight') this.fight();
+      const hole = e.target.closest('[data-hole]')?.dataset.hole;
+      if (hole) this.hole(hole);
       const snd = e.target.closest('[data-play]');
       if (snd) sfx.play(snd.dataset.play);
     });
@@ -76,8 +104,17 @@ export class DebugDialog {
       <td>${ATTACKER_TYPES.includes(type) ? num(`a.${type}`, c.a[type]) : '–'}</td>
       <td>${num(`b.${type}`, c.b[type])}</td>
     </tr>`).join('');
+    // Wormhole tools only in dev mode and only in a running game.
+    const running = this.app?.map?.view?.state === 'running';
+    const holes = !this.app ? '' : `
+      <h3>${t('dev.holes')}</h3>
+      ${running ? `<div class="debug-actions debug-dev">
+        ${['open', 'openHere', 'reveal', 'shake', 'close'].map(a =>
+          `<button type="button" class="tiny" data-hole="${a}"${a === 'openHere' && !this.selectionPoint() ? ' disabled' : ''}>${t(`dev.hole.${a}`)}</button>`).join('')}
+      </div>
+      <p class="muted small">${t('dev.holesHint')}</p>` : `<p class="muted small">${t('dev.inGame')}</p>`}`;
     this.modal.innerHTML = `<div class="modal-box debug-box">
-      <h2>${t('debug.title')}</h2>
+      <h2>${t('debug.title')}</h2>${holes}
       <h3>${t('debug.battle')}</h3>
       <table class="debug-grid">
         <thead><tr><th></th>

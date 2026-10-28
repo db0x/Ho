@@ -9,6 +9,8 @@ import { t, localeTag, onLocaleChange } from '../i18n.js';
 import { loadKey, dropKey, setupKey, encrypt, decrypt, safetyCode } from '../e2e.js';
 import { avatarHtml } from './avatar.js';
 import { sfx } from '../audio/sfx.js';
+import { bindEmoji } from './emoji.js';
+import { emojify } from '../../shared/emoji.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -58,6 +60,9 @@ export class FriendsPanel {
     $('#friends-unlock').onsubmit = (e) => { e.preventDefault(); this.unlock(); };
     $('#fc-back').onclick = () => this.openChat(null);
     $('#fc-send').onclick = () => this.write();
+    // Smileys and codes turn into emojis as in the comms, with the same palette.
+    const emoji = bindEmoji($('#fc-text'), $('#fc-emoji'));
+    onLocaleChange(() => emoji.relabel());
     $('#fc-text').onkeydown = (e) => {
       if (e.key === 'Enter') { e.preventDefault(); this.write(); }
       if (e.key === 'Escape') this.openChat(null);
@@ -322,7 +327,8 @@ export class FriendsPanel {
   /** Encrypts for the friend's key, then sends. */
   async write() {
     const input = $('#fc-text');
-    const text = input.value.replace(/\s+/g, ' ').trim().slice(0, 500);
+    // A smiley at the very end only counts now that the line is finished.
+    const text = emojify(input.value.replace(/\s+/g, ' ').trim()).slice(0, 500);
     const p = this.data.friends.find(x => x.handle === this.open);
     if (!text || !p) return;
     if (!this.key) return this.note(t(globalThis.crypto?.subtle ? 'friends.lockedSend' : 'friends.noKey'));

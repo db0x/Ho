@@ -502,6 +502,49 @@ export function supplyDistance(bases, point, zone) {
   return best;
 }
 
+// ------------------------------------------------------------------ Wormholes
+
+/**
+ * Wormholes open in the course of a game: two mouths far apart, linked.
+ * Whoever flies into one comes out of the other - where that is, only
+ * the first jump tells. After a while a wormhole collapses again; in its
+ * last turns it is unstable and shows it.
+ */
+export const WORMHOLE = {
+  firstTurn: 12,        // none before this turn
+  max: 1,               // open at the same time
+  chance: 0.2,          // per turn, as long as fewer than the limit are open
+  life: [16, 28],       // turns from opening to collapse
+  unstable: 3,          // the last turns before the collapse
+  span: 0.5,            // mouths at least this share of the map's longer side apart
+  clearance: 60,        // ly from the nearest world
+  neighbours: 280,      // at least two worlds this close - somewhere worth going
+  radius: 16            // drawn size of a mouth in ly
+};
+
+
+/**
+ * Range needed to fly from `from` to `target`: as a rule the distance of the
+ * target from the nearest own world. A known, open wormhole carries the
+ * supply along - but only for a fleet on its far side, i.e. one that is
+ * closer to home through the wormhole than through space. Flying from home
+ * past the wormhole into unknown space stays impossible, and once it has
+ * collapsed, whoever is on the far side is cut off.
+ * @param {{a: object, b: object}[]} portals entering at a, coming out at b
+ *   (a wormhole that works both ways is listed in both directions)
+ */
+export function supplyNeed(bases, from, target, zone, portals = []) {
+  let need = supplyDistance(bases, target, zone);
+  if (!portals.length || !from) return need;
+  const direct = supplyDistance(bases, from, zone);
+  for (const { a, b } of portals) {
+    const home = supplyDistance(bases, a, zone);
+    if (home + travelDistance(b, from, zone) >= direct) continue;    // this side of it
+    need = Math.min(need, home + travelDistance(b, target, zone));
+  }
+  return need;
+}
+
 /**
  * Outline of the area reachable from a base with `range`: per direction the
  * largest distance that can still be flown. Without an exclusion zone that is

@@ -27,6 +27,9 @@ services:
       # CB radio (push-to-talk voice between players, peer to peer). Off
       # unless switched on here; the game leader then opens it per game.
       HO_VOICE: ${HO_VOICE:-off}
+      # Dev mode: testing aids for admins in the game (e.g. wormholes).
+      # Off unless switched on - never on a public server.
+      HO_DEV: ${HO_DEV:-off}
       # Address the browsers should ask for STUN if it is not the page's
       # host (e.g. behind a proxy on another machine): stun:host:port
       HO_STUN_URL: ${HO_STUN_URL:-}

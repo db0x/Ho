@@ -3,10 +3,11 @@ import {
   TECH_FIELDS, SHIP_TYPES, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
-  holeZone, travelDistance, supplyDistance, batteryStats, cargoOf,
+  holeZone, travelDistance, supplyNeed, batteryStats, cargoOf,
   recycleRates, recycleValue, techMaxLevel
 } from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
+import { courseTarget, portalsOf, nearestPlanet } from '../render/courses.js';
 import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
@@ -646,8 +647,9 @@ export class Hud {
       <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:14px 0 6px">${t('empire.fleets')}</h4>
       ${v.fleets.filter(f => f.mine).map(f => {
         const where = f.at != null ? t('empire.inOrbitOf', { planet: v.planets[f.at].name })
-          : (f.dest != null ? t('empire.enRouteTo', { planet: v.planets[f.dest].name })
-            : t('fleet.enRoute'));
+          : f.dest != null ? t('empire.enRouteTo', { planet: v.planets[f.dest].name })
+          : f.hole ? t('empire.toHole')
+          : t('fleet.enRoute');
         return `<div class="listrow" data-f="${f.id}">
           <span class="dot" style="background:${v.me.color}"></span>
           <span class="nm">${t('word.ships', { n: f.ships.length, count: f.ships.length })} · ${where}</span>
@@ -703,7 +705,49 @@ export class Hud {
     const box = $('#selection');
     if (!sel) { box.innerHTML = `<p class="muted pad">${t('sel.empty')}</p>`; return; }
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
+    else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
     else this.fleetPanel(box, this.view.fleets.find(f => f.id === sel.id));
+  }
+
+  /**
+   * A wormhole mouth: where it lies, whether it holds, where it leads - and
+   * the course button for the fleet last selected.
+   */
+  holePanel(box, m) {
+    if (!m) { box.innerHTML = ''; return; }
+    const v = this.view;
+    const near = nearestPlanet(v, m);
+    const exit = m.link && v.wormholes.find(x => x.id === m.link);
+    const far = exit && nearestPlanet(v, exit);
+    const bound = v.fleets.filter(f => f.hole === m.id);
+    box.innerHTML = `
+      <div class="sel-head"><div>
+        <div class="sel-title">${t('hole.name')}</div>
+        <div class="sel-sub">${near ? t('hole.near', { planet: escapeHtml(near.name) }) : ''}</div>
+        <div class="sel-sub" style="color:${m.unstable ? 'var(--bad)' : '#cdb4ff'}">${t(m.unstable ? 'hole.unstable' : 'hole.stable')}</div>
+      </div></div>
+      <p class="hint-line">${far ? t('hole.knownHint', { planet: escapeHtml(far.name) }) : t('hole.unknownHint')}</p>
+      <p class="hint-line">${t('hole.supplyHint')}</p>
+      ${exit ? `<div class="sel-actions"><button class="tiny" data-goto>${t('hole.gotoExit')}</button></div>` : ''}
+      ${bound.length ? `<div class="sec"><h4>${t('hole.bound')}</h4>${bound.map(f => this.fleetRow(f, m)).join('')}</div>` : ''}
+      ${v.spectator ? '' : this.courseButton(m)}`;
+    // One copy per row - shipIcon keeps every image only once (see planetPanel).
+    for (const g of box.querySelectorAll('.ci')) {
+      const ic = shipIcon(g.dataset.t, 18, g.dataset.c);
+      const copy = document.createElement('canvas');
+      copy.width = ic.width; copy.height = ic.height;
+      copy.getContext('2d').drawImage(ic, 0, 0);
+      g.appendChild(copy);
+    }
+    for (const item of box.querySelectorAll('[data-fleet]')) {
+      item.onclick = () => this.app.setSelection({ type: 'fleet', id: item.dataset.fleet });
+    }
+    const b = box.querySelector('#setcourse');
+    if (b) b.onclick = () => this.app.orderHole(m.id);
+    if (exit) {
+      const go = box.querySelector('[data-goto]');
+      if (go) go.onclick = () => { this.app.map.focus(exit, this.app.freeArea()); this.app.setSelection({ type: 'hole', id: exit.id }); };
+    }
   }
 
   planetPanel(box, p) {
@@ -910,7 +954,7 @@ export class Hud {
       right = `<span class="muted">${t('fleet.strengthUnknown')}</span>`;
     }
     const whither = arriving && Number.isFinite(turns) ? t('fleet.arrivesIn', { turns: t('word.turns', { n: turns, count: turns }) })
-      : target ? `→ ${escapeHtml(target.name)}` : '';
+      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : '';
     return `<div class="fleetrow ${f.mine ? '' : 'foe'}" data-fleet="${f.id}">
       <div class="fr-top">
         <span class="dot" style="background:${color}"></span>
@@ -1036,7 +1080,7 @@ export class Hud {
     if (!f.stats || f.stats.speed <= 0) return t('err.fleetImmobile');
     const bases = v.planets.filter(q => q.owner === v.you && q.pop > 0.5);
     if (!bases.length) return t('err.outOfRange', { need: '∞', range: f.stats.range });
-    const need = Math.round(supplyDistance(bases, target, holeZone(v.galaxy)));
+    const need = Math.round(supplyNeed(bases, f, target, holeZone(v.galaxy), portalsOf(v)));
     if (need > f.stats.range) {
       return t('err.outOfRange', { need, range: f.stats.range });
     }
@@ -1052,10 +1096,10 @@ export class Hud {
    */
   courseButton(p) {
     const f = this.view.fleets.find(x => x.id === this.lastFleetId);
-    if (!this.lastFleetId || !f || !f.mine || f.at === p.id) return '';
+    if (!this.lastFleetId || !f || !f.mine || f.at === p.id || f.hole === p.id) return '';
     const reason = this.whyNot(f, p);
     const button = `<button id="setcourse" class="primary"${reason ? ' disabled' : ''}>`
-      + `${t('planet.courseButton', { n: f.ships.length })}</button>`;
+      + `${t(typeof p.id === 'string' ? 'hole.courseButton' : 'planet.courseButton', { n: f.ships.length })}</button>`;
     return `<div class="sel-actions">${button}</div>`
       + (reason ? `<p class="hint-line" style="color:var(--bad)">${t('fleet.cannotReach', { reason })}</p>` : '');
   }
@@ -1072,9 +1116,9 @@ export class Hud {
     if (!f.mine && !v.spectator) {
       const pl = v.players.find(q => q.id === f.owner);
       // Detected means: course and arrival are known, the ships themselves are not.
-      const target = f.dest != null ? v.planets[f.dest] : null;
+      const target = courseTarget(v, f);
       const whither = target
-        ? `<div class="sel-sub">${t('fleet.courseTo', { planet: target.name }).replace('<b>', '<b style="color:var(--gold)">')}`
+        ? `<div class="sel-sub">${t('fleet.courseTo', { planet: target.name ?? t('hole.name') }).replace('<b>', '<b style="color:var(--gold)">')}`
           + (f.eta ? ' ' + t('fleet.etaSuffix', { turns: t('word.turns', { n: f.eta, count: f.eta }) }) : '')
           + '</div>'
         : `<div class="sel-sub">${t('fleet.noCourse')}</div>`;
@@ -1087,10 +1131,11 @@ export class Hud {
     for (const s of f.ships) (groups[s.type] || (groups[s.type] = [])).push(s);
     const where = f.at != null ? v.planets[f.at] : null;
     const destP = f.dest != null ? v.planets[f.dest] : null;
+    const destM = f.hole ? courseTarget(v, f) : null;
     const st = f.stats;
     // The path around the black hole counts, not the straight line.
-    const turnsTo = destP
-      ? Math.max(1, Math.ceil(travelDistance(f, destP, holeZone(v.galaxy)) / (st.speed || 1)))
+    const turnsTo = destP || destM
+      ? Math.max(1, Math.ceil(travelDistance(f, destP || destM, holeZone(v.galaxy)) / (st.speed || 1)))
       : 0;
 
     box.innerHTML = `
@@ -1101,7 +1146,9 @@ export class Hud {
             : ''}${t('fleet.title', { n: f.ships.length })}</div>
           <div class="sel-sub">${where ? t('fleet.atPlanet', { planet: where.name }) : t('fleet.enRoute')}
             ${destP ? ' ' + t('fleet.destSuffix', { planet: destP.name, turns: turnsTo })
-              .replace('<b>', '<b style="color:var(--gold)">') : ''}</div>
+              .replace('<b>', '<b style="color:var(--gold)">') : ''}
+            ${destM ? ' ' + t('fleet.holeSuffix', { turns: turnsTo })
+              .replace('<b>', '<b style="color:#cdb4ff">') : ''}</div>
         </div>
       </div>
       <div class="statgrid cols4">
@@ -1127,10 +1174,10 @@ export class Hud {
         <h4>${t('fleet.orders')}</h4>
         <p class="hint-line" style="margin-top:0">${t('fleet.orderHint')}</p>
         <div class="sel-actions">
-          ${destP ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
+          ${destP || destM ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
           ${where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1
             ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
-          ${f.ships.length > 1 ? `<button class="tiny" id="split">${t('fleet.split')}</button>` : ''}
+          ${f.ships.length > 1 ? `<button class="tiny" id="split" title="${t('fleet.splitKey')}">${t('fleet.split')}</button>` : ''}
         </div>
         ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
         ${where ? this.recycleBlock('f:' + f.id) : ''}

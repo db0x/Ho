@@ -1,13 +1,20 @@
 // Star map: camera, background, planets, fleets, course lines.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
+import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
 import { t } from '../i18n.js';
-import { glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM } from './fx.js';
+import {
+  glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM,
+  drawWormhole, drawWormLink, WORMHOLE_MIN_PX
+} from './fx.js';
 import { BattleFx } from './battlefx.js';
-import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
+import {
+  orbitSlots, fanOut, courseStyle, arrowHead, midpoint, courseTarget, isMouth, portalsOf, nearestPlanet
+} from './courses.js';
 
 const ORBIT_R = 20;
+// A wormhole that appears unfolds over this long.
+export const HOLE_OPEN_MS = 1600;
 
 // The sky is built in tiles instead of once for a fixed galaxy size - that
 // way it grows along with the map. At low zoom a coarser level is used so
@@ -175,6 +182,7 @@ export class MapView {
     const first = !this.view;
     this.view = view;
     this.poke(900);
+    if (noteMouths(this, view, first)) this.poke(HOLE_OPEN_MS + 200);
     if (first) {
       this.fit();
       // Spectators have no homeworld - for them the overall view stays.
@@ -343,8 +351,27 @@ export class MapView {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+      // Beyond a known wormhole the supply reaches as far as is left after
+      // the way to its mouth.
+      for (const { mouth, left } of farSide(v, selFleet)) {
+        const outline = this.reachArea(mouth, left);
+        ctx.beginPath();
+        outline.forEach((q, i) => {
+          const [qx, qy] = this.w2s(q.x, q.y);
+          i === 0 ? ctx.moveTo(qx, qy) : ctx.lineTo(qx, qy);
+        });
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(176,112,255,0.05)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(190,150,255,.3)';
+        ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.restore();
     }
+
+    this.drawMouths(ctx, v);
 
     // Where every fleet stands on screen - in orbit on the side of its course.
     const zone = holeZone(v.galaxy);
@@ -357,16 +384,16 @@ export class MapView {
     const focusId = this.hover?.type === 'fleet' ? this.hover.id
       : this.selection?.type === 'fleet' ? this.selection.id : null;
     this._eta = null;
-    const moving = v.fleets.filter(f => f.dest != null && v.planets[f.dest])
+    const moving = v.fleets.filter(f => courseTarget(v, f))
       .sort((a, b) => (a.id === focusId) - (b.id === focusId));
     for (const f of moving) {
-      const target = v.planets[f.dest];
+      const target = courseTarget(v, f);
       const spot = spots.get(f.id);
       const path = route(f, target, zone);
       const pts = [[spot.x, spot.y], ...path.map(w => this.w2s(w.x, w.y))];
       const [bx, by] = pts[pts.length - 1];
       const st = courseStyle(f, focusId);
-      const tr = planetRadius(target) * this.cam.zoom + 15;
+      const tr = isMouth(target) ? this.mouthRadius() * 0.7 + 6 : planetRadius(target) * this.cam.zoom + 15;
       ctx.globalAlpha = this.dim(f.owner);
       ctx.save();
       ctx.strokeStyle = st.color;
@@ -484,8 +511,9 @@ export class MapView {
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
 
     // Course preview for the selected fleet
-    if (selFleet?.mine && this.hover?.type === 'planet') {
-      const target = this.view.planets[this.hover.id];
+    if (selFleet?.mine && (this.hover?.type === 'planet' || this.hover?.type === 'hole')) {
+      const target = this.hover.type === 'hole' ? v.wormholes?.find(m => m.id === this.hover.id)
+        : this.view.planets[this.hover.id];
       const src = selFleet.at != null ? this.view.planets[selFleet.at] : selFleet;
       if (target && src && target.id !== selFleet.at) {
         // From the ship, like the course lines.
@@ -511,6 +539,51 @@ export class MapView {
     }
 
     if (this.hover?.type === 'planet') this.tooltip(ctx, this.view.planets[this.hover.id]);
+    if (this.hover?.type === 'hole') {
+      const m = v.wormholes?.find(x => x.id === this.hover.id);
+      if (m) this.tooltipAt(ctx, ...this.w2s(m.x, m.y), this.mouthRadius() * 0.7, t('hole.name'), mouthLines(v, m));
+    }
+  }
+
+  /** Screen radius of a wormhole mouth. */
+  mouthRadius() {
+    return Math.max(WORMHOLE_MIN_PX, WORMHOLE.radius * this.cam.zoom);
+  }
+
+  /**
+   * Wormhole mouths: first the tunnels of those whose both ends are known,
+   * then the mouths themselves. They belong to nobody, like the black hole.
+   */
+  drawMouths(ctx, v) {
+    const list = v.wormholes || [];
+    if (!list.length) return;
+    const R = this.mouthRadius();
+    ctx.globalAlpha = this.dim(null);
+    for (const m of list) {
+      const b = m.link && list.find(x => x.id === m.link);
+      if (!b || m.id > b.id) continue;                  // each tunnel once
+      const [ax, ay] = this.w2s(m.x, m.y), [bx, by] = this.w2s(b.x, b.y);
+      drawWormLink(ctx, { x: ax, y: ay }, { x: bx, y: by }, this.phase, m.unstable);
+    }
+    const now = performance.now();
+    for (const m of list) {
+      const [sx, sy] = this.w2s(m.x, m.y);
+      if (sx < -R * 3 || sy < -R * 3 || sx > this.w + R * 3 || sy > this.h + R * 3) continue;
+      ctx.globalAlpha = this.dim(null);
+      drawWormhole(ctx, sx, sy, R, this.phase, { seed: m.id, unstable: m.unstable, open: mouthOpen(this, m, now) });
+      if (this.selection?.type === 'hole' && this.selection.id === m.id) this.ringAt(ctx, sx, sy, R * 1.05);
+      else if (this.hover?.type === 'hole' && this.hover.id === m.id) {
+        ctx.strokeStyle = 'rgba(220,200,255,.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(sx, sy, R * 1.05, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (this.showNames && this.cam.zoom > 0.25) {
+        label(ctx, m.link ? t('hole.labelKnown') : t('hole.label'), sx, sy + R * 1.2 + 10,
+          m.unstable ? '#ffb08a' : '#cdb4ff', this.cam.zoom, 11.5);
+      }
+      this.hit.push({ type: 'hole', id: m.id, x: sx, y: sy, r: Math.max(14, R * 0.9) });
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -634,10 +707,11 @@ export class MapView {
       if (f.at == null) {
         const [x, y] = this.w2s(f.x, f.y);
         let heading = 0;
-        if (f.dest != null && v.planets[f.dest]) {
+        const target = courseTarget(v, f);
+        if (target) {
           // First path segment that is long enough - on the arc around the
           // black hole the fleet flies at an angle to the target.
-          for (const w of route(f, v.planets[f.dest], zone)) {
+          for (const w of route(f, target, zone)) {
             const dx = w.x - f.x, dy = w.y - f.y;
             if (dx * dx + dy * dy > 1e-6) { heading = Math.atan2(dy, dx); break; }
           }
@@ -654,7 +728,7 @@ export class MapView {
       const [sx, sy] = this.w2s(p.x, p.y);
       const orr = planetRadius(p) * this.cam.zoom + ORBIT_R * scale;
       const headingOf = (f) => {
-        const target = f.dest != null ? v.planets[f.dest] : null;
+        const target = courseTarget(v, f);
         if (!target) return null;
         for (const w of route(p, target, zone)) {
           const [wx, wy] = this.w2s(w.x, w.y);
@@ -711,12 +785,17 @@ export class MapView {
       if (owner) lines.push([owner.name, owner.color || '#fff']);
       if (p.known === 'memory') lines.push([t('map.tooltipSeen', { turn: p.turn }), '#67738c']);
     }
+    this.tooltipAt(ctx, sx, sy, planetRadius(p) * this.cam.zoom, p.name, lines);
+  }
+
+  /** Box beside something on screen: a title and colored lines. */
+  tooltipAt(ctx, sx, sy, r, title, lines) {
     ctx.save();
     ctx.font = '13px Inter, system-ui, sans-serif';
-    const w = Math.max(...lines.map(l => ctx.measureText(l[0]).width)) + 18;
+    const w = Math.max(...lines.map(l => ctx.measureText(l[0]).width), ctx.measureText(title).width + 10) + 18;
     const h = lines.length * 16 + 14;
-    let x = sx + planetRadius(p) * this.cam.zoom + 14, y = sy - h / 2;
-    if (x + w > this.w - 8) x = sx - planetRadius(p) * this.cam.zoom - 14 - w;
+    let x = sx + r + 14, y = sy - h / 2;
+    if (x + w > this.w - 8) x = sx - r - 14 - w;
     y = Math.max(4, Math.min(this.h - h - 4, y));
     ctx.fillStyle = 'rgba(8,11,22,.93)';
     ctx.strokeStyle = 'rgba(150,175,215,.28)';
@@ -726,7 +805,7 @@ export class MapView {
     let yy = y + 14;
     ctx.font = '600 13.5px Inter, system-ui, sans-serif';
     ctx.fillStyle = '#fff';
-    ctx.fillText(p.name, x + 9, yy);
+    ctx.fillText(title, x + 9, yy);
     ctx.font = '13px Inter, system-ui, sans-serif';
     for (const [t, c] of lines) {
       yy += 16;
@@ -843,6 +922,58 @@ export class MapView {
 
     window.addEventListener('resize', () => this.resize());
   }
+}
+
+/**
+ * Remembers when each mouth was first seen. Those that appear while playing
+ * unfold (HOLE_OPEN_MS); those already there when the map opens just stand.
+ * @returns {boolean} whether a new one appeared
+ */
+export function noteMouths(view3, view, first) {
+  const born = view3._born || (view3._born = new Map());
+  let fresh = false;
+  for (const m of view.wormholes || []) {
+    if (born.has(m.id)) continue;
+    born.set(m.id, first ? -Infinity : performance.now());
+    fresh = fresh || !first;
+  }
+  return fresh;
+}
+
+/** 0..1 while a mouth unfolds. */
+export function mouthOpen(view3, m, now) {
+  return Math.min(1, (now - (view3._born?.get(m.id) ?? -Infinity)) / HOLE_OPEN_MS);
+}
+
+/** Tooltip lines for a mouth: state, and where it leads if known. */
+export function mouthLines(v, m) {
+  const lines = [[t(m.unstable ? 'hole.unstable' : 'hole.stable'), m.unstable ? '#ffb08a' : '#cdb4ff']];
+  const near = nearestPlanet(v, m);
+  if (near) lines.push([t('hole.near', { planet: near.name }), '#9aa8c4']);
+  const b = m.link && v.wormholes.find(x => x.id === m.link);
+  const exit = b && nearestPlanet(v, b);
+  lines.push(exit ? [t('hole.leadsTo', { planet: exit.name }), '#d6deef'] : [t('hole.leadsUnknown'), '#d6deef']);
+  return lines;
+}
+
+/**
+ * For an own fleet on the far side of known wormholes: each exit mouth and
+ * the range left there after the way from home to the entrance.
+ */
+export function farSide(v, f) {
+  const out = [];
+  if (!f?.mine || !v.wormholes?.length) return out;
+  const zone = holeZone(v.galaxy);
+  const bases = v.planets.filter(p => p.owner === v.you && p.pop > 0.5);
+  if (!bases.length) return out;
+  const direct = supplyDistance(bases, f, zone);
+  for (const { a, b } of portalsOf(v)) {
+    const home = supplyDistance(bases, a, zone);
+    if (home + travelDistance(b, f, zone) >= direct) continue;
+    const left = (f.stats?.range || 0) - home;
+    if (left > 0) out.push({ mouth: b, left });
+  }
+  return out;
 }
 
 function leadType(f) {
