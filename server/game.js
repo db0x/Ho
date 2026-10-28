@@ -6,10 +6,13 @@ import {
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
   COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS, AI_LEVELS,
-  holeZone, route, advance, travelDistance, supplyDistance, cargoOf, recycleValue
+  holeZone, route, advance, travelDistance, supplyNeed, cargoOf, recycleValue
 } from '../shared/rules.js';
 import { forecast, researchWeight } from '../shared/budget.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng, newSeed } from './galaxy.js';
+import {
+  SCAN, findMouth, wormholeTurn, spotWormholes, transit, portalsFor, wormholeView
+} from './wormholes.js';
 
 export const DEFAULT_SETTINGS = {
   planetsPerPlayer: 6,
@@ -21,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   shape: 'scatter',    // 'scatter' = scattered field, 'spiral' = spiral around a black hole
   maxTurns: 300,       // 0 = unlimited
   voice: false,        // CB radio open from the start (only if the server offers it)
+  wormholes: true,     // wormholes open now and then in the course of the game
   seed: null
 };
 
@@ -41,6 +45,7 @@ export function createGame(hostName) {
     galaxy: null,
     players: [],
     fleets: [],
+    wormholes: [],            // open wormholes (server/wormholes.js)
     nextFleetId: 1,
     nextShipId: 1,
     log: [],
@@ -154,6 +159,8 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     },
     explored: new Set(),
     knowledge: {},            // planetId -> last known state
+    seenMouths: new Set(),    // wormhole mouths in sight once
+    knownHoles: new Set(),    // wormholes jumped through: both ends known
     orders: { builds: {}, moves: {}, unload: {}, refit: {} },
     stats: { planets: 0, pop: 0, ships: 0, kills: 0, losses: 0 }
   };
@@ -288,7 +295,8 @@ function newFleet(game, owner, planet) {
     x: planet ? planet.x : 0,
     y: planet ? planet.y : 0,
     z: planet ? (planet.z || 0) : 0,
-    dest: null
+    dest: null,
+    hole: null           // course to a wormhole mouth instead of a world
   };
   game.fleets.push(f);
   return f;
@@ -317,7 +325,7 @@ export function planetById(game, id) { return game.galaxy.planets[id]; }
 export function playerById(game, id) { return game.players.find(p => p.id === id); }
 
 function orbitFleet(game, owner, planet) {
-  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && f.dest == null);
+  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && f.dest == null && !f.hole);
   if (!f) f = newFleet(game, owner, planet);
   return f;
 }
@@ -343,22 +351,24 @@ export function supplyBases(game, owner) {
 }
 
 /**
- * Nearest own supply base (inhabited own planet). Measured along the path
- * that can actually be flown: supply can pass through the black hole as
- * little as the fleet itself. Computed in shared/rules.js so the UI arrives
- * at the same result.
+ * Range a fleet needs for this target: the distance from the nearest own
+ * supply base (inhabited own planet), measured along the path that can
+ * actually be flown - supply can pass through the black hole as little as
+ * the fleet itself. Known wormholes carry it to their far side. Computed in
+ * shared/rules.js so the UI arrives at the same result.
  */
-function supplyDistanceFor(game, owner, point) {
-  return supplyDistance(supplyBases(game, owner), point, holeZone(game.galaxy));
+function supplyNeedFor(game, fleet, target) {
+  return supplyNeed(supplyBases(game, fleet.owner), fleet, target, holeZone(game.galaxy),
+    portalsFor(game, fleet.owner));
 }
 
-/** May this fleet head for this target? */
+/** May this fleet head for this target (a world or a wormhole mouth)? */
 export function canReach(game, fleet, target) {
   const st = fleetStats(fleet);
   if (st.speed <= 0) return { ok: false, key: 'err.fleetImmobile', params: {} };
   // Range is rounded in fleetStats, so compare against the rounded distance
   // as well - otherwise 170.3 > 170 rejects a target shown as "170 < 170".
-  const need = Math.round(supplyDistanceFor(game, fleet.owner, target));
+  const need = Math.round(supplyNeedFor(game, fleet, target));
   if (need > st.range) {
     return { ok: false, key: 'err.outOfRange', params: { need, range: st.range } };
   }
@@ -493,12 +503,24 @@ export function setOrders(game, player, msg) {
     // nothing happens - otherwise you click a button and simply nothing
     // happens (e.g. when the fleet has been merged in the meantime).
     if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
-    if (msg.move.planetId === null) { delete player.orders.moves[fleet.id]; fleet.dest = null; return; }
+    if (msg.move.hole != null) {
+      // Only a mouth this empire has seen - the id of an unseen one gives nothing away.
+      const found = player.seenMouths.has(msg.move.hole) ? findMouth(game, msg.move.hole) : null;
+      if (!found) return { error: 'err.noSuchHole' };
+      const reach = canReach(game, fleet, found.mouth);
+      if (!reach.ok) return { error: reach.key, params: reach.params };
+      fleet.hole = found.mouth.id;
+      fleet.dest = null;
+      delete player.orders.moves[fleet.id];
+      return;
+    }
+    if (msg.move.planetId === null) { delete player.orders.moves[fleet.id]; fleet.dest = null; fleet.hole = null; return; }
     const target = planetById(game, msg.move.planetId);
     if (!target) return { error: 'err.noSuchPlanet' };
     const reach = canReach(game, fleet, target);
     if (!reach.ok) return { error: reach.key, params: reach.params };
     fleet.dest = target.id;
+    fleet.hole = null;
     player.orders.moves[fleet.id] = target.id;
   }
   if (msg.split) {
@@ -524,6 +546,7 @@ export function setOrders(game, player, msg) {
       if (!planet) {
         nf.x = fleet.x; nf.y = fleet.y; nf.z = fleet.z;
         nf.dest = fleet.dest;
+        nf.hole = fleet.hole;
         if (fleet.dest != null) player.orders.moves[nf.id] = fleet.dest;
       }
       return nf.id;
@@ -533,7 +556,7 @@ export function setOrders(game, player, msg) {
   if (msg.merge) {
     const planet = planetById(game, msg.merge.planetId);
     if (!planet) return;
-    const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && f.dest == null);
+    const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && f.dest == null && !f.hole);
     if (own.length < 2) return;
     const target = own[0];
     for (const f of own.slice(1)) { target.ships.push(...f.ships); f.ships = []; }
@@ -810,15 +833,17 @@ export function resolveTurn(game) {
   const zone = holeZone(game.galaxy);
   const departures = [];            // [fleet, world it departs from this turn]
   for (const fleet of game.fleets) {
-    if (fleet.dest == null) continue;
+    if (fleet.dest == null && !fleet.hole) continue;
     const start = fleet.at;
-    const target = planetById(game, fleet.dest);
+    const mouth = fleet.hole ? findMouth(game, fleet.hole)?.mouth : null;
+    if (fleet.hole && !mouth) { fleet.hole = null; continue; }
+    const target = mouth || planetById(game, fleet.dest);
     const st = fleetStats(fleet);
     const owner = playerById(game, fleet.owner);
-    if (st.speed <= 0) { fleet.dest = null; continue; }
+    if (st.speed <= 0) { fleet.dest = null; fleet.hole = null; continue; }
     const reach = canReach(game, fleet, target);
     if (!reach.ok) {
-      fleet.dest = null;
+      fleet.dest = null; fleet.hole = null;
       if (owner) entries.push({ type: 'warn', playerIds: [owner.id], private: owner.id,
         key: 'log.fleetHeld', params: { near: nearestName(game, fleet) },
         because: { key: reach.key, params: reach.params } });
@@ -828,7 +853,9 @@ export function resolveTurn(game) {
     const step = advance(fleet, route(fleet, target, zone), st.speed);
     fleet.x = step.x; fleet.y = step.y; fleet.z = step.z;
     if (start != null && start !== fleet.dest) departures.push([fleet, start]);
-    if (step.done) {
+    if (step.done && mouth) {
+      transit(game, fleet, mouth.id, entries);
+    } else if (step.done) {
       fleet.at = target.id; fleet.dest = null;
       if (owner) {
         owner.explored.add(target.id);
@@ -949,7 +976,9 @@ export function resolveTurn(game) {
   // 8) Expansion, visibility, statistics, elimination - grow first, then
   // look: otherwise new worlds within scanner range stay blind for a turn.
   maybeExpand(game, entries);
+  wormholeTurn(game, entries);
   updateVisibility(game);
+  spotWormholes(game, entries);
   for (const p of game.players) {
     const planets = game.galaxy.planets.filter(q => q.owner === p.id);
     p.stats.planets = planets.length;
@@ -1251,8 +1280,8 @@ export function updateVisibility(game) {
     // long ago.
     for (const planet of game.galaxy.planets) {
       if (planet.owner === p.id || myFleets.some(f => f.at === planet.id)) continue;
-      const seen = mine.some(q => dist(q, planet) < 230)
-        || myFleets.some(f => dist(f, planet) < 185);
+      const seen = mine.some(q => dist(q, planet) < SCAN.world)
+        || myFleets.some(f => dist(f, planet) < SCAN.fleet);
       if (seen) {
         p.explored.add(planet.id);
         p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn);
@@ -1358,7 +1387,7 @@ export function buildView(game, player) {
     if (mine) {
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
-        x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest,
+        x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole,
         mine: true,
         ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
           ...(s.cargo ? { cargo: s.cargo.length } : {}) })),
@@ -1369,12 +1398,15 @@ export function buildView(game, player) {
     if ((f.at !== null && vis.has(f.at)) || inSight(game, player.id, f)) {
       // Whoever has a foreign fleet in their own space scouts it well enough to
       // know its course and arrival - what it flies with stays hidden.
-      const target = f.dest != null ? planetById(game, f.dest) : null;
+      // A course to a wormhole only shows if its mouth is in sight.
+      const mouth = f.hole && player.seenMouths.has(f.hole) ? findMouth(game, f.hole)?.mouth : null;
+      const target = mouth || (f.dest != null ? planetById(game, f.dest) : null);
       const speed = target ? fleetStats(f).speed : 0;
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0),
-        dest: target ? target.id : null,
+        dest: f.dest != null && !mouth ? f.dest : null,
+        hole: mouth ? mouth.id : null,
         eta: target && speed > 0
           ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
@@ -1402,6 +1434,7 @@ export function buildView(game, player) {
       shape: game.galaxy.shape || 'scatter',
       blackHole: game.galaxy.blackHole || null
     },
+    wormholes: wormholeView(game, player),
     me: {
       id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
       // Accurate to one decimal, as the server computes - with the rounded
@@ -1448,7 +1481,7 @@ export function buildSpectatorView(game) {
 
   const fleets = game.fleets.filter(f => f.ships.length).map(f => ({
     id: f.id, owner: f.owner, at: f.at,
-    x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, mine: false,
+    x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole, mine: false,
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
       attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
@@ -1477,6 +1510,7 @@ export function buildSpectatorView(game) {
       shape: game.galaxy.shape || 'scatter',
       blackHole: game.galaxy.blackHole || null
     },
+    wormholes: wormholeView(game, null),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       level: p.level,                      // spectators see how well each AI plays

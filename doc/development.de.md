@@ -24,6 +24,7 @@ server/
   index.js           HTTP + WebSocket, Lobby, Partieverwaltung, Zuschauertakt
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
+  wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
   userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil, Nachrichtenschlüssel (verpackt) – atomar geschrieben
@@ -151,6 +152,7 @@ npm test               # alle Testläufe
 npm run test:i18n      # Kataloge: gleiche Schlüssel, gleiche Platzhalter, Serverschlüssel
 npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
+npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat

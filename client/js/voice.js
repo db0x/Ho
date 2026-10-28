@@ -53,6 +53,11 @@ export class Voice {
     this.bind();
   }
 
+  /** Name of the push-to-talk key, as the settings show it. */
+  keyLabel() {
+    return keyName(this.key);
+  }
+
   configure(cfg) {
     this.enabled = !!cfg;
     this.stun = cfg?.stun ?? null;
@@ -503,7 +508,7 @@ function typing(el) {
 // game already uses cannot be taken.
 const KEY_STORE = 'ho-ptt-key';
 const DEFAULT_KEY = { code: 'ControlRight', label: null };
-const RESERVED = [' ', 'enter', 'escape', 'tab', 'f', 'p', 't', 'h', 'e', '+', '-'];
+const RESERVED = [' ', 'enter', 'escape', 'tab', 'f', 'p', 't', 'h', 'e', 's', '?', '+', '-'];
 function loadKey() {
   try { const k = JSON.parse(localStorage.getItem(KEY_STORE) || 'null'); if (k?.code) return k; } catch {}
   return DEFAULT_KEY;

@@ -31,7 +31,7 @@ for (const k of all) {
 // 3) Every key the server or a tool can name must be translatable - otherwise
 //    the bare key shows up in the browser or on the console.
 const { readFile } = await import('node:fs/promises');
-const sources = ['game.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
+const sources = ['game.js', 'wormholes.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
 let source = '';
 for (const name of sources) {
   source += await readFile(new URL('../server/' + name, import.meta.url), 'utf8');

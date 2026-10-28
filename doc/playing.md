@@ -10,6 +10,7 @@
 - [Galaxy shape: scatter or spiral](#galaxy-shape-scatter-or-spiral)
 - [Two playing fields: classic and space](#two-playing-fields-classic-and-space)
 - [A galaxy without an edge](#a-galaxy-without-an-edge)
+- [Wormholes](#wormholes)
 - [The AI empires](#the-ai-empires)
 - [Watching](#watching)
 - [Ranking and victory](#ranking-and-victory)
@@ -52,6 +53,7 @@ saying who can change them:
 | Starting capital, starting metal | Treasury at the start |
 | Turn timer | 0 = the game waits until everyone is done |
 | Galaxy grows | see [A galaxy without an edge](#a-galaxy-without-an-edge); off gives a fixed map |
+| Wormholes | see [Wormholes](#wormholes) |
 
 **Connection.** A disconnected player does not block the turn – they are skipped
 and can return at any time (the seat is stored in the browser). With sign-in a game can also be continued on
@@ -180,6 +182,31 @@ more and better metal. Settling out there pays off, but costs terraforming and
 radical tech. With 16 AI the map grows from 96 to around 390 worlds in 120 turns.
 It can be switched off in the lobby.
 
+## Wormholes
+
+From turn 12 on, wormholes open now and then: two mouths far apart – at least
+half the map's longer side – each with worlds nearby. Only one is open at a
+time. A mouth comes into sight like a world,
+within scanner range of your worlds and fleets.
+
+- **Jumping:** select a fleet, then click the mouth (or *Fly in* in its panel).
+  The fleet flies there, jumps and stands at the other mouth.
+- **Where to:** only the first jump tells. From then on you know both ends, the
+  map draws the tunnel between them, and the way back works too. Other empires
+  still do not know it.
+- **Supply:** range is measured from your inhabited worlds as always. An open
+  wormhole you know carries it to its far side – a fleet there may fly as far
+  as is left after the way from home to the entrance (the purple outline). From
+  home straight into the far side, through unknown space, there is no way.
+- **Collapse:** a wormhole lives 16–28 turns; in its last three it flickers red.
+  Fleets heading for it stop; whoever is on the far side is cut off – unless a
+  colony ship founds a new world there.
+
+Wormholes can be switched off in the lobby. The curious AI personalities –
+settler, raider and vulture – use them: a scout looks first, then colony ships
+follow to free worlds or a pack goes hunting on the far side; the raider also
+jumps blind. Before the wormhole collapses they come back.
+
 ## The AI empires
 
 AI empires enter under names of their own – from *Admiral Wobblebeard* to *Czarina
@@ -258,13 +285,14 @@ returning to the start screen and staying as they are.
 | Select | Left click on a world or fleet |
 | Set course | Pick a fleet, then **right-click** (or shift-click) the target world – or click the target world and use *Fleet here* in the panel |
 | See where fleets go | Each course line starts at its fleet – fleets in orbit wait on the side facing their target – and ends in an arrowhead. Select a fleet or point at it: its line stands out with the turns until arrival |
-| Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds). This works in flight too: both parts fly on to the same target until you give the new fleet a course of its own |
+| Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds). This works in flight too: both parts fly on to the same target until you give the new fleet a course of its own. Quicker: select the fleet and press `S` – it falls apart into single ships right away, no dialog |
 | End turn | Button in the middle of the top bar or `space` |
 | Show the budget | Click or hover over money or metal in the top bar |
 | Fit the map | `F` |
 | Bring only your own forward | Hold `E` – everything that is not yours fades far back. Or the flag button at the top right: a tap toggles it (the way on a phone), holding shows it only while held |
 | Clear selection | `Esc` |
 | Help | `H` |
+| Overview of all keys | `?` – or *Keys* in the menu (gear) and in the help |
 | Move / resize windows | Drag the title bar to move; drag any edge or corner to resize |
 | Minimize windows | **−** in the title bar or double-click it: the window becomes an icon in the top bar (★ research/empire/rankings, ☰ events/comms – with the count of unread comms). A click on the icon brings it back where it was. Position, size and state are remembered |
 | Comms (chat) | *Comms* tab in the log window. Messages you have not seen pop up and are counted on the tab – tap the message to reply. Smileys like `:)` `:(` `:D` `;)` `<3` turn into emojis, so do codes like `:sad:` `:rocket:` `:thumbsup:`; the 🙂 button next to the field shows them all |

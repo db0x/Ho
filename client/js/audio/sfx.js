@@ -209,33 +209,37 @@ const RENDER_VARIANTS = 4;
 
 /**
  * One explosion as a buffer: brown noise for the rumble, white noise behind
- * a filter that is wide open at the bang and then closes, crackle in the
- * first half second, a low thump - and everything driven into saturation,
- * which is what makes it sound big. Full level for a moment, then a tail of about a second.
+ * a filter that opens only to a muffled 2.6 kHz at the bang and then closes,
+ * a dull crackle in the first half second, a deep thump - and everything
+ * driven into saturation, which is what makes it sound big. A last low-pass
+ * takes the fizz off the saturation: heard through a hull, not in open air.
+ * Full level for a moment, then a tail of about a second.
  */
 function renderBlast(ctx, dur = 1.4) {
   const sr = ctx.sampleRate, n = Math.floor(sr * dur);
   const buf = ctx.createBuffer(1, n, sr);
   const d = buf.getChannelData(0);
-  let brown = 0, lp = 0, lp2 = 0, crack = 0, phase = 0, peak = 0;
-  const crackFade = Math.exp(-1 / (0.005 * sr));
+  let brown = 0, lp = 0, lp2 = 0, crack = 0, phase = 0, peak = 0, out = 0;
+  const crackFade = Math.exp(-1 / (0.006 * sr));
+  const dull = 1 - Math.exp(-2 * Math.PI * 1500 / sr);   // final low-pass at 1.5 kHz
   for (let i = 0; i < n; i++) {
     const t = i / sr;
     const w = Math.random() * 2 - 1;
     brown = (brown + 0.02 * w) / 1.02;
-    // Filter: from about 6 kHz at the bang down to a dull 180 Hz
-    const fc = 180 + 6000 * Math.exp(-t / 0.09);
+    // Filter: from about 2.6 kHz at the bang down to a dull 140 Hz
+    const fc = 140 + 2500 * Math.exp(-t / 0.07);
     lp += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (w - lp);
     lp2 += (1 - Math.exp(-2 * Math.PI * fc / sr)) * (lp - lp2);
-    const env = t < 0.004 ? t / 0.004 : t < 0.07 ? 1 : Math.exp(-(t - 0.07) / 0.26);
-    // Crackle: sparse, bright bursts, thinning out over the first 0.45 s
-    if (t < 0.45 && Math.random() < 90 * (1 - t / 0.45) / sr) crack = 0.3 + Math.random() * 0.6;
+    const env = t < 0.006 ? t / 0.006 : t < 0.08 ? 1 : Math.exp(-(t - 0.08) / 0.3);
+    // Crackle: sparse bursts of filtered noise - debris, not sparks
+    if (t < 0.45 && Math.random() < 50 * (1 - t / 0.45) / sr) crack = 0.2 + Math.random() * 0.35;
     crack *= crackFade;
-    // Thump: 62 -> 42 Hz, gone after a quarter second
-    phase += 2 * Math.PI * (42 + 20 * Math.exp(-t / 0.08)) / sr;
-    const thump = Math.sin(phase) * Math.exp(-t / 0.13);
-    const x = (brown * 3.2 + lp2 * 1.4) * env + crack * w + thump * 0.9;
-    d[i] = Math.tanh(x * 2.2);
+    // Thump: 54 -> 36 Hz, carrying the blast for a fifth of a second
+    phase += 2 * Math.PI * (36 + 18 * Math.exp(-t / 0.09)) / sr;
+    const thump = Math.sin(phase) * Math.exp(-t / 0.18);
+    const x = (brown * 3.6 + lp2 * 1.2) * env + crack * lp * 2 + thump * 1.3;
+    out += dull * (Math.tanh(x * 1.8) - out);
+    d[i] = out;
     peak = Math.max(peak, Math.abs(d[i]));
   }
   // Fade the last 50 ms so the tail does not click off
@@ -465,6 +469,14 @@ const RECIPES = {
     s.noise(b, t, { dur: 1.1, type: 'bandpass', from: 300, to: 2600, q: 0.8, gain: 0.09, attack: 0.5 });
     s.seq(b, t + 0.25, [440, 659, 880, 1319], 0.13, { type: 'sine', dur: 0.7, gain: 0.055 });
   } },
+  // A wormhole: a deep, wavering drone sinking away, air rushing into the
+  // throat, and a glassy shimmer on top - space folds.
+  wormhole: { max: 1, gap: 0.6, build: (s, b, t) => {
+    s.tone(b, t, { type: 'sine', from: 220, to: 55, dur: 1.6, gain: 0.13, attack: 0.25 });
+    s.tone(b, t + 0.05, { type: 'triangle', from: 233, to: 58, dur: 1.5, gain: 0.06, attack: 0.3 });
+    s.noise(b, t, { dur: 1.4, type: 'bandpass', from: 3200, to: 180, q: 2.2, gain: 0.1, attack: 0.5 });
+    s.seq(b, t + 0.2, [1568, 1397, 1175, 988], 0.11, { type: 'sine', dur: 0.6, gain: 0.03 });
+  } },
   victory: { max: 1, build: (s, b, t) => {
     s.seq(b, t, [523, 659, 784, 1046], 0.11, { type: 'triangle', dur: 0.5, gain: 0.11 });
     s.tone(b, t + 0.45, { type: 'triangle', from: 523, dur: 1.3, gain: 0.08, attack: 0.03 });
@@ -480,7 +492,7 @@ export const SFX_NAMES = Object.keys(RECIPES);
 export const LOG_SFX = {
   combat: 'combat', invade: 'invade', colonize: 'colonize', settle: 'settle',
   build: 'build', tech: 'tech', terra: 'terra', arrive: 'arrive', warn: 'warn',
-  galaxy: 'expand',
+  galaxy: 'expand', wormhole: 'wormhole',
   lost: 'lost', eliminated: 'eliminated', victory: 'victory'
 };
 

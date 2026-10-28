@@ -9,14 +9,16 @@
 //   - size and brightness by distance.
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, holeZone, route, routeLength, reachOutline } from '../../shared/rules.js';
+import { dist, holeZone, route, routeLength, reachOutline, WORMHOLE } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
-  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM
+  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM,
+  drawWormhole, drawWormLink, WORMHOLE_MIN_PX
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
-import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint } from './courses.js';
+import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint, courseTarget, isMouth } from './courses.js';
+import { noteMouths, mouthOpen, mouthLines, farSide, HOLE_OPEN_MS } from './map.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -182,6 +184,7 @@ export class SpaceView {
     const first = !this.view;
     this.view = view;
     this.poke(900);
+    if (noteMouths(this, view, first)) this.poke(HOLE_OPEN_MS + 200);
     if (first) {
       this.fit();
       const home = view.me ? view.planets.find(p => p.id === view.me.homeworld) : null;
@@ -213,6 +216,9 @@ export class SpaceView {
 
     this.drawBackdrop(ctx, colorOf);
     this._spots = this.fleetSpots(v);
+    ctx.globalAlpha = this.dim(null);
+    this.drawLinks(ctx);
+    ctx.globalAlpha = 1;
     this.drawCourses(ctx);
     if (this.showRange) this.drawRange(ctx);
 
@@ -237,6 +243,10 @@ export class SpaceView {
       const pr = this.project(bh.x, bh.y, bh.z || 0);
       if (pr) items.push({ depth: pr.depth, kind: 'hole', bh, pr });
     }
+    for (const m of v.wormholes || []) {
+      const pr = this.project(m.x, m.y, m.z || 0);
+      if (pr) items.push({ depth: pr.depth, kind: 'mouth', m, pr });
+    }
     items.sort((a, b) => b.depth - a.depth);
 
     // Names belong in the same order as their world: collected and drawn at
@@ -245,11 +255,14 @@ export class SpaceView {
     for (const it of items) {
       const labels = [];
       if (it.kind === 'planet') this.drawWorld(ctx, it, colorOf, labels);
-      else if (it.kind === 'hole') {
+      else if (it.kind === 'mouth') {
+        ctx.globalAlpha = this.dim(null);
+        this.drawMouth(ctx, it, labels);
+      } else if (it.kind === 'hole') {
         ctx.globalAlpha = this.dim(null);
         this.drawHole(ctx, it, labels);
       } else this.drawFleet(ctx, it, colorOf);
-      ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : it.kind === 'hole' ? this.dim(null) : 1;
+      ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : it.kind === 'hole' || it.kind === 'mouth' ? this.dim(null) : 1;
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
       ctx.globalAlpha = 1;
     }
@@ -264,6 +277,45 @@ export class SpaceView {
         shieldR: planetRadius(p) * pr.s * 1.14 + 20 * orbitScale(pr.s), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
     if (this.hover?.type === 'planet') this.tooltip(ctx, v.planets[this.hover.id]);
+    if (this.hover?.type === 'hole') {
+      const m = v.wormholes?.find(x => x.id === this.hover.id);
+      const pr = m && this.project(m.x, m.y, m.z || 0);
+      if (pr) this.tooltipAt(ctx, pr.x, pr.y, t('hole.name'), mouthLines(v, m));
+    }
+  }
+
+  /** Screen radius of a mouth at this projection. */
+  mouthRadius(pr) {
+    return Math.max(WORMHOLE_MIN_PX, WORMHOLE.radius * pr.s);
+  }
+
+  /**
+   * A wormhole mouth always faces the camera, like the worlds - it is a
+   * sphere seen from every side, after all.
+   */
+  drawMouth(ctx, it, labels) {
+    const { m, pr } = it;
+    const R = this.mouthRadius(pr);
+    const alpha = depthFade(pr.depth, this.cam.dist) * this.dim(null);
+    drawWormhole(ctx, pr.x, pr.y, R, this.phase,
+      { seed: m.id, unstable: m.unstable, open: mouthOpen(this, m, performance.now()), alpha });
+    if (this.selection?.type === 'hole' && this.selection.id === m.id) this.ringAt(ctx, pr.x, pr.y, R * 1.05);
+    if (this.showNames && R > 9) {
+      labels.push({ text: m.link ? t('hole.labelKnown') : t('hole.label'), x: pr.x, y: pr.y + R * 1.2 + 10,
+        color: m.unstable ? '#ffb08a' : '#cdb4ff', size: 11.5 });
+    }
+    this.hit.push({ type: 'hole', id: m.id, x: pr.x, y: pr.y, r: Math.max(14, R * 0.9) });
+  }
+
+  /** Tunnels between the mouths whose both ends are known - drawn below everything. */
+  drawLinks(ctx) {
+    const list = this.view.wormholes || [];
+    for (const m of list) {
+      const b = m.link && list.find(x => x.id === m.link);
+      if (!b || m.id > b.id) continue;
+      const pa = this.project(m.x, m.y, m.z || 0), pb = this.project(b.x, b.y, b.z || 0);
+      if (pa && pb) drawWormLink(ctx, pa, pb, this.phase, m.unstable);
+    }
   }
 
   /**
@@ -407,10 +459,10 @@ export class SpaceView {
     const focusId = this.hover?.type === 'fleet' ? this.hover.id
       : this.selection?.type === 'fleet' ? this.selection.id : null;
     this._eta = null;
-    const moving = v.fleets.filter(f => f.dest != null && v.planets[f.dest])
+    const moving = v.fleets.filter(f => courseTarget(v, f))
       .sort((a, b) => (a.id === focusId) - (b.id === focusId));
     for (const f of moving) {
-      const target = v.planets[f.dest];
+      const target = courseTarget(v, f);
       const path = route(f, target, zone);
       const spot = this._spots.get(f.id);
       const st = courseStyle(f, focusId);
@@ -443,7 +495,8 @@ export class SpaceView {
       const tp = this.project(target.x, target.y, target.z || 0);
       if (tp && pts.length > 1) {
         const [fx, fy] = pts[pts.length - 2];
-        arrowHead(ctx, fx, fy, tp.x, tp.y, planetRadius(target) * tp.s + 10, st.hot ? 11 : 8, st.color);
+        const tr = isMouth(target) ? this.mouthRadius(tp) * 0.7 + 6 : planetRadius(target) * tp.s + 10;
+        arrowHead(ctx, fx, fy, tp.x, tp.y, tr, st.hot ? 11 : 8, st.color);
       }
       ctx.globalAlpha = 1;
       if (st.hot && f.mine && f.stats?.speed > 0 && pts.length > 1) {
@@ -510,6 +563,17 @@ export class SpaceView {
         if (this._reach.size > 64) this._reach.clear();
         this._reach.set(key, u);
       }
+      ctx.beginPath();
+      for (let i = 0; i < u.length; i++) {
+        const a = u[i], b = u[(i + 1) % u.length];
+        this.seg(ctx, [a.x, a.y, a.z], [b.x, b.y, b.z]);
+      }
+      ctx.stroke();
+    }
+    // Beyond a known wormhole: what is left of the range after the way to it.
+    ctx.strokeStyle = 'rgba(190,150,255,.3)';
+    for (const { mouth, left } of farSide(v, sel)) {
+      const u = reachOutline(mouth, left, zone, 48);
       ctx.beginPath();
       for (let i = 0; i < u.length; i++) {
         const a = u[i], b = u[(i + 1) % u.length];
@@ -598,7 +662,7 @@ export class SpaceView {
    */
   headingAngle(f, x, y) {
     const v = this.view;
-    const target = f.dest != null ? v.planets[f.dest] : null;
+    const target = courseTarget(v, f);
     if (!target) return null;
     for (const w of route(f, target, holeZone(v.galaxy))) {
       const t = this.project(w.x, w.y, w.z || 0);
@@ -734,12 +798,17 @@ export class SpaceView {
       if (owner) lines.push([owner.name, owner.color || '#fff']);
     }
     lines.push([t('map.tooltipHeight', { z: ((p.z || 0) > 0 ? '+' : '') + Math.round(p.z || 0) }), '#67738c']);
+    this.tooltipAt(ctx, pr.x, pr.y, p.name, lines);
+  }
+
+  /** Box beside a point on screen: a title and colored lines. */
+  tooltipAt(ctx, px, py, title, lines) {
     ctx.save();
     ctx.font = '13px Inter, system-ui, sans-serif';
-    const w = Math.max(...lines.map(l => ctx.measureText(l[0]).width), ctx.measureText(p.name).width) + 18;
+    const w = Math.max(...lines.map(l => ctx.measureText(l[0]).width), ctx.measureText(title).width) + 18;
     const h = lines.length * 16 + 28;
-    let x = pr.x + 18, y = pr.y - h / 2;
-    if (x + w > this.w - 8) x = pr.x - 18 - w;
+    let x = px + 18, y = py - h / 2;
+    if (x + w > this.w - 8) x = px - 18 - w;
     y = Math.max(4, Math.min(this.h - h - 4, y));
     ctx.fillStyle = 'rgba(8,11,22,.93)';
     ctx.strokeStyle = 'rgba(150,175,215,.28)';
@@ -749,7 +818,7 @@ export class SpaceView {
     let yy = y + 14;
     ctx.font = '600 13.5px Inter, system-ui, sans-serif';
     ctx.fillStyle = '#fff';
-    ctx.fillText(p.name, x + 9, yy);
+    ctx.fillText(title, x + 9, yy);
     ctx.font = '13px Inter, system-ui, sans-serif';
     for (const [t, c] of lines) {
       yy += 16;

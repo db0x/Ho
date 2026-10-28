@@ -149,6 +149,7 @@
       <div id="fc-log" class="fc-log"></div>
       <div class="fc-input">
         <input id="fc-text" maxlength="500" autocomplete="off" data-i18n-attr="placeholder:friends.writePlaceholder">
+        <button type="button" id="fc-emoji" class="tiny">🙂</button>
         <button type="button" id="fc-send" class="primary" data-i18n="friends.send"></button>
       </div>
     </div>
@@ -159,7 +160,6 @@
     <div class="admin-head">
       <h2 data-i18n="admin.title"></h2>
       <span id="admin-updated" class="muted small"></span>
-      <button type="button" id="admin-debug" class="tiny" data-i18n="admin.debug" data-i18n-attr="title:admin.debugTitle"></button>
       <button type="button" id="admin-refresh" class="tiny" data-i18n="admin.refresh"></button>
     </div>
     <h3><span data-i18n="admin.games"></span> <span id="admin-games-count" class="muted"></span></h3>
@@ -248,6 +248,11 @@
           <b id="v-expand" class="ro-only"></b>
         </label>
         <p class="muted small" data-i18n="lobby.expandHint"></p>
+        <label class="chk" style="padding:0;margin-top:10px">
+          <input type="checkbox" id="s-holes" checked> <span data-i18n="lobby.holes"></span>
+          <b id="v-holes" class="ro-only"></b>
+        </label>
+        <p class="muted small" data-i18n="lobby.holesHint"></p>
         <div id="row-voice" class="hidden">
           <label class="chk" style="padding:0;margin-top:10px">
             <input type="checkbox" id="s-voice"> <span data-i18n="lobby.voice"></span>
@@ -350,6 +355,7 @@
             </div>
             <div id="voice-peers"></div>
           </div>
+          <button id="btn-keys" class="menu-keys" data-i18n="keys.open"></button>
           <button id="btn-quit" class="menu-quit" data-sfx="none" data-i18n="top.quit"></button>
           <div class="ho-version">Ho!! v__HO_VERSION__</div>
         </div>
@@ -574,11 +580,14 @@
         <p data-i18n-html="help.space.p"></p>
         <h4 data-i18n="help.fleets.h"></h4>
         <p data-i18n-html="help.fleets.p"></p>
+        <h4 data-i18n="help.holes.h"></h4>
+        <p data-i18n-html="help.holes.p"></p>
         <h4 data-i18n="help.combat.h"></h4>
         <p data-i18n-html="help.combat.p"></p>
       </section>
     </div>
     <div class="sel-actions" style="margin-top:18px">
+      <button id="help-keys" data-i18n="keys.open"></button>
       <button id="help-ships" data-i18n="shipinfo.open"></button>
       <button id="help-close" class="primary" data-i18n="help.close"></button>
     </div>

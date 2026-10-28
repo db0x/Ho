@@ -24,6 +24,7 @@ server/
   index.js           HTTP + WebSocket, lobby, game management, spectator pace
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
+  wormholes.js       Wormholes: opening, sight, jump, collapse, dev-mode aids
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
   userstore.js       Accounts on disk: name, scrypt hash, profile, message key (wrapped) – written atomically
@@ -148,6 +149,7 @@ npm test               # all test runs
 npm run test:i18n      # catalogues: same keys, same placeholders, server keys covered
 npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
+npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat

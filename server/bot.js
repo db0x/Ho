@@ -6,7 +6,7 @@
 import {
   shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
   holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, techMaxLevel, recycleValue, supplyDistance, cargoOf,
-  terraformable, IDEAL
+  terraformable, IDEAL, WORMHOLE
 } from '../shared/rules.js';
 import { setOrders, fleetStats, canReach, planetById, playerById, inSight } from './game.js';
 
@@ -41,6 +41,7 @@ const BATTERED = 3;
  *   vengeance   how resentful
  *   vsLeader    how much it wants to keep the front-runner small
  *   garrison    stays home when threatened (from 0.3)
+ *   wormholes   curious enough to send ships through wormholes
  */
 const PERSONAS = {
   // Picks a neighbor as rival and rolls it up world by world.
@@ -59,7 +60,7 @@ const PERSONAS = {
               { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3, recycling: 1 }],
     build: 0.6, terra: 0.45, settlers: 5, fleet: 0.8, fighters: 3, satellites: 2,
     campaign: 'retaliation', from: 45, margin: 1.4, solo: 'near',
-    vengeance: 0.8, vsLeader: 0.3, garrison: 0.4
+    vengeance: 0.8, vsLeader: 0.3, garrison: 0.4, wormholes: true
   },
   // Researches a lot, builds little, refits - and then strikes with quality.
   technocrat: {
@@ -78,7 +79,7 @@ const PERSONAS = {
               { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 0 }],
     build: 0.75, terra: 0.2, settlers: 2, fleet: 1.4, fighters: 5, satellites: 0,
     campaign: 'pressure', from: 8, margin: 1.0, solo: 'prey',
-    vengeance: 1.2, vsLeader: 1.0, garrison: 0, packs: true, scouts: 5
+    vengeance: 1.2, vsLeader: 1.0, garrison: 0, packs: true, scouts: 5, wormholes: true
   },
   // Satellites at every border. But not an eternal hedgehog: once the wall
   // is tight, it breaks out with a big fleet.
@@ -98,7 +99,7 @@ const PERSONAS = {
               { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 2 }],
     build: 0.7, terra: 0.3, settlers: 2, fleet: 1.2, fighters: 4, satellites: 1,
     campaign: 'always', from: 25, margin: 1.0, solo: 'carrion',
-    vengeance: 0.5, vsLeader: 0.8, garrison: 0.1, carrion: true, scouts: 5
+    vengeance: 0.5, vsLeader: 0.8, garrison: 0.1, carrion: true, scouts: 5, wormholes: true
   }
 };
 
@@ -347,12 +348,15 @@ export function runBot(game, bot) {
   }
   if (P.packs) formPacks();
 
+  // --- Wormholes: a probe first, then settlers or a raid to the far side
+  if (P.wormholes) wormholeTrips();
+
   // --- Fleet orders
   // Worlds an own colony ship is already heading for - one is enough, otherwise
   // they all fly to the same world and the rest wander around afterwards.
   const claimed = new Set(myFleets
     .filter(f => f.dest != null && f.ships.some(s => s.colonists > 0)).map(f => f.dest));
-  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.length)) {
+  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && f.ships.length)) {
     const st = fleetStats(fleet);
     if (st.speed <= 0 || fleet.ships.some(s => s.cargo)) continue;
     const here = fleet.at !== null ? planetById(game, fleet.at) : fleet;
@@ -412,6 +416,7 @@ export function runBot(game, bot) {
 
   if (hard) recall();
   if (hard) detach();
+  if (bot.knownHoles.size) comeBack();
   logistics();
   refit();
 
@@ -750,6 +755,107 @@ export function runBot(game, bot) {
     }
   }
 
+  /**
+   * The mouth a fleet on the far side of a known wormhole has to fly into to
+   * get home - null if it is on this side. Same test as supplyNeed in
+   * shared/rules.js: closer to home through the wormhole than through space.
+   */
+  function backDoor(f) {
+    if (!home.length) return null;
+    const direct = supplyDistance(home, f, zone);
+    for (const h of game.wormholes) {
+      if (!bot.knownHoles.has(h.id)) continue;
+      for (let i = 0; i < 2; i++) {
+        const b = h.mouths[i], a = h.mouths[1 - i];
+        if (supplyDistance(home, a, zone) + travelDistance(b, f, zone) < direct) return { hole: h, mouth: b };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Curious empires use the wormholes they see. As long as nobody knows
+   * where one leads, a scout goes through first - a cheap look. Once the far
+   * side is known, colony ships follow if free worlds wait there and land at
+   * home is getting scarce; whoever hunts sends a pack against weak worlds
+   * over there. Only through wormholes that hold long enough for the trip,
+   * and one fleet per wormhole every few turns - not the whole empire.
+   */
+  function wormholeTrips() {
+    ai.trips = ai.trips || {};          // wormhole -> turn before which nothing else is sent
+    const idle = game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && f.ships.length
+      && fleetStats(f).speed > 0 && !f.ships.some(s => s.cargo) && !backDoor(f));
+    for (const h of game.wormholes) {
+      if ((ai.trips[h.id] || 0) > game.turn) continue;
+      const known = bot.knownHoles.has(h.id);
+      for (let i = 0; i < 2; i++) {
+        const m = h.mouths[i], exit = h.mouths[1 - i];
+        if (!bot.seenMouths.has(m.id)) continue;
+        const toMouth = f => travelDistance(f, m, zone) / fleetStats(f).speed;
+        const fits = (f, beyond = 0) => h.closes - game.turn > toMouth(f) + beyond + 3 && canReach(game, f, m).ok;
+        const nearest = list => list.sort((a, b) => toMouth(a) - toMouth(b))[0] || null;
+        let pick = null;
+        if (!known) {
+          pick = nearest(idle.filter(f => f.ships.every(s => s.attack <= 0 && !s.colonists) && fits(f)));
+          // The raider does not wait for a scout: a small pack jumps blind
+          // and looks for prey over there itself.
+          if (!pick && P.packs) {
+            pick = nearest(idle.filter(f => strikePower(f) > 0 && f.ships.length <= 6
+              && !f.ships.some(s => s.colonists) && fits(f, 4)));
+          }
+        } else {
+          const homeToMouth = supplyDistance(home, m, zone);
+          const beyond = (f, p) => homeToMouth + travelDistance(exit, p, zone) <= fleetStats(f).range;
+          // Settlers: free worlds over there - when land at home runs short,
+          // or for an empire that lives to spread.
+          const land = settleable.filter(p => !claimed(p) && dist(p, exit) < 400);
+          if (land.length && (inRange.length <= 2 || P.settlers >= 4)) {
+            pick = nearest(idle.filter(f => f.ships.some(s => s.colonists > 0)
+              && land.some(p => beyond(f, p)) && fits(f, travelDistance(exit, land[0], zone) / fleetStats(f).speed)));
+          }
+          // Hunters: weak enemy worlds over there that this fleet cracks.
+          if (!pick && (solo === 'prey' || solo === 'carrion')) {
+            const prey = enemyWorlds.filter(p => dist(p, exit) < 400);
+            pick = nearest(idle.filter(f => {
+              const strike = strikePower(f);
+              return strike > 0 && fits(f, 2)
+                && prey.some(p => beyond(f, p) && price(p) * margin <= strike);
+            }));
+          }
+        }
+        if (!pick) continue;
+        setOrders(game, bot, { move: { fleetId: pick.id, hole: m.id } });
+        if (pick.hole === m.id) {
+          ai.trips[h.id] = game.turn + (known ? 3 : 8);
+          idle.splice(idle.indexOf(pick), 1);
+          break;
+        }
+      }
+    }
+    function claimed(p) {
+      return game.fleets.some(f => f.owner === bot.id && f.dest === p.id && f.ships.some(s => s.colonists > 0));
+    }
+  }
+
+  /**
+   * Fleets on the far side come home through the wormhole once they have
+   * nothing left to do there - or right away once it turns unstable, before
+   * it strands them. Ships already on their way to a target over there keep
+   * going; a colony ship that lands makes the far side home anyway.
+   */
+  function comeBack() {
+    for (const f of game.fleets.filter(f => f.owner === bot.id && !f.hole && f.ships.length)) {
+      const door = backDoor(f);
+      if (!door) continue;
+      // Late enough that the way back to the mouth still fits before it collapses.
+      const back = travelDistance(f, door.mouth, zone) / (fleetStats(f).speed || 1);
+      const shaky = door.hole.closes - game.turn <= Math.max(WORMHOLE.unstable, Math.ceil(back) + 2);
+      if (f.dest != null && !shaky) continue;
+      if (f.dest != null && f.ships.some(s => s.colonists > 0)) continue;
+      setOrders(game, bot, { move: { fleetId: f.id, hole: door.mouth.id } });
+    }
+  }
+
   /** The raider splits big clusters into packs that go hunting on their own. */
   function formPacks() {
     const size = Math.max(3, Math.round(3 + game.turn / 25));
@@ -808,7 +914,7 @@ export function runBot(game, bot) {
       return now.range > s.range * 1.6 || now.attack > s.attack * 1.6;
     };
     for (const f of [...myFleets]) {
-      if (f.dest != null || f.at == null || threatened.has(f.at)) continue;
+      if (f.dest != null || f.hole || f.at == null || threatened.has(f.at)) continue;
       const pl = planetById(game, f.at);
       if (!pl || pl.owner !== bot.id || pl.pop < 1) continue;
       if (f.ships.some(s => s.colonists > 0 || s.cargo?.length || !junk(s))) continue;

@@ -11,6 +11,7 @@ import {
   hostOf, pauseGame, resumeGame, continueGame
 } from './game.js';
 import { runBot } from './bot.js';
+import { devWormholes } from './wormholes.js';
 import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
 import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen, ensureHandles, userByHandle } from './userstore.js';
 import * as friends from './friends.js';
@@ -48,6 +49,10 @@ const IDLE_MS = (Number(process.env.HO_IDLE_HOURS) || 4) * 3600 * 1000;
 const VOICE = /^(on|1|true|yes)$/i.test(process.env.HO_VOICE || '');
 const STUN_PORT = /^(off|0)$/i.test(process.env.HO_STUN_PORT || '') ? null : Number(process.env.HO_STUN_PORT) || 3478;
 const STUN_URL = process.env.HO_STUN_URL || null;
+// Dev mode (HO_DEV=on): admins get testing aids in the game, e.g. opening a
+// wormhole on the spot. Without sign-in there are no admins - then everyone
+// gets them, which is fine on a developer's machine and nowhere else.
+const DEV = /^(on|1|true|yes)$/i.test(process.env.HO_DEV || '');
 let stunPort = null;                  // set once the socket is bound
 const FLOOR_MS = 30000;               // nobody holds the channel longer
 const RTC_MAX = 16 * 1024;            // one offer or answer with its candidates
@@ -212,6 +217,7 @@ wss.on('connection', (ws, req, session) => {
     voice: VOICE ? { stun: stunPort ? (STUN_URL || { port: stunPort }) : null } : null,
     profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null },
     admin: adminOf(c),
+    dev: devOf(c),
     // Which release's change notes this account has seen - null: none yet.
     // Without an account the browser remembers it.
     version: VERSION, releases: RELEASES, newsSeen: c.accountKey ? (account?.news ?? null) : undefined
@@ -381,6 +387,11 @@ function friendMessage(c, ws, msg) {
 function adminOf(c) {
   if (!c.accountKey) return false;
   try { return isAdmin(c.accountKey); } catch { return false; }   // account file unreadable
+}
+
+/** May this connection use the dev mode's testing aids? */
+function devOf(c) {
+  return DEV && (adminOf(c) || !authEnabled());
 }
 
 /** Everything the admin lobby shows: all games and all accounts. */
@@ -924,6 +935,20 @@ function handle(connId, ws, msg) {
       console.log(`Admin ${c.account} watches game ${g.id}`);
       break;
     }
+    case 'dev': {
+      // Testing aids in dev mode, for players and spectators alike. Everyone
+      // in the game reads in the radio log that somebody stepped in.
+      if (!devOf(c)) return send(ws, { t: 'error', key: 'err.notDev' });
+      if (!game || game.state !== 'running') return;
+      const at = msg.at && ['x', 'y'].every(k => Number.isFinite(msg.at[k]))
+        ? { x: msg.at.x, y: msg.at.y, z: Number.isFinite(msg.at.z) ? msg.at.z : 0 } : null;
+      const action = String(msg.action || '');
+      if (!devWormholes(game, me || null, action, at)) return send(ws, { t: 'notice', key: 'dev.nothing' });
+      console.log(`Dev: ${c.account ?? 'guest'} - wormholes ${action} in game ${game.id}`);
+      chat(game, 'System', { key: `chat.dev.${action}`, params: { player: me?.name ?? c.account ?? '?' } });
+      broadcastView(game);
+      break;
+    }
     case 'pace': {
       // Only AI games run at the spectators' pace - never one with humans.
       if (!game || !game.spectators.has(connId) || !watchable(game)) return;
@@ -994,6 +1019,7 @@ function sanitizeSettings(s) {
   if (Number.isFinite(s.maxTurns)) out.maxTurns = s.maxTurns === 0 ? 0 : Math.min(999, Math.max(20, Math.round(s.maxTurns)));
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
   if (typeof s.voice === 'boolean') out.voice = s.voice;
+  if (typeof s.wormholes === 'boolean') out.wormholes = s.wormholes;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
   return out;
@@ -1072,6 +1098,7 @@ server.listen(PORT, async () => {
   } catch (e) {
     console.error('Accounts: could not assign handles -', e.message);
   }
+  if (DEV) console.warn(`Dev mode: ON (HO_DEV) - testing aids for ${authEnabled() ? 'admins' : 'everyone'}.`);
   if (VOICE && STUN_PORT) {
     stunPort = await startStun(STUN_PORT);
     if (stunPort) console.log(`CB radio: STUN on UDP ${stunPort}${STUN_URL ? ` (announced as ${STUN_URL})` : ''}`);

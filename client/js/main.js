@@ -6,6 +6,7 @@ import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
 import { FriendsPanel } from './ui/friends.js';
 import { DebugDialog } from './ui/debug.js';
+import { bindKeys, toggleKeys } from './ui/keys.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
 import { openNews, hasNews, newsOnHello } from './ui/news.js';
@@ -131,7 +132,15 @@ const voice = new Voice({ send: m => net.send(m) });
 const admin = new AdminPanel(net);
 const friends = new FriendsPanel(net);
 const debug = new DebugDialog();
-$('#admin-debug').onclick = () => debug.toggle(true);
+let devMode = false;
+bindKeys(() => ({
+  space: map?.view?.mode === 'space',
+  spectator: app.spectator,
+  // The talk key only while the CB radio is on offer in this game.
+  voiceKey: map && !$('#voice-opts').classList.contains('hidden') ? voice.keyLabel() : null,
+  dev: devMode
+}));
+$('#help-keys').onclick = () => toggleKeys(true);
 account();
 let map = null;
 let hud = null;
@@ -173,11 +182,38 @@ const app = {
     const sel = app.selection;
     if (!sel || !map) return;
     const target = sel.type === 'planet' ? map.view?.planets[sel.id]
+      : sel.type === 'hole' ? map.view?.wormholes?.find(m => m.id === sel.id)
       : map.view?.fleets.find(f => f.id === sel.id);
     if (target) map.focus(target, app.freeArea());
   },
   order(planetId) {
-    if (app.spectator) return;
+    const fleetId = app.orderFleet();
+    if (!fleetId) return;
+    net.send({ t: 'orders', move: { fleetId, planetId } });
+    sfx.play('course', { pan: panOf(planetId) });
+  },
+  /** Course into a wormhole mouth: the fleet jumps when it gets there. */
+  orderHole(hole) {
+    const fleetId = app.orderFleet();
+    if (!fleetId) return;
+    net.send({ t: 'orders', move: { fleetId, hole } });
+    sfx.play('course');
+  },
+  /**
+   * The selected own fleet falls apart into single ships, without the
+   * split dialog - in orbit as in flight (then all keep the course).
+   */
+  splitAll() {
+    if (app.spectator || app.selection?.type !== 'fleet') return;
+    const fleet = map?.view?.fleets.find(f => f.id === app.selection.id);
+    if (!fleet?.mine || fleet.ships.length < 2) { sfx.play('deny'); return; }
+    net.send({ t: 'orders', split: { fleetId: fleet.id, ships: fleet.ships.map(s => s.id), each: true } });
+    hud?.toast(t('fleet.splitAllDone', { n: fleet.ships.length, count: fleet.ships.length }));
+    sfx.play('course');
+  },
+  /** The fleet a course order is for - null (with a hint) if there is none. */
+  orderFleet() {
+    if (app.spectator) return null;
     const sel = app.selection;
     const fleetId = sel?.type === 'fleet' ? sel.id : hud?.lastFleetId;
     // Only order a fleet that really exists in this view and belongs to us -
@@ -185,10 +221,9 @@ const app = {
     // did not register.
     const fleet = map?.view?.fleets.find(f => f.id === fleetId);
     if (!fleetId || !fleet || !fleet.mine) {
-      hud?.toast(t('fleet.selectFirst')); sfx.play('deny'); return;
+      hud?.toast(t('fleet.selectFirst')); sfx.play('deny'); return null;
     }
-    net.send({ t: 'orders', move: { fleetId, planetId } });
-    sfx.play('course', { pan: panOf(planetId) });
+    return fleetId;
   },
   get map() { return map; },
   /**
@@ -222,7 +257,11 @@ net.on('hello', (m) => {
   // Friends need an account - the handle only exists with one.
   friends.setEnabled(m.profile?.handle || null);
   admin.setEnabled(m.admin);
-  debug.setEnabled(m.admin);
+  // Dev mode (HO_DEV on the server) opens the debug dialog with its testing
+  // aids - for admins, or for everyone without sign-in. Otherwise it is off.
+  debug.setEnabled(m.dev);
+  devMode = !!m.dev;
+  debug.setDev(m.dev ? app : null);
   // Admins cannot delete their own account (the server refuses it too).
   $('#link-delete').classList.toggle('hidden', !!m.admin);
   showPendingNotice();
@@ -327,7 +366,8 @@ net.on('view', (m) => {
   map.selection = app.selection;
 
   // Clear the selection if it no longer exists
-  if (app.selection?.type === 'fleet' && !view.fleets.some(f => f.id === app.selection.id)) {
+  if ((app.selection?.type === 'fleet' && !view.fleets.some(f => f.id === app.selection.id))
+    || (app.selection?.type === 'hole' && !view.wormholes?.some(m => m.id === app.selection.id))) {
     app.selection = null;
     map.selection = null;
   }
@@ -342,7 +382,7 @@ net.on('view', (m) => {
     // pop-ups, otherwise they plaster the screen at a fast pace.
     const loud = view.spectator
       ? ['eliminated', 'victory']
-      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy'];
+      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole'];
     for (const l of settled(view)) {
       for (const e of l.entries) {
         if (!loud.includes(e.type)) continue;
@@ -406,6 +446,7 @@ function bindGame() {
   };
   map.onOrder = (hit) => {
     if (hit?.type === 'planet') app.order(hit.id);
+    if (hit?.type === 'hole') app.orderHole(hit.id);
   };
   map.onHoverChange = () => {};
 
@@ -458,6 +499,10 @@ function bindGame() {
   };
 
   $('#btn-fit').onclick = () => map.fit();
+  $('#btn-keys').onclick = () => {
+    if (narrow.matches) showSheet(''); else showOpts(false);
+    toggleKeys(true);
+  };
   $('#btn-zoomin').onclick = () => map.zoomBy(1.25);
   $('#btn-zoomout').onclick = () => map.zoomBy(1 / 1.25);
   // Sheets on narrow devices: only one open at a time, controlled via the bar
@@ -616,6 +661,8 @@ function bindGame() {
       else app.setSelection(null);
     }
     if (e.key === 'h' || e.key === 'H') $('#help').classList.toggle('hidden');
+    if (e.key === '?') toggleKeys();
+    if ((e.key === 's' || e.key === 'S') && !e.repeat) app.splitAll();
     if (e.key === '+') map.zoomBy(1.25);
     if (e.key === '-') map.zoomBy(1 / 1.25);
   });
@@ -630,7 +677,7 @@ function panOf(planetId) {
 }
 
 // Important things first: with many events, the rest falls by the wayside.
-const SFX_PRIO = ['victory', 'eliminated', 'lost', 'invade', 'combat', 'expand',
+const SFX_PRIO = ['victory', 'eliminated', 'lost', 'invade', 'combat', 'wormhole', 'expand',
   'colonize', 'settle', 'tech', 'build', 'terra', 'arrive', 'warn'];
 
 /**
