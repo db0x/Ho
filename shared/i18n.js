@@ -12,7 +12,7 @@ export const FALLBACK = 'en';
 let current = FALLBACK;
 
 /** Language tag for numbers and dates - more than the two letters. */
-const TAGS = { de: 'de-DE', en: 'en-US' };
+const TAGS = { de: 'de-DE', en: 'en-US', uk: 'uk-UA' };
 
 export function registerLocale(code, messages) {
   catalogs.set(code, { ...(catalogs.get(code) || {}), ...messages });
@@ -45,21 +45,32 @@ export function hasKey(key) {
 }
 
 function lookup(key, params) {
-  const form = params && params.count != null ? plural(params.count) : null;
   // Without count the plural form is used - better than the bare key in case
   // a call forgets the count.
-  const candidates = form ? [`${key}#${form}`, key] : [key, `${key}#other`];
   for (const code of [current, FALLBACK]) {
     const cat = catalogs.get(code);
     if (!cat) continue;
+    const form = params && params.count != null ? plural(code, params.count) : null;
+    const candidates = form ? [`${key}#${form}`, `${key}#other`, key] : [key, `${key}#other`];
     for (const k of candidates) if (cat[k] != null) return cat[k];
   }
   return key;
 }
 
-// German and English share the same simple rule. If a language with more
-// forms is added, an Intl.PluralRules belongs here.
-function plural(n) { return Math.abs(n) === 1 ? 'one' : 'other'; }
+// Plural forms by the language's own rule: German and English know one and
+// other, Ukrainian one, few, many and other (1 корабель, 2 кораблі,
+// 5 кораблів, 1,5 корабля).
+const pluralRules = new Map();
+function plural(code, n) {
+  let rules = pluralRules.get(code);
+  if (!rules) pluralRules.set(code, rules = new Intl.PluralRules(localeTag(code)));
+  return rules.select(Math.abs(n));
+}
+
+/** Plural forms a language needs in its catalog (key#form). */
+export function pluralForms(code) {
+  return new Intl.PluralRules(localeTag(code)).resolvedOptions().pluralCategories;
+}
 
 function interpolate(text, params) {
   if (!params || typeof text !== 'string') return text;

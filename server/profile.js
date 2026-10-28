@@ -24,10 +24,14 @@ const FORMATS = {
 /**
  * Names end up everywhere in the client via innerHTML - so nothing that could
  * be read as markup there, no control characters, no whitespace at the edges.
+ * An apostrophe (' or `) becomes the letter apostrophe ʼ instead of vanishing:
+ * Мар'яна and O'Brien stay readable, and nothing can break out of an
+ * attribute or a string.
  */
 export function cleanName(name) {
   return String(name ?? '')
-    .replace(/[\u0000-\u001f\u007f<>&"'`\\]/g, '')
+    .replace(/['`]/g, 'ʼ')
+    .replace(/[\u0000-\u001f\u007f<>&"\\]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, NAME_MAX)

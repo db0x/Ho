@@ -7,9 +7,9 @@ import {
 
 // The catalogs live as JSON under /i18n/<code>.json: keys are named by area
 // (menu., lobby., log. ...), {values} get inserted, keys with #one / #other
-// are singular and plural. They load before anything else - whoever imports
+// (Ukrainian also #few / #many) are the plural forms. They load before anything else - whoever imports
 // this module waits until both are there.
-const LANGUAGES = ['de', 'en'];
+const LANGUAGES = ['de', 'en', 'uk'];
 const catalogs = await Promise.all(LANGUAGES.map(code =>
   fetch(`i18n/${code}.json`).then(r => {
     if (!r.ok) throw new Error(`Catalog ${code}: HTTP ${r.status}`);
