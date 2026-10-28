@@ -26,7 +26,7 @@ server/
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
-  userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil – atomar geschrieben
+  userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil, Nachrichtenschlüssel (verpackt) – atomar geschrieben
   profile.js         Anzeigenamen und Profilbilder: prüfen, speichern, ausliefern
   invites.js         Einmal-Einladungslinks: erzeugen, prüfen, einlösen, verfallen (nur Hashes)
   friends.js         Freundschaften und Direktnachrichten zwischen Konten (friends.json)
@@ -38,6 +38,7 @@ client/
   i18n/              de.json, en.json – Textkataloge
   js/main.js         Verdrahtung, Spielschleife, Rundenwechsel
   js/net.js          WebSocket mit automatischem Wiederverbinden
+  js/e2e.js          Ende-zu-Ende-Verschlüsselung der Freundesnachrichten: ein Schlüssel pro Konto, mit dem Passwort verpackt
   js/render/         planets.js, ships.js (Karte), shipshd.js (Steckbrief, Schlacht),
                      map.js (flach), space.js (räumlich), courses.js (Kurslinien, Orbitplätze), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),

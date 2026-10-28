@@ -10,24 +10,20 @@
 // and for no longer than MESSAGE_TTL - read or not.
 //
 // Messages are end-to-end encrypted (client/js/e2e.js): what is stored here
-// is an envelope - ciphertext plus the message key, wrapped for every device
-// that may read it. The server keeps the devices' public keys so friends can
-// encrypt for each other, and checks no more than the shape of an envelope.
+// is an envelope - ciphertext and the public keys of sender and recipient.
+// The keys themselves belong to the accounts (userstore.js); here no more
+// than the shape of an envelope is checked.
 import fs from 'node:fs';
 import path from 'node:path';
-import { userFile, normalizeName } from './userstore.js';
+import { userFile, normalizeName, keyOf } from './userstore.js';
 
 export const MESSAGE_MAX = 500;
 // Ciphertext of MESSAGE_MAX characters of the widest UTF-8, as base64, with room.
 const CIPHER_MAX = 3000;
-export const DEVICES_MAX = 10;
-const DEVICE_RE = /^[0-9a-f]{16}$/;
-// Raw P-256 public key: 65 bytes, base64.
-const PUB_RE = /^B[A-Za-z0-9+/]{86}=$/;
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 export const MESSAGES_KEPT = 200;
 // The server is a mailbox, not an archive: the less ciphertext lies around,
-// the less a device key stolen later can open.
+// the less a key stolen later can open.
 export const MESSAGE_TTL = 14 * 24 * 3600 * 1000;
 export const PENDING_MAX = 20;
 
@@ -38,7 +34,7 @@ export function friendsFile() {
 let db = null;
 let dbFile = null;
 
-function empty() { return { version: 2, links: [], messages: {}, read: {}, devices: {} }; }
+function empty() { return { version: 3, links: [], messages: {}, read: {} }; }
 
 function data() {
   // Tests point HO_USERS_FILE elsewhere - then the friends follow.
@@ -47,12 +43,13 @@ function data() {
   try {
     const raw = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
     db = { ...empty(), ...raw };
-    // Version 1 kept messages in plain text. They go - nothing readable
-    // stays behind on the server.
-    if (raw.version !== 2) {
-      db.version = 2;
+    // Version 1 kept messages in plain text, version 2 encrypted them per
+    // device. Both go - from version 3 on, one key per account encrypts.
+    if (raw.version !== 3) {
+      db.version = 3;
       db.messages = {};
       db.read = {};
+      delete db.devices;
       save();
     }
   } catch (e) {
@@ -144,51 +141,25 @@ export function linksOf(me) {
   return out;
 }
 
-// ------------------------------------------------------------------ Devices
+// ----------------------------------------------------------------- Messages
 
-/**
- * Registers a device's public key (or notes that it is still in use). The
- * oldest unused devices drop out beyond DEVICES_MAX. Returns whether the set
- * of keys changed - then the friends' safety codes change too.
- */
-export function addDevice(me, id, pub) {
-  if (!DEVICE_RE.test(String(id)) || !PUB_RE.test(String(pub))) throw new Error('friends.err.badKey');
-  const list = data().devices[me] || (db.devices[me] = []);
-  const known = list.find(d => d.id === id);
-  if (known && known.pub === pub) { known.seen = Date.now(); return false; }
-  if (known) list.splice(list.indexOf(known), 1);
-  list.push({ id, pub, seen: Date.now() });
-  list.sort((a, b) => b.seen - a.seen);
-  list.splice(DEVICES_MAX);
-  save();
-  return true;
-}
-
-/** The devices of an account: {id, pub}. */
-export function devicesOf(name) {
-  return (data().devices[name] || []).map(d => ({ id: d.id, pub: d.pub }));
+/** The public message key of an account, or null if it has none yet. */
+export function publicKey(name) {
+  return keyOf(name)?.pub || null;
 }
 
 /**
- * Checks an envelope's shape: from a device of the sender, ciphertext within
- * bounds, a key for at most every device of both. Reading it is impossible here.
+ * Checks an envelope's shape: made with the sender's key for the recipient's,
+ * ciphertext within bounds. Reading it is impossible here.
  */
 function checkEnvelope(me, them, env) {
   const bad = () => { throw new Error('friends.err.badMessage'); };
-  if (!env || typeof env !== 'object' || env.v !== 1) bad();
-  const own = devicesOf(me).find(d => d.id === env.dev);
-  if (!own || own.pub !== env.pub) bad();
+  if (!env || typeof env !== 'object' || env.v !== 2) bad();
+  const mine = publicKey(me), theirs = publicKey(them);
+  if (!mine || !theirs || env.a !== mine || env.b !== theirs) bad();
   if (typeof env.iv !== 'string' || !B64_RE.test(env.iv) || env.iv.length > 24) bad();
   if (typeof env.ct !== 'string' || !B64_RE.test(env.ct) || env.ct.length > CIPHER_MAX) bad();
-  const allowed = new Set([...devicesOf(me), ...devicesOf(them)].map(d => d.id));
-  const keys = env.keys && typeof env.keys === 'object' ? Object.entries(env.keys) : [];
-  if (!keys.length || keys.length > allowed.size) bad();
-  for (const [id, k] of keys) {
-    if (!allowed.has(id) || typeof k?.iv !== 'string' || typeof k?.k !== 'string'
-      || !B64_RE.test(k.iv) || !B64_RE.test(k.k) || k.iv.length > 24 || k.k.length > 80) bad();
-  }
-  return { v: 1, dev: env.dev, pub: env.pub, iv: env.iv, ct: env.ct,
-    keys: Object.fromEntries(keys.map(([id, k]) => [id, { iv: k.iv, k: k.k }])) };
+  return { v: 2, a: env.a, b: env.b, iv: env.iv, ct: env.ct };
 }
 
 /** A direct message between friends, as an encrypted envelope. Returns the stored entry. */
@@ -247,7 +218,6 @@ export function forget(name) {
   const me = normalizeName(name);
   for (const l of linksOf(me).friends.concat(linksOf(me).incoming, linksOf(me).outgoing)) remove(me, l.name);
   delete data().read[me];
-  delete db.devices[me];
   save();
 }
 
@@ -263,7 +233,6 @@ export function purge(existing) {
   for (const key of Object.keys(d.messages)) {
     if (!key.split('|').every(n => keep.has(n))) delete d.messages[key];
   }
-  for (const me of Object.keys(d.devices)) if (!keep.has(me)) delete d.devices[me];
   for (const me of Object.keys(d.read)) {
     if (!keep.has(me)) { delete d.read[me]; continue; }
     for (const them of Object.keys(d.read[me])) if (!keep.has(them)) delete d.read[me][them];

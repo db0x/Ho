@@ -26,7 +26,7 @@ server/
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
-  userstore.js       Accounts on disk: name, scrypt hash, profile – written atomically
+  userstore.js       Accounts on disk: name, scrypt hash, profile, message key (wrapped) – written atomically
   profile.js         Display names and profile pictures: check, store, serve
   invites.js         One-time invite links: create, check, use up, expire (hashes only)
   friends.js         Friendships and direct messages between accounts (friends.json)
@@ -38,6 +38,7 @@ client/
   i18n/              de.json, en.json – text catalogues
   js/main.js         Wiring, game loop, turn changes
   js/net.js          WebSocket with automatic reconnect
+  js/e2e.js          End-to-end encryption of friend messages: one key per account, wrapped with the password
   js/render/         planets.js, ships.js (map), shipshd.js (data sheet, battle),
                      map.js (flat), space.js (spatial), courses.js (course lines, orbit slots), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),

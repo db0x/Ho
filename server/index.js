@@ -296,13 +296,14 @@ function friendsView(key) {
     const p = publicOf(l.name);
     return p && { ...p, ...extra(l) };
   }).filter(Boolean);
-  // The keys to encrypt for: every device of a friend, and our own.
+  // The keys to encrypt with: the friend's public one, and our own - a
+  // browser whose key no longer matches it opens nothing.
   const lastAt = (name) => friends.history(key, name).at(-1)?.at || 0;
   return {
-    devices: friends.devicesOf(key),
+    key: friends.publicKey(key),
     friends: people(links.friends, l => ({
       status: statusOf(l.name), unread: friends.unread(key, l.name), last: lastAt(l.name),
-      devices: friends.devicesOf(l.name)
+      key: friends.publicKey(l.name)
     })).sort((a, b) => (a.status === 'offline') - (b.status === 'offline') || b.last - a.last || a.name.localeCompare(b.name)),
     incoming: people(links.incoming, l => ({ since: l.since })),
     outgoing: people(links.outgoing, l => ({ since: l.since }))
@@ -326,19 +327,6 @@ function pushFriends(...keys) {
 
 function friendMessage(c, ws, msg) {
   const me = c.accountKey;
-  if (msg.t === 'e2eDevice') {
-    // This browser's public key. A new one changes the safety codes of all
-    // friends - they get the new list right away.
-    try {
-      const changed = friends.addDevice(me, msg.id, msg.pub);
-      c.device = msg.id;
-      if (changed) pushFriends(me, ...friends.linksOf(me).friends.map(f => f.name));
-      else sendFriends(c);
-    } catch (e) {
-      send(ws, { t: 'error', key: e.message });
-    }
-    return;
-  }
   const target = userByHandle(msg.handle);
   if (msg.t === 'friendLookup') {
     const now = Date.now();
@@ -693,8 +681,7 @@ function handle(connId, ws, msg) {
     case 'friendRemove':
     case 'friendMsg':
     case 'friendHistory':
-    case 'friendRead':
-    case 'e2eDevice': {
+    case 'friendRead': {
       // Friends exist only between accounts - guests have nobody to find.
       if (!c.accountKey || !authEnabled()) return send(ws, { t: 'error', key: 'friends.err.account' });
       friendMessage(c, ws, msg);

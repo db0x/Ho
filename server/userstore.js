@@ -1,6 +1,7 @@
 // User accounts. The host only stores who may play (name) and how a password
 // can be checked (scrypt hash with salt and parameters) - no plain text, no
-// session keys, no email addresses.
+// session keys, no email addresses. The key for messages between friends
+// lies here too, but only wrapped with the password (client/js/e2e.js).
 //
 // Accounts are created and deleted from outside with server/users.js, i.e. via
 // `docker exec`. The server only reads the file and notices from mtime and size
@@ -331,17 +332,24 @@ export function deleteUser(name) {
  * Sets a password. `mustChange` means: on the next sign-in the player has to
  * choose their own - that is how it is after creating and after resetting.
  */
-export async function setPassword(name, password, { mustChange = false } = {}) {
+/**
+ * Sets a new password. The message key was wrapped with the old one: it stays
+ * only if `e2e` brings it rewrapped for the new one - otherwise it goes, and
+ * the next sign-in makes a new one. That is what a reset does.
+ */
+export async function setPassword(name, password, { mustChange = false, e2e = null } = {}) {
   const key = normalizeName(name);
   const db = load();
   if (!db.users[key]) throw new Error('auth.cli.unknown');
   const problem = checkPassword(password, key);
   if (problem) throw new Error(problem);
+  const { e2e: _old, ...rest } = db.users[key];
   db.users[key] = {
-    ...db.users[key],
+    ...rest,
     hash: await hashPassword(password),
     mustChange,
-    changed: new Date().toISOString()
+    changed: new Date().toISOString(),
+    ...(e2e ? { e2e } : {})
   };
   save(db);
   return { name: key };
@@ -372,4 +380,40 @@ export async function verifyUser(name, password) {
  */
 export function stampOf(hash) {
   return crypto.createHash('sha256').update(String(hash ?? '')).digest('base64url').slice(0, 16);
+}
+
+// --------------------------------------------------------------- Message key
+
+const KEY_B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+// Raw P-256 public key: 65 bytes, base64.
+export const PUB_RE = /^B[A-Za-z0-9+/]{86}=$/;
+
+/**
+ * A wrapped key as client/js/e2e.js makes it: {pub, salt, iv, key, iter}.
+ * Returns a clean copy, or null if the shape is off. Whether it opens, only
+ * the password can tell - and that never stays here.
+ */
+export function cleanKey(k) {
+  if (!k || typeof k !== 'object') return null;
+  const b64 = (v, max) => typeof v === 'string' && v.length <= max && KEY_B64.test(v);
+  if (typeof k.pub !== 'string' || !PUB_RE.test(k.pub)) return null;
+  if (!b64(k.salt, 44) || !b64(k.iv, 24) || !b64(k.key, 400)) return null;
+  if (!Number.isInteger(k.iter) || k.iter < 100_000 || k.iter > 10_000_000) return null;
+  return { pub: k.pub, salt: k.salt, iv: k.iv, key: k.key, iter: k.iter };
+}
+
+/** The account's message key (wrapped), or null if it has none yet. */
+export function keyOf(name) {
+  return getUser(name)?.e2e || null;
+}
+
+/** Stores the account's first message key. A key there already stays: replacing it goes via setPassword. */
+export function setKey(name, e2e) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key]) throw new Error('auth.cli.unknown');
+  if (db.users[key].e2e) return false;
+  db.users[key].e2e = e2e;
+  save(db);
+  return true;
 }

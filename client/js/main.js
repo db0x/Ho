@@ -108,7 +108,8 @@ async function account() {
     e.preventDefault();
     openPassword(me.minPassword);
   };
-  bindDelete(() => net.forget());
+  // The message key goes along: nothing of the account stays in this browser.
+  bindDelete(() => { net.forget(); friends.forgetKey(); });
   document.querySelector('#del-user').value = me.user;
   document.querySelector('#link-delete').onclick = (e) => {
     e.preventDefault();
@@ -117,6 +118,8 @@ async function account() {
   document.querySelector('#link-logout').onclick = async (e) => {
     e.preventDefault();
     net.forget();
+    // Signed out, the message key leaves this browser - the next sign-in opens it again.
+    await friends.forgetKey();
     try { await fetch('api/auth/logout', { method: 'POST' }); } catch { /* never mind */ }
     leaveTo('login.html');
   };

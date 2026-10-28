@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import {
   verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, validName, addUser, MIN_PASSWORD,
-  deleteUser
+  deleteUser, keyOf, setKey, cleanKey
 } from './userstore.js';
 import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
 import { forget as forgetFriends } from './friends.js';
@@ -50,7 +50,7 @@ export function authEnabled() {
 // What goes out without sign-in: the sign-in page and what it needs to
 // display. Everything else - game client, rules, WebSocket - stays closed.
 const PUBLIC_EXACT = new Set([
-  '/login.html', '/js/login.js', '/js/i18n.js', '/js/ui/scene.js', '/shared/i18n.js', '/favicon.ico',
+  '/login.html', '/js/login.js', '/js/e2e.js', '/js/i18n.js', '/js/ui/scene.js', '/shared/i18n.js', '/favicon.ico',
   '/manifest.webmanifest'
 ]);
 const PUBLIC_PREFIX = ['/css/', '/img/', '/i18n/'];
@@ -240,6 +240,13 @@ export function handleAuth(req, res, urlPath) {
   if (route === 'login' && req.method === 'POST') { login(req, res); return true; }
   if (route === 'change' && req.method === 'POST') { change(req, res); return true; }
   if (route === 'delete' && req.method === 'POST') { remove(req, res); return true; }
+  if (route === 'key' && req.method === 'GET') {
+    const s = sessionOf(req);
+    if (!s) json(res, 401, { error: 'auth.err.noSession' });
+    else json(res, 200, keyView(s.user));
+    return true;
+  }
+  if (route === 'key' && req.method === 'POST') { storeKey(req, res); return true; }
   if (route.startsWith('invite') && req.method === 'GET') { checkInvite(req, res); return true; }
   if (route === 'redeem' && req.method === 'POST') { redeem(req, res); return true; }
   if (route === 'logout' && req.method === 'POST') {
@@ -328,7 +335,7 @@ async function redeem(req, res) {
   const stored = account(user.name);
   setCookie(req, res, newSession({ name: user.name, stamp: stampOf(stored.hash), mustChange: false }));
   console.log(`Account ${user.display} created via invite of ${used.by}`);
-  json(res, 200, { ok: true, user: user.name });
+  json(res, 200, { ok: true, user: user.name, ...keyView(user.name) });
 }
 
 async function login(req, res) {
@@ -358,7 +365,8 @@ async function login(req, res) {
   succeeded(`u:${name}`, `i:${ip}`);
   setCookie(req, res, newSession(user));
   console.log(`Signed in: ${user.name}${user.mustChange ? ' (password change due)' : ''}`);
-  json(res, 200, { ok: true, user: user.name, mustChange: user.mustChange });
+  // The wrapped message key: the sign-in page opens it with the password just typed.
+  json(res, 200, { ok: true, user: user.name, mustChange: user.mustChange, ...keyView(user.name) });
 }
 
 async function change(req, res) {
@@ -391,7 +399,11 @@ async function change(req, res) {
   const problem = checkPassword(newPw, s.user);
   if (problem) return json(res, 400, { error: problem, params: { n: MIN_PASSWORD } });
 
-  try { await setPassword(s.user, newPw, { mustChange: false }); } catch (e) {
+  // The message key, rewrapped by the browser for the new password. Only the
+  // same key may come back this way - without it, the key goes.
+  const e2e = cleanKey(data.e2e);
+  const keep = e2e && e2e.pub === keyOf(s.user)?.pub ? e2e : null;
+  try { await setPassword(s.user, newPw, { mustChange: false, e2e: keep }); } catch (e) {
     console.error('Password change failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
@@ -401,8 +413,51 @@ async function change(req, res) {
   revoke(s.user);
   const fresh = account(s.user);
   setCookie(req, res, newSession({ name: s.user, stamp: stampOf(fresh.hash), mustChange: false }));
-  console.log(`Password changed: ${s.user}`);
-  json(res, 200, { ok: true, user: s.user, mustChange: false });
+  console.log(`Password changed: ${s.user}${keyOf(s.user) ? '' : ' (message key dropped)'}`);
+  json(res, 200, { ok: true, user: s.user, mustChange: false, ...keyView(s.user) });
+}
+
+/** Handle and wrapped message key of an account - what the browser needs to open or make it. */
+function keyView(name) {
+  return { handle: getUser(name)?.handle || null, e2e: keyOf(name) };
+}
+
+/**
+ * POST /api/auth/key {password, e2e} - the account's first message key,
+ * wrapped in the browser. The password is checked here: a key wrapped with a
+ * typo would open on no other device. If there is a key already, it stays
+ * and comes back - the browser then opens that one.
+ */
+async function storeKey(req, res) {
+  const s = sessionOf(req);
+  if (!s) return json(res, 401, { error: 'auth.err.noSession' });
+  let data;
+  try { data = await body(req); } catch (e) {
+    console.warn('Message key not understood:', e.message);
+    return json(res, 400, { error: 'auth.err.badRequest' });
+  }
+  const ip = origin(req);
+  const wait = lockedFor(`u:${s.user}`, `i:${ip}`);
+  if (wait) return json(res, 429, { error: 'auth.err.locked', params: { n: wait } });
+  let user = null;
+  try { user = await verifyUser(s.user, String(data.password ?? '')); } catch (e) {
+    console.error('Password check failed:', e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  if (!user) {
+    failedAttempt(`u:${s.user}`, `i:${ip}`);
+    return json(res, 401, { error: 'auth.err.badLogin' });
+  }
+  succeeded(`u:${s.user}`, `i:${ip}`);
+  const e2e = cleanKey(data.e2e);
+  if (!e2e) return json(res, 400, { error: 'auth.err.badRequest' });
+  try {
+    if (setKey(s.user, e2e)) console.log(`Message key created: ${s.user}`);
+  } catch (e) {
+    console.error('Storing the message key failed:', e.message);
+    return json(res, 500, { error: 'auth.err.server' });
+  }
+  json(res, 200, { ok: true, ...keyView(s.user) });
 }
 
 /**

@@ -2,7 +2,9 @@
 // real server with real accounts. What is checked above all: a stranger only
 // ever learns the handle, the name and the image, never the sign-in name -
 // and the server never gets to see the text of a message (end-to-end, with
-// the browser's own client/js/e2e.js, here on Node's WebCrypto).
+// the browser's own client/js/e2e.js, here on Node's WebCrypto). One key per
+// account, kept on the server wrapped with the password: every sign-in, on
+// any device, opens the same one.
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import fs from 'node:fs';
@@ -14,7 +16,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ho-friends-'));
 const USERS = path.join(dir, 'users.json');
 process.env.HO_USERS_FILE = USERS;
 const { addUser, getUser } = await import('../server/userstore.js');
-const { createDevice, encrypt, decrypt, safetyCode } = await import('../client/js/e2e.js');
+const { setupKey, unwrapKey, rewrapKey, encrypt, decrypt, safetyCode } = await import('../client/js/e2e.js');
 
 let errors = 0;
 const check = (cond, msg) => { if (!cond) { console.error('ERROR: ' + msg); errors++; } return cond; };
@@ -26,8 +28,8 @@ const handle = name => getUser(name).handle;
 // Left over from before: one message past the 14 days, one within. The server
 // has to drop the old one at boot, unread or not.
 const DAY = 24 * 3600 * 1000;
-const oldEnv = { v: 1, dev: '0'.repeat(16), pub: 'B' + 'A'.repeat(86) + '=', iv: 'AAAA', ct: 'AAAA', keys: {} };
-fs.writeFileSync(path.join(dir, 'friends.json'), JSON.stringify({ version: 2, links: [], read: {}, devices: {},
+const oldEnv = { v: 2, a: 'B' + 'A'.repeat(86) + '=', b: 'B' + 'B'.repeat(86) + '=', iv: 'AAAA', ct: 'AAAA' };
+fs.writeFileSync(path.join(dir, 'friends.json'), JSON.stringify({ version: 3, links: [], read: {},
   messages: { 'alice|carol': [{ from: 'alice', env: oldEnv, at: Date.now() - 15 * DAY }, { from: 'alice', env: oldEnv, at: Date.now() - 13 * DAY }] } }));
 
 const PORT = 8711 + Math.floor(Math.random() * 300);
@@ -46,12 +48,29 @@ await new Promise(r => server.stdout.once('data', r));
   check(left.length === 1 && Date.now() - left[0].at < 14 * DAY, 'Messages older than 14 days survive the boot');
 }
 
-/** Signs in and opens the WebSocket with this device's key; collects everything that arrives. */
-async function connect(name, device) {
-  const r = await fetch(BASE + '/api/auth/login', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user: name, password: PW })
+/** POST/GET to /api/auth/* with a session cookie. */
+async function api(route, cookie, data) {
+  const r = await fetch(`${BASE}/api/auth/${route}`, {
+    method: data ? 'POST' : 'GET',
+    headers: { cookie, ...(data ? { 'content-type': 'application/json' } : {}) },
+    body: data ? JSON.stringify(data) : undefined
   });
+  return { status: r.status, cookie: r.headers.get('set-cookie')?.split(';')[0], ...(await r.json()) };
+}
+
+/**
+ * Signs in like the sign-in page: opens the account's key with the password
+ * (or makes the first one), then opens the WebSocket. Every call is a device
+ * of its own - nothing is kept between two of them.
+ */
+async function connect(name, password = PW) {
+  const r = await fetch(BASE + '/api/auth/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user: name, password })
+  });
+  const login = await r.json();
   const cookie = r.headers.get('set-cookie').split(';')[0];
+  const key = await setupKey(login.handle, password, login.e2e,
+    async e2e => (await api('key', cookie, { password, e2e })).e2e);
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
   const inbox = [];
   const waiters = [];
@@ -62,7 +81,7 @@ async function connect(name, device) {
     for (const w of [...waiters]) if (w.test(m)) { waiters.splice(waiters.indexOf(w), 1); w.ok(m); }
   });
   const c = {
-    ws, inbox, device, view: null,
+    ws, inbox, key, cookie, view: null,
     send: m => ws.send(JSON.stringify(m)),
     /** The next message of this type (and condition) - also one that already came. */
     next(t, cond = () => true, ms = 3000) {
@@ -78,24 +97,39 @@ async function connect(name, device) {
     // Status changes are pushed by a timer every three seconds.
     async friends(cond) { return c.next('friends', cond, 5000); },
     drain() { inbox.length = 0; },
-    /** Encrypted for every device of the friend and every own one - as the panel does it. */
+    /** Encrypted for the friend's key - as the panel does it. */
     async write(friendHandle, text) {
       const f = c.view.friends.find(x => x.handle === friendHandle);
-      c.send({ t: 'friendMsg', handle: friendHandle, env: await encrypt(device, text, [...f.devices, ...c.view.devices]) });
+      c.send({ t: 'friendMsg', handle: friendHandle, env: await encrypt(key, text, f.key) });
     },
-    read: msg => decrypt(device, msg.env)
+    read: msg => decrypt(key, msg.env)
   };
   await c.next('hello');
-  c.send({ t: 'e2eDevice', id: device.id, pub: device.pub });
-  await c.friends(m => m.devices.some(d => d.id === device.id));
+  await c.friends(m => m.key === key.pub);
   return c;
 }
 
+const saved = name => JSON.parse(fs.readFileSync(USERS, 'utf8')).users[name].e2e;
+
 try {
-  const keys = { alice: await createDevice(), bob: await createDevice(), carol: await createDevice() };
-  const alice = await connect('alice', keys.alice);
-  const bob = await connect('bob', keys.bob);
+  const alice = await connect('alice');
+  const bob = await connect('bob');
   check(alice.view.friends.length === 0 && alice.view.incoming.length === 0, 'A new account already has friends');
+
+  // --- The key: made at the first sign-in, kept wrapped, the same on every device
+  const wrapped = saved('alice');
+  check(wrapped?.pub === alice.key.pub && wrapped.key && wrapped.iter >= 100000, 'Alice\'s key is not kept with her account');
+  check(!JSON.stringify(wrapped).includes('"d"'), 'The private key lies in users.json unwrapped');
+  check(await unwrapKey(wrapped, 'not the password') === null, 'The key opens with a wrong password');
+  const second = await setupKey(handle('alice'), PW, wrapped, () => { throw new Error('made a second key'); });
+  check(second.pub === alice.key.pub, 'A second device gets another key');
+  const other = { ...wrapped, pub: saved('bob').pub };
+  check(await unwrapKey(other, PW) === null, 'A private key opens next to a foreign public key');
+  check((await api('key', alice.cookie, { password: 'wrongPassword1', e2e: wrapped })).status === 401,
+    'A key is accepted without the right password');
+  const taken = await api('key', alice.cookie, { password: PW, e2e: { ...wrapped, pub: saved('bob').pub } });
+  check(taken.e2e.pub === alice.key.pub && saved('alice').pub === alice.key.pub, 'An existing key gets replaced');
+  console.log('Key: made at the first sign-in, kept only wrapped, the same key on every device.');
 
   // --- Looking up: name and image, never the sign-in name
   alice.send({ t: 'friendLookup', handle: '#' + handle('bob').toLowerCase() });
@@ -131,67 +165,73 @@ try {
 
   // --- Messages: encrypted, also to someone offline, with unread count
   alice.drain(); bob.drain();
-  check(a2.friends[0].devices.some(d => d.pub === keys.bob.pub), 'The friend list does not carry the friend\'s key');
+  check(a2.friends[0].key === bob.key.pub, 'The friend list does not carry the friend\'s key');
   await alice.write(handle('bob'), 'Hallo <b>Bob</b>');
   const got = await bob.next('friendMsg');
   check(got.with === handle('alice') && !got.msg.mine && await bob.read(got.msg) === 'Hallo <b>Bob</b>', 'Message does not open as sent');
   const echo = await alice.next('friendMsg');
   check(echo.msg.mine && await alice.read(echo.msg) === 'Hallo <b>Bob</b>', 'Sender cannot read their own message');
   check(!JSON.stringify(got).includes('Hallo'), 'The text travels in plain sight');
-  check(await decrypt(keys.carol, got.msg.env) === null, 'A third device reads along');
+  const carolKey = (await setupKey(handle('carol'), PW, null, async e2e => e2e));
+  check(await decrypt(carolKey, got.msg.env) === null, 'A third key reads along');
   check((await bob.friends(m => m.friends[0]?.unread === 1)), 'Unread count missing');
   bob.send({ t: 'friendHistory', handle: handle('alice') });
   const hist = await bob.next('friendHistory');
   check(hist.messages.length === 1 && await bob.read(hist.messages[0]) === 'Hallo <b>Bob</b>', 'History is wrong');
   check(await bob.friends(m => m.friends[0]?.unread === 0), 'Reading does not clear the unread count');
 
-  // Envelopes the server must refuse: a device that is not the sender's, a key for a stranger
-  const forged = await encrypt(keys.carol, 'not me', [{ id: keys.bob.id, pub: keys.bob.pub }]);
-  alice.send({ t: 'friendMsg', handle: handle('bob'), env: forged });
-  check((await alice.next('error')).key === 'friends.err.badMessage', 'A message from a foreign device is accepted');
-  const leaky = await encrypt(keys.alice, 'for carol too', [keys.bob, keys.carol]);
-  alice.send({ t: 'friendMsg', handle: handle('bob'), env: leaky });
-  check((await alice.next('error')).key === 'friends.err.badMessage', 'A message wrapped for an outsider is accepted');
+  // Envelopes the server must refuse: not made with the sender's key, made for a stranger
+  alice.send({ t: 'friendMsg', handle: handle('bob'), env: await encrypt(carolKey, 'not me', bob.key.pub) });
+  check((await alice.next('error')).key === 'friends.err.badMessage', 'A message with a foreign key is accepted');
+  alice.send({ t: 'friendMsg', handle: handle('bob'), env: await encrypt(alice.key, 'for carol', carolKey.pub) });
+  check((await alice.next('error')).key === 'friends.err.badMessage', 'A message for an outsider is accepted');
 
   // Safety code: the same on both sides
-  const codeA = await safetyCode({ handle: handle('alice'), pubs: alice.view.devices.map(d => d.pub) },
-    { handle: handle('bob'), pubs: alice.view.friends[0].devices.map(d => d.pub) });
-  const bv = bob.view;
-  const codeB = await safetyCode({ handle: handle('bob'), pubs: bv.devices.map(d => d.pub) },
-    { handle: handle('alice'), pubs: bv.friends[0].devices.map(d => d.pub) });
+  const codeOf = v => safetyCode({ handle: v === alice.view ? handle('alice') : handle('bob'), pubs: [v.key] },
+    { handle: v.friends[0].handle, pubs: [v.friends[0].key] });
+  const codeA = await codeOf(alice.view), codeB = await codeOf(bob.view);
   check(codeA === codeB && /^\d{4} \d{4} \d{4}$/.test(codeA), `Safety codes differ: ${codeA} / ${codeB}`);
   console.log(`Messages: end-to-end encrypted, forged envelopes refused, safety code ${codeA} on both sides.`);
 
+  // --- Offline, then on another device: everything readable there too
   bob.ws.close();
   check(await alice.friends(m => m.friends[0]?.status === 'offline'), 'Bob going offline is not noticed');
   await alice.write(handle('bob'), 'while you were away');
   await alice.next('friendMsg');
-  // Bob comes back with the same browser - and with a new phone
-  const bobAgain = await connect('bob', keys.bob);
-  check(bobAgain.view.friends[0]?.unread === 1, 'A message to someone offline is lost');
-  const phone = await createDevice();
-  const bobPhone = await connect('bob', phone);
-  const ha = await alice.friends(m => m.friends[0]?.devices.length === 2);
-  check(ha, 'Alice does not learn about Bob\'s new device');
-  const codeNew = await safetyCode({ handle: handle('alice'), pubs: ha.devices.map(d => d.pub) },
-    { handle: handle('bob'), pubs: ha.friends[0].devices.map(d => d.pub) });
-  check(codeNew !== codeA, 'A new device does not change the safety code');
+  const bobPhone = await connect('bob');
+  check(bobPhone.key.pub === bob.key.pub, 'Bob\'s phone has another key');
+  check(bobPhone.view.friends[0]?.unread === 1, 'A message to someone offline is lost');
   bobPhone.send({ t: 'friendHistory', handle: handle('alice') });
   const onPhone = await bobPhone.next('friendHistory');
-  check(await bobPhone.read(onPhone.messages.at(-1)) === null, 'The new device reads what was written before it existed');
-  bobAgain.send({ t: 'friendHistory', handle: handle('alice') });
-  const onPc = await bobAgain.next('friendHistory');
-  check(await bobAgain.read(onPc.messages.at(-1)) === 'while you were away', 'The old browser lost the message');
-  await alice.write(handle('bob'), 'for both');
-  check(await bobPhone.read((await bobPhone.next('friendMsg')).msg) === 'for both', 'The new device cannot read new messages');
-  check(await bobAgain.read((await bobAgain.next('friendMsg')).msg) === 'for both', 'The old device cannot read new messages');
+  const texts = await Promise.all(onPhone.messages.map(m => bobPhone.read(m)));
+  check(texts.join('|') === 'Hallo <b>Bob</b>|while you were away', 'The new device does not read the history: ' + texts.join('|'));
   const stored = fs.readFileSync(path.join(dir, 'friends.json'), 'utf8');
-  check(!/Hallo|away|for both/.test(stored), 'Plain text ended up in friends.json');
+  check(!/Hallo|away/.test(stored), 'Plain text ended up in friends.json');
+  console.log('Offline and new devices: waits for whoever is away, every device reads the whole history, nothing in plain text on disk.');
+
+  // --- Password change: the same key, rewrapped; without it, the key goes
+  const NEW = 'anotherPassword2';
+  const rewrapped = await rewrapKey(saved('bob'), PW, NEW);
+  const changed = await api('change', bobPhone.cookie, { password: PW, newPassword: NEW, e2e: rewrapped });
+  check(changed.ok && changed.e2e?.pub === bob.key.pub, 'A password change loses the key');
+  check(await unwrapKey(saved('bob'), PW) === null && (await unwrapKey(saved('bob'), NEW))?.pub === bob.key.pub,
+    'The key is not wrapped with the new password');
+  const swapped = await api('change', changed.cookie, { password: NEW, newPassword: PW, e2e: { ...rewrapped, pub: carolKey.pub } });
+  check(swapped.ok && !saved('bob'), 'A password change slips in another key');
+  const bobAgain = await connect('bob');
+  check(bobAgain.key.pub !== bob.key.pub, 'Without a key, the next sign-in does not make a new one');
+  const ak = await alice.friends(m => m.friends[0]?.key === bobAgain.key.pub);
+  check(ak && await codeOf(ak) !== codeA, 'A new key does not change the safety code');
+  bobAgain.send({ t: 'friendHistory', handle: handle('alice') });
+  const after = await bobAgain.next('friendHistory');
+  check(await bobAgain.read(after.messages[0]) === null, 'The new key opens the old messages');
+  await alice.write(handle('bob'), 'with the new key');
+  check(await bobAgain.read((await bobAgain.next('friendMsg')).msg) === 'with the new key', 'The new key cannot read new messages');
   bobPhone.ws.close();
-  console.log('Offline and new devices: waits for whoever is away, a new device reads from then on, nothing in plain text on disk.');
+  console.log('Password change: the key stays, rewrapped; dropped, the next sign-in makes a new one and the safety code changes.');
 
   // --- Asking each other at the same time is a yes; ending deletes the history
-  const carol = await connect('carol', keys.carol);
+  const carol = await connect('carol');
   carol.send({ t: 'friendRequest', handle: handle('alice') });
   await carol.friends(m => m.outgoing.length === 1);
   alice.send({ t: 'friendRequest', handle: handle('carol') });

@@ -120,6 +120,16 @@
   <section id="friends-panel" class="menu-box friends-box hidden">
     <div class="friends-list-view">
       <h2 data-i18n="friends.title"></h2>
+      <!-- The message key is not in this browser yet: the password opens it. -->
+      <form id="friends-unlock" class="friends-unlock hidden">
+        <p class="small muted" data-i18n="friends.unlock.intro"></p>
+        <div class="friends-search">
+          <input id="friends-pw" type="password" autocomplete="current-password" maxlength="200" data-i18n-attr="placeholder:auth.password">
+          <button type="submit" data-i18n="friends.unlock.go"></button>
+        </div>
+        <p id="friends-unlock-error" class="small fc-warn"></p>
+      </form>
+      <p id="friends-nocrypto" class="small fc-warn hidden" data-i18n="friends.noKey"></p>
       <div class="friends-search">
         <input id="friends-handle" maxlength="7" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:friends.searchPlaceholder">
         <button type="button" id="friends-find" data-i18n="friends.search"></button>

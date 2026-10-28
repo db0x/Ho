@@ -2,8 +2,11 @@
 // request, answer one - and from then on see who is online and write to
 // each other. Only for accounts; the server says who is who by handle only.
 // Messages are end-to-end encrypted (../e2e.js) - the server never sees the text.
+// The key is the account's: the sign-in page leaves it in this browser. If it
+// is not there (a session from before, a private window), the password
+// opens it here.
 import { t, localeTag, onLocaleChange } from '../i18n.js';
-import { loadDevice, encrypt, decrypt, safetyCode } from '../e2e.js';
+import { loadKey, dropKey, setupKey, encrypt, decrypt, safetyCode } from '../e2e.js';
 import { avatarHtml } from './avatar.js';
 import { sfx } from '../audio/sfx.js';
 
@@ -26,8 +29,8 @@ export class FriendsPanel {
   constructor(net) {
     this.net = net;
     this.enabled = false;
-    this.data = { devices: [], friends: [], incoming: [], outgoing: [] };
-    this.device = null;         // this browser's key pair (../e2e.js)
+    this.data = { key: null, friends: [], incoming: [], outgoing: [] };
+    this.key = null;            // the account's key pair, opened (../e2e.js)
     this.handle = null;         // own handle
     this.code = null;           // safety code of the open conversation
     this.showCode = false;
@@ -52,6 +55,7 @@ export class FriendsPanel {
         case 'chat': this.openChat(h); break;
       }
     });
+    $('#friends-unlock').onsubmit = (e) => { e.preventDefault(); this.unlock(); };
     $('#fc-back').onclick = () => this.openChat(null);
     $('#fc-send').onclick = () => this.write();
     $('#fc-text').onkeydown = (e) => {
@@ -72,32 +76,74 @@ export class FriendsPanel {
   }
 
   /**
-   * After 'hello': only accounts have friends. Loads (or creates) this
-   * browser's key pair and tells the server its public half.
+   * After 'hello': only accounts have friends. Loads the account's key from
+   * this browser - kept per handle, two accounts on one device stay apart.
    */
   async setEnabled(handle) {
     this.enabled = !!handle;
+    if (this.handle !== handle) this.key = null;
     this.handle = handle || null;
     $('#friends-panel').classList.toggle('hidden', !this.enabled);
     $('#screen-menu').classList.toggle('with-friends', this.enabled);
     if (!this.enabled) return this.openChat(null);
-    // One key per account and browser - two accounts on one device stay apart.
-    if (this.device?.account !== handle) {
-      try {
-        this.device = { ...(await loadDevice(handle)), account: handle };
-      } catch (e) {
-        console.error('E2E: no key', e);
-        this.device = null;
-      }
-    }
-    if (this.device) this.net.send({ t: 'e2eDevice', id: this.device.id, pub: this.device.pub });
+    this.key ||= await loadKey(handle);
     this.render();
+  }
+
+  /**
+   * Opens the account's key with the password - or makes the first one. The
+   * server checks the password before it keeps a new key.
+   */
+  async unlock() {
+    const input = $('#friends-pw');
+    const password = input.value;
+    if (!password) return;
+    const button = $('#friends-unlock button');
+    const error = $('#friends-unlock-error');
+    button.disabled = true;
+    error.textContent = t('auth.working');
+    const api = async (method, data) => {
+      const r = await fetch('api/auth/key', {
+        method, cache: 'no-store',
+        headers: data ? { 'content-type': 'application/json' } : undefined,
+        body: data ? JSON.stringify(data) : undefined
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(body.error || 'auth.err.server'), { params: body.params });
+      return body;
+    };
+    try {
+      const { handle, e2e } = await api('GET');
+      this.key = await setupKey(handle, password, e2e, async saved => (await api('POST', { password, e2e: saved })).e2e);
+      input.value = '';
+      error.textContent = '';
+      this.render();
+      if (this.open) this.net.send({ t: 'friendHistory', handle: this.open });
+    } catch (e) {
+      const key = e.message === 'wrong' || e.message === 'auth.err.badLogin' ? 'friends.unlock.wrong'
+        : e.message.startsWith('auth.') ? e.message : 'auth.err.network';
+      error.textContent = t(key, e.params);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  /** Signing out or deleting the account: the key leaves this browser. */
+  async forgetKey() {
+    if (this.handle) await dropKey(this.handle);
+    this.key = null;
   }
 
   /** The server's list: friends with status, open requests both ways. */
   update(m) {
     const before = new Set(this.data.incoming.map(p => p.handle));
-    this.data = { devices: m.devices || [], friends: m.friends || [], incoming: m.incoming || [], outgoing: m.outgoing || [] };
+    this.data = { key: m.key || null, friends: m.friends || [], incoming: m.incoming || [], outgoing: m.outgoing || [] };
+    // The account has another key by now (a reset, then a new sign-in
+    // elsewhere): the one in this browser opens nothing new.
+    if (this.key && this.data.key && this.data.key !== this.key.pub) {
+      dropKey(this.handle);
+      this.key = null;
+    }
     if (this.data.incoming.some(p => !before.has(p.handle)) && this.seen) sfx.play('chat');
     this.seen = true;
     // A lookup result shows the relation - keep it current.
@@ -130,6 +176,10 @@ export class FriendsPanel {
 
   render() {
     if (!this.enabled) return;
+    // WebCrypto exists only over HTTPS (and on localhost).
+    const crypto = !!globalThis.crypto?.subtle;
+    $('#friends-unlock').classList.toggle('hidden', !!this.key || !crypto);
+    $('#friends-nocrypto').classList.toggle('hidden', crypto);
     $('#friends-result').innerHTML = this.resultHtml();
     const d = this.data;
     $('#friends-incoming').innerHTML = d.incoming.length ? `
@@ -192,10 +242,10 @@ export class FriendsPanel {
     $('#fc-text').focus();
   }
 
-  /** Opens an envelope: the text, or null if it was not meant for this browser. */
+  /** Opens an envelope: the text, or null if it does not open with this key. */
   async open1(msg) {
-    const text = this.device ? await decrypt(this.device, msg.env) : null;
-    return { mine: msg.mine, at: msg.at, text, pub: msg.env?.pub };
+    const text = this.key ? await decrypt(this.key, msg.env) : null;
+    return { mine: msg.mine, at: msg.at, text };
   }
 
   async onHistory(m) {
@@ -228,24 +278,20 @@ export class FriendsPanel {
       <span><b>${esc(p.name)}</b> <small class="muted">#${p.handle} · ${t('friends.status.' + p.status)}</small></span>`;
     const log = $('#fc-log');
     const time = at => new Date(at).toLocaleString(localeTag(), { dateStyle: 'short', timeStyle: 'short' });
-    // A key the server does not list for either of us: possibly slipped in.
-    const known = new Set([...p.devices, ...this.data.devices].map(d => d.pub));
     const bubble = m => m.text == null
-      ? `<span class="fc-locked">${t('friends.unreadable')}</span>`
+      ? `<span class="fc-locked">${t(this.key ? 'friends.unreadable' : 'friends.locked')}</span>`
       : `<span>${esc(m.text)}</span>`;
-    log.innerHTML = `<p class="fc-e2e">${t(this.device?.stored === false ? 'friends.e2eVolatile' : 'friends.e2e')}</p>` + (this.log.length
-      ? this.log.map(m => `<div class="fc-msg ${m.mine ? 'mine' : ''}">${bubble(m)}<small>${time(m.at)}${
-          m.text != null && !known.has(m.pub) ? ` · <b class="fc-warn" title="${t('friends.unknownKeyTip')}">${t('friends.unknownKey')}</b>` : ''}</small></div>`).join('')
+    log.innerHTML = `<p class="fc-e2e">${t(this.key?.stored === false ? 'friends.e2eVolatile' : 'friends.e2e')}</p>` + (this.log.length
+      ? this.log.map(m => `<div class="fc-msg ${m.mine ? 'mine' : ''}">${bubble(m)}<small>${time(m.at)}</small></div>`).join('')
       : `<p class="muted small">${t('friends.empty', { name: esc(p.name) })}</p>`);
     log.scrollTop = log.scrollHeight;
     this.updateCode(p);
   }
 
-  /** Safety code over the keys of both - recomputed when a device comes or goes. */
+  /** Safety code over the keys of both - recomputed when one of them changes. */
   async updateCode(p) {
-    const code = await safetyCode(
-      { handle: this.handle, pubs: this.data.devices.map(d => d.pub) },
-      { handle: p.handle, pubs: p.devices.map(d => d.pub) });
+    if (!this.data.key || !p.key) return;
+    const code = await safetyCode({ handle: this.handle, pubs: [this.data.key] }, { handle: p.handle, pubs: [p.key] });
     if (p.handle !== this.open) return;
     this.code = code;
     this.renderCode();
@@ -273,16 +319,15 @@ export class FriendsPanel {
       <p class="fc-end"><a href="#" data-end>${t('friends.remove')}</a></p>`;
   }
 
-  /** Encrypts for every device of the friend and every own one, then sends. */
+  /** Encrypts for the friend's key, then sends. */
   async write() {
     const input = $('#fc-text');
     const text = input.value.replace(/\s+/g, ' ').trim().slice(0, 500);
     const p = this.data.friends.find(x => x.handle === this.open);
     if (!text || !p) return;
-    if (!this.device) return this.note(t('friends.noKey'));
-    if (!p.devices.length) return this.note(t('friends.noDevice', { name: esc(p.name) }));
-    const own = this.data.devices.some(d => d.id === this.device.id) ? [] : [this.device];
-    const env = await encrypt(this.device, text, [...p.devices, ...this.data.devices, ...own]);
+    if (!this.key) return this.note(t(globalThis.crypto?.subtle ? 'friends.lockedSend' : 'friends.noKey'));
+    if (!p.key) return this.note(t('friends.noFriendKey', { name: esc(p.name) }));
+    const env = await encrypt(this.key, text, p.key);
     this.net.send({ t: 'friendMsg', handle: this.open, env });
     input.value = '';
   }

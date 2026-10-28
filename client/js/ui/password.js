@@ -2,7 +2,10 @@
 // how (POST api/auth/change, the same route as the first password change on
 // the sign-in page): it asks for the current password again, ends every
 // session of the account and hands this browser a fresh one right away.
+// The message key was wrapped with the old password: it goes along rewrapped
+// for the new one (../e2e.js) - the key itself stays the same.
 import { t } from '../i18n.js';
+import { rewrapKey } from '../e2e.js';
 
 const $ = s => document.querySelector(s);
 let minPassword = 8;
@@ -47,9 +50,14 @@ export function bindPassword() {
     save.disabled = true;
     error('');
     try {
+      let e2e = null;
+      try {
+        const k = await (await fetch('api/auth/key', { cache: 'no-store' })).json();
+        if (k.e2e && globalThis.crypto?.subtle) e2e = await rewrapKey(k.e2e, password, newPassword);
+      } catch { /* without it, the key is made anew at the next sign-in */ }
       const r = await fetch('api/auth/change', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password, newPassword }), cache: 'no-store'
+        body: JSON.stringify({ password, newPassword, e2e }), cache: 'no-store'
       });
       let body = {};
       try { body = await r.json(); } catch { /* an empty response is fine */ }

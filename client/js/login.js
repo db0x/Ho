@@ -4,6 +4,7 @@ import {
   initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, localeTag, t
 } from './i18n.js';
 import { startStars, sceneReady, leaveTo } from './ui/scene.js';
+import { setupKey, rewrapKey } from './e2e.js';
 
 const $ = s => document.querySelector(s);
 const NAME_KEY = 'ho-user';
@@ -36,6 +37,20 @@ function languagePicker() {
   paint();
   sel.onchange = () => useLocale(sel.value);
   onLocaleChange(paint);
+}
+
+/**
+ * Opens the message key with the password just typed - or makes the first
+ * one - and leaves it in this browser (./e2e.js). Never in the way of
+ * signing in: if it fails, the friends list asks for the password again.
+ */
+async function messageKey(handle, password, saved) {
+  if (!handle || !globalThis.crypto?.subtle) return;
+  try {
+    await setupKey(handle, password, saved, async e2e => (await api('key', 'POST', { password, e2e })).e2e);
+  } catch (e) {
+    console.warn('Message key:', e.message);
+  }
 }
 
 async function api(route, method, data) {
@@ -129,7 +144,11 @@ loginForm.onsubmit = (e) => {
     const a = await api('login', 'POST', { user, password });
     if (!a.ok) return { key: a.error || 'auth.err.badLogin', params: a.params };
     try { localStorage.setItem(NAME_KEY, user); } catch { /* never mind */ }
-    if (!a.mustChange) { leaveTo(target()); return null; }
+    if (!a.mustChange) {
+      await messageKey(a.handle, password, a.e2e);
+      leaveTo(target());
+      return null;
+    }
     // The first password is only valid here - fill it in right away so nobody
     // has to type it from the mail twice.
     $('#in-old').value = password;
@@ -148,8 +167,13 @@ changeForm.onsubmit = (e) => {
   if (newPassword !== $('#in-new2').value) return showError('auth.err.mismatch');
   if (newPassword.length < minPassword) return showError('auth.err.tooShort', { n: minPassword });
   submit(changeForm, async () => {
-    const a = await api('change', 'POST', { password, newPassword });
+    // A key wrapped with the old password goes along rewrapped. After a
+    // reset there is none - then the new password makes the first one.
+    const current = await api('key', 'GET');
+    const e2e = current.e2e && globalThis.crypto?.subtle ? await rewrapKey(current.e2e, password, newPassword) : null;
+    const a = await api('change', 'POST', { password, newPassword, e2e });
     if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
+    await messageKey(a.handle, newPassword, a.e2e);
     leaveTo(target());
     return null;
   });
@@ -167,6 +191,7 @@ inviteForm.onsubmit = (e) => {
     const a = await api('redeem', 'POST', { token: inviteToken, user, password });
     if (!a.ok) return { key: a.error || 'auth.err.server', params: a.params };
     try { localStorage.setItem(NAME_KEY, user); } catch { /* never mind */ }
+    await messageKey(a.handle, password, a.e2e);
     leaveTo('./');
     return null;
   });
