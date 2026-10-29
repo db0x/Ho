@@ -139,6 +139,7 @@ function place(wrap) {
   const needed = Math.min(MAX_HEIGHT, list.scrollHeight);
   const above = below < needed && aboveRoom > below;
   wrap.classList.toggle('above', above);
+  wrap.classList.toggle('end', r.left + list.offsetWidth > innerWidth - MARGIN);
   list.style.maxHeight = Math.max(72, Math.min(MAX_HEIGHT, above ? aboveRoom : below)) + 'px';
 }
 

@@ -4,6 +4,7 @@ import {
   initLocale, useLocale, onLocaleChange, applyI18n, localeName, availableLocales, getLocale, localeTag, t
 } from './i18n.js';
 import { startStars, sceneReady, leaveTo } from './ui/scene.js';
+import { enhanceSelects, syncSelects } from './ui/select.js';
 import { setupKey, rewrapKey } from './e2e.js';
 
 const $ = s => document.querySelector(s);
@@ -20,9 +21,10 @@ let invite = null;           // {expires, by, note} of an invite link being rede
 
 initLocale();
 languagePicker();
+enhanceSelects();
 startStars($('#login-canvas'));
 
-/** Language picker as in the start menu, just without its own select list. */
+/** Language picker as in the start menu, with the same custom select list. */
 function languagePicker() {
   const sel = $('#in-lang');
   sel.innerHTML = availableLocales().map(c => `<option value="${c}"></option>`).join('');
@@ -36,7 +38,7 @@ function languagePicker() {
   };
   paint();
   sel.onchange = () => useLocale(sel.value);
-  onLocaleChange(paint);
+  onLocaleChange(() => { paint(); syncSelects(); });
 }
 
 /**

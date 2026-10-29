@@ -845,7 +845,10 @@ select option { background: var(--panel-solid); color: var(--ink); }
 
 .sel-list {
   display: none;
-  position: absolute; left: 0; right: 0; top: calc(100% + 5px); z-index: 30;
+  /* At least as wide as the field, wider when an option needs it
+     ("Українська" under a narrow language field). */
+  position: absolute; left: 0; min-width: 100%; width: max-content; box-sizing: border-box;
+  top: calc(100% + 5px); z-index: 30;
   background: var(--panel-solid); border: 1px solid var(--line-strong);
   border-radius: 10px; box-shadow: var(--shadow);
   padding: 4px; max-height: 260px; overflow-y: auto;
@@ -853,8 +856,10 @@ select option { background: var(--panel-solid); color: var(--ink); }
 .sel.open .sel-list { display: block; animation: sel-in .11s ease-out; }
 /* Opened upwards when there is no room below (select.js). */
 .sel.above .sel-list { top: auto; bottom: calc(100% + 5px); }
+/* Aligned to the right edge when it would run out of the window (select.js). */
+.sel.end .sel-list { left: auto; right: 0; }
 @keyframes sel-in { from { opacity: 0; transform: translateY(-4px); } }
-.sel-opt { padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
+.sel-opt { white-space: nowrap; padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
 .sel-opt:hover { background: rgba(160, 190, 240, .1); }
 .sel-opt[aria-selected="true"] { color: var(--gold); background: rgba(240, 180, 41, .1); }
 
