@@ -625,6 +625,11 @@ const MAX_SHIPS = 400;
  * uses the same factors.
  */
 export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5 };
+/**
+ * How far the middle of a hull lies ahead of the origin, in units of the
+ * length/100: the destroyer's bow reaches out to 52, its stern only to -40.
+ */
+const SHIP_CENTER = { destroyer: 6 };
 
 function lenStep(len) {
   return Math.max(4, Math.round(len));
@@ -730,7 +735,10 @@ export function shipIcon(type, px = 34, color = '#9fb0c8') {
   // The whole ship must fit into the square - a class drawn larger than the
   // others (the destroyer) would otherwise lose its bow and stern.
   const len = Math.min(px * 0.82, px * 0.95 / (SHIP_SCALE[type] || 1));
-  drawShip(ctx, { type, x: px / 2, y: px / 2, angle: -Math.PI / 2, len, color, phase: 0.4, shadow: false });
+  // Ships whose hull does not sit around their origin are moved by that much,
+  // so the hull - not the origin - is in the middle of the square.
+  const shift = (SHIP_CENTER[type] || 0) * len * (SHIP_SCALE[type] || 1) / 100;
+  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: -Math.PI / 2, len, color, phase: 0.4, shadow: false });
   iconCache.set(key, cv);
   return cv;
 }

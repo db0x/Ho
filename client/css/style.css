@@ -108,6 +108,18 @@ input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
 input[readonly] { color: var(--ink-dim); background: transparent; border-style: dashed; cursor: default; }
 input[readonly]:focus { outline: none; }
 .field.slim { margin: 10px 0; }
+/* Password field with an eye to show what has been typed (login.js). */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 44px; }
+.pw-eye {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 36px; height: 34px; padding: 0;
+  background: none; border: none; border-radius: 6px; color: var(--ink-faint); cursor: pointer;
+}
+.pw-eye:hover { background: rgba(160, 190, 240, .1); border: none; color: var(--ink); }
+.pw-eye:active { transform: translateY(-50%); }
+.pw-eye[aria-pressed="true"] { color: var(--gold); }
+.pw-eye svg { width: 19px; height: 19px; }
 .field.slim > span { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; }
 .field.slim b { color: var(--gold); font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--gold); }

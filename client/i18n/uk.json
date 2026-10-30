@@ -142,6 +142,8 @@
   "auth.user": "Ім’я користувача",
   "auth.userPlaceholder": "kapitan",
   "auth.password": "Пароль",
+  "auth.showPassword": "Показати пароль",
+  "auth.hidePassword": "Сховати пароль",
   "auth.login": "Увійти",
   "auth.logout": "Вийти",
   "auth.signedInAs": "Вхід як {user}",

@@ -9,6 +9,9 @@ import { setupKey, rewrapKey } from './e2e.js';
 
 const $ = s => document.querySelector(s);
 const NAME_KEY = 'ho-user';
+// The eye in the password fields (revealToggles): open, and crossed out.
+const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20 20 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
 const loginForm = $('#form-login');
 const changeForm = $('#form-change');
@@ -22,6 +25,7 @@ let invite = null;           // {expires, by, note} of an invite link being rede
 initLocale();
 languagePicker();
 enhanceSelects();
+revealToggles();
 startStars($('#login-canvas'));
 
 /** Language picker as in the start menu, with the same custom select list. */
@@ -39,6 +43,47 @@ function languagePicker() {
   paint();
   sel.onchange = () => useLocale(sel.value);
   onLocaleChange(() => { paint(); syncSelects(); });
+}
+
+
+/**
+ * An eye in every password field: shows what has been typed, and hides it
+ * again. Before sending, every field is hidden again - so the password is
+ * not left readable on the screen, and the browser's password manager sees
+ * a password field as usual.
+ */
+function revealToggles() {
+  const toggles = [];
+  for (const input of document.querySelectorAll('input[type=password]')) {
+    const wrap = document.createElement('span');
+    wrap.className = 'pw-wrap';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-eye';
+    wrap.appendChild(btn);
+    const paint = () => {
+      const shown = input.type === 'text';
+      btn.innerHTML = shown ? EYE_OFF : EYE;
+      btn.setAttribute('aria-pressed', String(shown));
+      btn.title = t(shown ? 'auth.hidePassword' : 'auth.showPassword');
+      btn.setAttribute('aria-label', btn.title);
+    };
+    btn.onclick = () => {
+      // Keep the cursor where it was - the button must not interrupt typing.
+      const { selectionStart: a, selectionEnd: b } = input;
+      input.type = input.type === 'password' ? 'text' : 'password';
+      paint();
+      input.focus();
+      try { input.setSelectionRange(a, b); } catch { /* not every browser allows it */ }
+    };
+    paint();
+    toggles.push({ input, paint });
+  }
+  const hideAll = () => { for (const x of toggles) { x.input.type = 'password'; x.paint(); } };
+  for (const form of document.querySelectorAll('form')) form.addEventListener('submit', hideAll, true);
+  onLocaleChange(() => { for (const x of toggles) x.paint(); });
 }
 
 /**

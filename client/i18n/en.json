@@ -134,6 +134,8 @@
   "auth.user": "User name",
   "auth.userPlaceholder": "captain",
   "auth.password": "Password",
+  "auth.showPassword": "Show password",
+  "auth.hidePassword": "Hide password",
   "auth.login": "Sign in",
   "auth.logout": "Sign out",
   "auth.signedInAs": "Signed in as {user}",
