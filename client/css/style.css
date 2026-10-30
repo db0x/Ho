@@ -607,12 +607,21 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .buildrow .bi { flex: none; }
 .buildrow .bname { font-size: 14px; }
 .buildrow .bcost { font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
+/* Not yet available: what is missing instead of the price, in the regular font. */
+.buildrow.locked .bi, .buildrow.locked .bname { opacity: .5; }
+.buildrow.locked .bcost { font-family: inherit; color: var(--ink-faint); }
 .buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 /* Fixed width for up to three digits: otherwise "−" shifts aside at 10 or 100. */
 .buildrow .bq .n { font-family: var(--mono); min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .shiplist { display: flex; flex-direction: column; gap: 4px; }
 .shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }
 .shipitem .hp { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+/* Named big ships: one line each, the name first, the class beside it. */
+.shipitem .si-named { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shipitem .ship-name { font-weight: 600; color: var(--ink); }
+.shipitem.named .hp { flex: none; white-space: nowrap; }
+.shipitem .rename { flex: none; padding: 2px 7px; }
+.shipitem .rename-input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13.5px; }
 .hint-line { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
 /* Defense and fleets in orbit */
 .def-warn { margin: 0 0 8px; padding: 6px 9px; border-radius: 7px; font-size: 13px;

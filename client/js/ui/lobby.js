@@ -113,6 +113,9 @@ export class Lobby {
     $('#s-holes').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { wormholes: $('#s-holes').checked } });
     };
+    $('#s-capitals').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { capitalShips: $('#s-capitals').checked } });
+    };
     $('#s-voice').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { voice: $('#s-voice').checked } });
     };
@@ -427,6 +430,9 @@ export class Lobby {
     $('#s-holes').checked = s.wormholes !== false;
     $('#v-holes').textContent = t(s.wormholes !== false ? 'word.yes' : 'word.no');
     $('#s-holes').disabled = !this.isHost;
+    $('#s-capitals').checked = s.capitalShips !== false;
+    $('#v-capitals').textContent = t(s.capitalShips !== false ? 'word.yes' : 'word.no');
+    $('#s-capitals').disabled = !this.isHost;
     $('#s-voice').checked = !!s.voice;
     $('#v-voice').textContent = t(s.voice ? 'word.yes' : 'word.no');
     $('#s-voice').disabled = !this.isHost;

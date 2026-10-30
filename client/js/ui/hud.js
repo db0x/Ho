@@ -1,10 +1,10 @@
 // All panels of the game screen.
 import {
-  TECH_FIELDS, SHIP_TYPES, shipCost, refitTotal,
+  TECH_FIELDS, SHIP_TYPES, SHIP_DEFS, shipCost, refitTotal,
   habitability, planetCapacity, planetIncome, planetMining,
   terraformFullCost, terraformable, terraLimits, IDEAL,
   holeZone, travelDistance, supplyNeed, batteryStats, cargoOf,
-  recycleRates, recycleValue, techMaxLevel
+  recycleRates, recycleValue, techMaxLevel, buildLock, shipTypesFor
 } from '../../shared/rules.js';
 import { SHIELD_MIN } from '../render/fx.js';
 import { courseTarget, portalsOf, nearestPlanet } from '../render/courses.js';
@@ -12,7 +12,7 @@ import { shipIcon } from '../render/ships.js';
 import { planetThumb } from '../render/planets.js';
 import { makeDialog } from './dialog.js';
 import { compact, desktop } from './viewport.js';
-import { openShipInfo } from './shipinfo.js';
+import { openShipInfo, needsText } from './shipinfo.js';
 import { openSplit } from './split.js';
 import { forecast, refitShips, researchWeight } from '../../shared/budget.js';
 import { avatarHtml } from './avatar.js';
@@ -240,7 +240,7 @@ export class Hud {
   /** Profile of a ship type; without arguments, with your own tech levels. */
   showShip(type, tech, color, note) {
     const me = this.view?.me;
-    openShipInfo(type, { tech: tech || me?.tech || {}, color: color || me?.color, note });
+    openShipInfo(type, { tech: tech || me?.tech || {}, color: color || me?.color, note, types: shipTypesFor(this.view) });
   }
 
   /** Button for refitting, or the pending order with a cancel button. */
@@ -703,6 +703,8 @@ export class Hud {
   selection() {
     const sel = this.app.selection;
     const box = $('#selection');
+    // A ship being renamed: a new view must not throw away what is typed.
+    if (box.contains(document.activeElement) && document.activeElement.classList.contains('rename-input')) return;
     if (!sel) { box.innerHTML = `<p class="muted pad">${t('sel.empty')}</p>`; return; }
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
     else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
@@ -1018,21 +1020,26 @@ export class Hud {
     // below would not match the rows above it.
     const pl = this.plan();
     rows.innerHTML = '';
-    for (const type of SHIP_TYPES) {
+    for (const type of shipTypesFor(this.view)) {
       const cost = shipCost(type, pl.tech);
       const n = queue[type] || 0;
+      // Big ships need research and a large world - as the server checks it:
+      // with today's levels, not those after this turn's research.
+      const lock = buildLock(type, me.tech, p.pop);
       const row = document.createElement('div');
-      row.className = 'buildrow';
+      row.className = 'buildrow' + (lock ? ' locked' : '');
       row.innerHTML = `
         <span class="bi"></span>
         <span>
           <div class="bname">${t(`ship.${type}.name`)}</div>
-          <div class="bcost">${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}</div>
+          <div class="bcost">${lock ? t('yard.needs', { list: needsText(lock) })
+            : `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`}</div>
         </span>
         <span class="bq">
           <button class="tiny minus">−</button>
           <span class="n">${n}</span>
-          <button class="tiny plus"${this.affordable({ build: [p.id, type] }) ? '' : ` disabled title="${t('yard.cantAfford')}"`}>+</button>
+          <button class="tiny plus"${lock ? ` disabled title="${t('yard.needs', { list: needsText(lock) })}"`
+            : this.affordable({ build: [p.id, type] }) ? '' : ` disabled title="${t('yard.cantAfford')}"`}>+</button>
         </span>`;
       row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color));
       row.title = t(`ship.${type}.desc`) + ' ' + t('shipinfo.hint');
@@ -1122,9 +1129,12 @@ export class Hud {
           + (f.eta ? ' ' + t('fleet.etaSuffix', { turns: t('word.turns', { n: f.eta, count: f.eta }) }) : '')
           + '</div>'
         : `<div class="sel-sub">${t('fleet.noCourse')}</div>`;
+      // Big ships are known by name, like at sea - what else flies along is not.
+      const names = f.ships.filter(s => s.name).map(s => escapeHtml(s.name));
       box.innerHTML = `<div class="sel-head"><div><div class="sel-title">${t('fleet.foreign')}</div>
         <div class="sel-sub" style="color:${pl?.color}">${pl?.name || '?'}</div>${whither}</div></div>
-        <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>`;
+        <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>
+        ${names.length ? `<p class="hint-line">${t('fleet.namedSeen', { names: names.join(', ') })}</p>` : ''}`;
       return;
     }
     const groups = {};
@@ -1160,7 +1170,15 @@ export class Hud {
       <div class="sec">
         <h4>${t('fleet.ships')}</h4>
         <div class="shiplist">
-          ${Object.entries(groups).map(([type, arr]) => `
+          ${f.ships.filter(s => s.name).map(s => `
+            <div class="shipitem named clickable-ship" data-info="${s.type}" data-ship="${s.id}" title="${t('shipinfo.hint')}">
+              <span class="gi" data-t="${s.type}"></span>
+              <span class="si-named"><b class="ship-name">${escapeHtml(s.name)}</b>
+                <span class="muted small">${t(`ship.${s.type}.name`)}</span></span>
+              ${f.mine && !v.spectator ? `<button class="tiny rename" title="${t('fleet.rename')}" aria-label="${t('fleet.rename')}">✎</button>` : ''}
+              <span class="hp">${Math.round(s.hp)}/${Math.round(s.maxHp)} HP</span>
+            </div>`).join('')}
+          ${Object.entries(groups).filter(([type]) => !SHIP_DEFS[type]?.named).map(([type, arr]) => `
             <div class="shipitem clickable-ship" data-info="${type}" title="${t('shipinfo.hint')}">
               <span class="gi" data-t="${type}"></span>
               <span>${arr.length}× ${t(`ship.${type}.name`)}
@@ -1189,8 +1207,13 @@ export class Hud {
     for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
     // The built-in tech of these ships, not the current levels
     for (const el of box.querySelectorAll('[data-info]')) {
-      el.onclick = () => this.showShip(el.dataset.info, groups[el.dataset.info][0].tech, col);
+      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : groups[el.dataset.info][0];
+      el.onclick = (e) => {
+        if (e.target.closest('.rename, .rename-input')) return;
+        this.showShip(el.dataset.info, ship.tech, col);
+      };
     }
+    for (const b of box.querySelectorAll('.rename')) b.onclick = () => this.rename(b.closest('[data-ship]'), f);
     const c = box.querySelector('#cancel');
     if (c) c.onclick = () => this.app.send({ t: 'orders', move: { fleetId: f.id, planetId: null } });
     const m = box.querySelector('#merge');
@@ -1205,6 +1228,42 @@ export class Hud {
     this.wireRefit(box);
     this.wireRecycle(box);
     this.wireCargo(box, f);
+  }
+
+  /**
+   * Renaming a big ship right in the list: Enter or leaving the field takes
+   * the name, Escape keeps the old one.
+   */
+  rename(item, f) {
+    const ship = f.ships.find(s => s.id === item.dataset.ship);
+    const label = item.querySelector('.ship-name');
+    if (!ship || !label) return;
+    const input = document.createElement('input');
+    input.className = 'rename-input';
+    input.maxLength = 28;
+    input.value = ship.name;
+    input.setAttribute('aria-label', t('fleet.rename'));
+    label.replaceWith(input);
+    item.querySelector('.rename')?.remove();
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      const name = input.value.trim();
+      input.blur();
+      if (keep && name && name !== ship.name) {
+        this.app.send({ t: 'orders', rename: { shipId: ship.id, name } });
+      } else this.selection();
+    };
+    input.onkeydown = (e) => {
+      // Keys belong to the field - not to the map and its shortcuts.
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      if (e.key === 'Escape') finish(false);
+    };
+    input.onblur = () => finish(true);
   }
 
   /**

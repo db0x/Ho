@@ -18,6 +18,8 @@ gravity; settled worlds tint their surroundings in their empire's colour.*
 - **Simultaneous turns** for up to 16 players – friends via a four-letter code,
   empty seats filled with AI.
 - **AI with personality:** conqueror, settler, technocrat, raider, bulwark, vulture.
+- **Fighters and capital ships:** swarms of small ships, and named destroyers that
+  draw the fire and repair their fleet – or classic Ho!! with the small ships only.
 - **Flat or in space,** as a scatter field or a spiral galaxy with a black hole –
   and a map that grows as you explore.
 - **A budget that adds up:** the top bar shows where your money goes before you end
@@ -46,7 +48,7 @@ Then *Play 5 AI right away*, or *Host a new game* and pass on the code.
 
 | | |
 |---|---|
-| **[Playing](doc/playing.md)** | Rules, money and budget, combat, galaxy shapes, AI, watching, controls, phone |
+| **[Playing](doc/playing.md)** | Rules, ship classes, money and budget, combat, galaxy shapes, AI, watching, controls, phone |
 | **[Hosting](doc/hosting.md)** | Node and Docker, accounts, security, reverse proxy, settings, data |
 | **[Development](doc/development.md)** | Structure, principles, languages, sound, graphics, tests, roadmap |
 

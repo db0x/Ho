@@ -173,7 +173,7 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | --- | --- | --- |
 | `PORT` | `8080` | Port des Servers |
 | `HO_AUTH` | an | `off` schaltet die Anmeldung ab – nur zum Entwickeln |
-| `HO_DEV` | aus | `on` schaltet den Entwicklungsmodus ein: Admins bekommen den Debug-Dialog (Strg+Umschalt+D): Testkampf, Sounds und in der laufenden Partie Wurmlöcher öffnen und schließen; ohne Anmeldung bekommt ihn jeder – nur zum Entwickeln |
+| `HO_DEV` | aus | `on` schaltet den Entwicklungsmodus ein: Admins bekommen den Debug-Dialog (Strg+Umschalt+D): Testkampf, Sounds und in der laufenden Partie Wurmlöcher öffnen und schließen sowie sofort einen Zerstörer; ohne Anmeldung bekommt ihn jeder – nur zum Entwickeln |
 | `HO_USERS_FILE` | `data/users.json` | wo die Konten liegen; Profilbilder liegen daneben in `avatars/` |
 | `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
 | `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |

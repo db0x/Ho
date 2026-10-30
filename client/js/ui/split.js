@@ -10,7 +10,8 @@ import { shipIcon } from '../render/ships.js';
 import { t, localeTag } from '../i18n.js';
 
 const fmt = n => Math.round(n).toLocaleString(localeTag());
-const DRAG_START = 6;        // px of movement before a press becomes a drag
+const DRAG_START = 6;
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);        // px of movement before a press becomes a drag
 
 let modal = null, current = null;
 
@@ -102,8 +103,9 @@ function stacks(side) {
   const out = new Map();
   for (const s of current.fleet.ships) {
     if (current.side.get(s.id) !== side) continue;
-    const key = `${s.type}:${s.tech.weapons}/${s.tech.shields}/${s.tech.speed}`;
-    if (!out.has(key)) out.set(key, { key, type: s.type, tech: s.tech, ships: [] });
+    // A named ship is one of a kind - it never stacks.
+    const key = s.name ? `name:${s.id}` : `${s.type}:${s.tech.weapons}/${s.tech.shields}/${s.tech.speed}`;
+    if (!out.has(key)) out.set(key, { key, type: s.type, tech: s.tech, name: s.name, ships: [] });
     out.get(key).ships.push(s);
   }
   return [...out.values()];
@@ -144,7 +146,7 @@ function render() {
       el.className = 'sp-stack';
       el.title = t('split.moveOne');
       el.innerHTML = `<span class="sp-ic"></span>
-        <span class="sp-label"><span class="sp-type">${t(`ship.${g.type}.name`)}</span>
+        <span class="sp-label"><span class="sp-type">${g.name ? `<b>${escapeHtml(g.name)}</b> · ` : ''}${t(`ship.${g.type}.name`)}</span>
           <span class="muted small">${t('tech.weapons.short')}${g.tech.weapons}/${t('tech.shields.short')}${g.tech.shields}/${t('tech.speed.short')}${g.tech.speed}</span></span>
         <b class="sp-n">${g.ships.length}×</b>`;
       // shipIcon keeps every image only once - draw a copy per stack.

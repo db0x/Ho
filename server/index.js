@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import {
   createGame, addPlayer, removePlayer, startGame, setOrders, resolveTurn,
   allReady, buildView, buildSpectatorView, lobbyView, adminGameView, DEFAULT_SETTINGS, armTurnTimer, setPlayerColor, setBotLevel,
-  hostOf, pauseGame, resumeGame, continueGame
+  hostOf, pauseGame, resumeGame, continueGame, devDestroyer
 } from './game.js';
 import { runBot } from './bot.js';
 import { devWormholes } from './wormholes.js';
@@ -943,8 +943,16 @@ function handle(connId, ws, msg) {
       const at = msg.at && ['x', 'y'].every(k => Number.isFinite(msg.at[k]))
         ? { x: msg.at.x, y: msg.at.y, z: Number.isFinite(msg.at.z) ? msg.at.z : 0 } : null;
       const action = String(msg.action || '');
-      if (!devWormholes(game, me || null, action, at)) return send(ws, { t: 'notice', key: 'dev.nothing' });
-      console.log(`Dev: ${c.account ?? 'guest'} - wormholes ${action} in game ${game.id}`);
+      if (action === 'destroyer') {
+        // A destroyer without research and shipyard - only for a player of the game.
+        if (!devDestroyer(game, me, Number.isInteger(msg.planetId) ? msg.planetId : null)) {
+          return send(ws, { t: 'notice', key: 'dev.nothing' });
+        }
+        console.log(`Dev: ${c.account ?? 'guest'} - destroyer in game ${game.id}`);
+      } else {
+        if (!devWormholes(game, me || null, action, at)) return send(ws, { t: 'notice', key: 'dev.nothing' });
+        console.log(`Dev: ${c.account ?? 'guest'} - wormholes ${action} in game ${game.id}`);
+      }
       chat(game, 'System', { key: `chat.dev.${action}`, params: { player: me?.name ?? c.account ?? '?' } });
       broadcastView(game);
       break;
@@ -1020,6 +1028,7 @@ function sanitizeSettings(s) {
   if (typeof s.expanding === 'boolean') out.expanding = s.expanding;
   if (typeof s.voice === 'boolean') out.voice = s.voice;
   if (typeof s.wormholes === 'boolean') out.wormholes = s.wormholes;
+  if (typeof s.capitalShips === 'boolean') out.capitalShips = s.capitalShips;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
   return out;

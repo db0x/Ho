@@ -2,7 +2,8 @@
 // without sign-in): start a test battle or play any sound effect without
 // having to play towards it - purely in the browser, the battle is rolled
 // here with the server's combat rules. In a running game it also steps in:
-// opening and closing wormholes - that does go to the server.
+// opening and closing wormholes, and a destroyer right away - that does go
+// to the server.
 // Opened with Ctrl+Shift+D, in the start menu as in a game.
 import { SHIP_TYPES, shipStats, batteryStats, COMBAT_ROUNDS, PLAYER_COLORS } from '../../shared/rules.js';
 import { openBattle } from './battle.js';
@@ -59,6 +60,15 @@ export class DebugDialog {
     return it ? { x: it.x, y: it.y, z: it.z || 0 } : null;
   }
 
+  /** A destroyer at the selected own world - the server takes the homeworld otherwise. */
+  destroyer() {
+    const sel = this.app?.selection;
+    const planetId = sel?.type === 'planet' ? sel.id
+      : sel?.type === 'fleet' ? this.app.map?.view?.fleets.find(f => f.id === sel.id)?.at ?? null : null;
+    this.app.send({ t: 'dev', action: 'destroyer', planetId });
+    this.toggle(false);
+  }
+
   hole(action) {
     const at = action === 'openHere' ? this.selectionPoint() : null;
     if (action === 'openHere' && !at) { sfx.play('deny'); return; }
@@ -77,6 +87,7 @@ export class DebugDialog {
       if (a === 'close') this.toggle(false);
       if (a === 'reset') { this.cfg = structuredClone(DEFAULTS); this.render(); }
       if (a === 'fight') this.fight();
+      if (a === 'destroyer') this.destroyer();
       const hole = e.target.closest('[data-hole]')?.dataset.hole;
       if (hole) this.hole(hole);
       const snd = e.target.closest('[data-play]');
@@ -112,7 +123,12 @@ export class DebugDialog {
         ${['open', 'openHere', 'reveal', 'shake', 'close'].map(a =>
           `<button type="button" class="tiny" data-hole="${a}"${a === 'openHere' && !this.selectionPoint() ? ' disabled' : ''}>${t(`dev.hole.${a}`)}</button>`).join('')}
       </div>
-      <p class="muted small">${t('dev.holesHint')}</p>` : `<p class="muted small">${t('dev.inGame')}</p>`}`;
+      <p class="muted small">${t('dev.holesHint')}</p>` : `<p class="muted small">${t('dev.inGame')}</p>`}
+      ${running && !this.app.map.view.spectator && this.app.map.view.capitalShips !== false ? `<h3>${t('dev.ships')}</h3>
+      <div class="debug-actions debug-dev">
+        <button type="button" class="tiny" data-a="destroyer">${t('dev.destroyer')}</button>
+      </div>
+      <p class="muted small">${t('dev.destroyerHint')}</p>` : ''}`;
     this.modal.innerHTML = `<div class="modal-box debug-box">
       <h2>${t('debug.title')}</h2>${holes}
       <h3>${t('debug.battle')}</h3>
@@ -163,7 +179,7 @@ function simulate(cfg) {
   const sides = [[], []];
   const add = (k, type, tech) => {
     const s = shipStats(type, { weapons: tech, shields: tech });
-    sides[k].push({ type, attack: s.attack, hp: s.maxHp, maxHp: s.maxHp });
+    sides[k].push({ type, attack: s.attack, hp: s.maxHp, maxHp: s.maxHp, guns: s.guns, weight: s.weight });
   };
   for (const type of ATTACKER_TYPES) for (let i = 0; i < (cfg.a[type] || 0); i++) add(0, type, cfg.techA || 1);
   for (const type of SHIP_TYPES) for (let i = 0; i < (cfg.b[type] || 0); i++) add(1, type, cfg.techB || 1);
@@ -181,10 +197,16 @@ function simulate(cfg) {
     const damage = [];
     for (const [k, ships] of alive) {
       const enemies = alive.filter(([o]) => o !== k).flatMap(([, s]) => s);
+      const total = enemies.reduce((a, e) => a + (e.weight || 1), 0);
       for (const s of ships) {
         if (s.attack <= 0) continue;
-        const target = enemies[Math.floor(Math.random() * enemies.length)];
-        damage.push([target, round1(s.attack * (0.75 + Math.random() * 0.5)), s]);
+        // Several guns each pick a target; big ships are picked more often.
+        const guns = s.guns || 1;
+        for (let g = 0; g < guns; g++) {
+          let x = Math.random() * total, target = enemies[enemies.length - 1];
+          for (const e of enemies) if ((x -= e.weight || 1) < 0) { target = e; break; }
+          damage.push([target, round1(s.attack / guns * (0.75 + Math.random() * 0.5)), s]);
+        }
       }
     }
     rounds.push(damage.map(([to, dmg, s]) => [idx.get(s), idx.get(to), dmg]));

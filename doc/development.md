@@ -25,6 +25,7 @@ server/
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
   wormholes.js       Wormholes: opening, sight, jump, collapse, dev-mode aids
+  shipnames.js       Names for the destroyers: historical ships and a few from films and series
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
   userstore.js       Accounts on disk: name, scrypt hash, profile, message key (wrapped) – written atomically
@@ -36,7 +37,7 @@ client/
   index.html         Start screen, lobby, game screen
   login.html         Sign-in and first password change
   img/               logo.svg (wordmark), mark.svg (tab icon)
-  i18n/              de.json, en.json – text catalogues
+  i18n/              de.json, en.json, uk.json – text catalogues
   js/main.js         Wiring, game loop, turn changes
   js/net.js          WebSocket with automatic reconnect
   js/e2e.js          End-to-end encryption of friend messages: one key per account, wrapped with the password
@@ -150,6 +151,7 @@ npm run test:i18n      # catalogues: same keys, same placeholders, server keys c
 npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
 npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
+npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat

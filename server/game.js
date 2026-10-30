@@ -6,8 +6,9 @@ import {
   habitability, planetCapacity, planetIncome, planetMining, POP_GROWTH,
   IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, terraformable,
   COMBAT_ROUNDS, INTERCEPT_ROUNDS, batteryStats, dist, clamp, PLAYER_COLORS, PLAYER_EMBLEMS, AI_PERSONAS, AI_LEVELS,
-  holeZone, route, advance, travelDistance, supplyNeed, cargoOf, recycleValue
+  holeZone, route, advance, travelDistance, supplyNeed, cargoOf, recycleValue, buildLock, REPAIR_SHARE, shipTypesFor
 } from '../shared/rules.js';
+import { pickShipName } from './shipnames.js';
 import { forecast, researchWeight } from '../shared/budget.js';
 import { generateGalaxy, expandGalaxy, expandSpiral, makeRng, newSeed } from './galaxy.js';
 import {
@@ -25,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   maxTurns: 300,       // 0 = unlimited
   voice: false,        // CB radio open from the start (only if the server offers it)
   wormholes: true,     // wormholes open now and then in the course of the game
+  capitalShips: true,  // destroyers can be built; off = classic Ho!!
   seed: null
 };
 
@@ -317,6 +319,7 @@ function addShip(game, fleet, type, tech) {
     isTanker: st.isTanker
   };
   if (st.cargo) ship.cargo = [];        // satellites on board
+  if (SHIP_DEFS[type].named) ship.name = pickShipName(game);
   fleet.ships.push(ship);
   return ship;
 }
@@ -443,9 +446,12 @@ export function setOrders(game, player, msg) {
     const count = Math.round(Number(msg.build.count));
     const planet = planetById(game, planetId);
     if (!planet || planet.owner !== player.id || !SHIP_TYPES.includes(type) || !Number.isFinite(count) || !count) return;
+    if (count > 0 && !shipTypesFor(game.settings).includes(type)) return { error: 'yard.noCapitals' };
     if (count < 0) { buildStep(player, planetId, type, count); return; }
     // Where nobody lives, the server does not build - so accept nothing either.
     if (planet.pop < 1) return { error: 'yard.needPop' };
+    const lock = buildLock(type, player.tech, planet.pop);
+    if (lock) return { error: 'yard.locked', params: { ...SHIP_DEFS[type].requires } };
     for (let i = 0; i < Math.min(count, 99); i++) {
       buildStep(player, planetId, type, 1);
       if (!affordable(game, player)) {
@@ -453,6 +459,15 @@ export function setOrders(game, player, msg) {
         return { error: 'notice.buildUnaffordable' };
       }
     }
+  }
+  if (msg.rename) {
+    // Big ships carry a name - the owner may give them another one.
+    const ship = game.fleets.filter(f => f.owner === player.id).flatMap(f => f.ships)
+      .find(s => s.id === msg.rename.shipId);
+    if (!ship || ship.name == null) return { error: 'err.noSuchShip' };
+    const name = cleanShipName(msg.rename.name);
+    if (!name) return { error: 'err.shipName' };
+    ship.name = name;
   }
   if (msg.unload) {
     const planet = planetById(game, msg.unload.planetId);
@@ -562,6 +577,23 @@ export function setOrders(game, player, msg) {
     for (const f of own.slice(1)) { target.ships.push(...f.ships); f.ships = []; }
     cleanupFleets(game);
   }
+}
+
+export const SHIP_NAME_MAX = 28;
+
+/**
+ * Ship names end up in the client via innerHTML, like player names (see
+ * cleanName in server/profile.js): nothing that reads as markup, no control
+ * characters, the apostrophe as the letter apostrophe.
+ */
+function cleanShipName(name) {
+  return String(name ?? '')
+    .replace(/['`]/g, 'ʼ')
+    .replace(/[\u0000-\u001f\u007f<>&"\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, SHIP_NAME_MAX)
+    .trim();
 }
 
 /**
@@ -701,6 +733,22 @@ function loadOrDrop(game, player, o, load) {
   }
 }
 
+/**
+ * Dev mode: a destroyer right away and for free, in the orbit of an own
+ * world - the given one, otherwise the homeworld - built with the current
+ * levels. Testing it should not take forty turns of research.
+ * @returns {boolean} whether one was placed
+ */
+export function devDestroyer(game, player, planetId) {
+  if (!player?.alive || game.settings.capitalShips === false) return false;
+  let planet = planetId != null ? planetById(game, planetId) : null;
+  if (!planet || planet.owner !== player.id) planet = planetById(game, player.homeworld);
+  if (!planet || planet.owner !== player.id) planet = game.galaxy.planets.find(p => p.owner === player.id);
+  if (!planet) return false;
+  addShip(game, orbitFleet(game, player.id, planet), 'destroyer', player.tech);
+  return true;
+}
+
 function cleanupFleets(game) {
   game.fleets = game.fleets.filter(f => f.ships.length > 0);
 }
@@ -759,6 +807,13 @@ export function resolveTurn(game) {
       for (const type of SHIP_TYPES) {
         let n = queue[type] || 0;
         let built = 0;
+        // Accepted only when unlocked - but the world may have lost people
+        // since (and research never goes back).
+        if (n > 0 && buildLock(type, p.tech, planet.pop)) {
+          entries.push({ type: 'warn', playerIds: [p.id], private: p.id, planetId: planet.id,
+            key: 'log.buildLocked', params: { planet: planet.name, ship: type } });
+          continue;
+        }
         while (n-- > 0) {
           const cost = shipCost(type, p.tech);
           if (p.money < cost.money || p.metal < cost.metal) break;
@@ -868,6 +923,7 @@ export function resolveTurn(game) {
   }
   for (const p of game.players) p.orders.moves = {};
 
+  const fought = new Set();          // worlds with a battle this turn - no repairs there
   // 5) Combat. Whoever departs while an armed enemy is in orbit gets
   // intercepted: they still have to survive INTERCEPT_ROUNDS combat rounds,
   // then they are gone. Otherwise every scout would escape, since all moves happen simultaneously.
@@ -876,9 +932,10 @@ export function resolveTurn(game) {
       .filter(([f, from]) => from === planet.id && f.ships.length && game.fleets.some(g =>
         g.at === planet.id && g.owner !== f.owner && g.ships.some(s => s.attack > 0)))
       .map(([f]) => f);
-    resolveCombatAt(game, planet, entries, rng, fleeing);
+    if (resolveCombatAt(game, planet, entries, rng, fleeing)) fought.add(planet.id);
   }
   cleanupFleets(game);
+  repairFleets(game, fought, entries);
 
   // 6) Colonization and invasion
   for (const planet of game.galaxy.planets) {
@@ -1122,6 +1179,44 @@ function presentOwners(game, planet) {
   return [...set];
 }
 
+const gunsOf = s => SHIP_DEFS[s.type]?.guns || 1;
+/** Big ships draw the fire: picked as often as `weight` small ones. */
+const targetWeight = s => SHIP_DEFS[s.type]?.weight || 1;
+
+/**
+ * A target by weight. With equal weights exactly the same pick as
+ * enemies[Math.floor(r * n)] - existing battles roll the same as before.
+ */
+function pickTarget(enemies, weights, total, r) {
+  let x = r * total;
+  for (let i = 0; i < enemies.length; i++) {
+    x -= weights[i];
+    if (x < 0) return enemies[i];
+  }
+  return enemies[enemies.length - 1];
+}
+
+/**
+ * Repairs in the orbit of own worlds: a fleet with a destroyer gets back a
+ * share of every ship's hull - but not in a turn with a battle there.
+ */
+function repairFleets(game, fought, entries) {
+  for (const f of game.fleets) {
+    if (f.at == null || fought.has(f.at) || !f.ships.some(s => SHIP_DEFS[s.type]?.repair)) continue;
+    const planet = planetById(game, f.at);
+    if (!planet || planet.owner !== f.owner) continue;
+    let mended = 0;
+    for (const s of f.ships) {
+      if (s.hp >= s.maxHp) continue;
+      s.hp = Math.min(s.maxHp, round1(s.hp + s.maxHp * REPAIR_SHARE));
+      mended++;
+    }
+    if (mended) entries.push({ type: 'build', playerIds: [f.owner], private: f.owner, planetId: planet.id,
+      key: 'log.repaired', params: { planet: planet.name, count: mended } });
+  }
+}
+
+/** @returns {boolean} whether there was a battle */
 function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   const sides = new Map();
   let battery = null;
@@ -1143,7 +1238,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   }
   // Only fight if there is any stranger in orbit at all
   const intruder = [...sides.keys()].some(o => o !== planet.owner);
-  if (!intruder) return;
+  if (!intruder) return false;
   if (planet.owner) {
     const ownerP = playerById(game, planet.owner);
     const bs = ownerP ? batteryStats(planet.pop, ownerP.tech) : null;
@@ -1153,9 +1248,9 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
       sides.get(planet.owner).push(battery);
     }
   }
-  if (sides.size < 2) return;
+  if (sides.size < 2) return false;
   const anyArmed = [...sides.values()].some(ships => ships.some(s => s.attack > 0));
-  if (!anyArmed) return;
+  if (!anyArmed) return false;
 
   const before = new Map([...sides].map(([k, v]) => [k, v.length]));
 
@@ -1180,11 +1275,17 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
     for (const [owner, ships] of alive) {
       const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(engaged));
       if (!enemies.length) continue;
+      const weights = enemies.map(targetWeight);
+      const total = weights.reduce((a, w) => a + w, 0);
       for (const s of ships) {
         if (!engaged(s) || s.attack <= 0) continue;
-        const t = enemies[Math.floor(rng() * enemies.length)];
-        // Rounded to tenths - exactly as it appears in the record.
-        damage.push([t, round1(s.attack * (0.75 + rng() * 0.5)), s]);
+        // Big ships fire several guns, each at a target of its own.
+        const guns = gunsOf(s);
+        for (let g = 0; g < guns; g++) {
+          const t = pickTarget(enemies, weights, total, rng());
+          // Rounded to tenths - exactly as it appears in the record.
+          damage.push([t, round1(s.attack / guns * (0.75 + rng() * 0.5)), s]);
+        }
       }
     }
     rounds.push(damage.map(([t, dmg, s]) => [idx.get(s), idx.get(t), dmg]));
@@ -1250,6 +1351,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
     battle: { sides: owners, units, rounds, scuttled, fled: [...escaping].map(s => idx.get(s)) }
   });
   cleanupFleets(game);
+  return true;
 }
 
 /** Satellites that went down with lost transporters - told to the owner only. */
@@ -1390,7 +1492,7 @@ export function buildView(game, player) {
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole,
         mine: true,
         ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-          ...(s.cargo ? { cargo: s.cargo.length } : {}) })),
+          ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}) })),
         stats: fleetStats(f)
       });
       continue;
@@ -1411,7 +1513,8 @@ export function buildView(game, player) {
           ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
         mine: false, count: f.ships.length,
-        ships: f.ships.map(s => ({ id: s.id, type: s.type })),
+        // A big ship is known by its name, like at sea.
+        ships: f.ships.map(s => ({ id: s.id, type: s.type, ...(s.name ? { name: s.name } : {}) })),
         stats: { count: f.ships.length }
       });
     }
@@ -1427,6 +1530,7 @@ export function buildView(game, player) {
     paused: pauseView(game),
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
+    capitalShips: game.settings.capitalShips !== false,
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -1485,7 +1589,7 @@ export function buildSpectatorView(game) {
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
       attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-      ...(s.cargo ? { cargo: s.cargo.length } : {})
+      ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {})
     })),
     stats: fleetStats(f)
   }));
@@ -1503,6 +1607,7 @@ export function buildSpectatorView(game) {
     pace: { ...game.pace },
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
+    capitalShips: game.settings.capitalShips !== false,
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
