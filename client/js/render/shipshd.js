@@ -849,14 +849,15 @@ const transport = {
 // with bulging, ribbed flanks, the emblem and gun turrets all along; at the
 // stern two short engine nacelles with machinery in
 // between. Far out on the sides two curved landing decks, open at both
-// ends, held by two broad cross struts. Everything is covered in armor
+// ends, held by three broad cross struts. Everything is covered in armor
 // plates of slightly different shades. The empire color sits where the
 // original carries its red: short marks at the tip of the head and at the
-// front ends of the landing decks - and the ring of the emblem.
+// front ends of the landing decks - plus a narrow band across the head and
+// the ring of the emblem.
 const DD = {
   pod: 16.4,                // offset of the landing decks from the axis
   nacelle: 6.6,             // offset of the engine nacelles
-  struts: [[-4.2, -1], [-14.4, -11.2]]
+  struts: [[7.6, 10.8], [-3.4, -0.2], [-14.4, -11.2]]
 };
 /** Half width of the head: broad at the tip, curving out backwards. */
 const ddHeadHalf = x => 6.6 + 6.8 * (1 - ((x - 18) / 33) ** 2);
@@ -1003,10 +1004,13 @@ const destroyer = {
       bevel(ctx, nac, 0.8);
     }
 
-    // Silver tubes between the struts, from the hull out to the landing decks
-    for (const s of [-1, 1]) for (const y of [11.4, 12.9]) {
-      const p = () => { ctx.beginPath(); ctx.roundRect(-11.4, s * y - 0.32, 10.6, 0.64, 0.32); };
-      p(); fillShadowed(ctx, metal(ctx, s * y - 0.32, s * y + 0.32, '#c9d0da'), S * 0.3);
+    // Silver tubes between neighboring struts, from the hull out to the landing decks
+    for (let i = 1; i < DD.struts.length; i++) {
+      const x0 = Math.max(...DD.struts[i]), x1 = Math.min(...DD.struts[i - 1]);
+      for (const s of [-1, 1]) for (const y of [11.4, 12.9]) {
+        const p = () => { ctx.beginPath(); ctx.roundRect(x0 - 0.2, s * y - 0.32, x1 - x0 + 0.4, 0.64, 0.32); };
+        p(); fillShadowed(ctx, metal(ctx, s * y - 0.32, s * y + 0.32, '#c9d0da'), S * 0.3);
+      }
     }
 
     // Landing decks: curved, ribbed along the outer flank, open at both ends
@@ -1044,16 +1048,16 @@ const destroyer = {
     bevel(ctx, mid, 0.9);
     // Guns all along: the two groups of four on the spine, rows along both
     // ribbed flanks, one on each engine nacelle
-    for (const x of [6.6, 4]) for (const y of [-1.4, 1.4]) turret(x, y);
+    for (const x of [5.4, 2.8]) for (const y of [-1.4, 1.4]) turret(x, y);
     for (const x of [-17.4, -20]) for (const y of [-1.4, 1.4]) turret(x, y);
-    for (const x of [16, 9.5, 1.6, -7.8, -20.6, -25]) for (const y of [-7.9, 7.9]) turret(x, y, 1);
+    for (const x of [16.4, 13, 3.8, -7.8, -20.6, -25]) for (const y of [-7.9, 7.9]) turret(x, y, 1);
     for (const y of [-DD.nacelle, DD.nacelle]) turret(-28.6, y, 1);
     // The emblem: a ring in the empire color around a golden center
-    const em = () => { ctx.beginPath(); ctx.arc(11, 0, 2.9, 0, TAU); };
+    const em = () => { ctx.beginPath(); ctx.arc(14.6, 0, 2.9, 0, TAU); };
     em(); fillShadowed(ctx, color, S * 0.3);
-    ctx.fillStyle = '#e8c547'; ctx.beginPath(); ctx.arc(11, 0, 1.85, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#e8c547'; ctx.beginPath(); ctx.arc(14.6, 0, 1.85, 0, TAU); ctx.fill();
     ctx.strokeStyle = 'rgba(120,80,10,.7)'; ctx.lineWidth = 0.2;
-    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(11 + Math.cos(a) * 1.8, Math.sin(a) * 1.8); ctx.stroke(); }
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.beginPath(); ctx.moveTo(14.6, 0); ctx.lineTo(14.6 + Math.cos(a) * 1.8, Math.sin(a) * 1.8); ctx.stroke(); }
     bevel(ctx, em, 0.3);
 
     // The head: broad, plates all over, the darker deck set into it
@@ -1078,7 +1082,11 @@ const destroyer = {
       inside(ctx, deck, () => ribs(19, 34, -4.6, 4.6, 0.8));
       ctx.strokeStyle = 'rgba(14,18,28,.6)'; ctx.lineWidth = 0.3; deck(); ctx.stroke();
       ctx.fillStyle = 'rgba(14,18,28,.3)'; ctx.fillRect(36, -3.4, 4.5, 6.8);
-      // Empire color: two short marks across the tip
+      // Empire color: a narrow band across the head, two short marks at the tip
+      ctx.fillStyle = color;
+      ctx.fillRect(42.2, -13.4, 1.2, 26.8);
+      ctx.fillStyle = tone(color, 0.35); ctx.fillRect(42.2, -13.4, 0.35, 26.8);
+      ctx.fillStyle = 'rgba(10,14,24,.35)'; ctx.fillRect(43.2, -13.4, 0.2, 26.8);
       ctx.fillStyle = color;
       ctx.fillRect(46.4, -6.6, 1.3, 2.6); ctx.fillRect(46.4, 4, 1.3, 2.6);
     });

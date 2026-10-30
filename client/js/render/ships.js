@@ -401,7 +401,7 @@ function drawTransport(ctx, L, color, phase) {
 // The capital ship in plan view, after a battlestar (units of L/100): a
 // broad head whose flanks curve out backwards, the dominant midsection with
 // the emblem and gun turrets, two short engine nacelles at the stern, and far out on the
-// sides two curved landing decks on two broad cross struts. The empire color
+// sides two curved landing decks on three broad cross struts. The empire color
 // sits where the original carries its red: marks at the tip of the head and
 // the front ends of the landing decks, and the ring of the emblem. Same
 // shapes as in shipshd.js.
@@ -482,13 +482,19 @@ function drawDestroyer(ctx, L, color, phase) {
   // they would read as a band around a rocket nose, so the landing decks
   // and the emblem carry the color alone there.
   ctx.fillStyle = color;
-  if (!small) { ctx.fillRect(46.2 * u, -6.6 * u, 1.4 * u, 2.6 * u); ctx.fillRect(46.2 * u, 4 * u, 1.4 * u, 2.6 * u); }
+  // A narrow band across the head as well - very small it would turn the
+  // ship into a rocket again, so only from a middle size on.
+  if (!small) {
+    ctx.fillRect(46.2 * u, -6.6 * u, 1.4 * u, 2.6 * u); ctx.fillRect(46.2 * u, 4 * u, 1.4 * u, 2.6 * u);
+    const h = ddHeadHalf(42.8) - 0.4;
+    ctx.fillRect(42.2 * u, -h * u, 1.2 * u, 2 * h * u);
+  }
   // Emblem: a ring in the empire color around a golden center
-  ctx.beginPath(); ctx.arc(11 * u, 0, 2.9 * u * Math.min(k, 1.4), 0, Math.PI * 2); ctx.fill(); outline(ctx, fine(L) * 0.6);
-  if (L >= 30) { ctx.fillStyle = '#e8c547'; ctx.beginPath(); ctx.arc(11 * u, 0, 1.8 * u, 0, Math.PI * 2); ctx.fill(); }
+  ctx.beginPath(); ctx.arc(14.6 * u, 0, 2.9 * u * Math.min(k, 1.4), 0, Math.PI * 2); ctx.fill(); outline(ctx, fine(L) * 0.6);
+  if (L >= 30) { ctx.fillStyle = '#e8c547'; ctx.beginPath(); ctx.arc(14.6 * u, 0, 1.8 * u, 0, Math.PI * 2); ctx.fill(); }
   // Cross struts over everything
   const reach = pod + 3.4;
-  for (const x0 of [-4.2, -14.4]) {
+  for (const x0 of [7.6, -3.4, -14.4]) {
     // Very small, darker than the decks, so those stand apart from the hull
     ctx.fillStyle = small ? '#6a717d' : light(-reach * u, reach * u);
     ctx.fillRect(x0 * u, -reach * u, 3.2 * u, reach * 2 * u);
@@ -503,9 +509,9 @@ function drawDestroyer(ctx, L, color, phase) {
   if (L >= 50) {
     ctx.fillStyle = '#8e959f';
     const guns = [];
-    for (const x of [6.6, 4, -17.4, -20]) for (const y of [-1.4, 1.4]) guns.push([x, y]);
+    for (const x of [5.4, 2.8, -17.4, -20]) for (const y of [-1.4, 1.4]) guns.push([x, y]);
     for (const x of [22.5, 28.5, 34.5]) for (const y of [-8.6, 8.6]) guns.push([x, y]);
-    for (const x of [16, 9.5, 1.6, -7.8, -20.6, -25]) for (const y of [-7.9, 7.9]) guns.push([x, y]);
+    for (const x of [16.4, 13, 3.8, -7.8, -20.6, -25]) for (const y of [-7.9, 7.9]) guns.push([x, y]);
     for (const [x, y] of guns) {
       ctx.beginPath(); ctx.arc(x * u, y * u, 1.05 * u, 0, Math.PI * 2); ctx.fill(); outline(ctx, fine(L) * 0.5);
     }
