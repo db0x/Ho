@@ -19,6 +19,9 @@ Reiches.*
 - **Gleichzeitige Züge** für bis zu 16 Spieler – Freunde per vierstelligem Code,
   freie Plätze mit KI.
 - **KI mit Charakter:** Eroberer, Siedler, Technokrat, Pirat, Bollwerk, Aasgeier.
+- **Jäger und Großkampfschiffe:** Schwärme kleiner Schiffe und Zerstörer mit Namen,
+  die das Feuer auf sich ziehen und ihre Flotte reparieren – oder klassisches Ho!!
+  nur mit den kleinen Schiffen.
 - **Flach oder im Raum,** als Streufeld oder Spiralgalaxie mit schwarzem Loch – und
   eine Karte, die mit der Erkundung wächst.
 - **Ein Haushalt, der aufgeht:** die Kopfleiste zeigt vor dem Zugende, wohin das
@@ -48,7 +51,7 @@ weitergeben.
 
 | | |
 |---|---|
-| **[Spielen](doc/playing.de.md)** | Regeln, Geld und Haushalt, Kampf, Galaxieformen, KI, Zusehen, Steuerung, Telefon |
+| **[Spielen](doc/playing.de.md)** | Regeln, Schiffstypen, Geld und Haushalt, Kampf, Galaxieformen, KI, Zusehen, Steuerung, Telefon |
 | **[Betrieb](doc/hosting.de.md)** | Node und Docker, Konten, Sicherheit, Reverse-Proxy, Einstellungen, Daten |
 | **[Entwicklung](doc/development.de.md)** | Aufbau, Grundsätze, Sprachen, Ton, Grafik, Tests, offene Punkte |
 

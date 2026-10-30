@@ -397,6 +397,121 @@ function drawTransport(ctx, L, color, phase) {
   ctx.closePath(); ctx.fill(); outline(ctx, fine(L) * 0.7);
 }
 
+/* ------------------------------------------------------------ Destroyer */
+// The capital ship in plan view, after a battlestar (units of L/100): a
+// broad head whose flanks curve out backwards, the dominant midsection with
+// the emblem and gun turrets, two short engine nacelles at the stern, and far out on the
+// sides two curved landing decks on two broad cross struts. The empire color
+// sits where the original carries its red: marks at the tip of the head and
+// the front ends of the landing decks, and the ring of the emblem. Same
+// shapes as in shipshd.js.
+const DD_POD = 16.4, DD_NACELLE = 6.6;
+const ddHeadHalf = x => 6.6 + 6.8 * (1 - ((x - 18) / 33) ** 2);
+const ddMidHalf = x => 9.2 + 1.5 * Math.sin(Math.PI * (19 - x) / 46);
+
+function drawDestroyer(ctx, L, color, phase) {
+  const u = L / 100;
+  const P = (pts) => tracePath(ctx, pts.map(([x, y]) => [x * u, y * u]));
+  const mirror = pts => [...pts, ...pts.slice(1, -1).reverse().map(([x, y]) => [x, -y])];
+  // Small on the map the marks in the empire color grow, or they vanish
+  const k = L < 30 ? 2 : L < 60 ? 1.5 : 1;
+  // Very small, the landing decks move out a little and the lines get thinner -
+  // otherwise decks and hull run together into one block.
+  const small = L < 45;
+  const pod = DD_POD + (small ? 2.6 : 0);
+  const line = small ? Math.max(0.45, L * 0.018) : 0.8;
+  // Lighter than the attachments of the small ships: at map size the landing
+  // decks would otherwise sink into the dark.
+  const light = (y0, y1) => {
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#d9dee6'); g.addColorStop(0.45, '#9aa1ad'); g.addColorStop(1, '#555c69');
+    return g;
+  };
+  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.41, s * DD_NACELLE * u, L * 0.15, phase + s);
+  for (const s of [-1, 1]) nozzle(ctx, L, -37.5 * u, s * DD_NACELLE * u, 3 * u);
+  // Machinery between the nacelles
+  ctx.fillStyle = '#4b515b'; ctx.fillRect(-35 * u, -3 * u, 12 * u, 6 * u);
+  // Short engine nacelles
+  for (const s of [-1, 1]) {
+    const c = s * DD_NACELLE * u;
+    ctx.fillStyle = light(c - 4.4 * u, c + 4.4 * u);
+    ctx.beginPath(); ctx.roundRect(-35 * u, c - 4.2 * u, 13 * u, 8.4 * u, [1 * u, 4.2 * u, 4.2 * u, 1 * u]); ctx.fill(); outline(ctx, line);
+  }
+  // Curved landing decks, open at both ends
+  for (const s of [-1, 1]) {
+    const c = s * pod;
+    const out = [], inn = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12, x = 17 - 44 * t, b = Math.sin(Math.PI * t);
+      out.push([x, c + s * (1.9 + 1.6 * b)]);
+      inn.push([x, c - s * (1.9 + 1.0 * b)]);
+    }
+    P([...out, ...inn.reverse()]); ctx.closePath();
+    ctx.fillStyle = light((c - 3.5) * u, (c + 3.5) * u); ctx.fill(); outline(ctx, line);
+    if (L >= 50) for (let x = -20; x < 14; x += 4.5) seam(ctx, L, [[x * u, (c - 2.6) * u], [x * u, (c + 2.6) * u]]);
+    ctx.fillStyle = '#20252c';
+    for (const [x0, x1] of [[17, 13.6], [-27, -23.6]]) {
+      P([[x0, c - 1.9], [x1, c - 1.2], [x1, c + 1.2], [x0, c + 1.9]]); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(14.2 * u, (c - 3.4) * u, 1.8 * u * k, 6.8 * u);
+  }
+  // Dominant midsection with bulging flanks
+  const mid = [[19, 0]];
+  for (let x = 19; x >= -27; x -= 4.6) mid.push([x, -ddMidHalf(x)]);
+  mid.push([-27, -ddMidHalf(-27)], [-27, 0]);
+  P(mirror(mid)); ctx.closePath();
+  ctx.fillStyle = hullGradient(ctx, L * 0.22); ctx.fill(); outline(ctx, small ? line : 1);
+  if (L >= 40) for (const x of [-14, -6, 2]) seam(ctx, L, [[x * u, -10 * u], [x * u, 10 * u]]);
+  // Broad head, the flanks curving out backwards. Very small, the curve and
+  // its light edge melt into a round dome - a rocket nose. There the tip
+  // stays broad and flat with clear corners, as on the original.
+  let head;
+  if (small) head = [[51, 0], [51, -7.4], [49, -9], [18, -13.4], [18, 0]];
+  else {
+    head = [[52.2, 0], [52, -4.8], [51.2, -6.2]];
+    for (let x = 49; x >= 18; x -= 3.1) head.push([x, -ddHeadHalf(x)]);
+    head.push([18, -ddHeadHalf(18)], [18, 0]);
+  }
+  P(mirror(head)); ctx.closePath();
+  ctx.fillStyle = hullGradient(ctx, L * 0.3); ctx.fill(); outline(ctx, small ? line : 1);
+  if (!small) edgeLight(ctx, L, [[51.2 * u, -6.2 * u], [40 * u, -11.5 * u], [26 * u, -13.1 * u]]);
+  ctx.fillStyle = 'rgba(30,36,50,.45)'; ctx.fillRect(19 * u, -4.6 * u, 15 * u, 9.2 * u);
+  if (L >= 40) for (const x of [26, 40]) seam(ctx, L, [[x * u, -12.5 * u], [x * u, 12.5 * u]]);
+  // Two short marks at the tip, as in the detailed drawing - very small
+  // they would read as a band around a rocket nose, so the landing decks
+  // and the emblem carry the color alone there.
+  ctx.fillStyle = color;
+  if (!small) { ctx.fillRect(46.2 * u, -6.6 * u, 1.4 * u, 2.6 * u); ctx.fillRect(46.2 * u, 4 * u, 1.4 * u, 2.6 * u); }
+  // Emblem: a ring in the empire color around a golden center
+  ctx.beginPath(); ctx.arc(11 * u, 0, 2.9 * u * Math.min(k, 1.4), 0, Math.PI * 2); ctx.fill(); outline(ctx, fine(L) * 0.6);
+  if (L >= 30) { ctx.fillStyle = '#e8c547'; ctx.beginPath(); ctx.arc(11 * u, 0, 1.8 * u, 0, Math.PI * 2); ctx.fill(); }
+  // Cross struts over everything
+  const reach = pod + 3.4;
+  for (const x0 of [-4.2, -14.4]) {
+    // Very small, darker than the decks, so those stand apart from the hull
+    ctx.fillStyle = small ? '#6a717d' : light(-reach * u, reach * u);
+    ctx.fillRect(x0 * u, -reach * u, 3.2 * u, reach * 2 * u);
+    ctx.strokeStyle = 'rgba(6,10,20,.85)'; ctx.lineWidth = small ? line * 0.7 : Math.max(0.5, L * 0.008);
+    ctx.strokeRect(x0 * u, -reach * u, 3.2 * u, reach * 2 * u);
+    if (L >= 40) {
+      ctx.fillStyle = '#2f353e';
+      for (const s of [-1, 1]) ctx.fillRect((x0 + 0.5) * u, (s < 0 ? -13.7 : 10.6) * u, 2.2 * u, 3.1 * u);
+    }
+  }
+  // Gun turrets: two groups of four on the spine, rows along the flanks
+  if (L >= 50) {
+    ctx.fillStyle = '#8e959f';
+    const guns = [];
+    for (const x of [6.6, 4, -17.4, -20]) for (const y of [-1.4, 1.4]) guns.push([x, y]);
+    for (const x of [22.5, 28.5, 34.5]) for (const y of [-8.6, 8.6]) guns.push([x, y]);
+    for (const x of [16, 9.5, 1.6, -7.8, -20.6, -25]) for (const y of [-7.9, 7.9]) guns.push([x, y]);
+    for (const [x, y] of guns) {
+      ctx.beginPath(); ctx.arc(x * u, y * u, 1.05 * u, 0, Math.PI * 2); ctx.fill(); outline(ctx, fine(L) * 0.5);
+    }
+  }
+}
+
 /**
  * Habitat dome as in the detailed drawing: a park under glass - lawn, a lake
  * and a path - inside a light metal ring, so it catches the eye on the map.
@@ -490,7 +605,7 @@ function drawTanker(ctx, L, color, phase) {
 
 const DRAW = {
   scout: drawScout, fighter: drawFighter, satellite: drawSatellite,
-  colony: drawColony, tanker: drawTanker, transport: drawTransport
+  colony: drawColony, tanker: drawTanker, transport: drawTransport, destroyer: drawDestroyer
 };
 
 /* ------------------------------------------------------------- Sprites */
@@ -506,10 +621,15 @@ const MAX_SHIPS = 400;
 // zoom level anyway, and the ships would visibly be the wrong size.
 /**
  * Size of a class relative to the others, for every view: the scout a bit
- * smaller, the fighter slightly bigger. The detailed drawing (shipshd.js)
+ * smaller, the fighter slightly bigger, the destroyer clearly the largest. The detailed drawing (shipshd.js)
  * uses the same factors.
  */
-export const SHIP_SCALE = { scout: 0.85, fighter: 1.08 };
+export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5 };
+/**
+ * How far the middle of a hull lies ahead of the origin, in units of the
+ * length/100: the destroyer's bow reaches out to 52, its stern only to -40.
+ */
+const SHIP_CENTER = { destroyer: 6 };
 
 function lenStep(len) {
   return Math.max(4, Math.round(len));
@@ -612,7 +732,13 @@ export function shipIcon(type, px = 34, color = '#9fb0c8') {
   cv.style.width = px + 'px'; cv.style.height = px + 'px';
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
-  drawShip(ctx, { type, x: px / 2, y: px / 2, angle: -Math.PI / 2, len: px * 0.82, color, phase: 0.4, shadow: false });
+  // The whole ship must fit into the square - a class drawn larger than the
+  // others (the destroyer) would otherwise lose its bow and stern.
+  const len = Math.min(px * 0.82, px * 0.95 / (SHIP_SCALE[type] || 1));
+  // Ships whose hull does not sit around their origin are moved by that much,
+  // so the hull - not the origin - is in the middle of the square.
+  const shift = (SHIP_CENTER[type] || 0) * len * (SHIP_SCALE[type] || 1) / 100;
+  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: -Math.PI / 2, len, color, phase: 0.4, shadow: false });
   iconCache.set(key, cv);
   return cv;
 }

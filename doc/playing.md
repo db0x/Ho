@@ -54,6 +54,7 @@ saying who can change them:
 | Turn timer | 0 = the game waits until everyone is done |
 | Galaxy grows | see [A galaxy without an edge](#a-galaxy-without-an-edge); off gives a fixed map |
 | Wormholes | see [Wormholes](#wormholes) |
+| Capital ships | destroyers can be built (see [The ship classes](#the-ship-classes)); off gives classic Ho!! with the small ships only |
 
 **Connection.** A disconnected player does not block the turn – they are skipped
 and can return at any time (the seat is stored in the browser). With sign-in a game can also be continued on
@@ -83,7 +84,7 @@ colonisation, economy.
 
 ## The ship classes
 
-Six classes, each with a job of its own. Ships are built at the shipyard of one of
+Seven classes, each with a job of its own. Ships are built at the shipyard of one of
 your worlds; clicking a ship there – or *Browse ship types* in the help (`H`) –
 opens its data sheet with the current values.
 
@@ -91,6 +92,7 @@ opens its data sheet with the current values.
 |---|---|
 | <img src="screenshots/ships/scout.webp" width="120" alt="Scout"> | **Scout** – the fastest class, with a long range. Only a scout reveals a world's temperature, gravity and metal reserve. Unarmed and fragile: better steer clear of enemy fleets. |
 | <img src="screenshots/ships/fighter.webp" width="120" alt="Fighter"> | **Fighter** – the backbone of every fleet, with weapons and shields. Whoever holds the orbit and breaks the defence battery and the orbital defence takes the world. Short range – send a tanker along for strikes deep in enemy space. |
+| <img src="screenshots/ships/destroyer.webp" width="120" alt="Destroyer"> | **Destroyer** – the capital ship, and the anchor of a fleet. It costs as much as ten fighters and fights about as well, but in its own way: eight guns fire at different targets every round, and its hull draws the fire like four fighters. In orbit of a world of yours it repairs its whole fleet, 20% of every hull per turn without a battle there. Weak against worlds – conquering stays the fighters' job. Needs Weapons 5 and Shields 5, and a shipyard on a world with at least 20M people. Every destroyer carries a historical ship name, which you can change in the fleet panel. |
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbital defence"> | **Orbital defence** – a satellite placed straight into orbit of the world that builds it, where it stays. Cheap, tough and well armed; from five upwards they raise a shield. A world with satellites does not fall without a fight. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Colony ship"> | **Colony ship** – lands 8M settlers on a free world and is used up in the process. Over a world of yours that is not yet full, *Drop settlers here* tops up the population. Slow and defenceless – an escort pays off. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – does not fight, but gives the whole fleet its range, more than twice that of a fighter. Every further tanker in the same fleet adds +15%. |
@@ -103,6 +105,7 @@ the current level:
 |---|---|---|---|---|---|
 | Scout | 8 cr · 3 metal | – | 10 | 71 ly/t | 323 ly |
 | Fighter | 14 cr · 7 metal | 5 | 22 | 42 ly/t | 170 ly |
+| Destroyer | 140 cr · 80 metal | 8 × 5 | 320 | 29 ly/t | 170 ly |
 | Orbital defence | 10 cr · 5 metal | 6 | 34 | – | – |
 | Colony ship | 30 cr · 12 metal | – | 16 | 34 ly/t | 221 ly |
 | Tanker | 18 cr · 6 metal | – | 20 | 38 ly/t | 442 ly |
@@ -143,6 +146,11 @@ Every battle can be replayed afterwards: click its notice to open the recording.
 A world falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes
 hands.
+
+Damage stays with a ship. Only a **destroyer** repairs: in orbit of a world of
+yours its whole fleet gets back 20% of every hull per turn without a battle there.
+Its eight guns each pick a target of their own, and it draws the fire like four
+fighters – the small ships in its fleet are hit less often.
 
 ## Galaxy shape: scatter or spiral
 

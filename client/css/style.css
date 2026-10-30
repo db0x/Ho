@@ -108,6 +108,18 @@ input:focus { outline: 2px solid var(--gold-dim); outline-offset: 0; }
 input[readonly] { color: var(--ink-dim); background: transparent; border-style: dashed; cursor: default; }
 input[readonly]:focus { outline: none; }
 .field.slim { margin: 10px 0; }
+/* Password field with an eye to show what has been typed (login.js). */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 44px; }
+.pw-eye {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 36px; height: 34px; padding: 0;
+  background: none; border: none; border-radius: 6px; color: var(--ink-faint); cursor: pointer;
+}
+.pw-eye:hover { background: rgba(160, 190, 240, .1); border: none; color: var(--ink); }
+.pw-eye:active { transform: translateY(-50%); }
+.pw-eye[aria-pressed="true"] { color: var(--gold); }
+.pw-eye svg { width: 19px; height: 19px; }
 .field.slim > span { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); display: flex; justify-content: space-between; }
 .field.slim b { color: var(--gold); font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--gold); }
@@ -607,12 +619,21 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .buildrow .bi { flex: none; }
 .buildrow .bname { font-size: 14px; }
 .buildrow .bcost { font-size: 12px; color: var(--ink-dim); font-family: var(--mono); }
+/* Not yet available: what is missing instead of the price, in the regular font. */
+.buildrow.locked .bi, .buildrow.locked .bname { opacity: .5; }
+.buildrow.locked .bcost { font-family: inherit; color: var(--ink-faint); }
 .buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 /* Fixed width for up to three digits: otherwise "−" shifts aside at 10 or 100. */
 .buildrow .bq .n { font-family: var(--mono); min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .shiplist { display: flex; flex-direction: column; gap: 4px; }
 .shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }
 .shipitem .hp { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+/* Named big ships: one line each, the name first, the class beside it. */
+.shipitem .si-named { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shipitem .ship-name { font-weight: 600; color: var(--ink); }
+.shipitem.named .hp { flex: none; white-space: nowrap; }
+.shipitem .rename { flex: none; padding: 2px 7px; }
+.shipitem .rename-input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13.5px; }
 .hint-line { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
 /* Defense and fleets in orbit */
 .def-warn { margin: 0 0 8px; padding: 6px 9px; border-radius: 7px; font-size: 13px;

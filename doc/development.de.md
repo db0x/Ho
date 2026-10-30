@@ -25,6 +25,7 @@ server/
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
+  shipnames.js       Namen für die Zerstörer: historische Schiffe und einige aus Filmen und Serien
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
   userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil, Nachrichtenschlüssel (verpackt) – atomar geschrieben
@@ -36,7 +37,7 @@ client/
   index.html         Startbildschirm, Lobby, Spielbildschirm
   login.html         Anmeldung und erster Passwortwechsel
   img/               logo.svg (Wortmarke), mark.svg (Tab-Symbol)
-  i18n/              de.json, en.json – Textkataloge
+  i18n/              de.json, en.json, uk.json – Textkataloge
   js/main.js         Verdrahtung, Spielschleife, Rundenwechsel
   js/net.js          WebSocket mit automatischem Wiederverbinden
   js/e2e.js          Ende-zu-Ende-Verschlüsselung der Freundesnachrichten: ein Schlüssel pro Konto, mit dem Passwort verpackt
@@ -153,6 +154,7 @@ npm run test:i18n      # Kataloge: gleiche Schlüssel, gleiche Platzhalter, Serv
 npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
+npm run test:destroyer # Zerstörer: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat

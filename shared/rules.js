@@ -61,7 +61,7 @@ export function techCostToNext(level) {
 
 // --------------------------------------------------------------------- Ships
 
-export const SHIP_TYPES = ['scout', 'fighter', 'satellite', 'colony', 'tanker', 'transport'];
+export const SHIP_TYPES = ['scout', 'fighter', 'destroyer', 'satellite', 'colony', 'tanker', 'transport'];
 
 // Ship names and descriptions live in the catalogs under
 // ship.<type>.name / .desc; only values that hold in every language are here.
@@ -79,6 +79,19 @@ export const SHIP_DEFS = {
     money: 14, metal: 7, hull: 22,
     techs: ['range', 'speed', 'weapons', 'shields'],
     attackMul: 1, shieldMul: 1, speedMul: 1, rangeMul: 1
+  },
+  // The anchor of a fleet: costs as much as ten fighters and fights about as
+  // well as they do, but in its own way - eight guns, a hull that draws the
+  // fire away from the small ships, and in the orbit of an own world it
+  // repairs its whole fleet. Batteries hit it hard: the planetary defense
+  // wastes nothing on a target this big. Each one carries a name.
+  destroyer: {
+    icon: 'destroyer',
+    money: 14, metal: 8, hull: 320,
+    techs: ['range', 'speed', 'weapons', 'shields'],
+    attackMul: 8, shieldMul: 1, speedMul: 0.7, rangeMul: 1,
+    size: 10, guns: 8, weight: 4, repair: true, named: true, capital: true,
+    requires: { weapons: 5, shields: 5, pop: 20 }
   },
   satellite: {
     icon: 'satellite',
@@ -111,6 +124,37 @@ export const SHIP_DEFS = {
   }
 };
 
+/**
+ * The ship types of a game: without the lobby option "capital ships" it is
+ * classic Ho!! - no destroyers.
+ * @param {{capitalShips?: boolean}} settings
+ */
+export function shipTypesFor(settings) {
+  return settings?.capitalShips === false ? SHIP_TYPES.filter(t => !SHIP_DEFS[t].capital) : SHIP_TYPES;
+}
+
+/**
+ * Can this type be built at all? Some need research first and a large world
+ * as their shipyard. Null if it can, otherwise what is missing - the levels
+ * and the population it needs. `pop` left out: only the research counts.
+ * @returns {null | {weapons?: number, shields?: number, pop?: number}}
+ */
+export function buildLock(type, tech, pop) {
+  const need = SHIP_DEFS[type]?.requires;
+  if (!need) return null;
+  const missing = {};
+  for (const f of TECH_FIELDS) if (need[f] && (tech[f] || 1) < need[f]) missing[f] = need[f];
+  if (need.pop && pop != null && pop < need.pop) missing.pop = need.pop;
+  return Object.keys(missing).length ? missing : null;
+}
+
+/**
+ * Repair in the orbit of an own world: a fleet with a ship that can repair
+ * (the destroyer) gets back this share of every ship's hull per turn without
+ * a battle there.
+ */
+export const REPAIR_SHARE = 0.2;
+
 /** Technology surcharge on the price: high levels are expensive. */
 function techSurcharge(level) {
   return 2.6 * Math.pow(Math.max(0, level - 1), 1.45);
@@ -130,7 +174,9 @@ export function shipCost(type, tech) {
   const def = SHIP_DEFS[type];
   let extra = 0;
   for (const f of def.techs) extra += techSurcharge(tech[f] || 1);
-  const mf = miniFactor(tech.mini || 1);
+  // A big ship costs as much as `size` small ones - on every level, not just
+  // at the start.
+  const mf = miniFactor(tech.mini || 1) * (def.size || 1);
   return {
     money: Math.max(1, Math.round((def.money + extra) * mf)),
     metal: Math.max(1, Math.round((def.metal + extra * 0.35) * mf))
@@ -159,7 +205,7 @@ export function refitCost(type, shipTech, tech) {
     extra += techSurcharge(current) - techSurcharge(old);
   }
   if (extra <= 0) return null;
-  const mf = miniFactor(tech.mini || 1) * REFIT_FEE;
+  const mf = miniFactor(tech.mini || 1) * REFIT_FEE * (def.size || 1);
   return {
     tech: next,
     money: Math.max(1, Math.round(extra * mf)),
@@ -240,7 +286,12 @@ export function shipStats(type, tech) {
     mobile: def.speedMul > 0,
     colonists: def.colonists || 0,
     isTanker: !!def.tanker,
-    cargo: def.cargo || 0
+    cargo: def.cargo || 0,
+    // The attack is spread over this many shots per combat round, and the
+    // ship is picked as a target as often as `weight` small ones.
+    guns: def.guns || 1,
+    weight: def.weight || 1,
+    repairs: !!def.repair
   };
 }
 

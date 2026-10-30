@@ -171,7 +171,7 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | --- | --- | --- |
 | `PORT` | `8080` | server port |
 | `HO_AUTH` | on | `off` switches the sign-in off – for development only |
-| `HO_DEV` | off | `on` turns on the dev mode: admins get the debug dialog (Ctrl+Shift+D): test battle, sounds and, in the running game, opening and closing wormholes; without sign-in everyone gets it – for development only |
+| `HO_DEV` | off | `on` turns on the dev mode: admins get the debug dialog (Ctrl+Shift+D): test battle, sounds and, in the running game, opening and closing wormholes and a destroyer on the spot; without sign-in everyone gets it – for development only |
 | `HO_USERS_FILE` | `data/users.json` | where the accounts live; profile pictures sit next to it in `avatars/` |
 | `HO_SESSION_DAYS` | `30` | how long a session is good for |
 | `HO_SECURE_COOKIES` | automatic | `1`/`0` forces or forbids the `Secure` flag |

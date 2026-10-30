@@ -4,7 +4,7 @@
 // how it answers when it gets hit itself. On top of that comes a pinch of
 // variance per empire, so two conquerors do not play like twins.
 import {
-  shipCost, shipStats, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
+  shipCost, shipStats, buildLock, planetCapacity, terraformFullCost, dist, batteryStats, COMBAT_ROUNDS,
   holeZone, travelDistance, refitTotal, clamp, TECH_FIELDS, techMaxLevel, recycleValue, supplyDistance, cargoOf,
   terraformable, IDEAL, WORMHOLE
 } from '../shared/rules.js';
@@ -31,6 +31,8 @@ const BATTERED = 3;
  *   fleet       how fast the fleet may grow with the turns
  *   fighters    fighters per turn
  *   satellites  appetite for satellites at threatened worlds
+ *   capital     one destroyer per this many fighters once unlocked (0 = none -
+ *               too slow for a raider)
  *   campaign    'always' | 'retaliation' (only whoever strikes gets it back)
  *               | 'pressure' (only once it has got stuck)
  *   from        campaigns no earlier than this turn
@@ -49,7 +51,7 @@ const PERSONAS = {
     research: [32, 25],
     weights: [{ range: 3, speed: 2, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 0 },
               { range: 2, speed: 2, weapons: 4, shields: 3, mini: 2, radical: 1, recycling: 0 }],
-    build: 0.72, terra: 0.25, settlers: 3, fleet: 1.5, fighters: 6, satellites: 2,
+    build: 0.72, terra: 0.25, settlers: 3, fleet: 1.5, fighters: 6, satellites: 2, capital: 8,
     campaign: 'always', from: 15, margin: 1.15, solo: 'prey',
     vengeance: 1.5, vsLeader: 0.4, garrison: 0
   },
@@ -58,7 +60,7 @@ const PERSONAS = {
     research: [36, 32],
     weights: [{ range: 4, speed: 2, weapons: 1, shields: 1, mini: 2, radical: 4, recycling: 0 },
               { range: 3, speed: 2, weapons: 2, shields: 3, mini: 2, radical: 3, recycling: 1 }],
-    build: 0.6, terra: 0.45, settlers: 5, fleet: 0.8, fighters: 3, satellites: 2,
+    build: 0.6, terra: 0.45, settlers: 5, fleet: 0.8, fighters: 3, satellites: 2, capital: 12,
     campaign: 'retaliation', from: 45, margin: 1.4, solo: 'near',
     vengeance: 0.8, vsLeader: 0.3, garrison: 0.4, wormholes: true
   },
@@ -67,7 +69,7 @@ const PERSONAS = {
     research: [50, 40],
     weights: [{ range: 2, speed: 2, weapons: 3, shields: 3, mini: 3, radical: 2, recycling: 0 },
               { range: 2, speed: 2, weapons: 4, shields: 4, mini: 3, radical: 1, recycling: 1 }],
-    build: 0.65, terra: 0.3, settlers: 3, fleet: 0.8, fighters: 4, satellites: 1,
+    build: 0.65, terra: 0.3, settlers: 3, fleet: 0.8, fighters: 4, satellites: 1, capital: 8,
     campaign: 'always', from: 70, margin: 1.3, solo: 'never',
     vengeance: 1.0, vsLeader: 1.0, garrison: 0.2, refits: true
   },
@@ -77,7 +79,7 @@ const PERSONAS = {
     research: [30, 26],
     weights: [{ range: 3, speed: 4, weapons: 2, shields: 1, mini: 2, radical: 1, recycling: 0 },
               { range: 3, speed: 4, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 0 }],
-    build: 0.75, terra: 0.2, settlers: 2, fleet: 1.4, fighters: 5, satellites: 0,
+    build: 0.75, terra: 0.2, settlers: 2, fleet: 1.4, fighters: 5, satellites: 0, capital: 0,
     campaign: 'pressure', from: 8, margin: 1.0, solo: 'prey',
     vengeance: 1.2, vsLeader: 1.0, garrison: 0, packs: true, scouts: 5, wormholes: true
   },
@@ -87,7 +89,7 @@ const PERSONAS = {
     research: [38, 32],
     weights: [{ range: 2, speed: 1, weapons: 2, shields: 4, mini: 2, radical: 3, recycling: 0 },
               { range: 2, speed: 2, weapons: 3, shields: 4, mini: 2, radical: 2, recycling: 1 }],
-    build: 0.6, terra: 0.45, settlers: 3, fleet: 0.9, fighters: 3, satellites: 3,
+    build: 0.6, terra: 0.45, settlers: 3, fleet: 0.9, fighters: 3, satellites: 3, capital: 6,
     campaign: 'always', from: 100, margin: 1.25, solo: 'near',
     vengeance: 1.0, vsLeader: 0.5, garrison: 0.5, refits: true
   },
@@ -97,7 +99,7 @@ const PERSONAS = {
     research: [32, 28],
     weights: [{ range: 3, speed: 3, weapons: 2, shields: 2, mini: 2, radical: 2, recycling: 0 },
               { range: 3, speed: 3, weapons: 3, shields: 2, mini: 2, radical: 1, recycling: 2 }],
-    build: 0.7, terra: 0.3, settlers: 2, fleet: 1.2, fighters: 4, satellites: 1,
+    build: 0.7, terra: 0.3, settlers: 2, fleet: 1.2, fighters: 4, satellites: 1, capital: 10,
     campaign: 'always', from: 25, margin: 1.0, solo: 'carrion',
     vengeance: 0.5, vsLeader: 0.8, garrison: 0.1, carrion: true, scouts: 5, wormholes: true
   }
@@ -569,7 +571,24 @@ export function runBot(game, bot) {
       const have = myFleets.reduce((a, f) => a + f.ships.filter(s => s.cargo).length, 0);
       if (have < (P.satellites >= 3 ? 2 : 1) && surplus().length) order.push([yard, 'transport', 1]);
     };
+    // The anchor for the fleet: one per so many fighters, built at the
+    // largest world that may - repairs then happen at home anyway. It costs
+    // more than a turn's budget, so the empire saves up for it: fighters
+    // only when threatened, until it is paid for.
+    const big = P.capital && war && game.settings.capitalShips !== false ? yards.find(p => !buildLock('destroyer', bot.tech, p.pop)) : null;
+    let saving = false;
+    if (big) {
+      const ships = myFleets.flatMap(f => f.ships);
+      const fighters = ships.filter(s => s.type === 'fighter').length;
+      const have = ships.filter(s => s.type === 'destroyer').length;
+      if (have < Math.floor(fighters / P.capital)) {
+        const c = shipCost('destroyer', bot.tech);
+        if (c.money <= budget && c.metal <= bot.metal) order.push([big, 'destroyer', 1]);
+        else saving = true;
+      }
+    }
     const warships = () => {
+      if (saving && !threatened.size) return;
       // If a lot of money is lying around, it goes into ships instead of being hoarded.
       const hoard = Math.floor(Math.max(0, budget - 10 * fighterCost.money) / fighterCost.money * 0.4);
       const n = Math.min(P.fighters + (camp ? 2 : 0) + hoard, Math.ceil(cap - myShips));

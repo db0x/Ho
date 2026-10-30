@@ -14,7 +14,8 @@ const TAU = Math.PI * 2;
 const RD = 1.3;                       // seconds per combat round at speed 1
 const SPEEDS = [1, 2, 4];
 // Those who deal damage fight in front; those who are protected stand at the back.
-const FRONT = ['fighter', 'satellite', 'scout', 'tanker', 'transport', 'colony'];
+// The destroyer stands behind the fighters: big enough to be seen over them.
+const FRONT = ['fighter', 'satellite', 'destroyer', 'scout', 'tanker', 'transport', 'colony'];
 
 let modal = null, frame = 0, st = null;
 
@@ -167,7 +168,8 @@ function arrange(W, H) {
       const back = (row - (rows - 1) / 2) * cell * 0.95;
       const jx = (rnd() - 0.5) * cell * 0.25, jy = (rnd() - 0.5) * cell * 0.25;
       pos[i] = [ccx + perp[0] * off - dir[0] * back + jx, ccy + perp[1] * off - dir[1] * back + jy];
-      len[i] = cell * 0.78;
+      // The destroyer stands out even more in battle than on the map.
+      len[i] = cell * 0.78 * (battle.units[i][1] === 'destroyer' ? 1.15 : 1);
       facing[i] = Math.atan2(dir[1], dir[0]);
     });
   });

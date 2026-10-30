@@ -1,7 +1,7 @@
 // Profile of a ship type: a large, animated image and the stats the ship
 // would be built with. One window for all types - you can switch between
 // them at the top.
-import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL } from '../../shared/rules.js';
+import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
 import { shipIcon } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';
@@ -41,15 +41,27 @@ function build() {
 }
 
 /**
+ * What a ship type needs before it can be built, as a readable list:
+ * "Weapons 5 · Shields 5 · a world with 20M people". `need` is what
+ * buildLock (shared/rules.js) returns, or the type's full requirements.
+ */
+export function needsText(need) {
+  const parts = TECH_FIELDS.filter(f => need[f]).map(f => t('shipinfo.needTech', { tech: t(`tech.${f}.name`), level: need[f] }));
+  if (need.pop) parts.push(t('shipinfo.needPop', { n: need.pop }));
+  return parts.join(' · ');
+}
+
+/**
  * @param {string} type
- * @param {{tech?: Record<string, number>, color?: string, note?: string}} o
+ * @param {{tech?: Record<string, number>, color?: string, note?: string, types?: string[]}} o
  *   tech levels it would be built with (without: starting level), the empire
- *   color and a note below the stats
+ *   color, a note below the stats and the types of the game (without capital
+ *   ships in a classic game)
  */
 export function openShipInfo(type, o = {}) {
   if (!SHIP_DEFS[type]) return;
   if (!modal) build();
-  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '' };
+  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '', types: o.types || SHIP_TYPES };
   modal.querySelector('.si-close').textContent = t('shipinfo.close');
   render();
   modal.classList.remove('hidden');
@@ -72,7 +84,7 @@ function render() {
 
   const tabs = modal.querySelector('.si-tabs');
   tabs.innerHTML = '';
-  for (const kind of SHIP_TYPES) {
+  for (const kind of current.types) {
     const b = document.createElement('button');
     b.className = 'tiny' + (kind === type ? ' primary' : '');
     b.title = t(`ship.${kind}.name`);
@@ -100,6 +112,7 @@ function render() {
     row(t('fleet.attack'), st.attack ? fmt1(st.attack) : '–',
       st.attack ? differs(st.attack, base.attack) : null, fmt1),
     row(t('fleet.hull'), `${fmt(st.maxHp)} HP`, differs(st.maxHp, base.maxHp)),
+    st.guns > 1 ? row(t('shipinfo.guns'), t('shipinfo.gunsValue', { n: st.guns, attack: fmt1(st.attack / st.guns) })) : '',
     st.colonists ? row(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
     st.cargo ? row(t('shipinfo.cargo'), t('shipinfo.cargoValue', { n: st.cargo })) : '',
     row(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
@@ -110,7 +123,8 @@ function render() {
     <h2>${t(`ship.${type}.name`)}</h2>
     <p class="si-lead">${t(`ship.${type}.desc`)}</p>
     <div class="statgrid">${stats}</div>
-    <p class="small muted">${t('shipinfo.techs', { list: levels })}${note ? '<br>' + note : ''}</p>
+    <p class="small muted">${t('shipinfo.techs', { list: levels })}${note ? '<br>' + note : ''}${def.requires
+      ? '<br>' + t('shipinfo.requires', { list: needsText(def.requires) }) : ''}</p>
     <h4>${t('shipinfo.use')}</h4>
     <p class="si-use">${t(`ship.${type}.info`)}</p>`;
 }
@@ -130,7 +144,9 @@ function paint(ms) {
   // Without propulsion a satellite only drifts and rotates; everything else
   // flies upwards, swaying slightly.
   const stationary = !SHIP_DEFS[current.type].speedMul;
-  const len = px * 0.58, S = len / 100;
+  // The destroyer is the largest class everywhere - here it would run out
+  // of the stage, flames included.
+  const len = px * 0.58 * (current.type === 'destroyer' ? 0.88 : 1), S = len / 100;
   drawShipHD(ctx, {
     type: current.type,
     // Moved up a little: the flame needs room at the back.

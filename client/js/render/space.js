@@ -1014,7 +1014,7 @@ function makeStars(n) {
   return stars;
 }
 function leadType(f) {
-  const order = ['fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
+  const order = ['destroyer', 'fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
   const types = new Set((f.ships || []).map(s => s.type));
   for (const t of order) if (types.has(t)) return t;
   return 'fighter';
