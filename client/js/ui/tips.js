@@ -14,8 +14,11 @@ export function bindTips() {
   tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hovertip simple', role: 'tooltip' }));
   document.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse') return;
+    // Inside a [data-tip] the panel's own rich tooltip speaks - and the
+    // plain one of an element around it (a row's title) has to go.
+    if (e.target.closest?.('[data-tip]')) return hide();
     const el = e.target.closest?.('[title], [data-title]');
-    if (!el || el === target || el.closest('[data-tip]')) return;
+    if (!el || el === target) return;
     adopt(el);
     hide();
     target = el;

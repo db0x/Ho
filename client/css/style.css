@@ -659,6 +659,10 @@ body.is-blocked > :not(#blocked) { display: none !important; }
 .buildrow.locked .bcost { font-family: inherit; color: var(--ink-faint); }
 .buildrow .bq { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 /* Fixed width for up to three digits: otherwise "−" shifts aside at 10 or 100. */
+/* A disabled button gets no mouse events - its wrapper carries the reason. */
+.buildrow .bq .plus-wrap { display: inline-flex; }
+.buildrow .bq .plus-wrap button:disabled { pointer-events: none; }
+.hovertip .bad { color: var(--bad); font-weight: 600; }
 .buildrow .bq .n { font-family: var(--mono); min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .shiplist { display: flex; flex-direction: column; gap: 4px; }
 .shipitem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #0b1020; border: 1px solid var(--line); border-radius: 7px; font-size: 13.5px; }

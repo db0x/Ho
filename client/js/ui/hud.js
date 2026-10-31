@@ -1020,12 +1020,15 @@ export class Hud {
     // below would not match the rows above it.
     const pl = this.plan();
     rows.innerHTML = '';
+    const why = new Map();
     for (const type of shipTypesFor(this.view)) {
       const cost = shipCost(type, pl.tech);
       const n = queue[type] || 0;
       // Big ships need research and a large world - as the server checks it:
       // with today's levels, not those after this turn's research.
       const lock = buildLock(type, me.tech, p.pop);
+      const blocked = lock || !this.affordable({ build: [p.id, type] });
+      if (blocked) why.set(type, lock ? this.lockTip(type, p, pl) : this.budgetTip(type, cost, pl));
       const row = document.createElement('div');
       row.className = 'buildrow' + (lock ? ' locked' : '');
       row.innerHTML = `
@@ -1038,8 +1041,7 @@ export class Hud {
         <span class="bq">
           <button class="tiny minus">−</button>
           <span class="n">${n}</span>
-          <button class="tiny plus"${lock ? ` disabled title="${t('yard.needs', { list: needsText(lock) })}"`
-            : this.affordable({ build: [p.id, type] }) ? '' : ` disabled title="${t('yard.cantAfford')}"`}>+</button>
+          <span class="plus-wrap"${blocked ? ` data-tip="${type}"` : ''}><button class="tiny plus"${blocked ? ' disabled' : ''}>+</button></span>
         </span>`;
       row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color));
       row.title = t(`ship.${type}.desc`) + ' ' + t('shipinfo.hint');
@@ -1051,6 +1053,7 @@ export class Hud {
       row.querySelector('.minus').onclick = () => this.app.send({ t: 'orders', build: { planetId: p.id, type, count: -1 } });
       rows.appendChild(row);
     }
+    this.wireTips(rows, el => why.get(el.dataset.tip) || '');
     let cm = 0, ce = 0;
     for (const [type, count] of Object.entries(queue)) {
       const c = shipCost(type, pl.tech);
@@ -1074,6 +1077,56 @@ export class Hud {
     const [l1, l2] = sum.children;
     l1.textContent = line1; l1.title = line1;
     l2.textContent = line2 || '\u00a0'; l2.title = line2;
+  }
+
+  /**
+   * Why a type cannot be built here yet, for the tooltip on the greyed +:
+   * every requirement with what there is, the missing ones in red.
+   */
+  lockTip(type, p, pl) {
+    const me = this.view.me, need = SHIP_DEFS[type].requires;
+    const mark = ok => ok ? 'good' : 'bad';
+    const lines = TECH_FIELDS.filter(f => need[f]).map(f => {
+      const have = me.tech[f] || 1;
+      return `<span class="k">${t(`tech.${f}.name`)}</span><span class="v ${mark(have >= need[f])}">${have} / ${need[f]}</span>`;
+    });
+    if (need.pop) {
+      const ok = !buildLock(type, {}, p.pop)?.pop;
+      lines.push(`<span class="k">${t('yard.why.pop')}</span><span class="v ${mark(ok)}">${t('yard.why.popValue', { have: fmt1(p.pop), need: need.pop })}</span>`);
+    }
+    // Research done this turn only counts from the next one on - as on the server.
+    const soon = !buildLock(type, pl.tech) && buildLock(type, me.tech);
+    return `<div class="tip-title">${t('yard.why.locked', { ship: t(`ship.${type}.name`) })}</div>
+      <div class="tip-grid">${lines.join('')}</div>
+      ${soon ? `<div class="tip-warn">${t('yard.why.techNow')}</div>` : ''}`;
+  }
+
+  /**
+   * Why one more of this type no longer fits the budget: the price against
+   * what is left after research and the other orders - the same forecast
+   * the server checks the order with.
+   */
+  budgetTip(type, cost, pl) {
+    const lg = pl.ledger;
+    const used = { money: lg.build.money + lg.refit.money, metal: lg.build.metal + lg.refit.metal };
+    const free = { money: Math.max(0, lg.now.money - lg.research - used.money), metal: Math.max(0, lg.now.metal - used.metal) };
+    const res = (m, e) => `${fmt(m)} ${t('unit.cr')} · ${fmt(e)} ${t('unit.metal')}`;
+    const missing = [
+      cost.money > free.money ? `${fmt(cost.money - free.money)} ${t('unit.cr')}` : null,
+      cost.metal > free.metal ? `${fmt(cost.metal - free.metal)} ${t('unit.metal')}` : null
+    ].filter(Boolean);
+    const row = (k, v, cls = '') => `<span class="k">${k}</span><span class="v ${cls}">${v}</span>`;
+    return `<div class="tip-title">${t('yard.why.broke', { ship: t(`ship.${type}.name`) })}</div>
+      <div class="tip-grid">
+        ${row(t('yard.why.price'), res(cost.money, cost.metal))}
+        ${row(t('yard.why.cash'), res(lg.now.money, lg.now.metal))}
+        ${lg.research ? row(t('yard.why.research'), `${fmt(lg.research)} ${t('unit.cr')}`) : ''}
+        ${used.money || used.metal ? row(t('yard.why.orders'), res(used.money, used.metal)) : ''}
+        ${row(t('yard.why.free'), res(free.money, free.metal), missing.length ? 'bad' : '')}
+      </div>
+      <div class="tip-warn">${missing.length ? t('yard.why.missing', { list: missing.join(' · ') })
+        : lg.tight ? t('yard.cantAfford') : t('yard.why.others')}</div>
+      ${pl.breakthrough ? `<div class="tip-warn">${t('yard.why.breakthrough')}</div>` : ''}`;
   }
 
   /**

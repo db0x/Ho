@@ -137,6 +137,8 @@ export function shipTypesFor(settings) {
  * Can this type be built at all? Some need research first and a large world
  * as their shipyard. Null if it can, otherwise what is missing - the levels
  * and the population it needs. `pop` left out: only the research counts.
+ * The population counts as the game shows it, to one decimal - a world
+ * showing 20.0M must not fail on 19.96.
  * @returns {null | {weapons?: number, shields?: number, pop?: number}}
  */
 export function buildLock(type, tech, pop) {
@@ -144,7 +146,7 @@ export function buildLock(type, tech, pop) {
   if (!need) return null;
   const missing = {};
   for (const f of TECH_FIELDS) if (need[f] && (tech[f] || 1) < need[f]) missing[f] = need[f];
-  if (need.pop && pop != null && pop < need.pop) missing.pop = need.pop;
+  if (need.pop && pop != null && Math.round(pop * 10) / 10 < need.pop) missing.pop = need.pop;
   return Object.keys(missing).length ? missing : null;
 }
 

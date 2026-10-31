@@ -52,6 +52,9 @@ const unlock = p => { p.tech.weapons = 5; p.tech.shields = 5; };
   home.pop = 12;
   r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
   assert(r?.error === 'yard.locked', 'Order on a small world accepted');
+  // The population counts as shown, to one decimal: 19.96 reads 20.0 and is enough, 19.94 is not.
+  assert(!buildLock('destroyer', me.tech, 19.96), 'A world showing 20.0M refused');
+  assert(buildLock('destroyer', me.tech, 19.94)?.pop === 20, 'A world showing 19.9M accepted');
   home.pop = 30;
   r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
   assert(!r?.error, 'Order refused although unlocked: ' + r?.error);
