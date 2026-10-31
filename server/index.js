@@ -12,10 +12,14 @@ import {
 } from './game.js';
 import { runBot } from './bot.js';
 import { devWormholes } from './wormholes.js';
-import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled } from './auth.js';
-import { listUsers, userFile, getUser, setProfile, isAdmin, setNewsSeen, ensureHandles, userByHandle } from './userstore.js';
+import { handleAuth, gate, checkUpgrade, sessionAlive, authEnabled, revoke } from './auth.js';
+import {
+  listUsers, userFile, getUser, setProfile, isAdmin, isInviter, setInviter, isBlocked, setBlocked, deleteUser,
+  setNewsSeen, ensureHandles, userByHandle
+} from './userstore.js';
 import * as friends from './friends.js';
 import { createInvite, listInvites, revokeInvite } from './invites.js';
+import { addAppeal, appealsOf, allAppeals, forgetAppeals, cleanAppeal, unanswered, APPEAL_MAX, APPEAL_UNANSWERED } from './appeals.js';
 import { startStun } from './stun.js';
 import {
   cleanName, nameAllowed, reservedName, uniqueName, parseAvatar, putGuestAvatar, putAccountAvatar,
@@ -211,18 +215,24 @@ wss.on('connection', (ws, req, session) => {
     c.handle = account?.handle || null;
   }
   conns.set(connId, c);
+  // Blocked: signed in, but the hello carries only the block and the thread
+  // with the admins - no games, no seats, no friends.
+  const blocked = blockedOf(c) ? (account?.blocked || {}) : null;
+  c.blocked = !!blocked;
   send(ws, {
-    t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS, openGames: openGameList(),
-    mySeats: seatList(c, connId),
+    t: 'hello', maxPlayers: MAX_PLAYERS, defaults: DEFAULT_SETTINGS,
+    openGames: blocked ? [] : openGameList(), mySeats: blocked ? [] : seatList(c, connId),
+    ...(blocked ? { blocked: { at: blocked.at }, appeal: appealView(c.accountKey) } : {}),
     voice: VOICE ? { stun: stunPort ? (STUN_URL || { port: stunPort }) : null } : null,
     profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null },
     admin: adminOf(c),
+    inviter: inviterOf(c),
     dev: devOf(c),
     // Which release's change notes this account has seen - null: none yet.
     // Without an account the browser remembers it.
     version: VERSION, releases: RELEASES, newsSeen: c.accountKey ? (account?.news ?? null) : undefined
   });
-  if (c.accountKey && authEnabled()) sendFriends(c);
+  if (c.accountKey && authEnabled() && !blocked) sendFriends(c);
 
   ws.on('message', (raw) => {
     const conn = conns.get(connId);
@@ -316,8 +326,12 @@ function friendsView(key) {
   };
 }
 
-/** Sends the friends list - only if it changed since the last time, unless forced. */
+/**
+ * Sends the friends list - only if it changed since the last time, unless
+ * forced. Never to a blocked connection: it sees nothing of the instance.
+ */
 function sendFriends(c, force = true) {
+  if (c.blocked) return;
   let view;
   try { view = friendsView(c.accountKey); } catch (e) { console.error('Friends:', e.message); return; }
   const sig = JSON.stringify(view);
@@ -353,7 +367,7 @@ function friendMessage(c, ws, msg) {
       case 'friendMsg': {
         const m = friends.addMessage(me, them, msg.env);
         for (const x of conns.values()) {
-          if (x.accountKey === me || x.accountKey === them) {
+          if ((x.accountKey === me || x.accountKey === them) && !x.blocked) {
             const withHandle = x.accountKey === me ? target.handle : getUser(me)?.handle;
             send(x.ws, { t: 'friendMsg', with: withHandle, msg: { mine: x.accountKey === me, env: m.env, at: m.at } });
           }
@@ -389,6 +403,55 @@ function adminOf(c) {
   try { return isAdmin(c.accountKey); } catch { return false; }   // account file unreadable
 }
 
+/** May this connection create invite links? Admins may; so may accounts with the inviter flag. */
+function inviterOf(c) {
+  if (!c.accountKey) return false;
+  try { return isInviter(c.accountKey); } catch { return false; }   // account file unreadable
+}
+
+/**
+ * Is this connection's account blocked? Asked anew on every request, like
+ * the admin flag. An unreadable account file counts as blocked: better to
+ * refuse than to let someone through who should not be.
+ */
+function blockedOf(c) {
+  if (!c.accountKey) return false;
+  try { return isBlocked(c.accountKey); } catch { return true; }
+}
+
+/** The thread with the admins as the blocked player sees it. */
+function appealView(key) {
+  let msgs = [];
+  try { msgs = appealsOf(key); } catch (e) { console.error(e.message); }
+  return msgs.map(m => ({ mine: m.from === 'user', by: m.from === 'admin' ? m.by : null, text: m.text, at: m.at }));
+}
+
+/** Every open connection of an account. */
+function connsOf(key) {
+  return [...conns.values()].filter(other => other.accountKey === key);
+}
+
+/**
+ * The checks an admin action on another account goes through: it has to
+ * exist, and it must not be an admin - that includes oneself. Admins are
+ * taken off the flag on the command line first. Returns the account key,
+ * or null after sending the error.
+ */
+function targetAccount(ws, name) {
+  const key = String(name || '').trim().toLowerCase();
+  const user = key ? getUser(key) : null;
+  if (!user) { send(ws, { t: 'error', key: 'auth.cli.unknown', params: { user: key } }); return null; }
+  if (user.admin) { send(ws, { t: 'error', key: 'err.targetAdmin' }); return null; }
+  return key;
+}
+
+/** An inviter's own open invites - nobody else's. */
+function ownInvites(c) {
+  let invites = [];
+  try { invites = listInvites({ account: c.accountKey }); } catch (e) { console.error(e.message); }
+  return { t: 'inviteData', now: Date.now(), invites };
+}
+
 /** May this connection use the dev mode's testing aids? */
 function devOf(c) {
   return DEV && (adminOf(c) || !authEnabled());
@@ -402,9 +465,10 @@ function adminOverview() {
     if (!online.has(c.accountKey)) online.set(c.accountKey, []);
     online.get(c.accountKey).push({ since: c.since, game: c.gameId });
   }
-  let accounts = [], invites = [];
+  let accounts = [], invites = [], appeals = {};
   try { accounts = listUsers(); } catch { /* account file unreadable - show the games anyway */ }
   try { invites = listInvites(); } catch (e) { console.error(e.message); }
+  try { appeals = allAppeals(); } catch (e) { console.error(e.message); }
   return {
     now: Date.now(),
     games: [...games.values()].map(adminGameView)
@@ -412,7 +476,9 @@ function adminOverview() {
     accounts: accounts.map(u => {
       const sessions = online.get(u.name) || [];
       return {
-        name: u.name, handle: u.handle, display: u.display, nick: u.nick, admin: u.admin, mustChange: u.mustChange,
+        name: u.name, handle: u.handle, display: u.display, nick: u.nick, admin: u.admin, inviter: u.inviter,
+        blocked: u.blocked, appeal: appeals[u.name] || [],
+        mustChange: u.mustChange,
         invitedBy: u.invitedBy,
         avatar: u.avatar ? accountAvatarUrl(u.name) : null,
         created: u.created, changed: u.changed,
@@ -608,6 +674,10 @@ function changeProfile(c, msg) {
 function handle(connId, ws, msg) {
   const c = conns.get(connId);
   const game = c.gameId ? games.get(c.gameId) : null;
+  // A blocked account may do exactly one thing: write to the admins. Checked
+  // first, against the account file as it is now - before anything else
+  // reads the message, not even as a sign of life for a game.
+  if (msg?.t !== 'appeal' && blockedOf(c)) return send(ws, { t: 'error', key: 'err.blocked' });
   const me = game ? game.players.find(p => p.id === c.playerId) : null;
   // Every message from someone in a game counts as a sign of life for it.
   if (game) game.lastActivity = Date.now();
@@ -997,7 +1067,7 @@ function handle(connId, ws, msg) {
     case 'adminInvite': {
       if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
       // The token goes back to this admin only, once - the server keeps just a hash.
-      const { token, invite } = createInvite(c.account, msg.note);
+      const { token, invite } = createInvite(c.account, msg.note, c.accountKey);
       console.log(`Admin ${c.account} created invite ${invite.id}${invite.note ? ` (${JSON.stringify(invite.note)})` : ''}`);
       send(ws, { t: 'adminInviteCreated', token, invite });
       send(ws, { t: 'adminData', ...adminOverview() });
@@ -1007,6 +1077,95 @@ function handle(connId, ws, msg) {
       if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
       if (revokeInvite(String(msg.id || ''))) console.log(`Admin ${c.account} revoked invite ${msg.id}`);
       send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminInviter': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      // Taking the flag away also ends that account's open invites (invites.js).
+      const name = String(msg.name || '');
+      let r;
+      try { r = setInviter(name, !!msg.on); } catch (e) {
+        if (e.message !== 'auth.cli.unknown') throw e;
+        return send(ws, { t: 'error', key: e.message, params: { user: name } });
+      }
+      console.log(`Admin ${c.account} ${r.inviter ? 'granted' : 'revoked'} the inviter role of ${r.name}`);
+      // The account's open connections learn it right away - no new sign-in needed.
+      for (const other of conns.values()) {
+        if (other.accountKey === r.name && !other.blocked) send(other.ws, { t: 'roles', admin: adminOf(other), inviter: inviterOf(other) });
+      }
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminBlock': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const key = targetAccount(ws, msg.name);
+      if (!key) return;
+      const r = setBlocked(key, !!msg.on, c.account);
+      console.log(`Admin ${c.account} ${r.blocked ? 'blocked' : 'unblocked'} ${key}`);
+      // Their open connections start over: the next hello says what applies
+      // now. Closing also gives up a seat in a game, as any lost connection does.
+      for (const other of connsOf(key)) other.ws.close(4003, r.blocked ? 'blocked' : 'unblocked');
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminAppeal': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const key = targetAccount(ws, msg.name);
+      if (!key) return;
+      const text = cleanAppeal(msg.text);
+      if (!text) return send(ws, { t: 'error', key: 'err.badAppeal', params: { n: APPEAL_MAX } });
+      addAppeal(key, 'admin', c.account, text);
+      for (const other of connsOf(key)) send(other.ws, { t: 'appealData', msgs: appealView(key) });
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'adminDelete': {
+      if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+      const key = targetAccount(ws, msg.name);
+      if (!key) return;
+      // As when players delete themselves: profile image, friendships and
+      // messages go along; their sessions end, the cleanup loop closes the sockets.
+      deleteUser(key);
+      try { friends.forget(key); } catch (e) { console.error('Friends cleanup failed:', e.message); }
+      try { forgetAppeals(key); } catch (e) { console.error(e.message); }
+      revoke(key);
+      console.log(`Admin ${c.account} deleted account ${key}`);
+      send(ws, { t: 'adminData', ...adminOverview() });
+      break;
+    }
+    case 'appeal': {
+      if (!blockedOf(c)) return send(ws, { t: 'error', key: 'err.notBlocked' });
+      const text = cleanAppeal(msg.text);
+      if (!text) return send(ws, { t: 'error', key: 'err.badAppeal', params: { n: APPEAL_MAX } });
+      // No flooding the admins: a few messages in a row, then wait for an answer.
+      if (unanswered(c.accountKey) >= APPEAL_UNANSWERED) {
+        return send(ws, { t: 'error', key: 'err.appealWait', params: { n: APPEAL_UNANSWERED } });
+      }
+      addAppeal(c.accountKey, 'user', c.account, text);
+      console.log(`Blocked account ${c.account} wrote to the admins`);
+      // Every tab of the account shows it; the admins see it on their next poll.
+      for (const other of connsOf(c.accountKey)) send(other.ws, { t: 'appealData', msgs: appealView(c.accountKey) });
+      break;
+    }
+    case 'invites': {
+      if (!inviterOf(c)) return send(ws, { t: 'error', key: 'err.notInviter' });
+      send(ws, ownInvites(c));
+      break;
+    }
+    case 'inviteCreate': {
+      if (!inviterOf(c)) return send(ws, { t: 'error', key: 'err.notInviter' });
+      // As for admins: the token goes back once, the server keeps just a hash.
+      const { token, invite } = createInvite(c.account, msg.note, c.accountKey);
+      console.log(`${c.account} created invite ${invite.id}${invite.note ? ` (${JSON.stringify(invite.note)})` : ''}`);
+      send(ws, { t: 'inviteCreated', token, invite });
+      send(ws, ownInvites(c));
+      break;
+    }
+    case 'inviteRevoke': {
+      if (!inviterOf(c)) return send(ws, { t: 'error', key: 'err.notInviter' });
+      // Only their own - someone else's id simply finds nothing.
+      if (revokeInvite(String(msg.id || ''), { account: c.accountKey })) console.log(`${c.account} revoked invite ${msg.id}`);
+      send(ws, ownInvites(c));
       break;
     }
     case 'list': {
@@ -1066,6 +1225,12 @@ setInterval(() => {
       console.log('Session ended, connection closed:', c.account ?? '?');
       c.ws.close(4001);
       conns.delete(connId);
+    }
+    // Blocked or unblocked without the panel (users.js, the file by hand):
+    // the connection starts over like after the panel - and gives up its seat.
+    else if (c.accountKey && blockedOf(c) !== c.blocked) {
+      console.log(`Block of ${c.account} changed, connection closed`);
+      c.ws.close(4003, 'block changed');
     }
   }
   // Friends coming online, going offline or into a game: whoever is in the

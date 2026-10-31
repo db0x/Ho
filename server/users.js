@@ -6,12 +6,14 @@
 //   docker exec ho node server/users.js passwd captain
 //   docker exec ho node server/users.js name captain Captain
 //   docker exec ho node server/users.js admin captain [on|off]
+//   docker exec ho node server/users.js inviter captain [on|off]
+//   docker exec ho node server/users.js block captain [on|off]
 //
 // It cannot do more, and it is not supposed to. New accounts get a random
 // first password that has to be changed on the first sign-in - after that
 // only the player knows it.
 import {
-  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, setAdmin, userFile,
+  addUser, deleteUser, listUsers, resetPassword, setPassword, setDisplay, setAdmin, setInviter, setBlocked, userFile,
   checkPassword, MIN_PASSWORD
 } from './userstore.js';
 import { readFileSync } from 'node:fs';
@@ -93,6 +95,23 @@ async function run(command, name, password) {
       console.log(t(r.admin ? 'auth.cli.adminOn' : 'auth.cli.adminOff', { user: r.name }));
       break;
     }
+    case 'inviter': {
+      requireName(name);
+      // As with admin: on/off, without it the flag is granted.
+      const value = String(password ?? 'on').toLowerCase();
+      if (!['on', 'off'].includes(value)) throw new Error('auth.cli.badInviterValue');
+      const r = setInviter(name, value === 'on');
+      console.log(t(r.inviter ? 'auth.cli.inviterOn' : 'auth.cli.inviterOff', { user: r.name }));
+      break;
+    }
+    case 'block': {
+      requireName(name);
+      const value = String(password ?? 'on').toLowerCase();
+      if (!['on', 'off'].includes(value)) throw new Error('auth.cli.badBlockValue');
+      const r = setBlocked(name, value === 'on');
+      console.log(t(r.blocked ? 'auth.cli.blockOn' : 'auth.cli.blockOff', { user: r.name }));
+      break;
+    }
     case 'list':
     case 'ls': {
       const users = listUsers();
@@ -100,7 +119,7 @@ async function run(command, name, password) {
       console.log(t('auth.cli.listHead', { count: users.length, file: userFile() }));
       const width = Math.max(...users.map(u => u.display.length));
       for (const u of users) {
-        const mark = [u.admin ? t('auth.cli.isAdmin') : '', u.mustChange ? t('auth.cli.mustChange') : '']
+        const mark = [u.admin ? t('auth.cli.isAdmin') : '', u.inviter ? t('auth.cli.isInviter') : '', u.blocked ? t('auth.cli.isBlocked') : '', u.mustChange ? t('auth.cli.mustChange') : '']
           .filter(Boolean).join(', ');
         console.log(`  ${u.handle}  ${u.display.padEnd(width)}  ${(u.created || '').slice(0, 10)}  ${mark}`);
       }

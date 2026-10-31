@@ -138,6 +138,25 @@
       <div id="friends-incoming"></div>
       <div id="friends-list"></div>
       <div id="friends-outgoing"></div>
+      <!-- Inviters only: one-time links for new players, and their own open ones. -->
+      <div id="invite-box" class="invite-box hidden">
+        <h3><span data-i18n="invite.title"></span> <span id="invite-count" class="muted"></span></h3>
+        <p class="small muted" data-i18n="invite.intro"></p>
+        <div class="admin-invite-new">
+          <input id="invite-note" maxlength="60" autocomplete="off" data-i18n-attr="placeholder:admin.inviteNote">
+          <button type="button" id="invite-create" class="tiny primary" data-i18n="admin.inviteCreate"></button>
+        </div>
+        <!-- The fresh link: shown once, the server keeps only a hash of it. -->
+        <div id="invite-link" class="admin-invite-link hidden">
+          <p class="small" data-i18n="admin.inviteOnce"></p>
+          <div class="ail-row">
+            <input id="invite-url" readonly>
+            <button type="button" id="invite-copy" class="tiny" data-i18n="admin.copy"></button>
+            <button type="button" id="invite-close" class="tiny" data-i18n="admin.msgCancel"></button>
+          </div>
+        </div>
+        <div id="invite-list" class="admin-list"></div>
+      </div>
     </div>
     <div class="friends-chat hidden">
       <div class="fc-head">
@@ -191,6 +210,18 @@
     </div>
     <div id="admin-invites" class="admin-list"></div>
     <h3><span data-i18n="admin.accounts"></span> <span id="admin-accounts-count" class="muted"></span></h3>
+    <!-- Outside the list, like the composer: the poll would throw away a half-written answer. -->
+    <div id="admin-appeal" class="admin-compose hidden">
+      <div class="ac-head">
+        <b id="admin-appeal-to"></b>
+        <button type="button" id="admin-appeal-close" class="tiny" data-i18n="admin.msgCancel"></button>
+      </div>
+      <div id="admin-appeal-log" class="fc-log appeal-log"></div>
+      <textarea id="admin-appeal-text" rows="2" maxlength="500" data-i18n-attr="placeholder:admin.appealPlaceholder"></textarea>
+      <div class="ac-foot">
+        <button type="button" id="admin-appeal-send" class="tiny primary" data-i18n="admin.msgSend"></button>
+      </div>
+    </div>
     <div id="admin-accounts" class="admin-list"></div>
   </section>
 </div>
@@ -512,6 +543,22 @@
       <p class="muted small" data-i18n="auth.pw.doneHint"></p>
       <button id="pw-ok" class="primary" type="button" data-i18n="auth.pw.ok"></button>
     </div>
+  </div>
+</div>
+
+<!-- ====================== Blocked account: cannot be closed ====================== -->
+<div id="blocked" class="modal blocked-modal hidden" role="alertdialog" aria-labelledby="blocked-title">
+  <div class="modal-box narrow">
+    <h2 id="blocked-title" data-i18n="blocked.title"></h2>
+    <p data-i18n="blocked.text"></p>
+    <p id="blocked-since" class="muted small"></p>
+    <div id="blocked-log" class="fc-log appeal-log"></div>
+    <div class="fc-input appeal-input">
+      <input id="blocked-text" maxlength="500" autocomplete="off" data-i18n-attr="placeholder:blocked.placeholder">
+      <button type="button" id="blocked-send" class="primary" data-i18n="blocked.send"></button>
+    </div>
+    <p id="blocked-error" class="error small"></p>
+    <p class="small blocked-foot"><a href="#" id="blocked-logout" data-i18n="blocked.logout"></a></p>
   </div>
 </div>
 
