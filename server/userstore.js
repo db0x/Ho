@@ -208,6 +208,8 @@ export function listUsers() {
     invitedBy: users[name].invitedBy || null,
     avatar: users[name].avatar || null,          // image version; the image is in profile.js
     admin: !!users[name].admin,
+    inviter: !!users[name].inviter,
+    blocked: users[name].blocked || null,         // { at, by } while blocked
     mustChange: !!users[name].mustChange,
     created: users[name].created || null,
     changed: users[name].changed || null
@@ -231,6 +233,50 @@ export function setAdmin(name, on) {
   else delete db.users[key].admin;
   save(db);
   return { name: key, admin: !!on };
+}
+
+/**
+ * May this account hand out invite links? Admins always may; everyone else
+ * needs the inviter flag - and nobody who is blocked. Read fresh from the
+ * file every time.
+ */
+export function isInviter(name) {
+  const user = getUser(name);
+  return !!((user?.admin || user?.inviter) && !user.blocked);
+}
+
+/**
+ * Grants or revokes the inviter flag: a player who may also create invite
+ * links and sees (and revokes) their own - nothing of the admin's overview.
+ */
+export function setInviter(name, on) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key]) throw new Error('auth.cli.unknown');
+  if (on) db.users[key].inviter = true;
+  else delete db.users[key].inviter;
+  save(db);
+  return { name: key, inviter: !!on };
+}
+
+/** Is this account blocked? Read fresh from the file every time. */
+export function isBlocked(name) {
+  return !!getUser(name)?.blocked;
+}
+
+/**
+ * Blocks an account or lifts the block. A blocked account can still sign
+ * in, but gets nothing but a dialog saying so and a line to the admins.
+ * `by` is who did it, kept for the admin panel.
+ */
+export function setBlocked(name, on, by = null) {
+  const key = normalizeName(name);
+  const db = load();
+  if (!db.users[key]) throw new Error('auth.cli.unknown');
+  if (on) db.users[key].blocked = { at: new Date().toISOString(), ...(by ? { by } : {}) };
+  else delete db.users[key].blocked;
+  save(db);
+  return { name: key, blocked: !!on };
 }
 
 /**

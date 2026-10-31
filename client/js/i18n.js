@@ -76,6 +76,18 @@ function args(el) {
   try { return JSON.parse(el.dataset.i18nArgs); } catch { return undefined; }
 }
 
+/** "5 minutes ago" in the chosen language, with the largest fitting unit. */
+export function relative(deltaMs) {
+  const rtf = new Intl.RelativeTimeFormat(localeTag(), { numeric: 'auto', style: 'short' });
+  const s = Math.round(deltaMs / 1000);
+  const abs = Math.abs(s);
+  if (abs < 60) return rtf.format(s, 'second');
+  if (abs < 3600) return rtf.format(Math.round(s / 60), 'minute');
+  // Hours up to two days: "in 23 hours" says more than "tomorrow".
+  if (abs < 2 * 86400) return rtf.format(Math.round(s / 3600), 'hour');
+  return rtf.format(Math.round(s / 86400), 'day');
+}
+
 /** What a language calls itself - stored in its own catalog. */
 export function localeName(code) { return tIn(code, 'lang.name'); }
 

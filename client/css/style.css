@@ -175,10 +175,16 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
      otherwise the top would stick out where no scrolling reaches. */
   align-content: start; align-content: safe center;
 }
-#screen-menu.with-admin.with-friends { grid-template-columns: auto auto auto; }
 #screen-menu.with-admin > .menu-box, #screen-menu.with-friends > .menu-box { margin: 0; }
 .admin-box { width: min(560px, 92vw); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px 24px; }
-@media (max-width: 1520px) {
+/* All three side by side: equally wide columns that grow with the window
+   (up to 580px each), the boxes filling them - instead of each box keeping
+   its own width and the friends ending up narrowest in the middle. */
+@media (min-width: 1361px) {
+  #screen-menu.with-admin.with-friends { grid-template-columns: repeat(3, minmax(0, 580px)); padding-inline: 20px; }
+  #screen-menu.with-admin.with-friends > .menu-box { width: auto; min-width: 0; }
+}
+@media (max-width: 1360px) {
   /* Three columns no longer fit: menu and friends side by side, admin below */
   #screen-menu.with-admin.with-friends { grid-template-columns: auto auto; row-gap: 16px; align-content: start; }
   #screen-menu.with-admin.with-friends > .admin-box { grid-column: 1 / -1; justify-self: center; max-height: none; width: min(900px, 92vw); }
@@ -256,6 +262,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .fc-code .fc-end a { color: var(--ink-faint); }
 .fc-code .fc-end a:hover, .fc-code .fc-end a[data-armed="1"] { color: var(--bad); }
 .fc-input { display: flex; gap: 8px; }
+/* Inviters only: their invite links, below the friends. */
+.invite-box { margin-top: 16px; padding-top: 2px; border-top: 1px solid var(--line); }
+.invite-box h3 { margin: 14px 0 6px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.invite-box > p { margin: 0 0 8px; }
 .fc-input input { flex: 1; min-width: 0; }
 .admin-head { display: flex; align-items: baseline; gap: 12px; }
 .admin-head h2 { margin: 0; font-size: 20px; color: var(--gold); }
@@ -301,7 +311,32 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .admin-account .dot.on { background: var(--good); box-shadow: 0 0 6px var(--good); }
 .aa-name { min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .aa-status { grid-column: 2; }
-.aa-created { grid-column: 3; grid-row: 1 / span 2; text-align: right; }
+.aa-side { grid-column: 3; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
+/* The actions of an account: a "⋯" button opening a list in the look of the select lists. */
+.aa-toggle { min-width: 30px; letter-spacing: .05em; }
+.aa-menu.open .aa-toggle { border-color: var(--gold-dim); }
+/* Hung on the body and placed by admin.js, so the scrolling panel does not cut it off. */
+.aa-list { position: fixed; z-index: 40; display: flex; flex-direction: column;
+  width: max-content; padding: 4px; background: var(--panel-solid); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: var(--shadow); animation: sel-in .11s ease-out; }
+.aa-item { all: unset; box-sizing: border-box; white-space: nowrap; padding: 8px 10px; border-radius: 6px;
+  cursor: pointer; color: var(--ink); font-size: 13.5px; text-align: left; }
+.aa-item:hover, .aa-item:focus-visible { background: rgba(160, 190, 240, .1); }
+/* Deleting an account: red, and the second click is asked for in red too. */
+.aa-item.danger { color: var(--bad); }
+.aa-item.danger:hover, .aa-item.danger:focus-visible, .aa-item.danger.armed { background: rgba(255, 95, 95, .12); }
+.tag-blocked { font-size: 11px; color: var(--bad); border: 1px solid var(--bad); padding: 0 6px; border-radius: 20px; }
+.tag-waiting { font-size: 11px; color: var(--gold); }
+/* The thread between a blocked account and the admins - the friends' chat bubbles, shorter. */
+.appeal-log { height: auto; min-height: 90px; max-height: 260px; margin: 6px 0; }
+.admin-compose .appeal-log { max-height: 220px; }
+/* A blocked account sees the dialog and nothing else: no lobby shining
+   through, no game, no panel - whatever else is or comes into the page is
+   switched off (blocked.js). The server refuses it all anyway. */
+.blocked-modal { z-index: 60; background: var(--bg); }
+body.is-blocked > :not(#blocked) { display: none !important; }
+.blocked-modal .appeal-input { margin-top: 4px; }
+.blocked-foot { margin: 14px 0 0; text-align: right; }
 /* Profile in the start menu: image on the left, name next to it */
 .profile-row { display: flex; gap: 10px; align-items: center; }
 .avatar-pick {

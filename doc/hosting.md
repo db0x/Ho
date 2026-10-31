@@ -68,6 +68,8 @@ docker exec ho node server/users.js passwd captain             # reset a passwor
 docker exec ho node server/users.js name captain Captain       # spelling of the account name
 docker exec ho node server/users.js del captain                # delete an account
 docker exec ho node server/users.js admin captain              # make an admin (… admin captain off)
+docker exec ho node server/users.js inviter captain            # allow inviting (… inviter captain off)
+docker exec ho node server/users.js block captain              # block an account (… block captain off)
 ```
 
 Without Docker it is the same, only shorter: `npm run users -- add captain`.
@@ -105,6 +107,25 @@ Without Docker it is the same, only shorter: `npm run users -- add captain`.
   **24 hours**; open invites are listed there and can be revoked. The link is shown
   only when it is created: `invites.json` next to `users.json` holds just a hash of
   it, so reading that file does not reveal a working link.
+- In between sits the **inviter** role: a regular player who may also create invite
+  links. An admin grants and takes it in the admin panel from the “⋯” action menu of the
+  account (“Allow inviting” / “Stop inviting”), or on the host with `inviter`.
+  Inviters get an *Invites* section below their friends: create a link, see and
+  revoke their own open invites – not anyone else's, and nothing else of the admin
+  panel. When the role is taken away (or the account deleted), their open links end
+  at once; an open tab learns it without a reload.
+- From the same menu an admin can **block** and **delete** an account. A blocked
+  account can still sign in, but gets nothing but a dialog saying it is blocked and
+  a field to write to the admins – the server refuses everything else, and open
+  connections are closed when the block is set (a seat in a game then counts as
+  left). The same goes for `block` on the host. Over HTTP only signing in and out
+  remain; changing the password works only when a first password has to be
+  replaced, and deleting one's own account does not work either – that goes through
+  the admins. After five messages in a row the server waits for an answer before
+  taking more. Admins read and answer those messages from the menu under *Messages*; they
+  are stored as plain text in `appeals.json` next to `users.json`. *Delete user*
+  takes two clicks and, like deleting your own account, takes the profile image,
+  friendships and messages along. Admins can be neither blocked nor deleted.
 - Players pick their in-game **display name** themselves (see
   [Playing › Profile](playing.md#starting-a-game)); `name` only changes the
   spelling of the account name, e.g. for the "Signed in as …" line.

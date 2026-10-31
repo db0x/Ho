@@ -4,6 +4,8 @@ import { Lobby } from './ui/lobby.js';
 import { Hud } from './ui/hud.js';
 import { openShipInfo } from './ui/shipinfo.js';
 import { AdminPanel } from './ui/admin.js';
+import { InvitePanel } from './ui/invites.js';
+import { BlockedDialog } from './ui/blocked.js';
 import { FriendsPanel } from './ui/friends.js';
 import { DebugDialog } from './ui/debug.js';
 import { bindKeys, toggleKeys } from './ui/keys.js';
@@ -130,6 +132,8 @@ const net = new Net();
 const lobby = new Lobby(net);
 const voice = new Voice({ send: m => net.send(m) });
 const admin = new AdminPanel(net);
+const invites = new InvitePanel(net);
+const blockDialog = new BlockedDialog(net);
 const friends = new FriendsPanel(net);
 const debug = new DebugDialog();
 let devMode = false;
@@ -249,6 +253,14 @@ const app = {
 
 // ------------------------------------------------------------------ Messages
 net.on('hello', (m) => {
+  // Blocked: the dialog and nothing else - the server answers no other
+  // request anyway. Lifting the block reconnects, and this hello is normal.
+  blockDialog.set(m.blocked, m.appeal);
+  if (m.blocked) {
+    admin.setEnabled(false);
+    invites.setEnabled(false);
+    return;
+  }
   voice.configure(m.voice);
   lobby.setVoice(!!m.voice);
   lobby.showOpenGames(m.openGames);
@@ -257,6 +269,8 @@ net.on('hello', (m) => {
   // Friends need an account - the handle only exists with one.
   friends.setEnabled(m.profile?.handle || null);
   admin.setEnabled(m.admin);
+  // Admins create and see invites in their own panel - the box is for inviters.
+  invites.setEnabled(m.inviter && !m.admin);
   // Dev mode (HO_DEV on the server) opens the debug dialog with its testing
   // aids - for admins, or for everyone without sign-in. Otherwise it is off.
   debug.setEnabled(m.dev);
@@ -281,6 +295,11 @@ net.on('hello', (m) => {
 
 net.on('games', (m) => { lobby.showOpenGames(m.openGames); lobby.showMySeats(m.mySeats); });
 net.on('adminData', (m) => admin.update(m));
+net.on('inviteData', (m) => invites.update(m));
+net.on('appealData', (m) => blockDialog.update(m.msgs));
+net.on('inviteCreated', (m) => invites.created(m));
+// An admin granted or took away the inviter role while this tab was open.
+net.on('roles', (m) => invites.setEnabled(m.inviter && !m.admin));
 net.on('friends', (m) => friends.update(m));
 net.on('friendLookup', (m) => friends.onLookup(m));
 net.on('friendHistory', (m) => friends.onHistory(m));
@@ -333,6 +352,12 @@ function showPendingNotice() {
   if (notice) $('#menu-error').textContent = message(notice);
 }
 net.on('error', (m) => {
+  // Behind the block dialog the refusals of the block itself are only noise
+  // (a resumed seat, say); what is said about a message goes into the dialog.
+  if (blockDialog.open) {
+    if (m.key !== 'err.blocked') blockDialog.error(message(m));
+    return;
+  }
   const txt = message(m);
   if (!$('#screen-lobby').classList.contains('hidden')) lobby.error('#lobby-error', txt);
   else if (!$('#screen-menu').classList.contains('hidden')) lobby.error('#menu-error', txt);

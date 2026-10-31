@@ -2,8 +2,10 @@
 // account. Only shown when the server says so in 'hello' - and the server
 // checks the flag again on every request, so a hidden panel is no security
 // boundary, just a view.
-import { t, n as num, localeTag, onLocaleChange } from '../i18n.js';
+import { t, n as num, localeTag, relative, onLocaleChange } from '../i18n.js';
 import { avatarHtml } from './avatar.js';
+import { inviteUrl, copyField } from './invites.js';
+import { appealLogHtml } from './blocked.js';
 
 const $ = s => document.querySelector(s);
 const POLL_MS = 5000;
@@ -37,6 +39,41 @@ export class AdminPanel {
       const b = e.target.closest('[data-revoke]');
       if (b) this.net.send({ t: 'adminRevokeInvite', id: b.dataset.revoke });
     });
+    // Each account has a menu of actions. Which one is open is kept here,
+    // so the poll rebuilds it open instead of closing it under the mouse.
+    // The list itself hangs on the body: inside the scrolling panel it would
+    // be cut off at its edge (and a transform there rules out position:fixed).
+    this.pop = document.createElement('div');
+    this.pop.className = 'aa-list hidden';
+    this.pop.setAttribute('role', 'menu');
+    document.body.appendChild(this.pop);
+    this.pop.addEventListener('click', (e) => this.menuAction(e));
+    $('#admin-accounts').addEventListener('click', (e) => {
+      const toggle = e.target.closest('[data-menu]');
+      if (toggle) this.openMenu(this.menuFor === toggle.dataset.menu ? null : toggle.dataset.menu);
+    });
+    // The path as it was at the click: the list may have been rebuilt since
+    // (the first click on delete), and the clicked item is no longer in it.
+    document.addEventListener('click', (e) => {
+      if (this.menuFor && !e.composedPath().some(el => el === this.pop || el.classList?.contains('aa-menu'))) this.openMenu(null);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (this.menuFor && e.key === 'Escape') this.openMenu(null);
+    });
+    // Fixed to the window, the list would stay put while its button moves
+    // away - so scrolling closes it. Only scrolling that moves the button: a
+    // conversation log scrolling to its newest message does not.
+    addEventListener('scroll', (e) => {
+      const box = e.target === document ? document.documentElement : e.target;
+      if (this.menuFor && box.contains?.(this.menuButton)) this.openMenu(null);
+    }, true);
+    addEventListener('resize', () => { if (this.menuFor) this.openMenu(null); });
+    $('#admin-appeal-close').onclick = () => this.openAppeal(null);
+    $('#admin-appeal-send').onclick = () => this.sendAppeal();
+    $('#admin-appeal-text').onkeydown = (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.sendAppeal(); }
+      if (e.key === 'Escape') this.openAppeal(null);
+    };
     // The composer sits outside the list on purpose: the list is rebuilt on
     // every poll and would throw away a half-written message.
     $('#admin-compose-cancel').onclick = () => this.compose(null);
@@ -55,7 +92,10 @@ export class AdminPanel {
     $('#screen-menu').classList.toggle('with-admin', this.enabled);
     clearInterval(this.timer);
     this.timer = null;
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      this.menuFor = null;
+      return this.pop.classList.add('hidden');
+    }
     this.request();
     // Poll only while the start menu is visible - in a game nobody looks at it.
     this.timer = setInterval(() => {
@@ -91,13 +131,9 @@ export class AdminPanel {
     this.net.send({ t: 'adminWatch', code });
   }
 
-  /**
-   * A fresh invite: the server sends the token once. The link is built from
-   * this page's own address, so it also works behind a proxy under a subpath.
-   */
+  /** A fresh invite: the server sends the token once. */
   inviteCreated(m) {
-    const url = new URL(`login.html?invite=${encodeURIComponent(m.token)}`, location.href).href;
-    $('#admin-invite-url').value = url;
+    $('#admin-invite-url').value = inviteUrl(m.token);
     $('#admin-invite-link').classList.remove('hidden');
     $('#admin-invite-note').value = '';
     $('#admin-invite-copy').textContent = t('admin.copy');
@@ -105,16 +141,101 @@ export class AdminPanel {
   }
 
   async copyInvite() {
-    const field = $('#admin-invite-url');
-    try {
-      await navigator.clipboard.writeText(field.value);
-    } catch {
-      // No clipboard API without https (e.g. on a LAN address): fall back to
-      // the selection, which the old copy command can still handle.
-      field.select();
-      document.execCommand('copy');
-    }
+    await copyField($('#admin-invite-url'));
     $('#admin-invite-copy').textContent = t('admin.copied');
+  }
+
+  /** Opens the action menu of an account, or closes it with null. */
+  openMenu(name) {
+    this.menuFor = name;
+    this.render();
+  }
+
+  menuAction(e) {
+    const b = e.target.closest('.aa-item');
+    if (!b) return;
+    const { name } = b.dataset;
+    switch (b.dataset.act) {
+      case 'inviter': this.net.send({ t: 'adminInviter', name, on: b.dataset.on === '1' }); break;
+      case 'block': this.net.send({ t: 'adminBlock', name, on: b.dataset.on === '1' }); break;
+      case 'appeal': this.openAppeal(name); break;
+      // Two clicks, like ending a game - the menu stays open in between.
+      case 'delete': return this.deleteAccount(name);
+    }
+    this.openMenu(null);
+  }
+
+  /**
+   * Fills the list for the open menu and puts it under its button - above
+   * it when there is no room below. Gone with its button (account deleted,
+   * start menu left), the menu closes.
+   */
+  placeMenu() {
+    const a = this.menuFor && this.data?.accounts.find(x => x.name === this.menuFor);
+    const toggle = a && [...document.querySelectorAll('#admin-accounts [data-menu]')].find(b => b.dataset.menu === a.name);
+    this.menuButton = toggle;
+    if (!toggle?.offsetParent) {
+      this.menuFor = null;
+      this.pop.classList.add('hidden');
+      return;
+    }
+    this.pop.innerHTML = this.menuItems(a).join('');
+    this.pop.classList.remove('hidden');
+    const GAP = 5, MARGIN = 8;
+    const r = toggle.getBoundingClientRect();
+    const { offsetWidth: w, offsetHeight: h } = this.pop;
+    const below = r.bottom + GAP + h <= innerHeight - MARGIN || r.top - GAP - h < MARGIN;
+    this.pop.style.top = `${below ? r.bottom + GAP : r.top - GAP - h}px`;
+    this.pop.style.left = `${Math.max(MARGIN, Math.min(r.right - w, innerWidth - w - MARGIN))}px`;
+  }
+
+  /**
+   * Deleting an account takes two clicks within a few seconds, like ending
+   * a game: the first arms the item, the second sends it.
+   */
+  deleteAccount(name) {
+    if (this.armedDelete?.name === name && Date.now() < this.armedDelete.until) {
+      this.armedDelete = null;
+      this.net.send({ t: 'adminDelete', name });
+      if (this.appealFor === name) this.openAppeal(null);
+      return this.openMenu(null);
+    }
+    this.armedDelete = { name, until: Date.now() + 4000 };
+    this.render();
+    clearTimeout(this.disarmDelete);
+    this.disarmDelete = setTimeout(() => { this.armedDelete = null; this.render(); }, 4000);
+  }
+
+  /** Opens the conversation with a blocked account, or closes it with null. */
+  openAppeal(name) {
+    this.appealFor = name;
+    $('#admin-appeal').classList.toggle('hidden', !name);
+    if (!name) return;
+    this.renderAppeal();
+    const box = $('#admin-appeal-text');
+    box.focus();
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The thread comes along with every poll - an answer from the player shows up by itself. */
+  renderAppeal() {
+    const a = this.data?.accounts.find(x => x.name === this.appealFor);
+    if (!a) return;
+    $('#admin-appeal-to').textContent = t('admin.appealTo', { user: a.display });
+    const log = $('#admin-appeal-log');
+    const html = appealLogHtml(a.appeal.map(m => ({ mine: m.from === 'admin', who: m.by, text: m.text, at: m.at })),
+      t('admin.appealEmpty'));
+    // Only touched when something changed, so reading back is not interrupted.
+    if (log.dataset.html === html) return;
+    log.innerHTML = log.dataset.html = html;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  sendAppeal() {
+    const text = $('#admin-appeal-text').value.trim();
+    if (!this.appealFor || !text) return;
+    this.net.send({ t: 'adminAppeal', name: this.appealFor, text });
+    $('#admin-appeal-text').value = '';
   }
 
   /** Opens the message composer for a game, or closes it with null. */
@@ -165,6 +286,10 @@ export class AdminPanel {
     $('#admin-accounts').innerHTML = d.accounts.length
       ? d.accounts.map(a => this.accountRow(a)).join('')
       : `<p class="muted small">${t('admin.noAccounts')}</p>`;
+    this.placeMenu();
+    // The account is gone (deleted elsewhere): its conversation closes too.
+    if (this.appealFor && !d.accounts.some(a => a.name === this.appealFor)) this.openAppeal(null);
+    else if (this.appealFor) this.renderAppeal();
   }
 
   gameCard(g) {
@@ -246,28 +371,54 @@ export class AdminPanel {
       : t('word.offline');
     const created = a.created
       ? t('admin.created', { date: new Date(a.created).toLocaleDateString(localeTag()) }) : '';
+
     // The online dot sits on the image, like a status light.
     return `<div class="admin-account">
       <span class="aa-avatar">${avatarHtml({ name: a.display, avatar: a.avatar }, 30)}<span class="dot ${a.online ? 'on' : ''}"></span></span>
       <span class="aa-name">${name}
         ${a.admin ? `<span class="tag-host">${t('admin.isAdmin')}</span>` : ''}
+        ${a.inviter && !a.admin ? `<span class="tag-host">${t('admin.isInviter')}</span>` : ''}
+        ${a.blocked ? `<span class="tag-blocked">${t('admin.isBlocked')}</span>` : ''}
+        ${a.appeal.at(-1)?.from === 'user' ? `<span class="tag-waiting">✉ ${t('admin.appealWaiting')}</span>` : ''}
         ${a.mustChange ? `<span class="tagbot">${t('admin.mustChange')}</span>` : ''}</span>
       <span class="muted small aa-status">${status}</span>
-      <span class="muted small aa-created">${created}</span>
+      <span class="aa-side"><span class="muted small">${created}</span>${this.accountMenu(a)}</span>
     </div>`;
   }
-}
 
-/** "5 minutes ago" in the chosen language, with the largest fitting unit. */
-function relative(deltaMs) {
-  const rtf = new Intl.RelativeTimeFormat(localeTag(), { numeric: 'auto', style: 'short' });
-  const s = Math.round(deltaMs / 1000);
-  const abs = Math.abs(s);
-  if (abs < 60) return rtf.format(s, 'second');
-  if (abs < 3600) return rtf.format(Math.round(s / 60), 'minute');
-  // Hours up to two days: "in 23 hours" says more than "tomorrow".
-  if (abs < 2 * 86400) return rtf.format(Math.round(s / 3600), 'hour');
-  return rtf.format(Math.round(s / 86400), 'day');
+  /**
+   * The "⋯" button of an account; its list is placeMenu's. Admin accounts
+   * have none - they may invite anyway, and the server refuses to block or
+   * delete them.
+   */
+  accountMenu(a) {
+    if (a.admin) return '';
+    const open = this.menuFor === a.name;
+    return `<span class="aa-menu${open ? ' open' : ''}">
+      <button type="button" class="tiny aa-toggle" data-menu="${esc(a.name)}" aria-haspopup="menu" aria-expanded="${open}"
+        title="${t('admin.accountMenu')}" aria-label="${t('admin.accountMenu')}">⋯</button>
+    </span>`;
+  }
+
+  /** The actions in an account's menu. */
+  menuItems(a) {
+    const name = esc(a.name);
+    // `on` says which way a switch goes: 1 grants, 0 takes back.
+    const item = (act, label, title, { on, cls = '' } = {}) =>
+      `<button type="button" class="aa-item${cls}" role="menuitem" data-act="${act}" data-name="${name}"
+        ${on === undefined ? '' : `data-on="${on}"`} title="${t(title)}">${t(label)}</button>`;
+    const armed = this.armedDelete?.name === a.name && Date.now() < this.armedDelete.until;
+    return [
+      item('inviter', a.inviter ? 'admin.inviterRevoke' : 'admin.inviterGrant',
+        a.inviter ? 'admin.inviterRevokeTitle' : 'admin.inviterGrantTitle', { on: a.inviter ? 0 : 1 }),
+      item('block', a.blocked ? 'admin.unblock' : 'admin.block',
+        a.blocked ? 'admin.unblockTitle' : 'admin.blockTitle', { on: a.blocked ? 0 : 1 }),
+      // The conversation: while blocked, or as long as there is one to read.
+      a.blocked || a.appeal.length ? item('appeal', 'admin.appeal', 'admin.appealTitle') : null,
+      item('delete', armed ? 'admin.deleteConfirm' : 'admin.delete', 'admin.deleteTitle',
+        { cls: armed ? ' danger armed' : ' danger' })
+    ].filter(Boolean);
+  }
 }
 
 function esc(s) {

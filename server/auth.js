@@ -8,10 +8,11 @@
 import crypto from 'node:crypto';
 import {
   verifyUser, getUser, setPassword, stampOf, checkPassword, displayName, validName, addUser, MIN_PASSWORD,
-  deleteUser, keyOf, setKey, cleanKey
+  deleteUser, keyOf, setKey, cleanKey, isBlocked
 } from './userstore.js';
 import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
 import { forget as forgetFriends } from './friends.js';
+import { forgetAppeals } from './appeals.js';
 import { nameAllowed } from './profile.js';
 
 /**
@@ -122,6 +123,16 @@ export function sessionOf(req) {
   // The spelling fresh from the account file: a `users.js name` thus takes
   // effect without signing in again.
   return { ...s, token, display: displayName(s.user, user) };
+}
+
+/**
+ * Is the account behind this session blocked? Then it may sign in and out
+ * and ask who it is - nothing else here (the game socket lets it write to
+ * the admins, see index.js). An unreadable account file counts as blocked:
+ * better to refuse than to let someone through who should not be.
+ */
+function blockedSession(s) {
+  try { return isBlocked(s.user); } catch { return true; }
 }
 
 /** Is this session still alive? For open WebSockets that get kicked out afterwards. */
@@ -243,6 +254,7 @@ export function handleAuth(req, res, urlPath) {
   if (route === 'key' && req.method === 'GET') {
     const s = sessionOf(req);
     if (!s) json(res, 401, { error: 'auth.err.noSession' });
+    else if (blockedSession(s)) json(res, 403, { error: 'err.blocked' });
     else json(res, 200, keyView(s.user));
     return true;
   }
@@ -372,6 +384,9 @@ async function login(req, res) {
 async function change(req, res) {
   const s = sessionOf(req);
   if (!s) return json(res, 401, { error: 'auth.err.noSession' });
+  // Blocked accounts keep their password - unless a first one has to be
+  // replaced: without that they would not even get to the block dialog.
+  if (blockedSession(s) && !s.mustChange) return json(res, 403, { error: 'err.blocked' });
   let data;
   try { data = await body(req); } catch (e) {
     console.warn('Password change not understood:', e.message);
@@ -431,6 +446,7 @@ function keyView(name) {
 async function storeKey(req, res) {
   const s = sessionOf(req);
   if (!s) return json(res, 401, { error: 'auth.err.noSession' });
+  if (blockedSession(s)) return json(res, 403, { error: 'err.blocked' });
   let data;
   try { data = await body(req); } catch (e) {
     console.warn('Message key not understood:', e.message);
@@ -469,6 +485,8 @@ async function storeKey(req, res) {
 async function remove(req, res) {
   const s = sessionOf(req);
   if (!s) return json(res, 401, { error: 'auth.err.noSession' });
+  // Blocked: no new key, no leaving either - deleting the account goes through the admins.
+  if (blockedSession(s)) return json(res, 403, { error: 'err.blocked' });
   let data;
   try { data = await body(req); } catch (e) {
     console.warn('Account deletion not understood:', e.message);
@@ -495,8 +513,9 @@ async function remove(req, res) {
     console.error('Account deletion failed:', e.message);
     return json(res, 500, { error: 'auth.err.server' });
   }
-  // Friendships and messages go with the account.
+  // Friendships and messages go with the account - so does a thread with the admins.
   try { forgetFriends(s.user); } catch (e) { console.error('Friends cleanup failed:', e.message); }
+  try { forgetAppeals(s.user); } catch (e) { console.error(e.message); }
   succeeded(`u:${s.user}`, `i:${ip}`);
   revoke(s.user);
   clearCookie(req, res);

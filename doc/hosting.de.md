@@ -67,6 +67,8 @@ docker exec ho node server/users.js passwd captain             # Passwort zurüc
 docker exec ho node server/users.js name captain Captain       # Schreibweise des Kontonamens
 docker exec ho node server/users.js del captain                # Konto löschen
 docker exec ho node server/users.js admin captain              # zum Admin machen (… admin captain off)
+docker exec ho node server/users.js inviter captain            # Einladerecht geben (… inviter captain off)
+docker exec ho node server/users.js block captain              # Konto sperren (… block captain off)
 ```
 
 Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
@@ -105,6 +107,27 @@ Ohne Docker genauso, nur kürzer: `npm run users -- add captain`.
   lassen sich widerrufen. Der Link wird nur beim Erzeugen angezeigt: `invites.json`
   neben `users.json` enthält nur einen Hash davon, wer die Datei liest, bekommt also
   keinen gültigen Link.
+- Dazwischen gibt es die Rolle **Einlader**: ein normaler Spieler, der zusätzlich
+  Einladungslinks erzeugen darf. Ein Admin vergibt und entzieht sie im Admin-Panel
+  im Aktionsmenü „⋯“ am Konto („Einladen erlauben“ / „Einladen entziehen“) oder auf dem
+  Host mit `inviter`. Einlader sehen unter ihren Freunden einen Bereich
+  *Einladungen*: Link erzeugen, die eigenen offenen Einladungen sehen und
+  widerrufen – nicht die anderer und sonst nichts vom Admin-Panel. Wird die Rolle
+  entzogen (oder das Konto gelöscht), verfallen ihre offenen Links sofort; ein
+  offener Tab erfährt es ohne Neuladen.
+- Im selben Menü kann ein Admin ein Konto **sperren** und **löschen**. Ein
+  gesperrtes Konto kann sich noch anmelden, bekommt aber nur einen Dialog, dass es
+  gesperrt ist, und ein Feld, um den Admins zu schreiben – alles andere weist der
+  Server ab, offene Verbindungen werden beim Sperren getrennt (ein Platz in einer
+  Partie gilt dann als verlassen). Das gilt auch für `block` auf dem Host. Über
+  HTTP bleiben nur An- und Abmelden; Passwort ändern geht nur, wenn ein erstes
+  Passwort ersetzt werden muss, und auch das eigene Konto löschen geht nicht – das
+  läuft dann über die Admins. Mehr als fünf Nachrichten am Stück nimmt der Server
+  erst nach einer Antwort wieder an. Die Admins lesen und beantworten die Nachrichten
+  im Menü unter *Nachrichten*; sie liegen im Klartext in `appeals.json` neben
+  `users.json`. *Nutzer löschen* braucht zwei Klicks und nimmt wie die eigene
+  Löschung Profilbild, Freundschaften und Nachrichten mit. Admins lassen sich
+  weder sperren noch löschen.
 - Den **Anzeigenamen** im Spiel wählt jeder Spieler selbst (siehe
   [Spielen › Profil](playing.de.md#eine-partie-beginnen)); `name` ändert nur die
   Schreibweise des Kontonamens, etwa für die Zeile „Angemeldet als …“.

@@ -6,10 +6,11 @@ import { WebSocket } from 'ws';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { inviteFile } from '../server/invites.js';
+import { inviteFile, peekInvite } from '../server/invites.js';
+import { appealsOf } from '../server/appeals.js';
 import {
   hashPassword, verifyPassword, addUser, deleteUser, listUsers, getUser,
-  setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay, setAdmin
+  setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay, setAdmin, setInviter, setBlocked
 } from '../server/userstore.js';
 
 // A separate account file so no real data gets touched.
@@ -236,17 +237,22 @@ const NEW = 'myOwnPassword-2026';
 }
 
 /** Opens a socket, sends `msg` after hello and collects what comes back. */
-const session = (msg) => new Promise((ok) => {
-  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie } });
-  const got = { hello: null, data: null, sent: null, invite: null, errors: [] };
+const session = (msg, as = cookie) => new Promise((ok) => {
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: as } });
+  ws.on('error', () => ok(got));          // refused upgrade: no session (any more)
+  const got = { hello: null, data: null, sent: null, invite: null, mine: null, created: null, appeal: null, games: null, errors: [] };
   ws.on('message', (raw) => {
     const m = JSON.parse(raw.toString());
     if (m.t === 'hello') { got.hello = m; ws.send(JSON.stringify(msg)); }
     if (m.t === 'adminData') got.data = m;
     if (m.t === 'adminMsgSent') got.sent = m;
     if (m.t === 'adminInviteCreated') got.invite = m;
+    if (m.t === 'inviteData') got.mine = m;
+    if (m.t === 'inviteCreated') got.created = m;
+    if (m.t === 'appealData') got.appeal = m;
+    if (m.t === 'games') got.games = m;
     if (m.t === 'error') got.errors.push(m.key);
-    if (['adminData', 'adminMsgSent', 'error'].includes(m.t)) { ws.close(); ok(got); }
+    if (['adminData', 'adminMsgSent', 'inviteData', 'appealData', 'games', 'error'].includes(m.t)) { ws.close(); ok(got); }
   });
   setTimeout(() => { ws.close(); ok(got); }, 3000);
 });
@@ -599,6 +605,291 @@ const session = (msg) => new Promise((ok) => {
   check(notAllowed.errors.includes('err.notAdmin') && !notAllowed.invite, 'A normal account may create invites');
   deleteUser(created);
   console.log('Invites: once only, 24 h at most, revocable, token never stored or shown again.');
+}
+
+// --- Inviter role: an admin grants it in the panel; the account may then
+//     create invite links and sees and revokes only its own. Taking it away
+//     ends the open links at once and reaches the open tab.
+{
+  // Straight from the file, not over HTTP: the failed lookups above (and the
+  // deliberate ones here) would run into the guessing lock.
+  const peek = async (token) => peekInvite(token) ? 200 : 404;
+  await addUser('mate', 'matePassword1', { mustChange: false });
+  const login = await fetch(`${BASE}/api/auth/login`, asJson({ user: 'mate', password: 'matePassword1' }));
+  const mate = login.headers.get('set-cookie')?.split(';')[0];
+  check(mate, 'The second account cannot sign in');
+
+  const before = await session({ t: 'invites' }, mate);
+  check(before.hello?.inviter === false, 'hello calls a normal account an inviter');
+  for (const t of ['invites', 'inviteCreate', 'inviteRevoke']) {
+    const tried = await session({ t, id: 'x', note: 'x' }, mate);
+    check(tried.errors.includes('err.notInviter') && !tried.mine && !tried.created,
+      `A normal account gets through '${t}' (${JSON.stringify(tried.errors)})`);
+  }
+
+  setAdmin('captain', true);
+  const unknown = await session({ t: 'adminInviter', name: 'nobody', on: true });
+  check(unknown.errors.includes('auth.cli.unknown'), `Granting an unknown account gives no clear answer (${JSON.stringify(unknown.errors)})`);
+  const granted = await session({ t: 'adminInviter', name: 'mate', on: true });
+  check(granted.data?.accounts.find(a => a.name === 'mate')?.inviter && getUser('mate').inviter,
+    'The admin cannot grant the inviter role');
+  const adminsOwn = (await session({ t: 'adminInvite', note: 'by the admin' })).invite;
+
+  const made = await session({ t: 'inviteCreate', note: 'from mate' }, mate);
+  check(made.hello?.inviter === true, 'hello does not tell the inviter');
+  const token = made.created?.token;
+  check(token && await peek(token) === 200, 'The inviter gets no working link');
+  const mine = made.mine?.invites || [];
+  check(mine.length === 1 && mine[0].note === 'from mate' && mine[0].by === 'mate',
+    `The inviter does not see exactly their own invites (${JSON.stringify(mine)})`);
+  check(!JSON.stringify(made.mine).includes(token), 'The invite list shows the token');
+  const overview = await session({ t: 'admin' });
+  check(overview.data?.invites.some(i => i.id === made.created.invite.id), 'The admin does not see the inviter\'s invite');
+
+  // Someone else's invite: not visible, not revocable.
+  await session({ t: 'inviteRevoke', id: adminsOwn.invite.id }, mate);
+  check(await peek(adminsOwn.token) === 200, 'An inviter can revoke someone else\'s invite');
+  const second = await session({ t: 'inviteCreate' }, mate);
+  const gone = await session({ t: 'inviteRevoke', id: second.created.invite.id }, mate);
+  check(!gone.mine?.invites.some(i => i.id === second.created.invite.id) && await peek(second.created.token) === 404,
+    'The inviter cannot revoke their own invite');
+
+  // Taking the role away: the open tab hears it, the open link dies.
+  const tab = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: mate } });
+  let roles = null;
+  tab.on('message', (raw) => { const m = JSON.parse(raw.toString()); if (m.t === 'roles') roles = m; });
+  await new Promise(r => tab.on('open', r));
+  await wait(100);
+  await session({ t: 'adminInviter', name: 'mate', on: false });
+  for (let i = 0; i < 40 && !roles; i++) await wait(50);
+  check(roles?.inviter === false, `The open tab is not told the role is gone (${JSON.stringify(roles)})`);
+  tab.close();
+  check(!getUser('mate').inviter, 'The inviter role stays after revoking');
+  check(await peek(token) === 404, 'A link of a former inviter still works');
+  check(await peek(adminsOwn.token) === 200, 'Revoking an inviter takes the admin\'s links along');
+  const after = await session({ t: 'inviteCreate' }, mate);
+  check(after.errors.includes('err.notInviter') && !after.created, 'A former inviter can still create invites');
+
+  await session({ t: 'adminRevokeInvite', id: adminsOwn.invite.id });
+  setAdmin('captain', false);
+  deleteUser('mate');
+  console.log('Inviter role: granted and taken by an admin, own invites only, links end with the role.');
+}
+
+// --- Blocking and deleting from the admin panel. A blocked account still
+//     signs in, but may do nothing except write to the admins; admins can
+//     be neither blocked nor deleted.
+{
+  await addUser('outcast', 'outcastPassword1', { mustChange: false });
+  const login = await fetch(`${BASE}/api/auth/login`, asJson({ user: 'outcast', password: 'outcastPassword1' }));
+  const outcast = login.headers.get('set-cookie')?.split(';')[0];
+  setAdmin('captain', true);
+  /** The account's own HTTP routes, with its cookie. */
+  const api = (route, data, method = 'POST', jar = outcast) => fetch(`${BASE}/api/auth/${route}`, {
+    method, headers: { cookie: jar, ...(data ? { 'content-type': 'application/json' } : {}) },
+    body: data ? JSON.stringify(data) : undefined
+  });
+
+  // Not blocked: nothing to appeal, the menu works as usual.
+  const free = await session({ t: 'appeal', text: 'hello?' }, outcast);
+  check(!free.hello?.blocked && free.errors.includes('err.notBlocked'), 'An account that is not blocked can write appeals');
+
+  // An inviter that gets blocked loses their open links along with everything else.
+  setInviter('outcast', true);
+  const link = (await session({ t: 'inviteCreate' }, outcast)).created?.token;
+  check(link && peekInvite(link), 'The account to be blocked cannot create a link');
+
+  // A tab open at the moment of the block is closed and starts over.
+  const tab = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: outcast } });
+  const tabMsgs = [];
+  let closedWith = null;
+  tab.on('message', (raw) => tabMsgs.push(JSON.parse(raw.toString())));
+  tab.on('close', (code) => { closedWith = code; });
+  await new Promise(r => tab.on('open', r));
+  await wait(100);
+
+  const block = await session({ t: 'adminBlock', name: 'outcast', on: true });
+  check(block.data?.accounts.find(a => a.name === 'outcast')?.blocked && getUser('outcast').blocked,
+    'The admin cannot block an account');
+  for (let i = 0; i < 40 && closedWith === null; i++) await wait(50);
+  check(closedWith === 4003, `The open tab of a blocked account stays connected (${closedWith})`);
+  check(!peekInvite(link), 'A link of a blocked inviter still works');
+
+  const inside = await session({ t: 'list' }, outcast);
+  check(inside.hello?.blocked && inside.hello.openGames.length === 0 && Array.isArray(inside.hello.appeal),
+    `hello does not tell the block (${JSON.stringify(inside.hello?.blocked)})`);
+  // Every message the server knows - read from its source, so a future one
+  // that forgets the check fails here - plus some it does not, with a payload
+  // that would do something for anyone else. Each gets the refusal and
+  // nothing else, and neither the account nor the games change.
+  const source = fs.readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  const types = [...new Set([...source.matchAll(/case '([A-Za-z]+)'/g)].map(m => m[1]))]
+    .filter(t => t !== 'appeal').concat('nonsense', '__proto__', 'constructor', 'toString');
+  check(types.length > 40, `Message types not found in the source (${types.length})`);
+  const record = JSON.stringify(getUser('outcast'));
+  const gamesBefore = (await session({ t: 'admin' })).data?.games.length;
+  for (const t of types) {
+    const tried = await new Promise((ok) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: outcast } });
+      const got = [];
+      ws.on('message', (raw) => {
+        const m = JSON.parse(raw.toString());
+        if (m.t === 'hello') {
+          return ws.send(JSON.stringify({
+            t, code: 'ABCD', token: 'x', name: 'Hacker', nick: 'Hacker', handle: 'ABCDEF', text: 'x', id: 'x', note: 'x',
+            on: true, accept: true, settings: { maxTurns: 5 }, color: 1, level: 'hard', paused: false, ms: 120
+          }));
+        }
+        got.push(m);
+      });
+      setTimeout(() => { ws.close(); ok(got); }, 300);
+    });
+    check(tried.length === 1 && tried[0].t === 'error' && tried[0].key === 'err.blocked',
+      `A blocked account gets through '${t}' (${JSON.stringify(tried).slice(0, 160)})`);
+  }
+  check(JSON.stringify(getUser('outcast')) === record, 'A blocked account changed its own account');
+  check((await session({ t: 'admin' })).data?.games.length === gamesBefore, 'A blocked account changed the games');
+
+  // Nor does anything reach it: no friends list on the regular push, no
+  // friend request someone sends it - a socket that only listens gets nothing.
+  const quiet = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: outcast } });
+  const heard = [];
+  quiet.on('message', (raw) => { const m = JSON.parse(raw.toString()); if (m.t !== 'hello') heard.push(m.t); });
+  await new Promise(r => quiet.on('open', r));
+  await session({ t: 'friendRequest', handle: getUser('outcast').handle });
+  await wait(3500);
+  quiet.close();
+  check(!heard.length, `A blocked account still hears from the instance (${heard})`);
+
+  // Over HTTP: who it is and signing out, nothing else.
+  check((await api('me', null, 'GET')).status === 200, 'A blocked account cannot ask who it is');
+  check((await api('key', null, 'GET')).status === 403, 'A blocked account reads its message key');
+  check((await api('key', { password: 'outcastPassword1', e2e: {} })).status === 403, 'A blocked account stores a message key');
+  check((await api('change', { password: 'outcastPassword1', newPassword: 'outcastPassword9' })).status === 403
+    && await verifyUser('outcast', 'outcastPassword1'), 'A blocked account changes its password');
+  check((await api('delete', { password: 'outcastPassword1' })).status === 403 && getUser('outcast'),
+    'A blocked account deletes itself');
+
+  // The line to the admins - both ways.
+  const asked = await session({ t: 'appeal', text: '  Why was I blocked?  ' }, outcast);
+  check(asked.appeal?.msgs.length === 1 && asked.appeal.msgs[0].mine && asked.appeal.msgs[0].text === 'Why was I blocked?',
+    `The blocked account cannot write to the admins (${JSON.stringify(asked.appeal)})`);
+  const tooLong = await session({ t: 'appeal', text: 'x'.repeat(501) }, outcast);
+  check(tooLong.errors.includes('err.badAppeal'), 'An overlong appeal is accepted');
+  const seen = await session({ t: 'admin' });
+  const thread = seen.data?.accounts.find(a => a.name === 'outcast')?.appeal || [];
+  check(thread.length === 1 && thread[0].from === 'user', `The admins do not see the appeal (${JSON.stringify(thread)})`);
+
+  // A line, not a flood: five in a row, then the admins have to answer first.
+  for (let i = 2; i <= 5; i++) {
+    const more = await session({ t: 'appeal', text: `Message ${i}` }, outcast);
+    check(more.appeal?.msgs.length === i, `Appeal ${i} of 5 is refused (${JSON.stringify(more.errors)})`);
+  }
+  const flood = await session({ t: 'appeal', text: 'Message 6' }, outcast);
+  check(flood.errors.includes('err.appealWait') && appealsOf('outcast').length === 5, 'A blocked account can flood the admins');
+
+  const listening = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: outcast } });
+  let answer = null;
+  listening.on('message', (raw) => { const m = JSON.parse(raw.toString()); if (m.t === 'appealData') answer = m; });
+  await new Promise(r => listening.on('open', r));
+  await wait(100);
+  await session({ t: 'adminAppeal', name: 'outcast', text: 'Spamming the chat.' });
+  for (let i = 0; i < 40 && !answer; i++) await wait(50);
+  const last = answer?.msgs.at(-1);
+  check(last && !last.mine && last.by === 'captain' && last.text === 'Spamming the chat.',
+    `The blocked account does not get the admin's answer (${JSON.stringify(answer)})`);
+  listening.close();
+  const afterAnswer = await session({ t: 'appeal', text: 'Sorry.' }, outcast);
+  check(afterAnswer.appeal && !afterAnswer.errors.length, 'After an answer the blocked account cannot write again');
+
+  // Admins - oneself included - are off limits.
+  for (const t of ['adminBlock', 'adminDelete']) {
+    const tried = await session({ t, name: 'captain', on: true });
+    check(tried.errors.includes('err.targetAdmin') && !tried.data, `'${t}' works on an admin`);
+  }
+  check(getUser('captain') && !getUser('captain').blocked, 'The admin blocked or deleted themselves');
+
+  // Lifting the block: back to normal.
+  await session({ t: 'adminBlock', name: 'outcast', on: false });
+  const back = await session({ t: 'list' }, outcast);
+  check(!back.hello?.blocked && back.games && !back.errors.length, 'After lifting the block the account still cannot play');
+
+  // Deleting: two clicks in the panel, one message on the wire.
+  const del = await session({ t: 'adminDelete', name: 'outcast' });
+  check(!del.data?.accounts.some(a => a.name === 'outcast') && !getUser('outcast'), 'The admin cannot delete an account');
+  check(!appealsOf('outcast').length, 'The thread with the admins outlives the account');
+  const gone = await session({ t: 'list' }, outcast);
+  check(!gone.hello, 'The session of a deleted account still opens a socket');
+
+  setAdmin('captain', false);
+  console.log('Blocking: only a line to the admins, open tabs restart, admins off limits; deleting takes everything along.');
+}
+
+// --- Blocked without the panel (users.js, while the player is in a game):
+//     from the next message on everything is refused, the connection is
+//     closed within moments and the seat is given up - and only a first
+//     password that has to be replaced may still be changed.
+{
+  await addUser('rogue', 'roguePassword1', { mustChange: false });
+  const signIn = async (password) => (await fetch(`${BASE}/api/auth/login`, asJson({ user: 'rogue', password })))
+    .headers.get('set-cookie')?.split(';')[0];
+  let jar = await signIn('roguePassword1');
+  setAdmin('captain', true);
+
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: jar } });
+  const msgs = [];
+  let joined = null, closedWith = null;
+  ws.on('message', (raw) => {
+    const m = JSON.parse(raw.toString());
+    msgs.push(m);
+    if (m.t === 'hello') ws.send(JSON.stringify({ t: 'create', name: 'x' }));
+    if (m.t === 'joined') { joined = m; ws.send(JSON.stringify({ t: 'addBot' })); ws.send(JSON.stringify({ t: 'start' })); }
+  });
+  ws.on('close', (code) => { closedWith = code; });
+  for (let i = 0; i < 60 && !msgs.some(m => m.t === 'view'); i++) await wait(50);
+  check(joined && msgs.some(m => m.t === 'view'), 'The game for the block test does not start');
+
+  setBlocked('rogue', true);                       // as users.js does it: nobody is told
+  const before = msgs.length;
+  ws.send(JSON.stringify({ t: 'chat', text: 'still here' }));
+  ws.send(JSON.stringify({ t: 'ready' }));
+  for (let i = 0; i < 60 && closedWith === null; i++) await wait(50);
+  const answers = msgs.slice(before).filter(m => m.t === 'error');
+  check(answers.length >= 1 && answers.every(m => m.key === 'err.blocked'),
+    `Messages right after a block from outside go through (${JSON.stringify(answers)})`);
+  check(!msgs.slice(before).some(m => m.t === 'chat' && JSON.stringify(m).includes('still here')), 'The blocked player still chats');
+  check(closedWith === 4003, `A block from outside leaves the connection open (${closedWith})`);
+  const game = (await session({ t: 'admin' })).data?.games.find(g => g.id === joined?.code);
+  check(game && !game.players.find(p => p.account)?.connected, 'The blocked player still holds the seat');
+
+  const back = await session({ t: 'resume', code: joined?.code, token: joined?.token }, jar);
+  check(back.hello?.blocked && !back.hello.mySeats.length && back.errors.includes('err.blocked'),
+    'A blocked player gets the seat back');
+
+  // A first password still has to be replaced to get as far as the dialog.
+  await setPassword('rogue', 'roguePassword2', { mustChange: true });
+  jar = await signIn('roguePassword2');
+  const changed = await fetch(`${BASE}/api/auth/change`, {
+    method: 'POST', headers: { cookie: jar, 'content-type': 'application/json' },
+    body: JSON.stringify({ password: 'roguePassword2', newPassword: 'roguePassword3' })
+  });
+  check(changed.status === 200, `A blocked account cannot replace its first password (${changed.status})`);
+  jar = changed.headers.get('set-cookie')?.split(';')[0] || jar;
+  check((await session({ t: 'list' }, jar)).hello?.blocked, 'After the first password the block is gone');
+
+  // Lifted from outside too: the open connection starts over.
+  const open = new WebSocket(`ws://127.0.0.1:${PORT}`, { headers: { cookie: jar } });
+  let reopened = null;
+  open.on('close', (code) => { reopened = code; });
+  await new Promise(r => open.on('open', r));
+  await wait(100);
+  setBlocked('rogue', false);
+  for (let i = 0; i < 60 && reopened === null; i++) await wait(50);
+  check(reopened === 4003, `Lifting a block from outside leaves the blocked connection open (${reopened})`);
+
+  deleteUser('rogue');
+  setAdmin('captain', false);
+  console.log('Blocked from outside: refused from the next message, connection closed, seat given up.');
 }
 
 // --- Deleting your own account (right to erasure): only with a session and
