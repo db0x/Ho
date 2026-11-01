@@ -4,8 +4,10 @@
 // colony ship there and sends it to exactly that world; colony ships built
 // together each fly to a world of their own. The normal AI builds everything
 // at the capital, as before.
-import { createGame, addPlayer, startGame, resolveTurn } from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { dist, travelDistance, holeZone, shipStats, IDEAL } from '../shared/rules.js';
 
 let errors = 0;

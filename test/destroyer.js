@@ -2,10 +2,15 @@
 // level, needs Weapons 5, Shields 5 and a shipyard on a world with 20M
 // people, fires eight guns, draws the fire, repairs its fleet in the orbit
 // of an own world - and carries a name its owner can change.
-import { createGame, addPlayer, startGame, resolveTurn, setOrders, buildView, devDestroyer } from '../server/game.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { buildView } from '../server/game/intel.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { devDestroyer } from '../server/game/shipyard.js';
+import { resolveTurn } from '../server/game/turn.js';
 import { SHIP_NAMES } from '../server/shipnames.js';
 import { shipCost, shipStats, buildLock, REPAIR_SHARE, refitCost, shipTypesFor } from '../shared/rules.js';
-import { runBot } from '../server/bot.js';
+import { runBot } from '../server/ai/bot.js';
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };

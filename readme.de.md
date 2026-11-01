@@ -22,6 +22,8 @@ Reiches.*
 - **Jäger und Großkampfschiffe:** Schwärme kleiner Schiffe und Zerstörer mit Namen,
   die das Feuer auf sich ziehen und ihre Flotte reparieren – oder klassisches Ho!!
   nur mit den kleinen Schiffen.
+- **Bündnisse,** offen oder geheim – mit Menschen wie mit der KI. Verbündete teilen
+  Sicht und Versorgung, gewinnen gemeinsam und verraten sich manchmal.
 - **Flach oder im Raum,** als Streufeld oder Spiralgalaxie mit schwarzem Loch – und
   eine Karte, die mit der Erkundung wächst.
 - **Ein Haushalt, der aufgeht:** die Kopfleiste zeigt vor dem Zugende, wohin das

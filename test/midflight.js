@@ -5,8 +5,12 @@
 // fleet with firepower to spare peels off a detachment against a second
 // world it reaches in the same turn, and fighters split off to meet a small
 // foreign fleet at the free world it heads for. The normal AI does neither.
-import { createGame, addPlayer, startGame, resolveTurn, setOrders, canReach } from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { canReach } from '../server/game/movement.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { shipStats, dist } from '../shared/rules.js';
 
 let errors = 0;

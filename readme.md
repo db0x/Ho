@@ -20,6 +20,8 @@ gravity; settled worlds tint their surroundings in their empire's colour.*
 - **AI with personality:** conqueror, settler, technocrat, raider, bulwark, vulture.
 - **Fighters and capital ships:** swarms of small ships, and named destroyers that
   draw the fire and repair their fleet – or classic Ho!! with the small ships only.
+- **Alliances,** open or secret – with humans and AI alike. Allies share sight and
+  supply, win together, and sometimes betray each other.
 - **Flat or in space,** as a scatter field or a spiral galaxy with a black hole –
   and a map that grows as you explore.
 - **A budget that adds up:** the top bar shows where your money goes before you end

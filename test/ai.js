@@ -5,8 +5,10 @@
 // all. A mistake is a wave that breaks on the wall although it is not clearly
 // stronger than one whose failure was already known when it set off - waves
 // that were under way at the same time, or turned back, are none.
-import { createGame, addPlayer, startGame, resolveTurn } from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { shipStats, COMBAT_ROUNDS, dist } from '../shared/rules.js';
 
 let errors = 0;

@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { inviteFile, peekInvite } from '../server/invites.js';
 import { appealsOf } from '../server/appeals.js';
+import { MESSAGE_TYPES } from '../server/hub/hub.js';
 import {
   hashPassword, verifyPassword, addUser, deleteUser, listUsers, getUser,
   setPassword, verifyUser, generatePassword, checkPassword, validName, setDisplay, setAdmin, setInviter, setBlocked
@@ -262,11 +263,11 @@ const session = (msg, as = cookie) => new Promise((ok) => {
 //     without signing in again.
 {
 
-  // Every admin message, read from the server's source - so a future admin
-  // feature that forgets the check fails here without anyone remembering to
-  // add it. A normal account must get a refusal and no admin data for each.
-  const serverSource = fs.readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
-  const adminTypes = [...serverSource.matchAll(/case '(admin[A-Za-z]*)'/g)].map(m => m[1]);
+  // Every admin message, taken from the server's own table of message types -
+  // so a future admin feature that forgets the check fails here without anyone
+  // remembering to add it. A normal account must get a refusal and no admin
+  // data for each.
+  const adminTypes = MESSAGE_TYPES.filter(t => t.startsWith('admin'));
   check(adminTypes.length >= 6, `Admin messages not found in the source (${adminTypes})`);
   for (const t of adminTypes) {
     const tried = await session({ t, code: 'ABCD', text: 'x', id: 'x', note: 'x' });
@@ -718,12 +719,11 @@ const session = (msg, as = cookie) => new Promise((ok) => {
   const inside = await session({ t: 'list' }, outcast);
   check(inside.hello?.blocked && inside.hello.openGames.length === 0 && Array.isArray(inside.hello.appeal),
     `hello does not tell the block (${JSON.stringify(inside.hello?.blocked)})`);
-  // Every message the server knows - read from its source, so a future one
-  // that forgets the check fails here - plus some it does not, with a payload
-  // that would do something for anyone else. Each gets the refusal and
-  // nothing else, and neither the account nor the games change.
-  const source = fs.readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
-  const types = [...new Set([...source.matchAll(/case '([A-Za-z]+)'/g)].map(m => m[1]))]
+  // Every message the server knows - from its table of message types, so a
+  // future one that forgets the check fails here - plus some it does not, with
+  // a payload that would do something for anyone else. Each gets the refusal
+  // and nothing else, and neither the account nor the games change.
+  const types = MESSAGE_TYPES
     .filter(t => t !== 'appeal').concat('nonsense', '__proto__', 'constructor', 'toString');
   check(types.length > 40, `Message types not found in the source (${types.length})`);
   const record = JSON.stringify(getUser('outcast'));

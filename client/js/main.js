@@ -165,7 +165,8 @@ const app = {
     const b = app.battles.get(key);
     const v = map?.view;
     if (!b || !v) return;
-    openBattle({ battle: b.battle, planet: v.planets[b.planetId], players: v.players, you: v.you });
+    openBattle({ battle: b.battle, planet: v.planets[b.planetId], players: v.players, you: v.you,
+      alliances: v.diplomacy?.alliances || [] });
   },
   send: (m) => net.send(m),
   setSelection(sel) {
@@ -524,9 +525,11 @@ function bindGame() {
   };
 
   $('#btn-fit').onclick = () => map.fit();
-  $('#btn-keys').onclick = () => {
+  // The menu opens the game manual, like H; the key overview is one click
+  // further, in the manual itself.
+  $('#btn-manual').onclick = () => {
     if (narrow.matches) showSheet(''); else showOpts(false);
-    toggleKeys(true);
+    $('#help').classList.remove('hidden');
   };
   $('#btn-zoomin').onclick = () => map.zoomBy(1.25);
   $('#btn-zoomout').onclick = () => map.zoomBy(1 / 1.25);
@@ -769,8 +772,7 @@ function showTurnBanner(view) {
  * continued; "Weiter" (bound in bindGame()) is what opens the dialog about
  * either of those. */
 function showWinnerBanner(view) {
-  const winner = view.players.find(p => p.id === view.winner);
-  $('#winnerbanner-text').textContent = t('over.winner', { player: winner ? winner.name : '—' });
+  $('#winnerbanner-text').textContent = winnerText(view);
   $('#winnerbanner').classList.remove('hidden');
 }
 
@@ -778,14 +780,20 @@ function hideWinnerBanner() {
   $('#winnerbanner').classList.add('hidden');
 }
 
+/** Who won - alone, or allies together. */
+function winnerText(view) {
+  const name = id => view.players.find(p => p.id === id)?.name;
+  if (view.winners?.length > 1) return t('over.winners', { players: view.winners.map(name).join(' & ') });
+  return t('over.winner', { player: name(view.winner) || '—' });
+}
+
 /** Opens the dialog about a game that has ended: ask whether to keep playing,
  * with more turns, or go back to the start screen. Triggered by "Weiter" -
  * on the winner banner, or the same button at the top once the game is over.
  * Only the host gets asked - others only get the option to leave or dismiss. */
 function showGameEnd(view) {
-  const winner = view.players.find(p => p.id === view.winner);
   openGameEnd({
-    winnerText: t('over.winner', { player: winner ? winner.name : '—' }),
+    winnerText: winnerText(view),
     isHost: view.host === view.you,
     // Staying without going back to the start screen: the same wording the
     // leave-game dialog uses for "never mind" - by role, same as there.

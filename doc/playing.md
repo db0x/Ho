@@ -7,6 +7,7 @@
 - [The ship classes](#the-ship-classes)
 - [Money, metal and the budget](#money-metal-and-the-budget)
 - [Combat and conquest](#combat-and-conquest)
+- [Alliances](#alliances)
 - [Galaxy shape: scatter or spiral](#galaxy-shape-scatter-or-spiral)
 - [Two playing fields: classic and space](#two-playing-fields-classic-and-space)
 - [A galaxy without an edge](#a-galaxy-without-an-edge)
@@ -55,6 +56,7 @@ saying who can change them:
 | Galaxy grows | see [A galaxy without an edge](#a-galaxy-without-an-edge); off gives a fixed map |
 | Wormholes | see [Wormholes](#wormholes) |
 | Capital ships | destroyers can be built (see [The ship classes](#the-ship-classes)); off gives classic Ho!! with the small ships only |
+| Alliances | empires can ally (see [Alliances](#alliances)); off makes it everyone against everyone |
 
 **Connection.** A disconnected player does not block the turn – they are skipped
 and can return at any time (the seat is stored in the browser). With sign-in a game can also be continued on
@@ -76,7 +78,7 @@ colonisation, economy.
 | **Ideal** | 20 °C and 1.0 g. The closer a world is to it, the more people live there and the more money it brings in. |
 | **Terraforming** | Costs the set budget every turn and pushes temperature and gravity towards the ideal. Extreme worlds need a higher level of **radical tech** first. |
 | **Metal** | Mined on your own worlds, pooled and consumed when building ships. A planet's reserve runs out; after that, deep mining still yields a tenth. |
-| **Range** | Distance from your nearest *inhabited own* planet. New colonies are therefore stepping stones; tankers widen the radius. |
+| **Range** | Distance from your nearest *inhabited own* planet – or an ally's. New colonies are therefore stepping stones; tankers widen the radius. |
 | **Tech level** | Ships are built with the level of their build year and keep it. Higher levels make ships better *and more expensive* – **miniaturisation** brings the cost back down. Outdated ships can be **refitted** at a shipyard. |
 | **Defence battery** | Every inhabited world defends itself, in proportion to its population. |
 | **Orbital defence** | Cheap satellites that stay in orbit. They cannot fly themselves, but a **transporter** carries up to five of them to another world of yours. From five upwards they raise a shield. |
@@ -85,7 +87,7 @@ colonisation, economy.
 ## The ship classes
 
 Seven classes, each with a job of its own. Ships are built at the shipyard of one of
-your worlds; clicking a ship there – or *Browse ship types* in the help (`H`) –
+your worlds; clicking a ship there – or *Browse ship types* in *How to play* (`H`) –
 opens its data sheet with the current values.
 
 | | |
@@ -151,6 +153,41 @@ Damage stays with a ship. Only a **destroyer** repairs: in orbit of a world of
 yours its whole fleet gets back 20% of every hull per turn without a battle there.
 Its eight guns each pick a target of their own, and it draws the fire like four
 fighters – the small ships in its fleet are hit less often.
+
+## Alliances
+
+In the rankings (left window, *Rankings* tab) you can offer any empire an
+alliance – **open**, so that everyone learns of it, or **secret**. The other
+side accepts or declines; an offer stands for five turns, and after a refusal
+you have to wait ten turns before asking the same empire again.
+
+An alliance always binds two empires:
+
+- **Peace:** allies do not attack each other – neither their fleets nor the
+  defences of their worlds. Fleets may visit an ally's orbit and stay there.
+- **Side by side:** where an ally is attacked, its fleets in the orbit fight
+  along. A colony ship may land under an ally's escort.
+- **Shared sight:** you see what your ally sees – its worlds and fleets count
+  as your eyes.
+- **Supply:** an ally's inhabited worlds supply your fleets as if they were
+  your own, so your ships reach further.
+
+Alliances are not passed on: if A is allied with B and B with C, A and C still
+fight each other.
+
+**Secret alliances** are known only to the two partners – until someone sees
+fleets of both share an orbit in peace, or one partner's fleet over the other's
+world. That observer then knows, and the log tells them where. Either partner
+can make a secret alliance **public** at any time, for instance to deter an
+attacker.
+
+**Notice** can be given at any time. The alliance then holds for two more turns;
+after that, fleets still in the former partner's orbit fight. Keep an eye on
+guests in your own orbit.
+
+If only allies are left, with nobody under notice, they win **together**. The
+AI empires form alliances as well (see [The AI empires](#the-ai-empires)), and
+the host can switch alliances off in the lobby.
 
 ## Galaxy shape: scatter or spiral
 
@@ -232,6 +269,16 @@ Candyfloss* – and each with a personality of its own:
 They remember who attacked them, quietly gang up on a runaway leader and lose
 patience as the game drags on.
 
+They also form [alliances](#alliances) – among themselves and with you – and
+answer an offer right away. A runaway leader or a common rival brings them
+together, and the weak seek protection; nobody allies with whoever hurt it or
+stands with its rival. Whoever attacks an ally makes an enemy, and an empire
+with known allies is reckoned harder to take – an open alliance deters. Each
+personality has its own idea of loyalty: the settler and the bulwark stick
+together and show their friends openly, the vulture and the raider prefer
+secret alliances and drop an ally that leads, that lies on the ground, or that
+they simply need as prey late in the game.
+
 They only attack when the fleet can break the defence in **one turn** – the defence
 battery regrows from the population every turn, so a siege achieves nothing. When an
 empire falls back to three known worlds it becomes the **war target**: the fleets
@@ -263,6 +310,10 @@ no turn left to react. And a small foreign fleet heading for a free world (most
 likely a colony ship) may find a few of its fighters waiting there. It only sees
 what you would see: course, arrival and number of ships, not what they are.
 
+A hard empire betrays with a plan: its fleets first gather in the ally's orbit
+as guests, and only once enough of them are there does it give notice – when
+the notice runs out, the battle starts right inside the ally's defences.
+
 ## Watching
 
 *Watch a game* sets up a game with 4 to 16 AI empires. There is no empire of your
@@ -278,7 +329,8 @@ spectator would see everyone's cards.
 
 The ranking orders the empires by **population**, ties broken by worlds, then by
 ships. That is also how the game is decided: whoever has the most people at the
-turn limit wins. Without a turn limit, the last empire standing wins.
+turn limit wins. Without a turn limit, the last empire standing wins – or the
+last allies standing together (see [Alliances](#alliances)).
 
 When a game ends, who won stays up on the screen for everyone. *Weiter* opens
 a dialog about what happens next: only the host can extend the game by more
@@ -299,8 +351,9 @@ returning to the start screen and staying as they are.
 | Fit the map | `F` |
 | Bring only your own forward | Hold `E` – everything that is not yours fades far back. Or the flag button at the top right: a tap toggles it (the way on a phone), holding shows it only while held |
 | Clear selection | `Esc` |
-| Help | `H` |
-| Overview of all keys | `?` – or *Keys* in the menu (gear) and in the help |
+| How to play | `H` – or *How to play* in the menu (gear) |
+| Overview of all keys | `?` – or *Keys* in *How to play* |
+| Alliances | Rankings tab: *Offer alliance* or *Secret alliance* under an empire; there you also accept, decline, make public or give notice (a second click confirms) |
 | Move / resize windows | Drag the title bar to move; drag any edge or corner to resize |
 | Minimize windows | **−** in the title bar or double-click it: the window becomes an icon in the top bar (★ research/empire/rankings, ☰ events/comms – with the count of unread comms). A click on the icon brings it back where it was. Position, size and state are remembered |
 | Comms (chat) | *Comms* tab in the log window. Messages you have not seen pop up and are counted on the tab – tap the message to reply. Smileys like `:)` `:(` `:D` `;)` `<3` turn into emojis, so do codes like `:sad:` `:rocket:` `:thumbsup:`; the 🙂 button next to the field shows them all |

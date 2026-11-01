@@ -10,6 +10,7 @@
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, holeZone, route, routeLength, reachOutline, WORMHOLE } from '../../shared/rules.js';
+import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
@@ -553,7 +554,7 @@ export class SpaceView {
     const zone = holeZone(v.galaxy);
     this._reach = this._reach || new Map();
     for (const p of v.planets) {
-      if (p.owner !== v.you || !(p.pop > 0.5)) continue;
+      if (!suppliesMe(v, p.owner) || !(p.pop > 0.5)) continue;
       // Not a circle but the actually reachable outline - at the black hole
       // it has a dent (see reachOutline in shared/rules.js).
       const key = `${p.id}|${Math.round(range)}|${zone ? 1 : 0}`;

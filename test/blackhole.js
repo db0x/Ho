@@ -1,8 +1,10 @@
 // The black hole as a game element: in a spiral galaxy no fleet may fly
 // through the exclusion zone or stop inside it - not even between two turns
 // when it is just passing by.
-import { createGame, addPlayer, startGame, resolveTurn } from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { holeZone, route, routeLength, blocked, dist, travelDistance, reachOutline } from '../shared/rules.js';
 
 const game = createGame('Hole');

@@ -4,9 +4,10 @@
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import {
-  createGame, addPlayer, startGame, resolveTurn, continueGame,
-  MINIMUM_CONTINUE_TURNS, MAXIMUM_CONTINUE_TURNS
-} from '../server/game.js';
+  createGame, startGame, continueGame, MINIMUM_CONTINUE_TURNS, MAXIMUM_CONTINUE_TURNS
+} from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 
 let errors = 0;
 const fail = (msg) => { console.error('ERROR: ' + msg); errors++; };

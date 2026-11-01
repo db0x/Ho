@@ -2,6 +2,7 @@
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
+import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM,
@@ -328,7 +329,7 @@ export class MapView {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       for (const p of v.planets) {
-        if (p.owner !== v.you || !(p.pop > 0.5)) continue;
+        if (!suppliesMe(v, p.owner) || !(p.pop > 0.5)) continue;
         const [sx, sy] = this.w2s(p.x, p.y);
         const rr = range * this.cam.zoom;
         // Outline instead of a circle: at the black hole the fleet reaches less
@@ -964,7 +965,7 @@ export function farSide(v, f) {
   const out = [];
   if (!f?.mine || !v.wormholes?.length) return out;
   const zone = holeZone(v.galaxy);
-  const bases = v.planets.filter(p => p.owner === v.you && p.pop > 0.5);
+  const bases = v.planets.filter(p => suppliesMe(v, p.owner) && p.pop > 0.5);
   if (!bases.length) return out;
   const direct = supplyDistance(bases, f, zone);
   for (const { a, b } of portalsOf(v)) {
