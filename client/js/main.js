@@ -525,9 +525,11 @@ function bindGame() {
   };
 
   $('#btn-fit').onclick = () => map.fit();
-  $('#btn-keys').onclick = () => {
+  // The menu opens the game manual, like H; the key overview is one click
+  // further, in the manual itself.
+  $('#btn-manual').onclick = () => {
     if (narrow.matches) showSheet(''); else showOpts(false);
-    toggleKeys(true);
+    $('#help').classList.remove('hidden');
   };
   $('#btn-zoomin').onclick = () => map.zoomBy(1.25);
   $('#btn-zoomout').onclick = () => map.zoomBy(1 / 1.25);

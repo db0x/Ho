@@ -7,6 +7,7 @@
 - [Die Schiffstypen](#die-schiffstypen)
 - [Geld, Metall und der Haushalt](#geld-metall-und-der-haushalt)
 - [Kampf und Eroberung](#kampf-und-eroberung)
+- [Bündnisse](#bündnisse)
 - [Form der Galaxie: Streufeld oder Spirale](#form-der-galaxie-streufeld-oder-spirale)
 - [Zwei Spielfelder: Klassik und Raum](#zwei-spielfelder-klassik-und-raum)
 - [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand)
@@ -56,6 +57,7 @@ mit dem Hinweis, wer sie ändern kann:
 | Galaxie wächst | siehe [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand); aus ergibt eine feste Karte |
 | Wurmlöcher | siehe [Wurmlöcher](#wurmlöcher) |
 | Großkampfschiffe | Zerstörer sind baubar (siehe [Die Schiffstypen](#die-schiffstypen)); aus ergibt ein klassisches Ho!! nur mit den kleinen Schiffen |
+| Bündnisse | Reiche können sich verbünden (siehe [Bündnisse](#bündnisse)); aus ergibt ein Jeder gegen jeden |
 
 **Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
 übersprungen und kann jederzeit zurückkehren (der Platz wird im Browser
@@ -78,7 +80,7 @@ Kolonisierung, Wirtschaft.
 | **Ideal** | 20 °C und 1,0 g. Je näher eine Welt daran liegt, desto mehr Menschen leben dort und desto mehr Geld bringt sie. |
 | **Terraforming** | Kostet jede Runde das eingestellte Budget und schiebt Temperatur und Schwerkraft Richtung Ideal. Extreme Welten brauchen erst höhere **Radikaltechnik**. |
 | **Metall** | Wird auf den eigenen Welten gefördert, in einen gemeinsamen Vorrat gelegt und beim Schiffsbau verbraucht. Der Vorrat eines Planeten erschöpft sich; danach liefert er im Tiefbau noch ein Zehntel. |
-| **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten. Neue Kolonien sind damit Sprungbretter; Tanker erweitern den Radius. |
+| **Reichweite** | Abstand vom nächsten *bewohnten eigenen* Planeten – oder dem eines Verbündeten. Neue Kolonien sind damit Sprungbretter; Tanker erweitern den Radius. |
 | **Technikstand** | Schiffe werden mit dem Stand ihres Baujahrs gebaut und behalten ihn. Höhere Stufen machen Schiffe besser *und teurer* – **Miniaturisierung** senkt die Kosten wieder. Veraltete Schiffe lassen sich in einer Werft **umrüsten**. |
 | **Abwehrbatterie** | Jede bewohnte Welt verteidigt sich selbst, proportional zur Bevölkerung. |
 | **Orbitalverteidigung** | Billige Satelliten, die im Orbit bleiben. Selbst fliegen können sie nicht, aber ein **Transporter** bringt bis zu fünf davon zu einer anderen eigenen Welt. Ab fünf Stück spannen sie einen Schild auf. |
@@ -87,7 +89,7 @@ Kolonisierung, Wirtschaft.
 ## Die Schiffstypen
 
 Sieben Klassen, jede mit eigener Aufgabe. Gebaut wird in der Werft einer eigenen
-Welt; ein Klick auf ein Schiff dort – oder *Schiffstypen ansehen* in der Hilfe
+Welt; ein Klick auf ein Schiff dort – oder *Schiffstypen ansehen* in der Spielanleitung
 (`H`) – öffnet den Steckbrief mit den aktuellen Werten.
 
 | | |
@@ -155,6 +157,44 @@ eigenen Welt bekommt seine ganze Flotte in jeder Runde ohne Kampf dort 20 % jede
 Hülle zurück. Seine acht Geschütze suchen sich jeweils ein eigenes Ziel, und er
 zieht das Feuer auf sich wie vier Jäger – die kleinen Schiffe seiner Flotte
 werden seltener getroffen.
+
+## Bündnisse
+
+In der Rangliste (linkes Fenster, Reiter *Rangliste*) bietest du jedem Reich ein
+Bündnis an – **offen**, sodass alle davon erfahren, oder **geheim**. Die andere
+Seite nimmt an oder lehnt ab; ein Angebot gilt fünf Runden, und nach einer
+Ablehnung musst du zehn Runden warten, bevor du dasselbe Reich wieder fragst.
+
+Ein Bündnis verbindet immer zwei Reiche:
+
+- **Frieden:** Verbündete greifen sich nicht an – weder ihre Flotten noch die
+  Abwehr ihrer Welten. Flotten dürfen den Orbit eines Verbündeten besuchen und
+  dort bleiben.
+- **Seite an Seite:** Wird ein Verbündeter angegriffen, kämpfen seine Flotten im
+  Orbit mit. Ein Kolonieschiff darf unter dem Geleitschutz eines Verbündeten
+  landen.
+- **Gemeinsame Sicht:** Du siehst, was dein Verbündeter sieht – seine Welten und
+  Flotten sind auch deine Augen.
+- **Versorgung:** Die bewohnten Welten eines Verbündeten versorgen deine Flotten
+  wie eigene, deine Schiffe reichen also weiter.
+
+Bündnisse werden nicht weitergegeben: Ist A mit B und B mit C verbündet, kämpfen
+A und C trotzdem gegeneinander.
+
+**Geheimbündnisse** kennen nur die beiden Partner – bis jemand Flotten beider
+friedlich im selben Orbit sieht, oder die Flotte des einen über einer Welt des
+anderen. Dieser Beobachter weiß es dann, und das Log sagt ihm, wo. Jeder Partner
+kann ein Geheimbündnis jederzeit **öffentlich** machen, etwa um einen Angreifer
+abzuschrecken.
+
+**Kündigen** geht jederzeit. Das Bündnis gilt dann noch zwei Runden; danach
+kämpfen Flotten, die noch im Orbit des früheren Partners stehen. Behalte Gäste in
+deinem eigenen Orbit im Auge.
+
+Bleiben nur Verbündete übrig und hat niemand gekündigt, gewinnen sie
+**gemeinsam**. Auch die KI-Reiche schließen Bündnisse (siehe
+[Die KI-Reiche](#die-ki-reiche)), und der Gastgeber kann Bündnisse in der Lobby
+abschalten.
 
 ## Form der Galaxie: Streufeld oder Spirale
 
@@ -239,6 +279,17 @@ Sie merken sich, wer sie angegriffen hat, verbünden sich stillschweigend gegen
 einen davonziehenden Spitzenreiter und werden ungeduldig, je länger die Partie
 dauert.
 
+Sie schließen auch echte [Bündnisse](#bündnisse) – untereinander und mit dir –
+und beantworten ein Angebot sofort. Ein davonziehender Spitzenreiter oder ein
+gemeinsamer Rivale bringt sie zusammen, und die Schwachen suchen Schutz; niemand
+verbündet sich mit dem, der ihm geschadet hat oder zu seinem Rivalen hält. Wer
+einen Verbündeten angreift, macht sich einen Feind, und ein Reich mit bekannten
+Verbündeten gilt als schwerer zu nehmen – ein offenes Bündnis schreckt ab. Jede
+Persönlichkeit hält es anders mit der Treue: Siedler und Bollwerk halten
+zusammen und zeigen ihre Freunde offen, Aasgeier und Pirat verbünden sich lieber
+heimlich und lassen einen Verbündeten fallen, der führt, der am Boden liegt oder
+den sie spät in der Partie einfach als Beute brauchen.
+
 Angegriffen wird nur, wenn die Flotte die Abwehr in **einem Zug** brechen kann –
 die Abwehrbatterie wächst jede Runde aus der Bevölkerung nach, Belagern bringt
 nichts. Fällt ein Reich auf drei bekannte Welten zurück, wird es zum
@@ -275,6 +326,10 @@ auf dem Weg zu einer freien Welt (meist ein Kolonieschiff) trifft dort womöglic
 schon auf ein paar seiner Jäger. Es sieht dabei nur, was du auch sehen würdest:
 Kurs, Ankunft und Zahl der Schiffe, nicht deren Art.
 
+Ein schweres Reich verrät mit Plan: Seine Flotten sammeln sich zuerst als Gäste
+im Orbit des Verbündeten, und erst wenn genug dort stehen, kündigt es – läuft die
+Frist ab, beginnt die Schlacht mitten in der Abwehr des Verbündeten.
+
 ## Zusehen
 
 *Beim Spielen zusehen* setzt eine Partie mit 4 bis 16 KI-Reichen auf. Es gibt
@@ -290,7 +345,8 @@ reinen KI-Partien – sonst sähe ein Zuschauer die Karten aller Spieler.
 
 Die Rangliste ordnet die Reiche nach **Bevölkerung**, bei Gleichstand nach Welten,
 dann nach Schiffen. Danach wird auch gewertet: Wer beim Rundenlimit die meisten
-Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt.
+Einwohner hat, gewinnt. Ohne Rundenlimit gewinnt, wer als Letzter übrig bleibt –
+oder die letzten Verbündeten gemeinsam (siehe [Bündnisse](#bündnisse)).
 
 Ist die Partie beendet, steht der Gewinner für alle auf dem Bildschirm. *Weiter*
 öffnet einen Dialog dazu, wie es weitergeht: Nur der Gastgeber kann die Partie
@@ -311,8 +367,9 @@ nur zwischen Rückkehr zur Startseite und Bleiben wählen.
 | Karte einpassen | `F` |
 | Nur Eigenes hervorheben | `E` gedrückt halten – alles, was dir nicht gehört, tritt weit zurück. Oder der Flaggen-Knopf oben rechts: Antippen schaltet um (so am Handy), Gedrückthalten nur solange |
 | Auswahl aufheben | `Esc` |
-| Hilfe | `H` |
-| Übersicht aller Tasten | `?` – oder *Tasten* im Menü (Zahnrad) und in der Hilfe |
+| Spielanleitung | `H` – oder *Spielanleitung* im Menü (Zahnrad) |
+| Übersicht aller Tasten | `?` – oder *Tasten* in der Spielanleitung |
+| Bündnisse | Reiter *Rangliste*: *Bündnis anbieten* oder *Geheimbündnis* unter einem Reich; dort auch annehmen, ablehnen, öffentlich machen oder kündigen (ein zweiter Klick bestätigt) |
 | Fenster verschieben / Größe ändern | Titelleiste ziehen zum Verschieben; an jeder Kante oder Ecke ziehen für die Größe |
 | Fenster minimieren | **−** in der Titelleiste oder Doppelklick darauf: Das Fenster wird zum Icon in der Kopfleiste (★ Forschung/Imperium/Rangliste, ☰ Ereignisse/Funk – mit der Zahl ungelesener Funksprüche). Ein Klick auf das Icon holt es an seinen Platz zurück. Position, Größe und Zustand bleiben gespeichert |
 | Funk (Chat) | Reiter *Funk* im Protokollfenster. Ungesehene Nachrichten erscheinen als Hinweis und werden am Reiter gezählt – antippen, um zu antworten. Smileys wie `:)` `:(` `:D` `;)` `<3` werden zu Emojis, ebenso Codes wie `:sad:` `:rocket:` `:thumbsup:`; der 🙂-Knopf neben dem Feld zeigt alle |
