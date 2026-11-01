@@ -2,8 +2,13 @@
 // hole, an empire only sees what its scanners reach, learns where a mouth
 // leads by jumping - and can only travel on the far side as long as the
 // wormhole carries the supply. Without it, there is no flying into the unknown.
-import { createGame, addPlayer, startGame, resolveTurn, setOrders, canReach, buildView } from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { buildView } from '../server/game/intel.js';
+import { canReach } from '../server/game/movement.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { openWormhole, devWormholes, findMouth } from '../server/wormholes.js';
 import { WORMHOLE, holeZone, dist } from '../shared/rules.js';
 

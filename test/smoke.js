@@ -1,7 +1,12 @@
 // Plays a complete game with 16 AI empires and checks the invariants.
-import { createGame, addPlayer, startGame, resolveTurn, buildView, setOrders, canReach } from '../server/game.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { buildView } from '../server/game/intel.js';
+import { canReach } from '../server/game/movement.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 import { habitability, refitTotal, refitCost, dist } from '../shared/rules.js';
-import { runBot } from '../server/bot.js';
+import { runBot } from '../server/ai/bot.js';
 import { generateGalaxy } from '../server/galaxy.js';
 
 const game = createGame('Test');

@@ -49,11 +49,13 @@ for (const k of all) {
 
 // 3) Every key the server or a tool can name must be translatable - otherwise
 //    the bare key shows up in the browser or on the console.
-const { readFile } = await import('node:fs/promises');
-const sources = ['game.js', 'wormholes.js', 'index.js', 'auth.js', 'userstore.js', 'users.js', 'profile.js'];
+const { readFile, readdir } = await import('node:fs/promises');
+// Every server module, wherever it lives - a file split off later is not forgotten.
+const serverDir = new URL('../server/', import.meta.url);
+const sources = (await readdir(serverDir, { recursive: true })).filter(n => n.endsWith('.js'));
 let source = '';
 for (const name of sources) {
-  source += await readFile(new URL('../server/' + name, import.meta.url), 'utf8');
+  source += await readFile(new URL(name, serverDir), 'utf8');
 }
 // Keys travel as key:, error:, return value or error message.
 const KEY = "([a-z]+(?:\\.[A-Za-z]+)+)";

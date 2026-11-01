@@ -3,10 +3,12 @@
 // turns with random orders. Plus the cross-check: the new balance must be
 // fully explained by these items, otherwise money drains away somewhere that
 // no display knows about.
-import {
-  createGame, addPlayer, startGame, setOrders, resolveTurn, buildView
-} from '../server/game.js';
-import { runBot } from '../server/bot.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { buildView } from '../server/game/intel.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
+import { runBot } from '../server/ai/bot.js';
 import { forecast } from '../shared/budget.js';
 import { SHIP_TYPES, TECH_FIELDS } from '../shared/rules.js';
 

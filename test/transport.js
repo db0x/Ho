@@ -1,9 +1,14 @@
 // Transporters: carry up to 5 satellites each from one own world to another.
 // Loading and setting down happen at once; cargo does not fight and goes
 // down with its transporter. The AI builds and uses them too.
-import { createGame, addPlayer, startGame, resolveTurn, setOrders, buildView, fleetStats } from '../server/game.js';
+import { fleetStats } from '../server/game/fleets.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { buildView } from '../server/game/intel.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 import { shipStats, cargoOf, SHIP_DEFS } from '../shared/rules.js';
-import { runBot } from '../server/bot.js';
+import { runBot } from '../server/ai/bot.js';
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };

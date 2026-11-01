@@ -1,6 +1,9 @@
 // The galaxy grows with exploration, but not without end: at most
 // MAX_WORLDS_PER_PLAYER worlds per empire, then it is complete.
-import { createGame, addPlayer, startGame, resolveTurn, MAX_WORLDS_PER_PLAYER } from '../server/game.js';
+import { MAX_WORLDS_PER_PLAYER } from '../server/game/expansion.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };

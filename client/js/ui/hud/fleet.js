@@ -1,0 +1,305 @@
+// Fleets: the panel of a selected fleet with its ships, names and cargo,
+// the fleet rows other panels list - and whether a fleet can go somewhere.
+import {
+  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, supplyNeed
+} from '../../../shared/rules.js';
+import { t } from '../../i18n.js';
+import { courseTarget, portalsOf } from '../../render/courses.js';
+import { shipIcon } from '../../render/ships.js';
+import { openSplit } from '../../ui/split.js';
+import { escapeHtml, fmt, fmt1 } from './format.js';
+
+export const fleetMethods = {
+  fleetPanel(box, f) {
+    if (!f) { box.innerHTML = ''; return; }
+    const v = this.view;
+    this.lastFleetId = f.id;
+    if (!f.mine && !v.spectator) {
+      const pl = v.players.find(q => q.id === f.owner);
+      // Detected means: course and arrival are known, the ships themselves are not.
+      const target = courseTarget(v, f);
+      const whither = target
+        ? `<div class="sel-sub">${t('fleet.courseTo', { planet: target.name ?? t('hole.name') }).replace('<b>', '<b style="color:var(--gold)">')}`
+          + (f.eta ? ' ' + t('fleet.etaSuffix', { turns: t('word.turns', { n: f.eta, count: f.eta }) }) : '')
+          + '</div>'
+        : `<div class="sel-sub">${t('fleet.noCourse')}</div>`;
+      // Big ships are known by name, like at sea - what else flies along is not.
+      const names = f.ships.filter(s => s.name).map(s => escapeHtml(s.name));
+      box.innerHTML = `<div class="sel-head"><div><div class="sel-title">${t('fleet.foreign')}</div>
+        <div class="sel-sub" style="color:${pl?.color}">${pl?.name || '?'}</div>${whither}</div></div>
+        <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>
+        ${names.length ? `<p class="hint-line">${t('fleet.namedSeen', { names: names.join(', ') })}</p>` : ''}`;
+      return;
+    }
+    const groups = {};
+    for (const s of f.ships) (groups[s.type] || (groups[s.type] = [])).push(s);
+    const where = f.at != null ? v.planets[f.at] : null;
+    const destP = f.dest != null ? v.planets[f.dest] : null;
+    const destM = f.hole ? courseTarget(v, f) : null;
+    const st = f.stats;
+    // The path around the black hole counts, not the straight line.
+    const turnsTo = destP || destM
+      ? Math.max(1, Math.ceil(travelDistance(f, destP || destM, holeZone(v.galaxy)) / (st.speed || 1)))
+      : 0;
+
+    box.innerHTML = `
+      <div class="sel-head">
+        <div>
+          <div class="sel-title">${v.spectator
+            ? `<span style="color:${(v.players.find(q => q.id === f.owner) || {}).color}">${(v.players.find(q => q.id === f.owner) || {}).name || '?'}</span> · `
+            : ''}${t('fleet.title', { n: f.ships.length })}</div>
+          <div class="sel-sub">${where ? t('fleet.atPlanet', { planet: where.name }) : t('fleet.enRoute')}
+            ${destP ? ' ' + t('fleet.destSuffix', { planet: destP.name, turns: turnsTo })
+              .replace('<b>', '<b style="color:var(--gold)">') : ''}
+            ${destM ? ' ' + t('fleet.holeSuffix', { turns: turnsTo })
+              .replace('<b>', '<b style="color:#cdb4ff">') : ''}</div>
+        </div>
+      </div>
+      <div class="statgrid cols4">
+        <div class="stat"><div class="k">${t('fleet.speed')}</div><div class="v">${Math.round(st.speed)} ${t('unit.lyPerTurn')}</div></div>
+        <div class="stat"><div class="k">${t('fleet.range')}</div><div class="v">${fmt(st.range)} ${t('unit.ly')}</div></div>
+        <div class="stat"><div class="k">${t('fleet.attack')}</div><div class="v">${st.attack}</div></div>
+        <div class="stat"><div class="k">${t('fleet.hull')}</div><div class="v">${Math.round(st.hp)}</div></div>
+      </div>
+      <div class="sec">
+        <h4>${t('fleet.ships')}</h4>
+        <div class="shiplist">
+          ${f.ships.filter(s => s.name).map(s => `
+            <div class="shipitem named clickable-ship" data-info="${s.type}" data-ship="${s.id}" title="${t('shipinfo.hint')}">
+              <span class="gi" data-t="${s.type}"></span>
+              <span class="si-named"><b class="ship-name">${escapeHtml(s.name)}</b>
+                <span class="muted small">${t(`ship.${s.type}.name`)}</span></span>
+              ${f.mine && !v.spectator ? `<button class="tiny rename" title="${t('fleet.rename')}" aria-label="${t('fleet.rename')}">✎</button>` : ''}
+              <span class="hp">${Math.round(s.hp)}/${Math.round(s.maxHp)} HP</span>
+            </div>`).join('')}
+          ${Object.entries(groups).filter(([type]) => !SHIP_DEFS[type]?.named).map(([type, arr]) => `
+            <div class="shipitem clickable-ship" data-info="${type}" title="${t('shipinfo.hint')}">
+              <span class="gi" data-t="${type}"></span>
+              <span>${arr.length}× ${t(`ship.${type}.name`)}
+                <span class="muted small">(${t('tech.weapons.short')}${arr[0].tech.weapons}/${t('tech.shields.short')}${arr[0].tech.shields}/${t('tech.speed.short')}${arr[0].tech.speed})</span></span>
+              <span class="hp">${Math.round(arr.reduce((a, s) => a + s.hp, 0))} HP</span>
+            </div>`).join('')}
+        </div>
+      </div>
+      ${!f.mine ? '' : `
+      <div class="sec">
+        <h4>${t('fleet.orders')}</h4>
+        <p class="hint-line" style="margin-top:0">${t('fleet.orderHint')}</p>
+        <div class="sel-actions">
+          ${destP || destM ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
+          ${where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1
+            ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
+          ${f.ships.length > 1 ? `<button class="tiny" id="split" title="${t('fleet.splitKey')}">${t('fleet.split')}</button>` : ''}
+        </div>
+        ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
+        ${where ? this.recycleBlock('f:' + f.id) : ''}
+      </div>`}
+      ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
+
+    const col = (f.mine && v.me) ? v.me.color
+      : ((v.players.find(q => q.id === f.owner) || {}).color || '#9fb0c8');
+    for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
+    // The built-in tech of these ships, not the current levels
+    for (const el of box.querySelectorAll('[data-info]')) {
+      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : groups[el.dataset.info][0];
+      el.onclick = (e) => {
+        if (e.target.closest('.rename, .rename-input')) return;
+        this.showShip(el.dataset.info, ship.tech, col);
+      };
+    }
+    for (const b of box.querySelectorAll('.rename')) b.onclick = () => this.rename(b.closest('[data-ship]'), f);
+    const c = box.querySelector('#cancel');
+    if (c) c.onclick = () => this.app.send({ t: 'orders', move: { fleetId: f.id, planetId: null } });
+    const m = box.querySelector('#merge');
+    if (m) m.onclick = () => this.app.send({ t: 'orders', merge: { planetId: f.at } });
+    const sp = box.querySelector('#split');
+    if (sp) sp.onclick = () => openSplit(f, {
+      color: col,
+      // In flight both parts keep the course - say so, with the target.
+      flight: !where ? { target: destP ? destP.name : null } : null,
+      onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
+    });
+    this.wireRefit(box);
+    this.wireRecycle(box);
+    this.wireCargo(box, f);
+  },
+
+  /**
+   * Renaming a big ship right in the list: Enter or leaving the field takes
+   * the name, Escape keeps the old one.
+   */
+  rename(item, f) {
+    const ship = f.ships.find(s => s.id === item.dataset.ship);
+    const label = item.querySelector('.ship-name');
+    if (!ship || !label) return;
+    const input = document.createElement('input');
+    input.className = 'rename-input';
+    input.maxLength = 28;
+    input.value = ship.name;
+    input.setAttribute('aria-label', t('fleet.rename'));
+    label.replaceWith(input);
+    item.querySelector('.rename')?.remove();
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      const name = input.value.trim();
+      input.blur();
+      if (keep && name && name !== ship.name) {
+        this.app.send({ t: 'orders', rename: { shipId: ship.id, name } });
+      } else this.selection();
+    };
+    input.onkeydown = (e) => {
+      // Keys belong to the field - not to the map and its shortcuts.
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      if (e.key === 'Escape') finish(false);
+    };
+    input.onblur = () => finish(true);
+  },
+
+  /**
+   * Hold of the transporters: what is aboard, and - in orbit of an own
+   * world - taking satellites aboard and setting them down. Each direction
+   * has its own counter, capped by what fits or is there.
+   */
+  cargoSection(f, where) {
+    const c = cargoOf(f.ships);
+    if (!c.capacity) return '';
+    const own = where && where.owner === this.view.you;
+    const here = own ? where.defenses || 0 : 0;
+    const max = { load: Math.min(c.room, here), drop: c.used };
+    if (this.cargoFleet !== f.id) { this.cargoFleet = f.id; this.cargoPick = { ...max }; }
+    this.cargoMax = max;
+    for (const k of ['load', 'drop']) this.cargoPick[k] = Math.max(Math.min(1, max[k]), Math.min(this.cargoPick[k], max[k]));
+    const row = (k) => {
+      const off = max[k] ? '' : ' disabled';
+      return `
+        <div class="buildrow">
+          <span class="bq" style="margin-left:0">
+            <button class="tiny" id="cq-${k}-minus"${off}>−</button>
+            <span class="n" id="cq-${k}">${this.cargoPick[k]}</span>
+            <button class="tiny" id="cq-${k}-plus"${off}>+</button>
+          </span>
+          <button class="tiny" id="cargo-${k}"${off}>${t('fleet.' + k)}</button>
+          <span class="small muted">${t('fleet.' + k + 'Max', { n: max[k] })}</span>
+        </div>`;
+    };
+    return `
+      <div class="sec">
+        <h4>${t('fleet.cargo')}</h4>
+        <div class="small">${t('fleet.cargoValue', { used: c.used, capacity: c.capacity })}</div>
+        <div class="meter"><i style="width:${c.used / c.capacity * 100}%;background:var(--gold)"></i></div>
+        ${own ? `
+        <p class="hint-line">${t('fleet.cargoHere', { n: here, count: here })}</p>
+        ${row('load')}
+        ${row('drop')}
+        <p class="hint-line">${t('fleet.cargoHint')}</p>`
+        : `<p class="hint-line">${t('fleet.cargoAway')}</p>`}
+      </div>`;
+  },
+
+  wireCargo(box, f) {
+    for (const k of ['load', 'drop']) {
+      const n = box.querySelector('#cq-' + k);
+      if (!n) continue;
+      const step = (d) => {
+        this.cargoPick[k] = Math.max(1, Math.min(this.cargoMax[k], this.cargoPick[k] + d));
+        n.textContent = this.cargoPick[k];
+      };
+      box.querySelector(`#cq-${k}-minus`).onclick = () => step(-1);
+      box.querySelector(`#cq-${k}-plus`).onclick = () => step(1);
+      box.querySelector('#cargo-' + k).onclick = () =>
+        this.app.send({ t: 'orders', [k]: { fleetId: f.id, count: this.cargoPick[k] } });
+    }
+  },
+
+  /**
+   * A fleet in orbit or incoming. For own fleets, firepower and hull are
+   * shown; for foreign ones only which ships they are.
+   */
+  fleetRow(f, p) {
+    const v = this.view;
+    const pl = v.players.find(q => q.id === f.owner);
+    const color = pl?.color || '#9fb0c8';
+    const target = f.dest != null && f.dest !== p.id ? v.planets[f.dest] : null;
+    const arriving = f.dest === p.id && f.at !== p.id;
+    const turns = arriving ? this.eta(f, p) : null;
+    let right, below = '';
+    if (f.mine) {
+      const hp = f.ships.reduce((a, s) => a + s.hp, 0), max = f.ships.reduce((a, s) => a + s.maxHp, 0);
+      right = `${fmt1(f.stats.attack || 0)} ⚔ · ${fmt(hp)}/${fmt(max)} HP`;
+      below = `<div class="meter"><i style="width:${max ? hp / max * 100 : 0}%;background:${hp / max > 0.5 ? 'var(--good)' : hp / max > 0.25 ? 'var(--gold)' : 'var(--bad)'}"></i></div>`;
+    } else {
+      right = `<span class="muted">${t('fleet.strengthUnknown')}</span>`;
+    }
+    const whither = arriving && Number.isFinite(turns) ? t('fleet.arrivesIn', { turns: t('word.turns', { n: turns, count: turns }) })
+      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : '';
+    return `<div class="fleetrow ${f.mine ? '' : 'foe'}" data-fleet="${f.id}">
+      <div class="fr-top">
+        <span class="dot" style="background:${color}"></span>
+        <span class="fr-name">${f.mine ? t('fleet.own') : escapeHtml(pl?.name || '?')}</span>
+        <span class="hp">${right}</span>
+      </div>
+      ${below}
+      <div class="fr-sub"><span class="fr-comp">${this.composition(f, color)}</span><span>${whither}</span></div>
+    </div>`;
+  },
+
+  /** Turns until a fleet reaches the world - the server names those of foreign fleets. */
+  eta(f, p) {
+    if (!f.mine) return f.eta ?? Infinity;
+    const speed = f.stats?.speed || 0;
+    return speed > 0 ? Math.max(1, Math.ceil(travelDistance(f, p, holeZone(this.view.galaxy)) / speed)) : Infinity;
+  },
+
+  /** Ship types of a fleet as small images with counts. */
+  composition(f, color) {
+    const per = {};
+    for (const s of f.ships) per[s.type] = (per[s.type] || 0) + 1;
+    return SHIP_TYPES.filter(type => per[type]).map(type =>
+      `<span class="comp" title="${per[type]}× ${t(`ship.${type}.name`)}"><span class="ci" data-t="${type}" data-c="${color}"></span>${per[type]}</span>`).join('');
+  },
+
+  /**
+   * Can this fleet go there? Computed as on the server (shared functions from
+   * shared/rules.js) so the UI does not offer something the server would
+   * reject right away.
+   * @returns {string|null} the reason, or null if it is possible
+   */
+  whyNot(f, target) {
+    const v = this.view;
+    if (!f.stats || f.stats.speed <= 0) return t('err.fleetImmobile');
+    const bases = v.planets.filter(q => q.owner === v.you && q.pop > 0.5);
+    if (!bases.length) return t('err.outOfRange', { need: '∞', range: f.stats.range });
+    const need = Math.round(supplyNeed(bases, f, target, holeZone(v.galaxy), portalsOf(v)));
+    if (need > f.stats.range) {
+      return t('err.outOfRange', { need, range: f.stats.range });
+    }
+    return null;
+  },
+
+  /**
+   * "Fleet here" for the most recently selected own fleet. Applies to every
+   * world - including your own: bringing fleets home is defense, and
+   * inhabited own worlds are the stepping stones for range.
+   * It is only hidden when the fleet is already there; if it is not
+   * possible, the reason is shown below instead of a rejection after the click.
+   */
+  courseButton(p) {
+    const f = this.view.fleets.find(x => x.id === this.lastFleetId);
+    if (!this.lastFleetId || !f || !f.mine || f.at === p.id || f.hole === p.id) return '';
+    const reason = this.whyNot(f, p);
+    const button = `<button id="setcourse" class="primary"${reason ? ' disabled' : ''}>`
+      + `${t(typeof p.id === 'string' ? 'hole.courseButton' : 'planet.courseButton', { n: f.ships.length })}</button>`;
+    return `<div class="sel-actions">${button}</div>`
+      + (reason ? `<p class="hint-line" style="color:var(--bad)">${t('fleet.cannotReach', { reason })}</p>` : '');
+  },
+
+  wireCourse(box, p) {
+    const b = box.querySelector('#setcourse');
+    if (b) b.onclick = () => this.app.order(p.id);
+  }
+};

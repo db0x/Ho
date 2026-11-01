@@ -1,7 +1,10 @@
 // Recycling: own ships and satellites are taken apart at an own shipyard -
 // right away, for money, for metal. Only once researched; every level makes
 // it cheaper and more thorough, but never past 80% metal and 5% cost.
-import { createGame, addPlayer, startGame, resolveTurn, setOrders } from '../server/game.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { setOrders } from '../server/game/orders.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 import {
   recycleRates, recycleValue, shipCost, techMaxLevel, TECH_START_LEVEL,
   RECYCLE_MIN_LEVEL, RECYCLE_FULL_LEVEL, RECYCLE_MAX_METAL, RECYCLE_MIN_COST, SHIP_TYPES

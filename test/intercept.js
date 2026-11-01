@@ -1,7 +1,9 @@
 // Interception: whoever departs from an orbit holding an armed enemy fights
 // along for INTERCEPT_ROUNDS rounds and is then gone. Previously every scout
 // escaped because movement is resolved before combat.
-import { createGame, addPlayer, startGame, resolveTurn } from '../server/game.js';
+import { createGame, startGame } from '../server/game/game.js';
+import { addPlayer } from '../server/game/players.js';
+import { resolveTurn } from '../server/game/turn.js';
 import { shipStats, INTERCEPT_ROUNDS } from '../shared/rules.js';
 
 let errors = 0;
