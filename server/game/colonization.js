@@ -1,6 +1,7 @@
 // Taking worlds: colony ships landing on free worlds, settlers unloading on
 // own ones, and invading an enemy world whose defenses have fallen.
 import { planetCapacity } from '../../shared/rules.js';
+import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
 import { planetById, playerById } from './game.js';
 
@@ -13,17 +14,23 @@ export function orderUnload(game, player, o) {
   }
 }
 
-/** Whoever holds the orbit alone takes the world - or settles it. */
+/**
+ * Whoever holds the orbit takes the world - or settles it. Alone, or
+ * together with allies: then the owner settles its own world, and on a free
+ * one the first with settlers aboard lands.
+ */
 export function colonize(game, entries) {
   for (const planet of game.galaxy.planets) {
     const present = presentOwners(game, planet);
-    if (present.length !== 1) continue;
-    const owner = present[0];
+    const owner = holder(game, planet, present);
+    if (owner == null) continue;
     const p = playerById(game, owner);
     if (!p || !p.alive) continue;
     const cap = planetCapacity(planet);
 
     if (planet.owner && planet.owner !== owner) {
+      // An ally's world is safe, even with its battery broken.
+      if (!hostile(game, owner, planet.owner)) continue;
       // Enemy world without remaining defenses: invasion
       const armed = game.fleets.some(f => f.owner === owner && f.at === planet.id && f.ships.some(s => s.attack > 0));
       if (armed) {
@@ -71,6 +78,21 @@ export function colonize(game, entries) {
   }
   for (const p of game.players) p.orders.unload = {};
   cleanupFleets(game);
+}
+
+/**
+ * Who acts in this orbit: nobody while enemies face each other; otherwise
+ * the owner if present, else an armed one (who may invade), else the first
+ * with settlers aboard.
+ */
+function holder(game, planet, present) {
+  if (present.length === 1) return present[0];
+  if (!present.length || present.some(a => present.some(b => hostile(game, a, b)))) return null;
+  if (present.includes(planet.owner)) return planet.owner;
+  const here = present.map(o => game.fleets.filter(f => f.owner === o && f.at === planet.id));
+  const armed = present.find((o, i) => here[i].some(f => f.ships.some(s => s.attack > 0)));
+  if (planet.owner && armed != null) return armed;
+  return present.find((o, i) => here[i].some(f => f.ships.some(s => s.colonists > 0))) ?? present[0];
 }
 
 /**

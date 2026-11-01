@@ -4,6 +4,7 @@
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
 import { round1 } from './combat.js';
+import { teamOf, alliesOf, diplomacyView } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
 import { planetById, hostOf, pauseView } from './game.js';
 import { visibleEntry, logEntry } from './log.js';
@@ -11,11 +12,13 @@ import { visibleEntry, logEntry } from './log.js';
 export function updateVisibility(game) {
   for (const p of game.players) {
     // Collect own worlds and fleets once: the map grows, otherwise every new
-    // world would be checked against every other here.
-    const mine = game.galaxy.planets.filter(q => q.owner === p.id);
-    const myFleets = game.fleets.filter(f => f.owner === p.id);
+    // world would be checked against every other here. Allies share what
+    // they see - their worlds and fleets count as eyes too.
+    const team = teamOf(game, p.id);
+    const mine = game.galaxy.planets.filter(q => team.includes(q.owner));
+    const myFleets = game.fleets.filter(f => team.includes(f.owner));
     for (const planet of game.galaxy.planets) {
-      const presence = planet.owner === p.id || myFleets.some(f => f.at === planet.id);
+      const presence = team.includes(planet.owner) || myFleets.some(f => f.at === planet.id);
       if (presence) {
         p.explored.add(planet.id);
         p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn);
@@ -26,7 +29,7 @@ export function updateVisibility(game) {
     // was free would stay free on the map, even if someone settled there
     // long ago.
     for (const planet of game.galaxy.planets) {
-      if (planet.owner === p.id || myFleets.some(f => f.at === planet.id)) continue;
+      if (team.includes(planet.owner) || myFleets.some(f => f.at === planet.id)) continue;
       const seen = mine.some(q => dist(q, planet) < SCAN.world)
         || myFleets.some(f => dist(f, planet) < SCAN.fleet);
       if (seen) {
@@ -65,19 +68,30 @@ function defenseStats(planet) {
 }
 
 /**
- * Does this empire see a foreign fleet - near one of its worlds or fleets?
- * Then it knows course, arrival and the number of ships, not what they are.
- * The AI goes by the same rule.
+ * Does this empire see a foreign fleet - near one of its worlds or fleets,
+ * or those of its allies? Then it knows course, arrival and the number of
+ * ships, not what they are. The AI goes by the same rule.
  */
 export function inSight(game, playerId, f) {
-  return game.galaxy.planets.some(q => q.owner === playerId && dist(q, f) < 300)
-    || game.fleets.some(g => g.owner === playerId && g.ships.length && dist(g, f) < 240);
+  const team = teamOf(game, playerId);
+  return game.galaxy.planets.some(q => team.includes(q.owner) && dist(q, f) < 300)
+    || game.fleets.some(g => team.includes(g.owner) && g.ships.length && dist(g, f) < 240);
+}
+
+/** Does this empire see the fleet - its own, in a watched orbit, or in sight? */
+export function seesFleet(game, playerId, f) {
+  if (f.owner === playerId) return true;
+  const team = teamOf(game, playerId);
+  if (f.at != null && (team.includes(planetById(game, f.at).owner)
+    || game.fleets.some(g => team.includes(g.owner) && g.at === f.at && g.ships.length))) return true;
+  return inSight(game, playerId, f);
 }
 
 export function buildView(game, player) {
-  const vis = new Set();   // planets with current sight
+  const vis = new Set();   // planets with current sight - own and allied eyes
+  const team = teamOf(game, player.id);
   for (const planet of game.galaxy.planets) {
-    if (planet.owner === player.id || game.fleets.some(f => f.owner === player.id && f.at === planet.id)) vis.add(planet.id);
+    if (team.includes(planet.owner) || game.fleets.some(f => team.includes(f.owner) && f.at === planet.id)) vis.add(planet.id);
   }
 
   const planets = game.galaxy.planets.map(p => {
@@ -145,6 +159,7 @@ export function buildView(game, player) {
           ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
         mine: false, count: f.ships.length,
+        ...(team.includes(f.owner) ? { allied: true } : {}),
         // A big ship is known by its name, like at sea.
         ships: f.ships.map(s => ({ id: s.id, type: s.type, ...(s.name ? { name: s.name } : {}) })),
         stats: { count: f.ships.length }
@@ -156,6 +171,7 @@ export function buildView(game, player) {
     turn: game.turn,
     state: game.state,
     winner: game.winner || null,
+    winners: game.winners || null,
     you: player.id,
     deadline: game.turnDeadline,
     host: hostOf(game)?.id ?? null,
@@ -163,6 +179,7 @@ export function buildView(game, player) {
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     capitalShips: game.settings.capitalShips !== false,
+    alliances: game.settings.alliances !== false,
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -184,8 +201,10 @@ export function buildView(game, player) {
       ready: player.ready,
       homeworld: player.homeworld,
       builds: player.orders.builds,
-      refit: player.orders.refit
+      refit: player.orders.refit,
+      allies: alliesOf(game, player.id)
     },
+    diplomacy: diplomacyView(game, player.id),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
@@ -230,6 +249,7 @@ export function buildSpectatorView(game) {
     turn: game.turn,
     state: game.state,
     winner: game.winner || null,
+    winners: game.winners || null,
     spectator: true,
     code: game.id,
     you: null,
@@ -240,6 +260,7 @@ export function buildSpectatorView(game) {
     mode: game.settings.mode || 'classic',
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     capitalShips: game.settings.capitalShips !== false,
+    alliances: game.settings.alliances !== false,
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -248,6 +269,7 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, null),
+    diplomacy: diplomacyView(game, null),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       level: p.level,                      // spectators see how well each AI plays

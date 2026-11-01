@@ -4,6 +4,7 @@ import {
   habitability, planetCapacity, terraformable, terraformFullCost, terraLimits, IDEAL, planetIncome,
   planetMining, batteryStats
 } from '../../../shared/rules.js';
+import { isAlly } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { SHIELD_MIN } from '../../render/fx.js';
 import { planetThumb } from '../../render/planets.js';
@@ -52,6 +53,7 @@ export const planetMethods = {
         <div>
           <div class="sel-title">${p.name}${p.isHomeworld ? ' ★' : ''}</div>
           <div class="sel-sub">${ownerP ? `<span style="color:${ownerP.color}">${ownerP.name}</span>` : t('planet.unsettled')}
+            ${isAlly(v, p.owner) ? ` · <span class="dip-state allied">${t('dip.ally')}</span>` : ''}
             ${p.known === 'memory' ? ` · ${t('planet.memory', { turn: p.turn })}` : ''}</div>
         </div>
       </div>

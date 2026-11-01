@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   voice: false,        // CB radio open from the start (only if the server offers it)
   wormholes: true,     // wormholes open now and then in the course of the game
   capitalShips: true,  // destroyers can be built; off = classic Ho!!
+  alliances: true,     // empires may ally (diplomacy.js); off = everyone against everyone
   seed: null
 };
 
@@ -44,6 +45,12 @@ export function createGame(hostName) {
     nextFleetId: 1,
     nextShipId: 1,
     log: [],
+    // Diplomacy (diplomacy.js): alliances, open offers, offers turned down,
+    // and what was agreed during the turn - it goes into the turn's log.
+    alliances: [],
+    offers: [],
+    refusals: [],
+    diplomacyLog: [],
     turnDeadline: null,
     // Paused by the host: { by, name, left } - left is what remained of the
     // turn timer (ms) or null without one. No turn resolves while paused.
@@ -169,6 +176,7 @@ export function continueGame(game, extraTurns) {
   game.settings.maxTurns = Math.min(999, game.turn + roundedTurns - 1);
   game.state = 'running';
   game.winner = null;
+  game.winners = null;
   for (const player of game.players) player.ready = false;
   armTurnTimer(game);
   return true;

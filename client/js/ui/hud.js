@@ -110,6 +110,7 @@ export class Hud {
     }
     this.empire();
     this.players();
+    this.noticeOffers();
     // Skip panels with sliders while dragging (see bindStatic)
     if (!this.dragging) { this.research(); this.selection(); }
   }

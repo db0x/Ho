@@ -3,6 +3,7 @@
 import {
   travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, supplyNeed
 } from '../../../shared/rules.js';
+import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { courseTarget, portalsOf } from '../../render/courses.js';
 import { shipIcon } from '../../render/ships.js';
@@ -272,7 +273,7 @@ export const fleetMethods = {
   whyNot(f, target) {
     const v = this.view;
     if (!f.stats || f.stats.speed <= 0) return t('err.fleetImmobile');
-    const bases = v.planets.filter(q => q.owner === v.you && q.pop > 0.5);
+    const bases = v.planets.filter(q => suppliesMe(v, q.owner) && q.pop > 0.5);
     if (!bases.length) return t('err.outOfRange', { need: '∞', range: f.stats.range });
     const need = Math.round(supplyNeed(bases, f, target, holeZone(v.galaxy), portalsOf(v)));
     if (need > f.stats.range) {

@@ -5,8 +5,11 @@ import {
   holeZone, clamp, shipStats, planetCapacity, supplyDistance, travelDistance, shipCost, batteryStats,
   dist, COMBAT_ROUNDS
 } from '../../shared/rules.js';
+import { allied } from '../game/diplomacy.js';
 import { fleetStats } from '../game/fleets.js';
 import { playerById } from '../game/game.js';
+import { supplyBases } from '../game/movement.js';
+import { friendly, knownAllies } from './diplomacy.js';
 import { memory, perceive, review } from './memory.js';
 import { chooseRival } from './war.js';
 
@@ -42,7 +45,9 @@ export function survey(game, bot) {
   const mine = planets.filter(p => p.owner === bot.id);
   const known = planets.filter(p => bot.explored.has(p.id));
   const openWorlds = known.filter(p => !p.owner);
-  const enemyWorlds = known.filter(p => p.owner && p.owner !== bot.id);
+  // Allies' worlds are no targets - unless notice was given, or this empire
+  // is plotting against them (diplomacy.js).
+  const enemyWorlds = known.filter(p => p.owner && p.owner !== bot.id && !friendly(game, bot, p.owner));
   const early = game.turn < 30;
 
   const threatened = perceive(game, bot, ai, mine, enemyWorlds);
@@ -64,7 +69,8 @@ export function survey(game, bot) {
   // Free worlds: which ones can the colony ships reach, and which ones are
   // known but out of reach? For the latter, range gets researched.
   const colonyRange = shipStats('colony', bot.tech).range;
-  const home = mine.filter(p => p.pop > 0.5);
+  // Supply reaches out from own inhabited worlds and those of allies.
+  const home = supplyBases(game, bot.id);
   const settleable = openWorlds.filter(p => planetCapacity(p) >= 1
     && !(hard && (ai.learn.danger[p.id] || 0) > game.turn));
   const inRange = settleable.filter(p => supplyDistance(home, p, zone) <= colonyRange);
@@ -100,9 +106,11 @@ export function assessEnemies(s) {
   // sieging is pointless, it has to be broken in one move.
   const homeFleet = new Map();
   for (const f of game.fleets) {
-    if (f.at === null || f.at === undefined) continue;
+    // Own guests in an ally's orbit are no defense against us.
+    if (f.at === null || f.at === undefined || f.owner === bot.id) continue;
     const pl = planets[f.at];
-    if (!pl || pl.owner !== f.owner) continue;
+    // An ally's fleet in the orbit defends the world as well.
+    if (!pl || !pl.owner || (pl.owner !== f.owner && !allied(game, pl.owner, f.owner))) continue;
     homeFleet.set(f.at, (homeFleet.get(f.at) || 0) + f.ships.reduce((a, s) => a + s.maxHp, 0));
   }
   // Hard: armed fleets of the owner that can be there within two turns count
@@ -124,7 +132,9 @@ export function assessEnemies(s) {
     const bs = holder ? batteryStats(p.pop, holder.tech) : null;
     let hp = bs ? bs.hp : 0;
     if (p.defenses) for (const s of p.defenses) hp += s.maxHp;
-    for (const r of rescuers.get(p.owner) || []) {
+    // Known allies of the owner come to the rescue too - a public alliance deters.
+    const helpers = game.alliances.length ? [p.owner, ...knownAllies(game, bot, p.owner)] : [p.owner];
+    for (const r of helpers.flatMap(o => o === bot.id ? [] : rescuers.get(o) || [])) {
       if (r.f.at !== p.id && (r.f.dest == null || r.f.dest === p.id) && dist(r.f, p) <= r.reach) hp += r.hp;
     }
     defense.set(p.id, hp + (homeFleet.get(p.id) || 0));
@@ -155,7 +165,7 @@ export function assessEnemies(s) {
   const leader = top && top.id !== bot.id && top.stats.pop / totalPop > 0.25 && living.length > 2
     ? top.id : null;
 
-  ai.rival = chooseRival(ai, P, enemyWorlds, distance, leader);
+  ai.rival = chooseRival(ai, P, enemyWorlds, distance, leader, o => friendly(game, bot, o));
 
   // What is an enemy world worth - from the point of view of exactly this empire?
   const value = p => {
@@ -166,6 +176,8 @@ export function assessEnemies(s) {
     if (o === leader) w *= 1 + P.vsLeader;
     if ((worldsLeft.get(o) || 99) <= BATTERED) w *= 1.8;
     if (P.carrion && ai.fresh.has(p.id)) w *= 2.5;
+    // The ally it plots against: that is what the fleets gather for.
+    if (ai.plot?.id === o) w *= 3;
     return w;
   };
 

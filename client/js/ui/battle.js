@@ -71,7 +71,7 @@ function action(a) {
 }
 
 /**
- * @param {{battle:object, planet:object, players:object[], you:string|null}} o
+ * @param {{battle:object, planet:object, players:object[], you:string|null, alliances?:object[]}} o
  */
 export function openBattle(o) {
   if (!o?.battle) return;
@@ -423,9 +423,13 @@ function status(T, hp) {
     if (done) {
       const remaining = battle.sides.filter((_, k) =>
         battle.units.some((u, i) => u[0] === k && !Number.isFinite(tl.death[i]) && !tl.flee.ids.has(i)));
+      // Allies left standing together have won together.
+      const together = remaining.length > 1 && remaining.every((a, i) => remaining.slice(i + 1).every(b =>
+        (st.alliances || []).some(x => (x.a === a && x.b === b) || (x.a === b && x.b === a))));
       res.textContent = remaining.length === 1
         ? t('battle.winner', { player: player(remaining[0]).name })
-        : t('battle.draw');
+        : together ? t('battle.winners', { players: remaining.map(id => player(id).name).join(' & ') })
+          : t('battle.draw');
     }
   }
 }

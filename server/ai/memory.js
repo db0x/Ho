@@ -2,6 +2,7 @@
 // worlds, approaching fleets, fighting at the neighbors - and, for hard
 // empires, what its earlier strikes taught it.
 import { planetById } from '../game/game.js';
+import { friendly } from './diplomacy.js';
 import { PERSONAS } from './personas.js';
 
 /**
@@ -69,7 +70,8 @@ export function perceive(game, bot, ai, mine, enemyWorlds) {
 
   const threatened = new Map();
   for (const f of game.fleets) {
-    if (f.owner === bot.id) continue;
+    // Allies come as guests - unless notice was given.
+    if (f.owner === bot.id || friendly(game, bot, f.owner)) continue;
     const target = f.dest != null ? f.dest : f.at;
     if (target == null || !now.has(target)) continue;
     const fire = f.ships.reduce((a, s) => a + s.attack, 0);

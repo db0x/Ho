@@ -1,9 +1,11 @@
-// The other empires: the ranking for players, and the full table with tech
-// and treasuries for spectators.
+// The other empires: the ranking with diplomacy for players - offering,
+// accepting and ending alliances - and the full table with tech and
+// treasuries for spectators.
 import { TECH_FIELDS } from '../../../shared/rules.js';
+import { allianceOf, alliesOf } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { avatarHtml } from '../../ui/avatar.js';
-import { fmt1, statsText, fmt } from './format.js';
+import { fmt1, statsText, fmt, escapeHtml } from './format.js';
 
 const $ = s => document.querySelector(s);
 
@@ -28,8 +30,79 @@ export const playersMethods = {
                    ].filter(Boolean).join(' · ')}</small>
         </span>
         <span class="num"><b>${p.alive ? t('word.pop', { n: fmt1(p.stats.pop) }) : t('rank.out')}</b></span>
-      </div>`;
+      </div>${this.diplomacyRow(p)}`;
     }).join('');
+    this.wireDiplomacy(box);
+  },
+
+  /**
+   * Under every other empire: what binds us, what was offered - and the
+   * buttons that go with it. Plus the alliances among the others, as far as
+   * we know them.
+   */
+  diplomacyRow(p) {
+    const v = this.view;
+    // Our own alliances show under each partner - not again under us.
+    if (!p.alive || v.spectator || p.id === v.you || v.alliances === false) return '';
+    const name = id => escapeHtml(v.players.find(q => q.id === id)?.name || '?');
+    const others = alliesOf(v, p.id).filter(x => x.id !== v.you)
+      .map(x => (x.alliance.secret ? '🔒 ' : '') + name(x.id));
+    const known = others.length ? `<div class="dip-known">${t('dip.alliedWith', { names: others.join(', ') })}</div>` : '';
+    if (!v.me?.id) return known ? `<div class="dip">${known}</div>` : '';
+    const d = v.diplomacy || { offers: [], refusedBy: [] };
+    const btn = (action, label, extra = '') =>
+      `<button class="tiny" data-dip="${action}" data-with="${p.id}"${extra}>${label}</button>`;
+    const x = allianceOf(v, v.you, p.id);
+    const incoming = d.offers.find(o => o.from === p.id && o.to === v.you);
+    const outgoing = d.offers.find(o => o.from === v.you && o.to === p.id);
+    let line;
+    if (x && x.endsAt != null) {
+      line = `<span class="dip-state ending">${t('dip.ending', { n: Math.max(0, x.endsAt - v.turn), count: Math.max(0, x.endsAt - v.turn) })}</span>`;
+    } else if (x) {
+      line = `<span class="dip-state allied" title="${escapeHtml(t(x.secret ? 'dip.secretTip' : 'dip.publicTip'))}">${t(x.secret ? 'dip.alliedSecret' : 'dip.allied')}</span>
+        ${x.secret ? btn('announce', t('dip.announce'), ` title="${escapeHtml(t('dip.announceTip'))}"`) : ''}
+        ${btn('end', t('dip.end'), ` data-confirm="${escapeHtml(t('dip.endConfirm'))}" title="${escapeHtml(t('dip.endTip'))}"`)}`;
+    } else if (incoming) {
+      line = `<span class="dip-state offer">${t(incoming.secret ? 'dip.offeredSecret' : 'dip.offered')}</span>
+        ${btn('accept', t('dip.accept'))}${btn('decline', t('dip.decline'))}`;
+    } else if (outgoing) {
+      line = `<span class="dip-state">${t(outgoing.secret ? 'dip.sentSecret' : 'dip.sent')}</span>${btn('withdraw', t('dip.withdraw'))}`;
+    } else {
+      const refused = d.refusedBy?.find(r => r.id === p.id);
+      const off = refused ? ` disabled title="${escapeHtml(t('dip.refused', { turn: refused.until }))}"` : '';
+      line = btn('offer', t('dip.offer'), off || ` title="${escapeHtml(t('dip.offerTip'))}"`)
+        + btn('offer', t('dip.offerSecret'), off || ` data-secret="1" title="${escapeHtml(t('dip.offerSecretTip'))}"`);
+    }
+    return `<div class="dip">${known}<div class="dip-line">${line}</div></div>`;
+  },
+
+  wireDiplomacy(box) {
+    for (const b of box.querySelectorAll('[data-dip]')) {
+      b.onclick = () => {
+        // Ending an alliance takes a second click - a slip should not start a war.
+        if (b.dataset.confirm && !b.classList.contains('armed')) {
+          b.classList.add('armed');
+          b.textContent = b.dataset.confirm;
+          return;
+        }
+        this.app.send({ t: 'diplomacy', action: b.dataset.dip, with: b.dataset.with, secret: !!b.dataset.secret });
+      };
+    }
+  },
+
+  /** A new offer of an alliance pops up as a message - a tap opens the list. */
+  noticeOffers() {
+    const v = this.view;
+    const now = new Set((v.diplomacy?.offers || []).filter(o => o.to === v.you).map(o => o.from));
+    const before = this.offersSeen || new Set();
+    this.offersSeen = now;
+    for (const id of now) {
+      if (before.has(id)) continue;
+      const p = v.players.find(q => q.id === id);
+      const o = v.diplomacy.offers.find(x => x.from === id && x.to === v.you);
+      this.toast(t(o.secret ? 'dip.toastSecret' : 'dip.toast', { player: p?.name || '?' }), p?.color || null,
+        () => document.querySelector('#leftdock .tabs button[data-tab="players"]')?.click(), '▶ ' + t('dip.toastOpen'));
+    }
   },
 
   /** Table of all empires - the most interesting part of the picture when spectating. */
@@ -37,6 +110,7 @@ export const playersMethods = {
     const v = this.view;
     const rows = ranking(v.players);
     const maxPop = Math.max(1, ...rows.map(p => p.stats.pop));
+    const name = id => v.players.find(q => q.id === id)?.name || '?';
     $('#tab-research').innerHTML = `<div class="league">${rows.map(p => `
       <div class="row ${p.alive ? '' : 'dead'}">
         <div class="head">
@@ -49,6 +123,8 @@ export const playersMethods = {
         <div class="bar"><i style="width:${Math.round(p.stats.pop / maxPop * 100)}%;background:${p.color}"></i></div>
         <div class="tech">${TECH_FIELDS.map(f => t(`tech.${f}.short`) + p.tech[f]).join(' ')}
           · ${fmt(p.money)} ${t('unit.cr')} · ${fmt(p.metal)} ${t('unit.metal')}</div>
+        ${alliesOf(v, p.id).length ? `<div class="dip-known">${t('dip.alliedWith', {
+          names: escapeHtml(alliesOf(v, p.id).map(x => (x.alliance.secret ? '🔒 ' : '') + name(x.id)).join(', ')) })}</div>` : ''}
       </div>`).join('')}</div>`;
   }
 };

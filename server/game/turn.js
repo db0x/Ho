@@ -4,10 +4,11 @@ import { cargoOf } from '../../shared/rules.js';
 import { wormholeTurn, spotWormholes } from '../wormholes.js';
 import { colonize } from './colonization.js';
 import { fightBattles } from './combat.js';
+import { exposeAlliances, settleDiplomacy, united } from './diplomacy.js';
 import { runEconomy } from './economy.js';
 import { maybeExpand } from './expansion.js';
 import { armTurnTimer } from './game.js';
-import { updateVisibility } from './intel.js';
+import { updateVisibility, seesFleet } from './intel.js';
 import { pushLog } from './log.js';
 import { moveFleets } from './movement.js';
 import { research } from './research.js';
@@ -51,6 +52,8 @@ export function resolveTurn(game) {
   wormholeTurn(game, entries);
   updateVisibility(game);
   spotWormholes(game, entries);
+  // Allied fleets sharing an orbit in peace give a secret alliance away.
+  if (game.alliances.length) exposeAlliances(game, entries, seesFleet);
   for (const p of game.players) {
     const planets = game.galaxy.planets.filter(q => q.owner === p.id);
     p.stats.planets = planets.length;
@@ -70,6 +73,9 @@ export function resolveTurn(game) {
     }
   }
 
+  // What was agreed during the turn, and alliances whose notice runs out.
+  settleDiplomacy(game, entries);
+
   game.turn++;
   game.lastTurnAt = Date.now();
   for (const p of game.players) p.ready = false;
@@ -80,6 +86,13 @@ export function resolveTurn(game) {
     game.state = 'over';
     game.winner = alive[0].id;
     pushLog(game, [{ type: 'victory', key: 'log.victory', params: { player: alive[0].name } }]);
+  } else if (united(game, alive.map(p => p.id))) {
+    // Only allies are left: they rule the galaxy together.
+    game.state = 'over';
+    const ranked = alive.slice().sort((a, b) => b.stats.pop - a.stats.pop);
+    game.winner = ranked[0].id;
+    game.winners = ranked.map(p => p.id);
+    pushLog(game, [{ type: 'victory', key: 'log.jointVictory', params: { players: ranked.map(p => p.name).join(' & ') } }]);
   } else if (game.settings.maxTurns && game.turn > game.settings.maxTurns) {
     game.state = 'over';
     const best = alive.sort((a, b) => b.stats.pop - a.stats.pop)[0];

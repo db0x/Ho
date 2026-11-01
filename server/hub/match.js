@@ -1,7 +1,11 @@
-// A running game: orders, being done with the turn, pausing, extending a
-// finished game, the chat - and leaving it, on purpose or because the
-// connection was lost.
-import { hostOf, pauseGame, resumeGame, continueGame } from '../game/game.js';
+// A running game: orders, diplomacy, being done with the turn, pausing,
+// extending a finished game, the chat - and leaving it, on purpose or
+// because the connection was lost.
+import { answerOffers } from '../ai/diplomacy.js';
+import {
+  offerAlliance, answerOffer, withdrawOffer, endAlliance, announceAlliance
+} from '../game/diplomacy.js';
+import { hostOf, pauseGame, resumeGame, continueGame, playerById } from '../game/game.js';
 import { buildView } from '../game/intel.js';
 import { setOrders } from '../game/orders.js';
 import { removePlayer } from '../game/players.js';
@@ -18,6 +22,27 @@ export const matchHandlers = {
     if (r?.recycled) send(ws, { t: 'recycled', ...r.recycled });
     // Orders change only this player's view - the others see them at the end of the turn.
     send(ws, { t: 'view', view: buildView(game, me) });
+  },
+
+  diplomacy({ ws, game, me }, msg) {
+    if (!game || !me || game.state !== 'running' || !me.alive) return;
+    const other = String(msg.with ?? '');
+    const actions = {
+      offer: () => offerAlliance(game, me, other, msg.secret === true),
+      accept: () => answerOffer(game, me, other, true),
+      decline: () => answerOffer(game, me, other, false),
+      withdraw: () => withdrawOffer(game, me, other),
+      end: () => endAlliance(game, me, other),
+      announce: () => announceAlliance(game, me, other)
+    };
+    if (!Object.hasOwn(actions, msg.action)) return;
+    const r = actions[msg.action]();
+    if (r?.error) send(ws, { t: 'notice', key: r.error });
+    // An AI does not keep anyone waiting - it answers right away.
+    const bot = playerById(game, other);
+    if (bot?.isBot && bot.alive) answerOffers(game, bot);
+    // Alliances change what everyone sees: shared sight, a public announcement.
+    broadcastView(game);
   },
 
   ready({ game, me }, msg) {

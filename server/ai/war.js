@@ -7,6 +7,8 @@ import { planetById } from '../game/game.js';
 import { inSight } from '../game/intel.js';
 import { canReach } from '../game/movement.js';
 import { setOrders } from '../game/orders.js';
+import { allianceOf } from '../game/diplomacy.js';
+import { friendly } from './diplomacy.js';
 import { reachable } from './fleets.js';
 import { HIT_RATE, BATTERED } from './situation.js';
 
@@ -15,7 +17,7 @@ import { HIT_RATE, BATTERED } from './situation.js';
  * chosen, it stays the rival for a while - otherwise the empire keeps switching
  * fronts and never gathers enough.
  */
-export function chooseRival(ai, P, enemyWorlds, distance, leader) {
+export function chooseRival(ai, P, enemyWorlds, distance, leader, friend) {
   const points = {};
   for (const p of enemyWorlds) {
     const d = distance.get(p.id);
@@ -25,7 +27,8 @@ export function chooseRival(ai, P, enemyWorlds, distance, leader) {
   if (leader) points[leader] = (points[leader] || 0) + 3 * P.vsLeader;
   if (ai.rival && points[ai.rival] != null) points[ai.rival] += 2;
   let best = null;
-  for (const [o, s] of Object.entries(points)) if (!best || s > best.s) best = { o, s };
+  // An ally is nobody's rival, however much it once hurt us.
+  for (const [o, s] of Object.entries(points)) if (!friend(o) && (!best || s > best.s)) best = { o, s };
   return best ? best.o : null;
 }
 
@@ -38,7 +41,7 @@ export function planCampaign(s) {
   let plan = ai.campaign;
   if (plan) {
     const z = planetById(game, plan.targetId);
-    const open = z && z.owner && z.owner !== bot.id && bot.explored.has(z.id);
+    const open = z && z.owner && z.owner !== bot.id && !friendly(game, bot, z.owner) && bot.explored.has(z.id);
     // Waited too long, or the target arms faster than we can rebuild:
     // drop it and avoid it for a while.
     const tooCostly = open && price(z) * margin > (power + reinforcements) * 1.5;
@@ -64,7 +67,11 @@ export function planCampaign(s) {
     // everyone only nibbles at fringe colonies and the core stays rigid.
     const costScale = Math.max(60, potential / 25);
     let best = null, cheapest = null;
-    for (const p of enemyWorlds) {
+    // Plotting against an ally: its worlds are the only targets, as long as
+    // one of them is within reach and affordable.
+    const plotted = ai.plot && enemyWorlds.filter(p => p.owner === ai.plot.id
+      && distance.get(p.id) <= reach && price(p) * margin <= potential);
+    for (const p of plotted?.length ? plotted : enemyWorlds) {
       const d0 = distance.get(p.id);
       if (d0 > reach || (ai.avoided[p.id] || 0) > game.turn) continue;
       if (revengeOnly && (ai.grudge[p.owner] || 0) < 2) continue;
@@ -109,13 +116,19 @@ export function frontWorld(s) {
  * satellites), it turns back to the rally point instead of breaking on it.
  */
 export function recall(s) {
-  const { game, bot, planets, strikePower, price, margin, camp, rallyPoint, yard } = s;
+  const { game, bot, planets, strikePower, price, margin, camp, rallyPoint, yard, ai } = s;
   for (const f of game.fleets) {
     if (f.owner !== bot.id || f.dest == null) continue;
     const target = planets[f.dest];
     if (!target || !target.owner || target.owner === bot.id) continue;
+    // Allied since the fleet set out: no reason to go there anymore. A guest
+    // gathering in the orbit of the ally it plots against flies on - it is
+    // safe there while the alliance holds.
+    const peace = friendly(game, bot, target.owner);
+    const x = ai.plot?.id === target.owner ? allianceOf(game, bot.id, target.owner) : null;
+    if (x && x.endsAt == null) continue;
     const strike = strikePower(f);
-    if (strike <= 0 || price(target) * margin <= strike * 1.25) continue;
+    if (!peace && (strike <= 0 || price(target) * margin <= strike * 1.25)) continue;
     const back = (camp && camp.rally) || rallyPoint || yard;
     if (back && back.id !== f.dest && canReach(game, f, back).ok) {
       setOrders(game, bot, { move: { fleetId: f.id, planetId: back.id } });
@@ -230,7 +243,7 @@ export function formPacks(s) {
 export function combatTarget(s, fleet, st, far) {
   const {
     garrison, threatened, yard, camp, margin, game, price, solo, enemyWorlds, distance, ai,
-    worldsLeft, value, guard, rallyPoint
+    worldsLeft, value, guard, rallyPoint, bot
   } = s;
   const strike = st.attack * COMBAT_ROUNDS * HIT_RATE;
   // Garrison: whoever is threatened at home stays where they are needed.
@@ -239,6 +252,15 @@ export function combatTarget(s, fleet, st, far) {
   if (yard && fleet.at === yard.id && threatened.has(yard.id)) return null;
 
   if (camp && strike >= camp.cost * margin && canReach(game, fleet, camp.target).ok) return camp.target;
+
+  // Plotting against an ally: gather in its orbit as a guest, before any
+  // hunt of its own - safe while the alliance holds, and once notice runs
+  // out the battle starts right there.
+  const plot = camp && ai.plot && camp.target.owner === ai.plot.id ? allianceOf(game, bot.id, ai.plot.id) : null;
+  if (plot && plot.endsAt == null) {
+    if (fleet.at === camp.target.id) return null;
+    if (canReach(game, fleet, camp.target).ok) return camp.target;
+  }
 
   // On its own: only targets this fleet cracks in one move - the defense
   // battery is back at full strength next turn.

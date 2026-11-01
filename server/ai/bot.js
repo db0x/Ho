@@ -5,9 +5,10 @@
 // comes a pinch of variance per empire, so two conquerors do not play like
 // twins.
 //
-// A move: first the situation (situation.js), then research and
+// A move: first the situation (situation.js), then research, diplomacy,
 // terraforming, building, the fleets, war and wormholes - each in its own
 // module, all working on the same situation `s`.
+import { diplomacy } from './diplomacy.js';
 import { planResearch, terraform } from './economy.js';
 import { organizeFleets, orderFleets, logistics } from './fleets.js';
 import { scrap, build, refit } from './shipyard.js';
@@ -23,6 +24,7 @@ export function runBot(game, bot) {
   s.treasury = bot.money * (1 - s.research / 100);
   assessEnemies(s);
   s.camp = planCampaign(s);
+  diplomacy(s);
   terraform(s);
   takePositions(s);
   if (s.yard) build(s);

@@ -5,6 +5,7 @@ import { fleetStats } from '../game/fleets.js';
 import { planetById } from '../game/game.js';
 import { canReach } from '../game/movement.js';
 import { setOrders } from '../game/orders.js';
+import { friendly } from './diplomacy.js';
 import { surplus } from './shipyard.js';
 import { formPacks, combatTarget } from './war.js';
 
@@ -133,7 +134,7 @@ export function orderFleets(s) {
       // Foreign worlds come last: their defenses shoot a scout down. But it
       // still reveals the world on arrival - whoever only knows what lies on
       // their own doorstep finds no targets in the late game.
-      const safe = p => !p.owner || p.owner === bot.id;
+      const safe = p => !p.owner || p.owner === bot.id || friendly(game, bot, p.owner);
       const unknown = planets.filter(p => !bot.explored.has(p.id));
       target = reachable(game, fleet, unknown.filter(safe), p => -far(p));
       if (!target) target = reachable(game, fleet, unknown, p => -far(p));

@@ -3,12 +3,14 @@
 // at the end of the turn, around the black hole and into wormholes.
 import { supplyNeed, holeZone, advance, route, dist } from '../../shared/rules.js';
 import { portalsFor, findMouth, transit } from '../wormholes.js';
+import { teamOf } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
 import { planetById, playerById } from './game.js';
 
-/** Own inhabited worlds - supply reaches out from there. */
+/** Own inhabited worlds and those of allies - supply reaches out from there. */
 export function supplyBases(game, owner) {
-  return game.galaxy.planets.filter(p => p.owner === owner && p.pop > 0.5);
+  const team = teamOf(game, owner);
+  return game.galaxy.planets.filter(p => team.includes(p.owner) && p.pop > 0.5);
 }
 
 /**

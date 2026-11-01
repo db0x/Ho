@@ -4,6 +4,7 @@
 import {
   SHIP_DEFS, REPAIR_SHARE, batteryStats, COMBAT_ROUNDS, INTERCEPT_ROUNDS
 } from '../../shared/rules.js';
+import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
 import { planetById, playerById } from './game.js';
 
@@ -21,7 +22,7 @@ export function fightBattles(game, departures, entries) {
   for (const planet of game.galaxy.planets) {
     const fleeing = departures
       .filter(([f, from]) => from === planet.id && f.ships.length && game.fleets.some(g =>
-        g.at === planet.id && g.owner !== f.owner && g.ships.some(s => s.attack > 0)))
+        g.at === planet.id && hostile(game, g.owner, f.owner) && g.ships.some(s => s.attack > 0)))
       .map(([f]) => f);
     if (resolveCombatAt(game, planet, entries, rng, fleeing)) fought.add(planet.id);
   }
@@ -90,8 +91,9 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
     if (!sides.has(planet.owner)) sides.set(planet.owner, []);
     sides.get(planet.owner).push(...planet.defenses);
   }
-  // Only fight if there is any stranger in orbit at all
-  const intruder = [...sides.keys()].some(o => o !== planet.owner);
+  // Only fight if there is any stranger in orbit at all - allies of the
+  // owner are guests, not strangers.
+  const intruder = [...sides.keys()].some(o => o !== planet.owner && (!planet.owner || hostile(game, o, planet.owner)));
   if (!intruder) return false;
   if (planet.owner) {
     const ownerP = playerById(game, planet.owner);
@@ -102,8 +104,11 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
       sides.get(planet.owner).push(battery);
     }
   }
-  if (sides.size < 2) return false;
-  const anyArmed = [...sides.values()].some(ships => ships.some(s => s.attack > 0));
+  // A battle needs two sides that are at war - and someone with weapons.
+  const foes = (owner, among) => among.filter(([o]) => hostile(game, o, owner));
+  const all = [...sides];
+  if (!all.some(([o]) => foes(o, all).length)) return false;
+  const anyArmed = all.some(([o, ships]) => ships.some(s => s.attack > 0) && foes(o, all).length);
   if (!anyArmed) return false;
 
   const before = new Map([...sides].map(([k, v]) => [k, v.length]));
@@ -124,10 +129,11 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   for (let round = 0; round < COMBAT_ROUNDS; round++) {
     const engaged = s => s.hp > 0 && (round < INTERCEPT_ROUNDS || !escaping.has(s));
     const alive = [...sides].filter(([, ships]) => ships.some(engaged));
-    if (alive.length < 2) break;
+    if (!alive.some(([o]) => foes(o, alive).length)) break;
     const damage = [];
     for (const [owner, ships] of alive) {
-      const enemies = alive.filter(([o]) => o !== owner).flatMap(([, s]) => s.filter(engaged));
+      // Allies fight side by side: they only shoot at their enemies.
+      const enemies = foes(owner, alive).flatMap(([, s]) => s.filter(engaged));
       if (!enemies.length) continue;
       const weights = enemies.map(targetWeight);
       const total = weights.reduce((a, w) => a + w, 0);
@@ -176,11 +182,13 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   for (const f of game.fleets) if (f.at === planet.id && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
   if (planet.defenses && planet.defenses.some(s => s.attack > 0)) armedOwners.add(planet.owner);
   if (battery && battery.hp > 0) armedOwners.add(planet.owner);
+  // The orbit belongs to the armed if they are no longer at war with each
+  // other - alone or as allies. Whoever is at war with them loses what is left.
   const scuttled = [];
-  if (armedOwners.size === 1) {
-    const victor = [...armedOwners][0];
+  const victors = [...armedOwners];
+  if (victors.length && victors.every(a => victors.every(b => !hostile(game, a, b)))) {
     for (const f of game.fleets) {
-      if (f.at === planet.id && f.owner !== victor && f.ships.length) {
+      if (f.at === planet.id && victors.some(v => hostile(game, v, f.owner)) && f.ships.length) {
         const p = playerById(game, f.owner);
         if (p) p.stats.losses += f.ships.length;
         for (const s of f.ships) if (idx.has(s)) scuttled.push(idx.get(s));
