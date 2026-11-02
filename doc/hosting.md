@@ -211,4 +211,19 @@ is a copy of the directory. The account file is mode 0600 and is written beside
 itself and then moved into place, so an abort cannot lose the whole set.
 
 **Running games** live in server memory only – a restart ends them, and with them
-the open sessions.
+the open sessions. Such a game is not recorded.
+
+**Game statistics** go to `stats.json` next to `users.json`: one record per game
+opened with *Host a new game* (not the instant game against the AI), written when
+the game is first decided or when everybody has left it or it was discarded as idle.
+Per empire it holds account, name, AI level and persona, place, how it ended
+(winner, eliminated in turn …, left in turn …) and the final values (worlds,
+population, ships, kills, losses, peaks, tech levels). The **ranking** in the start
+menu is computed from it – an Elo rating, AI empires at a fixed 1000 (normal) or
+1200 (hard), games of at least 10 turns, listed from 3 games on. Deleting an
+account removes its name and account from all records; the games themselves stay.
+
+**Privacy switches** below the friends: every account can leave the ranking (only
+it still sees its own rating; its games keep counting for the others) and hide its
+online status (friends then always see it offline). Both are stored in `users.json`
+(`unlisted`, `invisible`) and only while switched off.

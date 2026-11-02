@@ -3,6 +3,7 @@
 // deleting accounts, and answering blocked players.
 import * as friends from '../friends.js';
 import { allAppeals, cleanAppeal, APPEAL_MAX, addAppeal, forgetAppeals } from '../appeals.js';
+import { forget as forgetStats } from '../stats.js';
 import { revoke } from '../auth.js';
 import { adminGameView } from '../game/game.js';
 import { listInvites, createInvite, revokeInvite } from '../invites.js';
@@ -180,6 +181,7 @@ export const adminHandlers = {
     deleteUser(key);
     try { friends.forget(key); } catch (e) { console.error('Friends cleanup failed:', e.message); }
     try { forgetAppeals(key); } catch (e) { console.error(e.message); }
+    try { forgetStats(key); } catch (e) { console.error('Stats cleanup failed:', e.message); }
     revoke(key);
     console.log(`Admin ${c.account} deleted account ${key}`);
     send(ws, { t: 'adminData', ...adminOverview() });

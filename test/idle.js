@@ -2,11 +2,14 @@
 // HO_IDLE_HOURS - here shortened to a few seconds.
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
+import { scratchUsers } from './scratch.js';
+
+const SCRATCH = scratchUsers('idle');
 
 const IDLE_S = 3.6;                      // HO_IDLE_HOURS=0.001
 const PORT = 8411 + Math.floor(Math.random() * 300);
 const server = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT), HO_AUTH: 'off', HO_IDLE_HOURS: '0.001' },
+  env: { ...process.env, HO_USERS_FILE: SCRATCH, PORT: String(PORT), HO_AUTH: 'off', HO_IDLE_HOURS: '0.001' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));

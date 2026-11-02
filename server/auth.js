@@ -13,6 +13,7 @@ import {
 import { peekInvite, consumeInvite, restoreInvite } from './invites.js';
 import { forget as forgetFriends } from './friends.js';
 import { forgetAppeals } from './appeals.js';
+import { forget as forgetStats } from './stats.js';
 import { nameAllowed } from './profile.js';
 
 /**
@@ -516,6 +517,7 @@ async function remove(req, res) {
   // Friendships and messages go with the account - so does a thread with the admins.
   try { forgetFriends(s.user); } catch (e) { console.error('Friends cleanup failed:', e.message); }
   try { forgetAppeals(s.user); } catch (e) { console.error(e.message); }
+  try { forgetStats(s.user); } catch (e) { console.error('Stats cleanup failed:', e.message); }
   succeeded(`u:${s.user}`, `i:${ip}`);
   revoke(s.user);
   clearCookie(req, res);

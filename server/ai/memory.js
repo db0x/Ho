@@ -99,28 +99,30 @@ export function perceive(game, bot, ai, mine, enemyWorlds) {
 }
 
 /**
- * Hard empires learn from their moves. Every strike was noted with what was
+ * Every empire learns from its moves. Every strike was noted with what was
  * sent; now that the outcome is known the picture gets corrected:
+ * - failed (the fleet is gone, or it sits there and the world is not ours):
+ *   this world needs clearly more next time than what just broke on it - no
+ *   second wave of the same size against the same wall, that much any
+ *   empire sees.
+ * Hard empires draw more from it:
  * - taken: the enemy was not stronger than thought - the empire grows bolder
  *   against it, even a little below the plain estimate
- * - failed (the fleet is gone, or it sits there and the world is not ours):
- *   this world needs clearly more next time than what just broke on it, and
- *   its owner is trusted with more strength everywhere - no second wave of
- *   the same size against the same wall.
+ * - failed: its owner is trusted with more strength everywhere.
  * Without new experience the picture drifts back to the plain estimate:
  * caution that only ever grows would end in an empire that never attacks.
- * Colony ships shot down on the way mark their target as dangerous.
+ * Colony ships shot down on the way mark their target as dangerous (hard).
  */
 const FOE_MIN = 0.85, FOE_MAX = 3;
 const FOE_FADE = 0.97;        // per turn, towards the plain estimate
 
-export function review(game, bot, ai) {
+export function review(game, bot, ai, hard) {
   const L = ai.learn;
   L.strikes = L.strikes.filter(s => {
     const world = planetById(game, s.target);
     const fleet = game.fleets.find(f => f.id === s.fleetId && f.owner === bot.id);
     if (world.owner === bot.id) {
-      L.foe[s.owner] = Math.max(FOE_MIN, (L.foe[s.owner] || 1) * 0.85);
+      if (hard) L.foe[s.owner] = Math.max(FOE_MIN, (L.foe[s.owner] || 1) * 0.85);
       delete L.world[s.target];
       L.wins++;
       return false;
@@ -129,7 +131,7 @@ export function review(game, bot, ai) {
     if (fleet && fleet.at !== s.target) return false;                          // turned elsewhere
     const before = L.world[s.target]?.need || 0;
     L.world[s.target] = { need: Math.max(before, s.strike * 1.7), since: game.turn, owner: world.owner };
-    L.foe[s.owner] = Math.min(FOE_MAX, (L.foe[s.owner] || 1) * 1.2);
+    if (hard) L.foe[s.owner] = Math.min(FOE_MAX, (L.foe[s.owner] || 1) * 1.2);
     L.failures++;
     return false;
   });

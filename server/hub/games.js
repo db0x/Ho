@@ -5,6 +5,7 @@ import { runBot } from '../ai/bot.js';
 import { lobbyView, allReady } from '../game/game.js';
 import { buildView } from '../game/intel.js';
 import { resolveTurn } from '../game/turn.js';
+import { recordGame } from '../stats.js';
 import { conns, send } from './connections.js';
 import { spectatorView } from './spectators.js';
 
@@ -58,8 +59,15 @@ export function maybeResolve(game) {
   if (!allReady(game)) return false;
   for (const bot of game.players.filter(p => p.isBot && p.alive)) runBot(game, bot);
   const entries = resolveTurn(game);
+  // Decided: into the statistics - a continuation afterwards no longer counts.
+  if (game.state === 'over') record(game);
   broadcastView(game, { resolved: true, entryCount: entries.length });
   return true;
+}
+
+/** Into the statistics; a full disk must not take the game down with it. */
+export function record(game, opts) {
+  try { recordGame(game, opts); } catch (e) { console.error(`Game ${game.id} not recorded:`, e.message); }
 }
 
 /**
@@ -83,6 +91,8 @@ export function discardIfIdle(game, now) {
   const idle = now - game.lastActivity;
   const orphaned = !game.players.some(p => p.connected) && !game.spectators.size;
   if (idle > IDLE_MS || (orphaned && idle > ORPHAN_MS)) {
+    // Nobody played it to the end: given up, as far as the ranking is concerned.
+    if (game.state === 'running') record(game, { abandoned: true });
     console.log(`Game ${game.id} discarded after ${Math.round(idle / 60000)} min without activity (state ${game.state}, turn ${game.turn})`);
     closeGame(game, { key: 'notice.endedIdle', params: { hours: +(IDLE_MS / 3600000).toFixed(2) } });
   }

@@ -731,11 +731,23 @@ const iconCache = new Map();
 /** Icon for lists and build menus. */
 export function shipIcon(type, px = 34, color = '#9fb0c8') {
   const key = type + '|' + px + '|' + color;
-  if (iconCache.has(key)) return iconCache.get(key);
-  const cv = document.createElement('canvas');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = px * dpr; cv.height = px * dpr;
-  cv.style.width = px + 'px'; cv.style.height = px + 'px';
+  const blank = () => {
+    const cv = document.createElement('canvas');
+    cv.width = px * dpr; cv.height = px * dpr;
+    cv.style.width = px + 'px'; cv.style.height = px + 'px';
+    return cv;
+  };
+  // Drawn once, handed out as a copy: one canvas element can only hang in one
+  // place - two destroyers in a fleet would otherwise share a single image,
+  // and only the last row would keep it.
+  const copy = (src) => {
+    const cv = blank();
+    cv.getContext('2d').drawImage(src, 0, 0);
+    return cv;
+  };
+  if (iconCache.has(key)) return copy(iconCache.get(key));
+  const cv = blank();
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
   // The whole ship must fit into the square - a class drawn larger than the

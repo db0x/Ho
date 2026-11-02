@@ -12,6 +12,8 @@ import { bindKeys, toggleKeys } from './ui/keys.js';
 import { sceneReady, leaveTo } from './ui/scene.js';
 import { showAnnouncement } from './ui/announce.js';
 import { openNews, hasNews, newsOnHello } from './ui/news.js';
+import { bindRanking, showRanking } from './ui/ranking.js';
+import { bindPrivacy, showPrivacy } from './ui/privacy.js';
 import { bindEmoji } from './ui/emoji.js';
 import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
@@ -288,6 +290,8 @@ net.on('hello', (m) => {
     }
   });
   newsOnHello(m, msg => net.send(msg));
+  bindRanking(!!m.ranking, msg => net.send(msg));
+  bindPrivacy(m.privacy, msg => net.send(msg));
   if (!net.session) lobby.show('menu');
   // Testing aid: ?solo=N starts a game against N AI empires right away
   const solo = new URLSearchParams(location.search).get('solo');
@@ -296,6 +300,8 @@ net.on('hello', (m) => {
 
 net.on('games', (m) => { lobby.showOpenGames(m.openGames); lobby.showMySeats(m.mySeats); });
 net.on('adminData', (m) => admin.update(m));
+net.on('ranking', (m) => showRanking(m));
+net.on('privacy', (m) => showPrivacy(m.privacy));
 net.on('inviteData', (m) => invites.update(m));
 net.on('appealData', (m) => blockDialog.update(m.msgs));
 net.on('inviteCreated', (m) => invites.created(m));

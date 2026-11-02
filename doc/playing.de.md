@@ -56,7 +56,7 @@ mit dem Hinweis, wer sie ändern kann:
 | Zugzeit | 0 = es wird gewartet, bis alle fertig sind |
 | Galaxie wächst | siehe [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand); aus ergibt eine feste Karte |
 | Wurmlöcher | siehe [Wurmlöcher](#wurmlöcher) |
-| Großkampfschiffe | Zerstörer sind baubar (siehe [Die Schiffstypen](#die-schiffstypen)); aus ergibt ein klassisches Ho!! nur mit den kleinen Schiffen |
+| Großkampfschiffe | Träger sind baubar (siehe [Die Schiffstypen](#die-schiffstypen)); aus ergibt ein klassisches Ho!! nur mit den kleinen Schiffen |
 | Bündnisse | Reiche können sich verbünden (siehe [Bündnisse](#bündnisse)); aus ergibt ein Jeder gegen jeden |
 
 **Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
@@ -96,7 +96,7 @@ Welt; ein Klick auf ein Schiff dort – oder *Schiffstypen ansehen* in der Spiel
 |---|---|
 | <img src="screenshots/ships/scout.webp" width="120" alt="Späher"> | **Späher** – der schnellste Typ mit großer Reichweite. Erst ein Späher deckt Temperatur, Schwerkraft und Metallvorrat einer Welt auf. Waffenlos und zerbrechlich: feindlichen Flotten lieber ausweichen. |
 | <img src="screenshots/ships/fighter.webp" width="120" alt="Jäger"> | **Jäger** – das Rückgrat jeder Flotte, mit Waffen und Schilden. Wer den Orbit hält und Abwehrbatterie und Orbitalverteidigung bricht, erobert die Welt. Kurze Reichweite – für Angriffe tief im Feindgebiet einen Tanker mitschicken. |
-| <img src="screenshots/ships/destroyer.webp" width="120" alt="Zerstörer"> | **Zerstörer** – das Großkampfschiff und der Anker einer Flotte. Kostet so viel wie zehn Jäger und kämpft etwa so gut wie sie, aber auf eigene Art: Acht Geschütze feuern jede Runde auf verschiedene Ziele, und der Rumpf zieht das Feuer auf sich wie vier Jäger. Im Orbit einer eigenen Welt repariert er seine ganze Flotte, 20 % jeder Hülle pro Runde ohne Kampf dort. Gegen Welten schwach – Erobern bleibt Sache der Jäger. Braucht Waffen 5 und Schilde 5 und eine Werft auf einer Welt ab 20 Mio. Einwohnern. Jeder Zerstörer trägt einen historischen Schiffsnamen, den du im Flottenpanel ändern kannst. |
+| <img src="screenshots/ships/destroyer.webp" width="120" alt="Träger"> | **Träger** – das Großkampfschiff und der Anker einer Flotte. Kostet so viel wie zehn Jäger und kämpft etwa so gut wie sie, aber auf eigene Art: Acht Geschütze feuern jede Runde auf verschiedene Ziele, und der Rumpf zieht das Feuer auf sich wie vier Jäger. Im Orbit einer eigenen Welt repariert er seine ganze Flotte, 20 % jeder Hülle pro Runde ohne Kampf dort. Gegen Welten schwach – Erobern bleibt Sache der Jäger. Braucht Waffen 5 und Schilde 5 und eine Werft auf einer Welt ab 20 Mio. Einwohnern. Jeder Träger führt einen historischen Schiffsnamen, den du im Flottenpanel ändern kannst. |
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbitalverteidigung"> | **Orbitalverteidigung** – ein Satellit, der direkt im Orbit der Bauwelt entsteht und dort bleibt. Billig, zäh und kräftig bewaffnet; ab fünf Stück spannen sie einen Schild auf. Eine Welt mit Satelliten fällt nicht kampflos. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Kolonieschiff"> | **Kolonieschiff** – setzt 8 Mio. Siedler auf einer freien Welt ab und geht dabei auf. Über einer eigenen, noch nicht vollen Welt stockt *Siedler hier absetzen* die Bevölkerung auf. Langsam und wehrlos – Geleitschutz lohnt sich. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – kämpft nicht, gibt aber der ganzen Flotte seine Reichweite, mehr als doppelt so viel wie ein Jäger. Jeder weitere Tanker in derselben Flotte bringt +15 %. |
@@ -109,7 +109,7 @@ den jeweils aktuellen Stand:
 |---|---|---|---|---|---|
 | Späher | 8 Cr · 3 Metall | – | 10 | 71 Lj/R | 323 Lj |
 | Jäger | 14 Cr · 7 Metall | 5 | 22 | 42 Lj/R | 170 Lj |
-| Zerstörer | 140 Cr · 80 Metall | 8 × 5 | 320 | 29 Lj/R | 170 Lj |
+| Träger | 140 Cr · 80 Metall | 8 × 5 | 320 | 29 Lj/R | 170 Lj |
 | Orbitalverteidigung | 10 Cr · 5 Metall | 6 | 34 | – | – |
 | Kolonieschiff | 30 Cr · 12 Metall | – | 16 | 34 Lj/R | 221 Lj |
 | Tanker | 18 Cr · 6 Metall | – | 20 | 38 Lj/R | 442 Lj |
@@ -152,7 +152,7 @@ Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder
 Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht
 dabei zurück, der Rest wechselt den Besitzer.
 
-Schaden bleibt am Schiff. Reparieren kann nur ein **Zerstörer**: Im Orbit einer
+Schaden bleibt am Schiff. Reparieren kann nur ein **Träger**: Im Orbit einer
 eigenen Welt bekommt seine ganze Flotte in jeder Runde ohne Kampf dort 20 % jeder
 Hülle zurück. Seine acht Geschütze suchen sich jeweils ein eigenes Ziel, und er
 zieht das Feuer auf sich wie vier Jäger – die kleinen Schiffe seiner Flotte

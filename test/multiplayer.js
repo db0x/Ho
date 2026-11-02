@@ -1,10 +1,13 @@
 // Starts the real server and lets 16 WebSocket clients play a game.
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
+import { scratchUsers } from './scratch.js';
+
+const SCRATCH = scratchUsers('multiplayer');
 
 const PORT = 8111 + Math.floor(Math.random() * 300);
 const server = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT), HO_AUTH: 'off' },
+  env: { ...process.env, HO_USERS_FILE: SCRATCH, PORT: String(PORT), HO_AUTH: 'off' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));

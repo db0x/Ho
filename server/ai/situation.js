@@ -51,9 +51,9 @@ export function survey(game, bot) {
   const early = game.turn < 30;
 
   const threatened = perceive(game, bot, ai, mine, enemyWorlds);
-  // Hard: first look at how the last strikes went, then plan.
+  // First look at how the last strikes went, then plan.
   const hard = bot.level === 'hard';
-  if (hard) review(game, bot, ai);
+  review(game, bot, ai, hard);
   const hit = game.turn - ai.lastHit < 8;
 
   // --- Endgame pressure: the later, the less patience. Whoever has not moved
@@ -141,12 +141,12 @@ export function assessEnemies(s) {
     worldsLeft.set(p.owner, (worldsLeft.get(p.owner) || 0) + 1);
   }
 
-  // What a world really costs, as far as this empire knows: the estimate -
-  // for a hard empire corrected by what its earlier strikes taught it.
+  // What a world really costs, as far as this empire knows: the estimate,
+  // corrected by what earlier strikes against it taught - and for a hard
+  // empire by what it learned about the owner anywhere.
   const price = p => {
-    const base = defense.get(p.id) || 0;
-    if (!hard) return base;
-    return Math.max(base * (ai.learn.foe[p.owner] || 1), ai.learn.world[p.id]?.need || 0);
+    const base = (defense.get(p.id) || 0) * (hard ? ai.learn.foe[p.owner] || 1 : 1);
+    return Math.max(base, ai.learn.world[p.id]?.need || 0);
   };
 
   // How far is each enemy world from the nearest own base?

@@ -6,6 +6,7 @@ import { startStars } from './scene.js';
 import { openQuickTurns, bindQuickTurns, DEFAULT_TURNS } from './quickturns.js';
 import { PLAYER_COLORS, AI_LEVELS } from '../../shared/rules.js';
 import { t, n as num } from '../i18n.js';
+import { refreshRanking } from './ranking.js';
 
 const $ = s => document.querySelector(s);
 
@@ -191,7 +192,7 @@ export class Lobby {
   quickStart(bots) {
     this.pendingQuickStart = bots;
     this.net.forget();
-    this.net.send({ t: 'create', name: this.name(), settings: { planetsPerPlayer: 7, mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
+    this.net.send({ t: 'create', name: this.name(), quick: true, settings: { planetsPerPlayer: 7, mode: this.mode(), shape: this.shape(), maxTurns: this.maxTurns() } });
   }
 
   name() {
@@ -338,6 +339,8 @@ export class Lobby {
     for (const s of ['menu', 'lobby', 'game']) {
       document.querySelector('#screen-' + s).classList.toggle('hidden', s !== which);
     }
+    // Back in the start menu, perhaps after a game that just counted.
+    if (which === 'menu') refreshRanking();
   }
 
   /** @param {boolean} reveal false: only relabel, do not switch the screen */

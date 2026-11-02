@@ -1,0 +1,20 @@
+{
+  "de": [
+    "Rangliste: Partien, die du über „Neue Partie eröffnen“ startest, werden gewertet – ab 10 Runden, gegen Menschen wie gegen die KI. Die Wertung ist eine Elo-Zahl: Jeder Platz vor einem Gegner zählt als Sieg gegen ihn, eine schwere KI zu schlagen bringt mehr als eine normale. Wer eine Partie vorzeitig verlässt, landet hinter allen, die geblieben sind. Die Rangliste steht neben dem Startmenü unter deinen Freunden; die Kennung siehst du dort nur bei Freunden.",
+    "Privatsphäre: Unter deinen Freunden kannst du dich aus der Rangliste austragen – dann siehst nur noch du deine Wertung – und deinen Online-Status verbergen. Deine Freunde sehen dich dann immer als offline, Nachrichten erreichen dich trotzdem.",
+    "Klügere KI: Sie schickt einen Jäger, wenn ein fremdes Schiff ihre Siedler blockiert, verteilt ihre Späher, statt sie im Schwarm zum selben Ziel zu schicken, bringt Satelliten mit Transportern dorthin, wo sie wirklich etwas nützen, und lernt aus gescheiterten Angriffen – keine zweite Welle derselben Größe gegen dieselbe Wand.",
+    "Kleinigkeiten: Der Zerstörer heißt jetzt Träger – er führt ja die Jäger seiner Flotte mit sich. Und fliegen mehrere Großkampfschiffe in einer Flotte, hat in der Flottenansicht wieder jedes sein Symbol."
+  ],
+  "en": [
+    "Ranking: games you start with “Host a new game” are rated – from 10 turns on, against people and the AI alike. The rating is an Elo number: finishing ahead of an opponent counts as a win against them, and beating a hard AI is worth more than beating a normal one. Whoever leaves a game early finishes behind everyone who stayed. The ranking sits next to the start menu below your friends; handles show there only for friends.",
+    "Privacy: below your friends you can leave the ranking – then only you see your rating – and hide your online status. Your friends then always see you as offline; messages still reach you.",
+    "A smarter AI: it sends a fighter when a foreign ship blocks its settlers, spreads its scouts out instead of sending a swarm to the same world, brings satellites by transporter to where they really help, and learns from failed attacks – no second wave of the same size against the same wall.",
+    "Small things: when several capital ships fly in one fleet, each of them has its icon in the fleet view again."
+  ],
+  "uk": [
+    "Рейтинг: партії, які ви починаєте через «Створити нову гру», враховуються – від 10 ходів, проти людей і проти ШІ. Рейтинг — це число Ело: кожне місце попереду суперника рахується як перемога над ним, а перемога над складним ШІ дає більше, ніж над звичайним. Хто залишає партію достроково, опиняється позаду всіх, хто залишився. Рейтинг стоїть поруч зі стартовим меню під вашими друзями; ідентифікатор там видно лише в друзів.",
+    "Приватність: під списком друзів можна прибрати себе з рейтингу – тоді свій рейтинг бачите лише ви – і приховати онлайн-статус. Друзі тоді завжди бачать вас офлайн, повідомлення все одно доходять.",
+    "Розумніший ШІ: він посилає винищувач, коли чужий корабель блокує його поселенців, розподіляє розвідників замість того, щоб слати їх роєм до одного світу, доставляє супутники транспортами туди, де вони справді потрібні, і вчиться на невдалих атаках – жодної другої хвилі такого ж розміру на ту саму стіну.",
+    "Дрібниці: коли в одному флоті летить кілька великих бойових кораблів, у вікні флоту кожен знову має свій значок."
+  ]
+}

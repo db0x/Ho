@@ -22,10 +22,12 @@ function publicOf(key) {
 /**
  * 'playing' with a seat in a game, 'watching' as a spectator, 'online' when
  * connected, else 'offline'. With several devices the busiest one counts.
+ * Whoever hides their status is always offline to the others.
  */
 const STATUS_RANK = ['offline', 'online', 'watching', 'playing'];
 function statusOf(key) {
   let status = 'offline';
+  if (getUser(key)?.invisible) return status;
   for (const c of conns.values()) {
     if (c.accountKey !== key) continue;
     const s = !c.gameId || !games.has(c.gameId) ? 'online' : c.playerId != null ? 'playing' : 'watching';

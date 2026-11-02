@@ -851,6 +851,30 @@ body.is-blocked > :not(#blocked) { display: none !important; }
 .news-box .nw-release { margin: 14px 0 6px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
 .news-box .nw-release:first-child { margin-top: 0; }
 .news-box .nw-body { max-height: 60vh; overflow-y: auto; }
+.ranking-box { width: min(560px, 94vw); }
+.ranking-box .rk-body { max-height: 60vh; overflow-y: auto; }
+.rk-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rk-table th { text-align: left; font-weight: normal; color: var(--ink-faint); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; padding: 0 8px 8px; border-bottom: 1px solid var(--line); }
+.rk-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.rk-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rk-table .who { overflow-wrap: anywhere; }
+.rk-table tr.me td { color: var(--gold); }
+.rk-handle { color: var(--ink-faint); font-family: var(--mono); font-size: 12px; font-weight: normal; }
+.rk-cell { display: inline-flex; align-items: center; gap: 8px; }
+/* The pane in the friends panel */
+.rk-row .rk-rank { flex: none; width: 22px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 13px; }
+.rk-row .rk-rank.top { color: var(--gold); font-weight: 700; }
+.rk-row .rk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-row .rk-rating { flex: none; font-family: var(--mono); font-size: 15px; color: var(--ink); }
+.rk-row.me { border-color: var(--gold-dim); }
+.rk-row.me .rk-name b, .rk-row.me .rk-rating { color: var(--gold); }
+.rk-gap { text-align: center; color: var(--ink-faint); line-height: 1; margin: -2px 0 4px; }
+#ranking-box .rk-me { margin: 4px 0 8px; }
+#ranking-box .rk-all { margin-top: 4px; }
+.privacy-box .chk { padding: 0; margin-top: 8px; }
+.privacy-box p { margin: 2px 0 0 41px; }
+.rk-me { margin: 14px 0 0; color: var(--gold); }
+.rk-note { margin: 14px 0 0; }
 #spectate { display: flex; align-items: center; gap: 6px; }
 #spectate button { padding: 6px 10px; }
 .sp-speeds { display: flex; gap: 2px; margin-left: 4px; }
