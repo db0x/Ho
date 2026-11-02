@@ -7,7 +7,7 @@ import { listInvites, createInvite, revokeInvite } from '../invites.js';
 import {
   cleanName, nameAllowed, reservedName, parseAvatar, putAccountAvatar, putGuestAvatar
 } from '../profile.js';
-import { isAdmin, isInviter, isBlocked, setProfile } from '../userstore.js';
+import { isAdmin, isInviter, isBlocked, setProfile, setPrivacy } from '../userstore.js';
 import { send, connsOf, conns } from './connections.js';
 import { broadcastLobby, broadcastView } from './games.js';
 import { playerName } from './lobby.js';
@@ -78,6 +78,21 @@ function changeProfile(c, msg) {
 }
 
 export const accountHandlers = {
+  /** What others may see: the status for friends, the line in the ranking. */
+  privacy({ c, ws }, msg) {
+    if (!c.accountKey) return;
+    const change = {};
+    if (typeof msg.status === 'boolean') change.status = msg.status;
+    if (typeof msg.ranking === 'boolean') change.ranking = msg.ranking;
+    let privacy;
+    try { privacy = setPrivacy(c.accountKey, change); } catch (e) {
+      console.error('Privacy not saved:', e.message);
+      return send(ws, { t: 'error', key: 'err.server', params: { detail: e.message } });
+    }
+    // Every device of the account shows the same switches.
+    for (const other of connsOf(c.accountKey)) send(other.ws, { t: 'privacy', privacy });
+  },
+
   profile({ c, ws, game, me }, msg) {
     const problem = changeProfile(c, msg);
     if (problem) send(ws, { t: 'error', key: problem });

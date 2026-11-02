@@ -196,7 +196,7 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | --- | --- | --- |
 | `PORT` | `8080` | Port des Servers |
 | `HO_AUTH` | an | `off` schaltet die Anmeldung ab – nur zum Entwickeln |
-| `HO_DEV` | aus | `on` schaltet den Entwicklungsmodus ein: Admins bekommen den Debug-Dialog (Strg+Umschalt+D): Testkampf, Sounds und in der laufenden Partie Wurmlöcher öffnen und schließen sowie sofort einen Zerstörer; ohne Anmeldung bekommt ihn jeder – nur zum Entwickeln |
+| `HO_DEV` | aus | `on` schaltet den Entwicklungsmodus ein: Admins bekommen den Debug-Dialog (Strg+Umschalt+D): Testkampf, Sounds und in der laufenden Partie Wurmlöcher öffnen und schließen sowie sofort einen Träger; ohne Anmeldung bekommt ihn jeder – nur zum Entwickeln |
 | `HO_USERS_FILE` | `data/users.json` | wo die Konten liegen; Profilbilder liegen daneben in `avatars/` |
 | `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
 | `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |
@@ -216,4 +216,21 @@ erst daneben geschrieben und dann umgeschoben, damit ein Abbruch nicht den ganze
 Bestand verliert.
 
 **Laufende Partien** liegen nur im Serverspeicher – ein Neustart beendet sie, und
-mit ihnen die offenen Sitzungen.
+mit ihnen die offenen Sitzungen. Eine solche Partie wird nicht gespeichert.
+
+**Spielstatistik** landet in `stats.json` neben der `users.json`: ein Eintrag pro
+Partie, die über *Neue Partie eröffnen* gestartet wurde (nicht das Sofortspiel gegen
+die KI), geschrieben, sobald die Partie zum ersten Mal entschieden ist oder alle sie
+verlassen haben oder sie wegen Untätigkeit verworfen wurde. Pro Imperium: Konto,
+Name, KI-Stufe und -Charakter, Platz, wie es endete (Sieger, ausgeschieden in Runde
+…, verlassen in Runde …) und die Endwerte (Welten, Bevölkerung, Schiffe,
+Abschüsse, Verluste, Höchstwerte, Techstufen). Die **Rangliste** im Startmenü wird
+daraus berechnet – eine Elo-Wertung, KI-Imperien fest mit 1000 (normal) bzw. 1200
+(schwer), Partien ab 10 Runden, gelistet ab 3 Partien. Wird ein Konto gelöscht,
+verschwinden sein Name und Konto aus allen Einträgen; die Partien selbst bleiben.
+
+**Privatsphäre-Schalter** unter den Freunden: Jedes Konto kann sich aus der
+Rangliste austragen (nur es selbst sieht dann noch seine Wertung; seine Partien
+zählen für die anderen weiter) und seinen Online-Status verbergen (Freunde sehen
+es dann immer offline). Beides steht in der `users.json` (`unlisted`, `invisible`),
+und nur solange es ausgeschaltet ist.

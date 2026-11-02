@@ -10,7 +10,7 @@ import { buildView } from '../game/intel.js';
 import { setOrders } from '../game/orders.js';
 import { removePlayer } from '../game/players.js';
 import { send, conns } from './connections.js';
-import { broadcastView, maybeResolve, chat, games, broadcastLobby } from './games.js';
+import { broadcastView, maybeResolve, chat, games, broadcastLobby, record } from './games.js';
 import { watchable } from './spectators.js';
 import { voiceDrop } from './voice.js';
 
@@ -93,14 +93,19 @@ export const matchHandlers = {
       me.connected = false;
       me.connId = null;
       me.token = null;
+      // Leaving an empire that is still in the game is giving up (server/stats.js).
+      if (game.state === 'running' && me.alive) me.leftAt = game.turn;
       voiceDrop(game, me);
       chat(game, 'System', { key: 'chat.left', params: { player: me.name } });
       broadcastView(game);
       maybeResolve(game);
     }
     c.gameId = null; c.playerId = null;
-    // If nobody is playing anymore, the game can go
-    if (!game.players.some(p => p.connected) && !game.spectators.size) games.delete(game.id);
+    // If nobody is playing anymore, the game can go - as given up.
+    if (!game.players.some(p => p.connected) && !game.spectators.size) {
+      if (game.state === 'running') record(game, { abandoned: true });
+      games.delete(game.id);
+    }
   },
 
   chat({ game, me }, msg) {

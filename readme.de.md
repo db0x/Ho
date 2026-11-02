@@ -19,7 +19,7 @@ Reiches.*
 - **Gleichzeitige Züge** für bis zu 16 Spieler – Freunde per vierstelligem Code,
   freie Plätze mit KI.
 - **KI mit Charakter:** Eroberer, Siedler, Technokrat, Pirat, Bollwerk, Aasgeier.
-- **Jäger und Großkampfschiffe:** Schwärme kleiner Schiffe und Zerstörer mit Namen,
+- **Jäger und Großkampfschiffe:** Schwärme kleiner Schiffe und Träger mit Namen,
   die das Feuer auf sich ziehen und ihre Flotte reparieren – oder klassisches Ho!!
   nur mit den kleinen Schiffen.
 - **Bündnisse,** offen oder geheim – mit Menschen wie mit der KI. Verbündete teilen

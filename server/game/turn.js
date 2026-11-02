@@ -60,12 +60,16 @@ export function resolveTurn(game) {
     p.stats.pop = Math.round(planets.reduce((a, q) => a + q.pop, 0) * 10) / 10;
     p.stats.ships = game.fleets.filter(f => f.owner === p.id).reduce((a, f) => a + f.ships.length + cargoOf(f.ships).used, 0)
       + game.galaxy.planets.reduce((a, q) => a + ((q.owner === p.id && q.defenses) ? q.defenses.length : 0), 0);
+    // The heights an empire reached - for the statistics (server/stats.js).
+    p.stats.peakPlanets = Math.max(p.stats.peakPlanets || 0, p.stats.planets);
+    p.stats.peakPop = Math.max(p.stats.peakPop || 0, p.stats.pop);
     // Without a world it is over: range is measured from own inhabited worlds,
     // so leftover ships could not go anywhere anymore. They vanish with the
     // empire instead of standing on the map as ghost fleets. (A colony ship
     // above a free world has already been allowed to land above.)
     if (p.alive && p.stats.planets === 0) {
       p.alive = false;
+      p.outAt = game.turn;
       game.fleets = game.fleets.filter(f => f.owner !== p.id);
       p.stats.ships = 0;
       entries.push({ type: 'eliminated', playerIds: [p.id],
@@ -84,17 +88,20 @@ export function resolveTurn(game) {
   const alive = game.players.filter(p => p.alive);
   if (alive.length === 1 && game.players.length > 1) {
     game.state = 'over';
+    game.endReason = 'conquest';
     game.winner = alive[0].id;
     pushLog(game, [{ type: 'victory', key: 'log.victory', params: { player: alive[0].name } }]);
   } else if (united(game, alive.map(p => p.id))) {
     // Only allies are left: they rule the galaxy together.
     game.state = 'over';
+    game.endReason = 'alliance';
     const ranked = alive.slice().sort((a, b) => b.stats.pop - a.stats.pop);
     game.winner = ranked[0].id;
     game.winners = ranked.map(p => p.id);
     pushLog(game, [{ type: 'victory', key: 'log.jointVictory', params: { players: ranked.map(p => p.name).join(' & ') } }]);
   } else if (game.settings.maxTurns && game.turn > game.settings.maxTurns) {
     game.state = 'over';
+    game.endReason = 'turnLimit';
     const best = alive.sort((a, b) => b.stats.pop - a.stats.pop)[0];
     game.winner = best ? best.id : null;
     pushLog(game, [{ type: 'victory',

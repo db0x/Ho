@@ -36,7 +36,9 @@ export function build(s) {
     const underway = myFleets.reduce((a, f) => a + f.ships.filter(s => s.type === 'scout' && s.range >= farEnough).length, 0);
     const wanted = known.length < planets.length || (game.settings.expanding !== false && !game.galaxy.complete)
       ? (P.scouts ? 3 : 2) : 0;
-    if (game.turn < 6) order.push([yard, 'scout', 2]);
+    // At the start one more, quickly - but not two new ones every turn: a
+    // swarm of scouts only finds the same worlds.
+    if (game.turn < 6 && underway < wanted + 1) order.push([yard, 'scout', Math.min(2, wanted + 1 - underway)]);
     else if (underway < wanted && game.turn % 3 === 0) order.push([yard, 'scout', 1]);
   };
   const colonies = () => {
@@ -138,15 +140,18 @@ export function build(s) {
 }
 
 /**
- * Worlds with more satellites than they need: not threatened, and none of
- * the rival's worlds close by. What stands beyond the reserve may go.
+ * Worlds with more satellites than they need right now: not threatened.
+ * Two stay as a reserve - at the border, with enemy worlds close by, four.
+ * What stands beyond the reserve may go. Satellites are built where the
+ * danger was, that is mostly at the border - without it, there would
+ * hardly ever be anything to move.
  */
 export function surplus(s) {
-  const { mine, threatened, enemyWorlds } = s;
-  const keep = 2;
-  return mine.filter(p => !threatened.has(p.id) && (p.defenses?.length || 0) > keep
-    && !enemyWorlds.some(e => dist(e, p) < 300))
-    .map(p => ({ p, spare: p.defenses.length - keep }));
+  const { mine, threatened, enemyWorlds, guard } = s;
+  return mine.map(p => {
+    const keep = enemyWorlds.some(e => dist(e, p) < 300) ? 4 : 2;
+    return { p, spare: (p.defenses?.length || 0) - keep };
+  }).filter(x => x.spare > 0 && !threatened.has(x.p.id) && x.p.id !== guard?.id);
 }
 
 /**

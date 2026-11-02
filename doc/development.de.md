@@ -25,13 +25,14 @@ server/
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
-  shipnames.js       Namen für die Zerstörer: historische Schiffe und einige aus Filmen und Serien
+  shipnames.js       Namen für die Träger: historische Schiffe und einige aus Filmen und Serien
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
   userstore.js       Konten auf der Platte: Name, scrypt-Hash, Profil, Nachrichtenschlüssel (verpackt) – atomar geschrieben
   profile.js         Anzeigenamen und Profilbilder: prüfen, speichern, ausliefern
   invites.js         Einmal-Einladungslinks: erzeugen, prüfen, einlösen, verfallen (nur Hashes)
   friends.js         Freundschaften und Direktnachrichten zwischen Konten (friends.json)
+  stats.js           Spielstatistik und die daraus berechnete Elo-Rangliste (stats.json)
   users.js           Werkzeug für den Host: add, del, passwd, name, admin, list
 client/
   index.html         Startbildschirm, Lobby, Spielbildschirm
@@ -154,7 +155,7 @@ npm run test:i18n      # Kataloge: gleiche Schlüssel, gleiche Platzhalter, Serv
 npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
-npm run test:destroyer # Zerstörer: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
+npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat

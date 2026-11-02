@@ -61,6 +61,7 @@ function takeSeat(c, connId, g, p) {
   if (p.voice && p.voice.connId !== connId) voiceDrop(g, p);
   const wasAway = !p.connected;
   p.connId = connId; p.connected = true;
+  delete p.leftAt;
   c.gameId = g.id; c.playerId = p.id;
   g.lastActivity = Date.now();
   send(c.ws, { t: 'joined', code: g.id, playerId: p.id, token: p.token });
@@ -105,6 +106,9 @@ export const lobbyHandlers = {
   create({ c, connId, ws }, msg) {
     leaveLobby(c, connId);
     const g = createGame('');
+    // Where it was opened: "new game" counts for the ranking, the instant
+    // game against the AI is practice (server/stats.js).
+    g.origin = msg.quick ? 'quick' : 'custom';
     const name = playerName(c, g, msg.name);
     g.hostName = name;
     Object.assign(g.settings, sanitizeSettings(msg.settings));

@@ -6,7 +6,7 @@ import { MAX_PLAYERS } from '../../shared/rules.js';
 import { authEnabled } from '../auth.js';
 import { DEFAULT_SETTINGS } from '../game/game.js';
 import { accountAvatarUrl } from '../profile.js';
-import { getUser } from '../userstore.js';
+import { getUser, privacyOf } from '../userstore.js';
 import { accountHandlers, blockedOf, appealView, adminOf, inviterOf, checkConnections } from './account.js';
 import { adminHandlers } from './admin.js';
 import { conns, send, allowMessage, RATE } from './connections.js';
@@ -16,6 +16,7 @@ import { games, discardIfIdle } from './games.js';
 import { lobbyHandlers, openGameList, seatList } from './lobby.js';
 import { matchHandlers, connectionLost, checkTurnTimer } from './match.js';
 import { newsHandlers, VERSION, RELEASES } from './news.js';
+import { rankingHandlers } from './ranking.js';
 import { spectatorHandlers, paceSpectatorGames } from './spectators.js';
 import { voiceHandlers, voiceOffer, releaseFloor } from './voice.js';
 
@@ -25,7 +26,7 @@ import { voiceHandlers, voiceOffer, releaseFloor } from './voice.js';
  */
 const HANDLERS = new Map(Object.entries({
   ...lobbyHandlers, ...matchHandlers, ...spectatorHandlers, ...voiceHandlers,
-  ...friendHandlers, ...accountHandlers, ...newsHandlers, ...adminHandlers, ...devHandlers
+  ...friendHandlers, ...accountHandlers, ...newsHandlers, ...rankingHandlers, ...adminHandlers, ...devHandlers
 }));
 export const MESSAGE_TYPES = [...HANDLERS.keys()];
 
@@ -54,9 +55,12 @@ export function attach(wss) {
       ...(blocked ? { blocked: { at: blocked.at }, appeal: appealView(c.accountKey) } : {}),
       voice: voiceOffer(),
       profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null },
+      privacy: c.accountKey ? privacyOf(account) : null,
       admin: adminOf(c),
       inviter: inviterOf(c),
       dev: devOf(c),
+      // The ranking needs accounts - without sign-in there is none.
+      ranking: authEnabled() && !blocked,
       // Which release's change notes this account has seen - null: none yet.
       // Without an account the browser remembers it.
       version: VERSION, releases: RELEASES, newsSeen: c.accountKey ? (account?.news ?? null) : undefined

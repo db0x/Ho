@@ -8,6 +8,9 @@ import {
 } from '../server/game/game.js';
 import { addPlayer } from '../server/game/players.js';
 import { resolveTurn } from '../server/game/turn.js';
+import { scratchUsers } from './scratch.js';
+
+const SCRATCH = scratchUsers('continue');
 
 let errors = 0;
 const fail = (msg) => { console.error('ERROR: ' + msg); errors++; };
@@ -49,7 +52,7 @@ const check = (cond, msg) => { if (!cond) fail(msg); };
 
 const PORT = 8711 + Math.floor(Math.random() * 300);
 const server = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT), HO_AUTH: 'off' },
+  env: { ...process.env, HO_USERS_FILE: SCRATCH, PORT: String(PORT), HO_AUTH: 'off' },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 server.stderr.on('data', d => console.error('[server]', d.toString().trim()));

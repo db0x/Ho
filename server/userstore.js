@@ -350,6 +350,30 @@ export function setProfile(name, { nick, avatar } = {}) {
 }
 
 /**
+ * What others may see of an account. `status`: friends see whether it is
+ * online and in a game - otherwise always offline. `ranking`: it appears in
+ * the ranking of the instance - otherwise only it sees its own rating.
+ * Stored only where the account says no, so everything else stays as it was.
+ */
+export function setPrivacy(name, { status, ranking } = {}) {
+  const key = normalizeName(name);
+  const db = load();
+  const user = db.users[key];
+  if (!user) throw new Error('auth.cli.unknown');
+  for (const [field, shown] of [['invisible', status], ['unlisted', ranking]]) {
+    if (shown === undefined) continue;
+    if (shown) delete user[field]; else user[field] = true;
+  }
+  save(db);
+  return privacyOf(user);
+}
+
+/** The visibility settings of an account record, as the client sees them. */
+export function privacyOf(user) {
+  return { status: !user?.invisible, ranking: !user?.unlisted };
+}
+
+/**
  * The change notes of this release have been shown to the account - they
  * appear once per account, not once per browser.
  */

@@ -91,6 +91,7 @@ export function startGame(game) {
     seed
   });
   game.settings.seed = game.galaxy.seed;
+  game.startedAt = Date.now();
   game.rng = makeRng(`${game.galaxy.seed}:play`);
   game.state = 'running';
   game.turn = 1;

@@ -161,7 +161,17 @@ try {
   check(await alice.friends(m => m.friends[0]?.status === 'watching'), 'Bob watching a game does not show as watching');
   bob.send({ t: 'leave' });
   check(await alice.friends(m => m.friends[0]?.status === 'online'), 'Bob back in the menu does not show as online');
-  console.log('Request: shows on both sides, writing only after the yes, then friends with status.');
+  // Status hidden: offline to friends, even in a game - and back once shown again.
+  bob.send({ t: 'privacy', status: false });
+  check((await bob.next('privacy')).privacy.status === false, 'Hiding the status is not confirmed');
+  check(await alice.friends(m => m.friends[0]?.status === 'offline'), 'A hidden status still shows as online');
+  bob.send({ t: 'watch', bots: 2 });
+  await new Promise(ok => setTimeout(ok, 3500));
+  check(alice.view.friends[0]?.status === 'offline', `A hidden status shows ${alice.view.friends[0]?.status} while watching`);
+  bob.send({ t: 'leave' });
+  bob.send({ t: 'privacy', status: true });
+  check(await alice.friends(m => m.friends[0]?.status === 'online'), 'Showing the status again does not bring it back');
+  console.log('Request: shows on both sides, writing only after the yes, then friends with status - which can be hidden.');
 
   // --- Messages: encrypted, also to someone offline, with unread count
   alice.drain(); bob.drain();

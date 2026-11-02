@@ -138,6 +138,16 @@
       <div id="friends-incoming"></div>
       <div id="friends-list"></div>
       <div id="friends-outgoing"></div>
+      <!-- The ranking of this instance: the top, the own line, the rest in a dialog (ranking.js). -->
+      <div id="ranking-box" class="hidden"></div>
+      <!-- What others may see of this account (privacy.js). -->
+      <div id="privacy-box" class="privacy-box hidden">
+        <h3 data-i18n="privacy.title"></h3>
+        <label class="chk"><input type="checkbox" id="privacy-status"> <span data-i18n="privacy.status"></span></label>
+        <p class="small muted" data-i18n="privacy.statusHint"></p>
+        <label class="chk"><input type="checkbox" id="privacy-ranking"> <span data-i18n="privacy.ranking"></span></label>
+        <p class="small muted" data-i18n="privacy.rankingHint"></p>
+      </div>
       <!-- Inviters only: one-time links for new players, and their own open ones. -->
       <div id="invite-box" class="invite-box hidden">
         <h3><span data-i18n="invite.title"></span> <span id="invite-count" class="muted"></span></h3>

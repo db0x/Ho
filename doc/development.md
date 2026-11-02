@@ -32,6 +32,7 @@ server/
   profile.js         Display names and profile pictures: check, store, serve
   invites.js         One-time invite links: create, check, use up, expire (hashes only)
   friends.js         Friendships and direct messages between accounts (friends.json)
+  stats.js           Game statistics and the Elo ranking derived from them (stats.json)
   users.js           Tool for the host: add, del, passwd, name, admin, list
 client/
   index.html         Start screen, lobby, game screen

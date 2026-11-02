@@ -1,8 +1,7 @@
-// AI levels: a hard empire learns from failed strikes. A colony next door
-// gets reinforcements the attacker cannot see whenever a strike is on its
-// way - every attack that arrives fails. The normal AI keeps sending waves of
-// about the same size; the hard one must come back clearly stronger or not at
-// all. A mistake is a wave that breaks on the wall although it is not clearly
+// AI empires learn from failed strikes. A colony next door gets
+// reinforcements the attacker cannot see whenever a strike is on its way -
+// every attack that arrives fails. Normal and hard empires alike must come
+// back clearly stronger or not at all. A mistake is a wave that breaks on the wall although it is not clearly
 // stronger than one whose failure was already known when it set off - waves
 // that were under way at the same time, or turned back, are none.
 import { createGame, startGame } from '../server/game/game.js';
@@ -62,14 +61,13 @@ function play(level) {
   return { sorties: sorties.length, repeats, lessons: bot.ai?.learn };
 }
 
-const normal = play('normal');
-const hard = play('hard');
-console.log(`normal: ${normal.sorties} waves, ${normal.repeats} broke although no stronger than one known to have failed`);
-console.log(`hard:   ${hard.sorties} waves, ${hard.repeats} repeats, ${hard.lessons.failures} failures noted`);
-assert(normal.repeats > 0, 'The scenario does not show the problem - the normal AI never repeats a failed wave');
-assert(hard.sorties > 0, 'The hard AI never attacks at all');
-assert(hard.repeats === 0, `The hard AI sent ${hard.repeats} waves no stronger than one that already failed`);
-assert(hard.lessons.failures > 0, 'The hard AI noted no failure');
+for (const level of ['normal', 'hard']) {
+  const r = play(level);
+  console.log(`${level}: ${r.sorties} waves, ${r.repeats} broke although no stronger than one known to have failed, ${r.lessons.failures} failures noted`);
+  assert(r.sorties > 0, `The ${level} AI never attacks at all`);
+  assert(r.lessons.failures > 0, `The ${level} AI noted no failure - the scenario does not show the problem`);
+  assert(r.repeats === 0, `The ${level} AI sent ${r.repeats} waves no stronger than one that already failed`);
+}
 
 if (errors) { console.error(`\n${errors} AI checks failed.`); process.exit(1); }
 console.log('\nAll AI checks passed.');

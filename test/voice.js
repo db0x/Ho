@@ -9,6 +9,9 @@ import dgram from 'node:dgram';
 import crypto from 'node:crypto';
 import { WebSocket } from 'ws';
 import { bindingResponse } from '../server/stun.js';
+import { scratchUsers } from './scratch.js';
+
+const SCRATCH = scratchUsers('voice');
 
 let errors = 0;
 const check = (cond, msg) => { if (!cond) { console.error('ERROR: ' + msg); errors++; } return cond; };
@@ -61,7 +64,7 @@ function mapped(res) {
 const PORT = 8711 + Math.floor(Math.random() * 300);
 const STUN = 20000 + Math.floor(Math.random() * 20000);
 const server = spawn(process.execPath, ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT), HO_AUTH: 'off', HO_VOICE: 'on', HO_STUN_PORT: String(STUN) },
+  env: { ...process.env, HO_USERS_FILE: SCRATCH, PORT: String(PORT), HO_AUTH: 'off', HO_VOICE: 'on', HO_STUN_PORT: String(STUN) },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 server.stderr.on('data', d => process.stderr.write('[server] ' + d));
@@ -251,7 +254,7 @@ server.kill();
 {
   const P2 = PORT + 1;
   const off = spawn(process.execPath, ['server/index.js'], {
-    env: { ...process.env, PORT: String(P2), HO_AUTH: 'off', HO_VOICE: '', HO_STUN_PORT: String(STUN) },
+    env: { ...process.env, HO_USERS_FILE: SCRATCH, PORT: String(P2), HO_AUTH: 'off', HO_VOICE: '', HO_STUN_PORT: String(STUN) },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let out = '';
