@@ -23,6 +23,7 @@ function rows(c) {
     ['fleets', [
       [['k.click'], 'do.select'],
       [['k.rightClick', 'k.shiftClick'], 'do.course', !c.spectator],
+      [['k.tab', 'k.shiftTab'], 'do.nextFleet'],
       [['S'], 'do.split', !c.spectator],
       [['Esc'], 'do.deselect']
     ]],

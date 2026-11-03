@@ -207,6 +207,22 @@ const app = {
     sfx.play('course');
   },
   /**
+   * The next fleet in the same orbit as the selected one (back with -1),
+   * in the order of the planet panel. False if there is none to switch to.
+   */
+  nextFleet(step = 1) {
+    if (app.selection?.type !== 'fleet') return false;
+    const fleets = map?.view?.fleets || [];
+    const cur = fleets.find(f => f.id === app.selection.id);
+    if (cur?.at == null) return false;
+    const orbit = fleets.filter(f => f.at === cur.at);
+    if (orbit.length < 2) return false;
+    const next = orbit[(orbit.indexOf(cur) + step + orbit.length) % orbit.length];
+    app.setSelection({ type: 'fleet', id: next.id });
+    sfx.play('selectFleet');
+    return true;
+  },
+  /**
    * The selected own fleet falls apart into single ships, without the
    * split dialog - in orbit as in flight (then all keep the course).
    */
@@ -697,6 +713,8 @@ function bindGame() {
     if (e.key === 'h' || e.key === 'H') $('#help').classList.toggle('hidden');
     if (e.key === '?') toggleKeys();
     if ((e.key === 's' || e.key === 'S') && !e.repeat) app.splitAll();
+    // Only taken from the browser where there is a fleet to switch to.
+    if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && app.nextFleet(e.shiftKey ? -1 : 1)) e.preventDefault();
     if (e.key === '+') map.zoomBy(1.25);
     if (e.key === '-') map.zoomBy(1 / 1.25);
   });

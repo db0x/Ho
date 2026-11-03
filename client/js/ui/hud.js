@@ -5,7 +5,7 @@ import { shipTypesFor } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import { makeDialog } from '../ui/dialog.js';
 import { openShipInfo } from '../ui/shipinfo.js';
-import { desktop } from '../ui/viewport.js';
+import { compact, desktop } from '../ui/viewport.js';
 import { commsMethods } from './hud/comms.js';
 import { empireMethods } from './hud/empire.js';
 import { fleetMethods } from './hud/fleet.js';
@@ -54,13 +54,14 @@ export class Hud {
     // The log is a window: movable, resizable from every edge, minimizable.
     this.logDlg = makeDialog($('#logdock'), {
       handle: $('#log-bar'), grip: $('#log-grip'), collapse: $('#log-collapse'), icon: $('#tray-log'), key: 'ho-logdock',
-      w: 460, h: 240, minW: 250, minH: 110,
+      w: 460, h: 240, minW: 250, minH: 110, avoid: $('#rightdock'),
       onToggle: () => this.chatSeen()
     });
     // The dock at the top left likewise.
     this.leftDlg = makeDialog($('#leftdock'), {
       handle: $('#left-bar'), grip: $('#left-grip'), collapse: $('#left-collapse'), icon: $('#tray-left'), key: 'ho-leftdock',
-      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 220, minH: 130
+      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 220, minH: 130,
+      avoid: $('#rightdock')
     });
 
     // Ledger: hover with the pointer to view it, pinned with a click.
@@ -94,6 +95,9 @@ export class Hud {
       this.dragging = null;
       if (this.view) this.update(this.view);     // catch up on what was left over
     };
+    // The sheet on a phone shows "nothing selected" instead of what the
+    // slid-in panel still holds.
+    compact.addEventListener('change', () => { if (this.view) this.selection(); });
     addEventListener('pointerup', release, true);
     addEventListener('pointercancel', release, true);
   }
@@ -146,7 +150,22 @@ export class Hud {
     const box = $('#selection');
     // A ship being renamed: a new view must not throw away what is typed.
     if (box.contains(document.activeElement) && document.activeElement.classList.contains('rename-input')) return;
-    if (!sel) { box.innerHTML = `<p class="muted pad">${t('sel.empty')}</p>`; return; }
+    // On the desktop the panel sits at the right edge and slides out only
+    // while something is selected. Sliding back in it keeps its content -
+    // otherwise it would go empty in the middle of the movement.
+    // The windows make way for it and come back when it is gone.
+    const dock = $('#rightdock');
+    // Also without a change: the first time the game screen is shown, the
+    // panel only now has a size to measure.
+    const glide = dock.classList.contains('open') !== !!sel;
+    dock.classList.toggle('open', !!sel);
+    this.logDlg.refresh(glide);
+    this.leftDlg.refresh(glide);
+    if (!sel) {
+      if (compact.matches) { box.classList.remove('split'); box.innerHTML = `<p class="muted pad">${t('sel.empty')}</p>`; }
+      return;
+    }
+    box.classList.remove('split');                      // only the planet panel is in two parts
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
     else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
     else this.fleetPanel(box, this.view.fleets.find(f => f.id === sel.id));
