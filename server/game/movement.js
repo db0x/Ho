@@ -94,6 +94,7 @@ export function endChase(fleet) {
  * the battle is at that world then.
  */
 function orderChase(game, player, fleet, targetId) {
+  if (game.settings.interception === false) return { error: 'err.chaseOff' };
   const target = game.fleets.find(f => f.id === targetId && f.ships.length);
   if (!target || target.owner === player.id || !seesFleet(game, player.id, target)) return { error: 'err.noSuchTarget' };
   if (!hostile(game, player.id, target.owner)) return { error: 'err.chaseFriend' };

@@ -202,6 +202,7 @@ export function buildView(game, player) {
     wormholes: wormholeView(game, player),
     rifts: riftView(game, player),
     aliens: game.settings.aliens !== false,
+    interception: game.settings.interception !== false,
     me: {
       id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
       // Accurate to one decimal, as the server computes - with the rounded
@@ -286,6 +287,7 @@ export function buildSpectatorView(game) {
     wormholes: wormholeView(game, null),
     rifts: riftView(game, null),
     aliens: game.settings.aliens !== false,
+    interception: game.settings.interception !== false,
     diplomacy: diplomacyView(game, null),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,

@@ -180,5 +180,23 @@ const alive = (g, f) => g.fleets.includes(f) && f.ships.length > 0;
   console.log('AI: intercepts raids on its worlds; the hard one only with a clear edge.');
 }
 
+// 7) Switched off in the lobby: no chase orders - neither by players nor by the AI
+{
+  const { g, a, b, homeA, homeB } = setup({ levelA: 'hard' });
+  g.settings.interception = false;
+  const hunter = fleetOf(g, a.id, homeA, Array(8).fill('fighter'));
+  const prey = fleetOf(g, b.id, { x: homeA.x + 120, y: homeA.y + 60 }, ['colony']);
+  prey.dest = homeB.id;
+  assert(setOrders(g, a, { move: { fleetId: hunter.id, chase: prey.id } })?.error === 'err.chaseOff', 'A chase order went through although switched off');
+  const colony = g.galaxy.planets.filter(p => !p.owner).sort((x, y) => dist(x, homeA) - dist(y, homeA))[0];
+  colony.owner = a.id; colony.pop = 3;
+  const raid = fleetOf(g, b.id, { x: colony.x + 80, y: colony.y + 80 }, ['fighter']);
+  raid.dest = colony.id;
+  runBot(g, a);
+  assert(!g.fleets.some(f => f.chase), 'The AI intercepts although switched off');
+  assert(buildView(g, a).interception === false, 'The view does not tell the client');
+  console.log('Switched off: no chase orders, the AI holds back.');
+}
+
 if (errors) { console.error(`\n${errors} chase checks failed.`); process.exit(1); }
 console.log('\nAll chase checks passed.');

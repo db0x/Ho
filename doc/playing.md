@@ -153,7 +153,7 @@ its course. Where they come close enough, both stop and fight in open space,
 without battery or satellites; a survivor flies on afterwards. A faster fleet
 catches up, a slower one only head-on. If the target reaches an orbit, your
 fleet follows it there; if it goes out of sight, the chase ends. The AI
-empires intercept too.
+empires intercept too. Intercepting can be switched off in the lobby.
 
 A world falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes

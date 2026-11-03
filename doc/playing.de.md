@@ -156,7 +156,8 @@ sie das Ziel auf seinem Kurs trifft. Kommen sie sich nah genug, halten beide an
 und kämpfen im freien Raum, ohne Abwehrbatterie und Satelliten; wer überlebt,
 fliegt danach weiter. Eine schnellere Flotte holt ein, eine langsamere nur im
 Gegenkurs. Erreicht das Ziel einen Orbit, folgt deine Flotte dorthin; gerät es
-außer Sicht, endet die Verfolgung. Auch die KI-Reiche fangen ab.
+außer Sicht, endet die Verfolgung. Auch die KI-Reiche fangen ab. Abschaltbar
+in der Lobby.
 
 Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder
 Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht

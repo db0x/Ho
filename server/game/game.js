@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = {
   capitalShips: true,  // destroyers can be built; off = classic Ho!!
   alliances: true,     // empires may ally (diplomacy.js); off = everyone against everyone
   aliens: true,        // now and then aliens raid from another galaxy (server/aliens.js)
+  interception: true,  // armed fleets may chase foreign fleets in flight (movement.js)
   seed: null
 };
 

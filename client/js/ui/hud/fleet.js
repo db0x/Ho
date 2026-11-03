@@ -333,7 +333,7 @@ export const fleetMethods = {
   chaseButton(prey) {
     const v = this.view;
     const f = v.fleets.find(x => x.id === this.lastFleetId);
-    if (v.spectator || !f || !f.mine || prey.at != null || prey.allied) return '';
+    if (v.spectator || v.interception === false || !f || !f.mine || prey.at != null || prey.allied) return '';
     if (!f.ships.some(s => s.attack > 0)) return `<p class="hint-line">${t('fleet.chaseNeedsArms')}</p>`;
     return `<div class="sel-actions"><button id="chase" class="primary">${t('fleet.chaseButton', { n: f.ships.length })}</button></div>`;
   },

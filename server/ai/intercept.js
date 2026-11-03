@@ -38,6 +38,7 @@ function holdsAlone(world, fire, tech) {
 
 export function intercepts(s) {
   const { game, bot, hard, zone, threatened } = s;
+  if (game.settings.interception === false) return;
   const hunters = game.fleets.filter(f => f.owner === bot.id && !f.chase && f.dest == null && !f.hole
     && f.ships.some(x => x.attack > 0) && !f.ships.some(x => x.colonists > 0 || x.cargo)
     && fleetStats(f).speed > 0);

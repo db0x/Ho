@@ -205,7 +205,8 @@ const app = {
     const fleetId = app.orderFleet();
     if (!fleetId) return;
     const prey = map?.view?.fleets.find(f => f.id === target);
-    if (!prey || prey.mine || prey.allied) { sfx.play('deny'); return; }
+    // Switched off in the lobby: a right click on a fleet does nothing.
+    if (map?.view?.interception === false || !prey || prey.mine || prey.allied) { sfx.play('deny'); return; }
     net.send({ t: 'orders', move: { fleetId, chase: target } });
     sfx.play('course');
   },
