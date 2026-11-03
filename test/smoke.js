@@ -90,7 +90,8 @@ function checkReplay(e) {
   const gone = new Set(scuttled);
   sides.forEach((owner, k) => {
     const left = units.filter((u, i) => u[0] === k && u[1] !== 'battery' && hp[i] > 0 && !gone.has(i)).length;
-    const name = (game.players.find(p => p.id === owner) || {}).name;
+    // The aliens are no empire: their tally carries the owner id as its name.
+    const name = (game.players.find(p => p.id === owner) || { name: owner }).name;
     const tally = e.params.sides.find(x => x.name === name);
     assert(tally && tally.left === left,
       `Record at ${e.params.planet}: ${name} keeps ${left}, tally says ${tally?.left}`);

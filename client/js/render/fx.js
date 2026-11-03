@@ -163,7 +163,9 @@ export const WORMHOLE_MIN_PX = 10;
 // embers - that is the warning that it will soon be gone.
 const HOLE_TINT = {
   calm: { rim: [176, 112, 255], core: [150, 236, 255], ring: [205, 240, 255] },
-  shaky: { rim: [255, 104, 74], core: [255, 196, 120], ring: [255, 226, 190] }
+  shaky: { rim: [255, 104, 74], core: [255, 196, 120], ring: [255, 226, 190] },
+  // The aliens' rift: poison green, from another galaxy.
+  alien: { rim: [60, 255, 120], core: [200, 255, 170], ring: [170, 255, 200] }
 };
 
 const holeSprites = new Map();
@@ -237,12 +239,12 @@ const easeOutBack = (t) => 1 + 2.4 * Math.pow(t - 1, 3) + 1.4 * Math.pow(t - 1, 
  * lensing ring and in the middle the throat with a view of the far side,
  * where rings sink away into the tunnel. Unstable it flickers, trembles and
  * throws sparks. While it opens it unfolds from a point with a shock wave.
- * @param {{seed: string, unstable?: boolean, open?: number, alpha?: number}} o
- *   open: 0..1 while it unfolds, 1 afterwards
+ * @param {{seed: string, unstable?: boolean, open?: number, alpha?: number, alien?: boolean}} o
+ *   open: 0..1 while it unfolds, 1 afterwards; alien: the green rift of the aliens
  */
 export function drawWormhole(ctx, x, y, R, phase, o) {
   const open = Math.max(0, Math.min(1, o.open ?? 1));
-  const tint = o.unstable ? HOLE_TINT.shaky : HOLE_TINT.calm;
+  const tint = o.alien ? HOLE_TINT.alien : o.unstable ? HOLE_TINT.shaky : HOLE_TINT.calm;
   // Unstable: an uneven flicker made of two detuned waves, and a tremble.
   const flicker = o.unstable ? 0.62 + 0.38 * Math.abs(Math.sin(phase * 7.3) * Math.sin(phase * 3.1 + 1)) : 1;
   const r = R * easeOutBack(open) * (o.unstable ? 1 + 0.06 * Math.sin(phase * 17) : 1);

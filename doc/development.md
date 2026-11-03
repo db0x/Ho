@@ -25,6 +25,7 @@ server/
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
   wormholes.js       Wormholes: opening, sight, jump, collapse, dev-mode aids
+  aliens.js          Aliens: rifts, raids, overrunning worlds, leaving, dev-mode aid
   shipnames.js       Names for the destroyers: historical ships and a few from films and series
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
@@ -153,6 +154,7 @@ npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
 npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
 npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
+npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last world spared, carrier, dev mode
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat

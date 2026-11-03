@@ -117,6 +117,9 @@ export class Lobby {
     $('#s-capitals').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { capitalShips: $('#s-capitals').checked } });
     };
+    $('#s-aliens').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { aliens: $('#s-aliens').checked } });
+    };
     $('#s-alliances').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { alliances: $('#s-alliances').checked } });
     };
@@ -442,6 +445,9 @@ export class Lobby {
     $('#s-alliances').checked = s.alliances !== false;
     $('#v-alliances').textContent = t(s.alliances !== false ? 'word.yes' : 'word.no');
     $('#s-alliances').disabled = !this.isHost;
+    $('#s-aliens').checked = s.aliens !== false;
+    $('#v-aliens').textContent = t(s.aliens !== false ? 'word.yes' : 'word.no');
+    $('#s-aliens').disabled = !this.isHost;
     $('#s-voice').checked = !!s.voice;
     $('#v-voice').textContent = t(s.voice ? 'word.yes' : 'word.no');
     $('#s-voice').disabled = !this.isHost;

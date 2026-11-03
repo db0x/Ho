@@ -1,8 +1,9 @@
 // Fleets: the panel of a selected fleet with its ships, names and cargo,
 // the fleet rows other panels list - and whether a fleet can go somewhere.
 import {
-  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, supplyNeed
+  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, ALIEN_TYPES, supplyNeed
 } from '../../../shared/rules.js';
+import { ownerOf, ownerColor } from '../../owners.js';
 import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { courseTarget, portalsOf } from '../../render/courses.js';
@@ -16,7 +17,7 @@ export const fleetMethods = {
     const v = this.view;
     this.lastFleetId = f.id;
     if (!f.mine && !v.spectator) {
-      const pl = v.players.find(q => q.id === f.owner);
+      const pl = ownerOf(v, f.owner);
       // Detected means: course and arrival are known, the ships themselves are not.
       const target = courseTarget(v, f);
       const whither = target
@@ -26,6 +27,21 @@ export const fleetMethods = {
         : `<div class="sel-sub">${t('fleet.noCourse')}</div>`;
       // Big ships are known by name, like at sea - what else flies along is not.
       const names = f.ships.filter(s => s.name).map(s => escapeHtml(s.name));
+      if (pl?.alien) {
+        // The aliens make no secret of themselves: a carrier and its swarm,
+        // there for everyone to see - and where to hit them.
+        box.innerHTML = `<div class="sel-head"><div><div class="sel-title" style="color:${pl.color}">${t('alien.fleet')}</div>
+          ${whither}</div></div>
+          <div class="fr-sub"><span class="fr-comp">${this.composition(f, pl.color)}</span></div>
+          <p class="hint-line">${t('alien.hint')}</p>`;
+        for (const el of box.querySelectorAll('.ci')) {
+          el.appendChild(shipIcon(el.dataset.t, 18, el.dataset.c));
+          // Each type opens its profile in the ship overview.
+          el.parentElement.classList.add('clickable-ship');
+          el.parentElement.onclick = () => this.showShip(el.dataset.t);
+        }
+        return;
+      }
       box.innerHTML = `<div class="sel-head"><div><div class="sel-title">${t('fleet.foreign')}</div>
         <div class="sel-sub" style="color:${pl?.color}">${pl?.name || '?'}</div>${whither}</div></div>
         <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>
@@ -47,7 +63,7 @@ export const fleetMethods = {
       <div class="sel-head">
         <div>
           <div class="sel-title">${v.spectator
-            ? `<span style="color:${(v.players.find(q => q.id === f.owner) || {}).color}">${(v.players.find(q => q.id === f.owner) || {}).name || '?'}</span> · `
+            ? `<span style="color:${ownerOf(v, f.owner)?.color}">${escapeHtml(ownerOf(v, f.owner)?.name || '?')}</span> · `
             : ''}${t('fleet.title', { n: f.ships.length })}</div>
           <div class="sel-sub">${where ? t('fleet.atPlanet', { planet: where.name }) : t('fleet.enRoute')}
             ${destP ? ' ' + t('fleet.destSuffix', { planet: destP.name, turns: turnsTo })
@@ -98,7 +114,7 @@ export const fleetMethods = {
       ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
 
     const col = (f.mine && v.me) ? v.me.color
-      : ((v.players.find(q => q.id === f.owner) || {}).color || '#9fb0c8');
+      : ownerColor(v, f.owner, '#9fb0c8');
     for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
     // The built-in tech of these ships, not the current levels
     for (const el of box.querySelectorAll('[data-info]')) {
@@ -223,7 +239,7 @@ export const fleetMethods = {
    */
   fleetRow(f, p) {
     const v = this.view;
-    const pl = v.players.find(q => q.id === f.owner);
+    const pl = ownerOf(v, f.owner);
     const color = pl?.color || '#9fb0c8';
     const target = f.dest != null && f.dest !== p.id ? v.planets[f.dest] : null;
     const arriving = f.dest === p.id && f.at !== p.id;
@@ -260,7 +276,7 @@ export const fleetMethods = {
   composition(f, color) {
     const per = {};
     for (const s of f.ships) per[s.type] = (per[s.type] || 0) + 1;
-    return SHIP_TYPES.filter(type => per[type]).map(type =>
+    return [...ALIEN_TYPES, ...SHIP_TYPES].filter(type => per[type]).map(type =>
       `<span class="comp" title="${per[type]}× ${t(`ship.${type}.name`)}"><span class="ci" data-t="${type}" data-c="${color}"></span>${per[type]}</span>`).join('');
   },
 

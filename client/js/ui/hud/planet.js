@@ -1,5 +1,6 @@
 // The panel of a selected world: what it is like, who holds it, its
 // population and terraforming, its shipyard and its defenses.
+import { ownerOf } from '../../owners.js';
 import {
   habitability, planetCapacity, terraformable, terraformFullCost, terraLimits, IDEAL, planetIncome,
   planetMining, batteryStats
@@ -206,9 +207,9 @@ export const planetMethods = {
     const ships = (f) => t('word.ships', { n: f.ships.length, count: f.ships.length });
     const warnings = [
       ...enemyOrbit.map(f => t('def.enemyOrbit', {
-        player: escapeHtml(v.players.find(q => q.id === f.owner)?.name || '?'), ships: ships(f) })),
+        player: escapeHtml(ownerOf(v, f.owner)?.name || '?'), ships: ships(f) })),
       ...enemyIncoming.map(f => t(f.eta ? 'def.enemyIncoming' : 'def.enemyIncomingNoEta', {
-        player: escapeHtml(v.players.find(q => q.id === f.owner)?.name || '?'), ships: ships(f),
+        player: escapeHtml(ownerOf(v, f.owner)?.name || '?'), ships: ships(f),
         turns: f.eta ? t('word.turns', { n: f.eta, count: f.eta }) : '' }))
     ];
     const outdated = ds && (ds.weapons < me.tech.weapons || ds.shields < me.tech.shields);

@@ -2,7 +2,7 @@
 // the replay, intercepting fleets that try to leave, the planetary defense
 // battery - and the repairs a destroyer makes afterwards.
 import {
-  SHIP_DEFS, REPAIR_SHARE, batteryStats, COMBAT_ROUNDS, INTERCEPT_ROUNDS
+  SHIP_DEFS, REPAIR_SHARE, batteryStats, COMBAT_ROUNDS, INTERCEPT_ROUNDS, isAlien
 } from '../../shared/rules.js';
 import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
@@ -12,6 +12,7 @@ import { planetById, playerById } from './game.js';
  * Every world with strangers in orbit sees a battle. Whoever departs while
  * an armed enemy is in orbit gets intercepted (see below), then the
  * destroyers repair their fleets where nobody fought.
+ * @returns {Set<number>} the worlds with a battle this turn
  */
 export function fightBattles(game, departures, entries) {
   const rng = game.rng;
@@ -28,6 +29,7 @@ export function fightBattles(game, departures, entries) {
   }
   cleanupFleets(game);
   repairFleets(game, fought, entries);
+  return fought;
 }
 
 // Numbers go out unformatted - how they are written (comma or period) is
@@ -205,7 +207,8 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
     const left = (game.fleets.filter(f => (f.at === planet.id || fleeing.includes(f)) && f.owner === owner)
       .reduce((a, f) => a + f.ships.length, 0))
       + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0);
-    tally.push({ name: p ? p.name : String(owner), left, before: n });
+    // The aliens have no name of their own - the client gives them one.
+    tally.push({ name: p ? p.name : String(owner), left, before: n, ...(isAlien(owner) ? { alien: true } : {}) });
   }
   entries.push({
     type: 'combat', planetId: planet.id, playerIds: [...before.keys()],

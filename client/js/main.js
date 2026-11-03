@@ -430,7 +430,7 @@ net.on('view', (m) => {
     // pop-ups, otherwise they plaster the screen at a fast pace.
     const loud = view.spectator
       ? ['eliminated', 'victory']
-      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole'];
+      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole', 'alien'];
     for (const l of settled(view)) {
       for (const e of l.entries) {
         if (!loud.includes(e.type)) continue;
@@ -729,7 +729,7 @@ function panOf(planetId) {
 }
 
 // Important things first: with many events, the rest falls by the wayside.
-const SFX_PRIO = ['victory', 'eliminated', 'lost', 'invade', 'combat', 'wormhole', 'expand',
+const SFX_PRIO = ['victory', 'eliminated', 'lost', 'alien', 'invade', 'combat', 'wormhole', 'expand',
   'colonize', 'settle', 'tech', 'build', 'terra', 'arrive', 'warn'];
 
 /**

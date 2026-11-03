@@ -1,6 +1,7 @@
 // Taking worlds: colony ships landing on free worlds, settlers unloading on
 // own ones, and invading an enemy world whose defenses have fallen.
-import { planetCapacity } from '../../shared/rules.js';
+import { planetCapacity, ALIEN_ID } from '../../shared/rules.js';
+import { overrun } from '../aliens.js';
 import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
 import { planetById, playerById } from './game.js';
@@ -24,6 +25,8 @@ export function colonize(game, entries) {
     const present = presentOwners(game, planet);
     const owner = holder(game, planet, present);
     if (owner == null) continue;
+    // The aliens alone in the orbit: they do not take the world, they empty it.
+    if (owner === ALIEN_ID) { overrun(game, planet, entries); continue; }
     const p = playerById(game, owner);
     if (!p || !p.alive) continue;
     const cap = planetCapacity(planet);

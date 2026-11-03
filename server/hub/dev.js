@@ -1,6 +1,8 @@
 // Dev mode: testing aids in a running game, announced to everyone in it.
 import { authEnabled } from '../auth.js';
+import { devAliens } from '../aliens.js';
 import { devDestroyer } from '../game/shipyard.js';
+import { pushLog } from '../game/log.js';
 import { devWormholes } from '../wormholes.js';
 import { adminOf } from './account.js';
 import { send } from './connections.js';
@@ -31,6 +33,18 @@ export const devHandlers = {
         return send(ws, { t: 'notice', key: 'dev.nothing' });
       }
       console.log(`Dev: ${c.account ?? 'guest'} - destroyer in game ${game.id}`);
+    } else if (action === 'aliens') {
+      // Aliens right away: at the selected world, otherwise at one of the
+      // player's own - or wherever the next raid would have gone.
+      const entries = [];
+      if (!devAliens(game, me || null, Number.isInteger(msg.planetId) ? msg.planetId : null, entries)) {
+        return send(ws, { t: 'notice', key: 'dev.nothing' });
+      }
+      // Into the log of the current turn, as if the rift had opened with it.
+      const last = game.log[game.log.length - 1];
+      if (last && last.turn === game.turn) last.entries.push(...entries);
+      else pushLog(game, entries);
+      console.log(`Dev: ${c.account ?? 'guest'} - aliens in game ${game.id}`);
     } else {
       if (!devWormholes(game, me || null, action, at)) return send(ws, { t: 'notice', key: 'dev.nothing' });
       console.log(`Dev: ${c.account ?? 'guest'} - wormholes ${action} in game ${game.id}`);

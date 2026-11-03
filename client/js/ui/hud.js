@@ -1,7 +1,7 @@
 // All panels of the game screen. The Hud holds what they share - the view,
 // the selection, the docks and tooltips - and puts the panels together;
 // each panel lives in ./hud/ with its own part of the game.
-import { shipTypesFor } from '../../shared/rules.js';
+import { shipTypesFor, ALIEN_TYPES } from '../../shared/rules.js';
 import { t } from '../i18n.js';
 import { makeDialog } from '../ui/dialog.js';
 import { openShipInfo } from '../ui/shipinfo.js';
@@ -202,7 +202,9 @@ export class Hud {
   /** Profile of a ship type; without arguments, with your own tech levels. */
   showShip(type, tech, color, note) {
     const me = this.view?.me;
-    openShipInfo(type, { tech: tech || me?.tech || {}, color: color || me?.color, note, types: shipTypesFor(this.view) });
+    // The aliens at the end - in a game with them, so they can be looked up.
+    const types = [...shipTypesFor(this.view), ...(this.view?.aliens !== false ? ALIEN_TYPES : [])];
+    openShipInfo(type, { tech: tech || me?.tech || {}, color: color || me?.color, note, types });
   }
 }
 

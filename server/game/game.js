@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = {
   wormholes: true,     // wormholes open now and then in the course of the game
   capitalShips: true,  // destroyers can be built; off = classic Ho!!
   alliances: true,     // empires may ally (diplomacy.js); off = everyone against everyone
+  aliens: true,        // now and then aliens raid from another galaxy (server/aliens.js)
   seed: null
 };
 
@@ -42,6 +43,8 @@ export function createGame(hostName) {
     players: [],
     fleets: [],
     wormholes: [],            // open wormholes (server/wormholes.js)
+    aliens: null,             // when the next raid is due and who had one (server/aliens.js)
+    alienRifts: [],           // rifts of the last turn, for the map
     nextFleetId: 1,
     nextShipId: 1,
     log: [],

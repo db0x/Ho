@@ -2,6 +2,7 @@
 // remembers from earlier, and the view of the game built from that for its
 // player - fog of war included. Spectators get the view without fog.
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
+import { riftView } from '../aliens.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
 import { round1 } from './combat.js';
 import { teamOf, alliesOf, diplomacyView } from './diplomacy.js';
@@ -188,6 +189,8 @@ export function buildView(game, player) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, player),
+    rifts: riftView(game, player),
+    aliens: game.settings.aliens !== false,
     me: {
       id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
       // Accurate to one decimal, as the server computes - with the rounded
@@ -269,6 +272,8 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, null),
+    rifts: riftView(game, null),
+    aliens: game.settings.aliens !== false,
     diplomacy: diplomacyView(game, null),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,

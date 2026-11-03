@@ -1,7 +1,7 @@
 // Profile of a ship type: a large, animated image and the stats the ship
 // would be built with. One window for all types - you can switch between
 // them at the top.
-import { SHIP_DEFS, SHIP_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
+import { SHIP_DEFS, SHIP_TYPES, ALIEN_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
 import { shipIcon } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';
@@ -9,6 +9,8 @@ import { t, localeTag, onLocaleChange } from '../i18n.js';
 const fmt = n => Math.round(n).toLocaleString(localeTag());
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(localeTag(), { maximumFractionDigits: 1 });
 const STAGE = 250;           // edge length of the stage in CSS pixels
+// Size on the stage relative to the others.
+const STAGE_SIZE = { destroyer: 0.88, alienFighter: 1.35, alienCarrier: 1.35 };
 
 let modal = null, frame = 0, current = null;
 
@@ -61,7 +63,7 @@ export function needsText(need) {
 export function openShipInfo(type, o = {}) {
   if (!SHIP_DEFS[type]) return;
   if (!modal) build();
-  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '', types: o.types || SHIP_TYPES };
+  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '', types: o.types || [...SHIP_TYPES, ...ALIEN_TYPES] };
   modal.querySelector('.si-close').textContent = t('shipinfo.close');
   render();
   modal.classList.remove('hidden');
@@ -107,15 +109,16 @@ function render() {
   const stats = [
     row(t('fleet.speed'), st.mobile ? `${fmt(st.speed)} ${t('unit.lyPerTurn')}` : t('shipinfo.immobile'),
       st.mobile ? differs(st.speed, base.speed) : null),
-    row(t('fleet.range'), st.range ? `${fmt(st.range)} ${t('unit.ly')}` : '–',
-      st.range ? differs(st.range, base.range) : null),
+    // The aliens bring their own supply: no range to speak of.
+    row(t('fleet.range'), st.range && !def.alien ? `${fmt(st.range)} ${t('unit.ly')}` : '–',
+      st.range && !def.alien ? differs(st.range, base.range) : null),
     row(t('fleet.attack'), st.attack ? fmt1(st.attack) : '–',
       st.attack ? differs(st.attack, base.attack) : null, fmt1),
     row(t('fleet.hull'), `${fmt(st.maxHp)} HP`, differs(st.maxHp, base.maxHp)),
     st.guns > 1 ? row(t('shipinfo.guns'), t('shipinfo.gunsValue', { n: st.guns, attack: fmt1(st.attack / st.guns) })) : '',
     st.colonists ? row(t('shipinfo.colonists'), t('word.pop', { n: fmt(st.colonists) })) : '',
     st.cargo ? row(t('shipinfo.cargo'), t('shipinfo.cargoValue', { n: st.cargo })) : '',
-    row(t('shipinfo.cost'), `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
+    row(t('shipinfo.cost'), def.alien ? t('shipinfo.notBuildable') : `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`)
   ].join('');
   const levels = def.techs.map(f => `${t(`tech.${f}.name`)} ${tech[f] || TECH_START_LEVEL}`).join(' · ');
 
@@ -123,7 +126,7 @@ function render() {
     <h2>${t(`ship.${type}.name`)}</h2>
     <p class="si-lead">${t(`ship.${type}.desc`)}</p>
     <div class="statgrid">${stats}</div>
-    <p class="small muted">${t('shipinfo.techs', { list: levels })}${note ? '<br>' + note : ''}${def.requires
+    <p class="small muted">${def.alien ? t('shipinfo.alienTech') : t('shipinfo.techs', { list: levels })}${note ? '<br>' + note : ''}${def.requires
       ? '<br>' + t('shipinfo.requires', { list: needsText(def.requires) }) : ''}</p>
     <h4>${t('shipinfo.use')}</h4>
     <p class="si-use">${t(`ship.${type}.info`)}</p>`;
@@ -145,13 +148,14 @@ function paint(ms) {
   // flies upwards, swaying slightly.
   const stationary = !SHIP_DEFS[current.type].speedMul;
   // The destroyer is the largest class everywhere - here it would run out
-  // of the stage, flames included.
-  const len = px * 0.58 * (current.type === 'destroyer' ? 0.88 : 1), S = len / 100;
+  // of the stage, flames included. The aliens have no flames and are shown
+  // as large as the stage allows.
+  const len = px * 0.58 * (STAGE_SIZE[current.type] || 1), S = len / 100;
   drawShipHD(ctx, {
     type: current.type,
     // Moved up a little: the flame needs room at the back.
     x: px / 2 + Math.sin(s * 0.7) * px * 0.015,
-    y: px / 2 - (stationary ? 0 : 10 * S) + Math.sin(s * 1.1) * px * 0.02,
+    y: px / 2 - (stationary || SHIP_DEFS[current.type].alien ? 0 : 10 * S) + Math.sin(s * 1.1) * px * 0.02,
     angle: stationary ? s * 0.2 : -Math.PI / 2 + Math.sin(s * 0.6) * 0.1,
     len,
     color: current.color,

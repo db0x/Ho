@@ -1,7 +1,7 @@
 // Movement through space: how far a fleet may go (range is measured from
 // the own inhabited worlds - supply), setting courses, and the fleets moving
 // at the end of the turn, around the black hole and into wormholes.
-import { supplyNeed, holeZone, advance, route, dist } from '../../shared/rules.js';
+import { supplyNeed, holeZone, advance, route, dist, isAlien } from '../../shared/rules.js';
 import { portalsFor, findMouth, transit } from '../wormholes.js';
 import { teamOf } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
@@ -82,7 +82,8 @@ export function moveFleets(game, entries) {
     const st = fleetStats(fleet);
     const owner = playerById(game, fleet.owner);
     if (st.speed <= 0) { fleet.dest = null; fleet.hole = null; continue; }
-    const reach = canReach(game, fleet, target);
+    // The aliens bring their own supply - they fly wherever they like.
+    const reach = isAlien(fleet.owner) ? { ok: true } : canReach(game, fleet, target);
     if (!reach.ok) {
       fleet.dest = null; fleet.hole = null;
       if (owner) entries.push({ type: 'warn', playerIds: [owner.id], private: owner.id,

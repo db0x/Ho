@@ -1,4 +1,5 @@
 // Star map: camera, background, planets, fleets, course lines.
+import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
@@ -184,6 +185,7 @@ export class MapView {
     this.view = view;
     this.poke(900);
     if (noteMouths(this, view, first)) this.poke(HOLE_OPEN_MS + 200);
+    if (noteRifts(this, view)) this.poke(RIFT_MS + 200);
     if (first) {
       this.fit();
       // Spectators have no homeworld - for them the overall view stays.
@@ -319,7 +321,7 @@ export class MapView {
     this.hit = [];
 
     const v = this.view;
-    const colorOf = id => (v.players.find(p => p.id === id) || {}).color || '#889';
+    const colorOf = id => ownerColor(v, id);
 
     // Range circles for the selected fleet
     const selFleet = this.selection?.type === 'fleet'
@@ -373,6 +375,7 @@ export class MapView {
     }
 
     this.drawMouths(ctx, v);
+    this.drawRifts(ctx, v);
 
     // Where every fleet stands on screen - in orbit on the side of its course.
     const zone = holeZone(v.galaxy);
@@ -555,6 +558,19 @@ export class MapView {
    * Wormhole mouths: first the tunnels of those whose both ends are known,
    * then the mouths themselves. They belong to nobody, like the black hole.
    */
+  drawRifts(ctx, v) {
+    const now = performance.now();
+    const R = this.mouthRadius() * 1.3;
+    for (const r of v.rifts || []) {
+      const open = riftOpen(this, v, r, now);
+      if (open == null) continue;
+      const [sx, sy] = this.w2s(r.x, r.y);
+      ctx.globalAlpha = 1;
+      drawWormhole(ctx, sx, sy, R, this.phase, { seed: 'rift', open, alien: true });
+    }
+    ctx.globalAlpha = 1;
+  }
+
   drawMouths(ctx, v) {
     const list = v.wormholes || [];
     if (!list.length) return;
@@ -930,6 +946,35 @@ export class MapView {
  * unfold (HOLE_OPEN_MS); those already there when the map opens just stand.
  * @returns {boolean} whether a new one appeared
  */
+export const RIFT_MS = 3400;
+
+/**
+ * Alien rifts of the turn: each one tears open, stays a moment for the
+ * swarm to come through (or to leave) and closes again - once, when the
+ * turn's view arrives. Returns whether there is a new one to animate.
+ */
+export function noteRifts(view3, view) {
+  const born = view3._rifts || (view3._rifts = new Map());
+  let fresh = false;
+  for (const r of view.rifts || []) {
+    const key = `${view.turn}:${r.kind}:${r.x}:${r.y}`;
+    if (born.has(key)) continue;
+    born.set(key, performance.now());
+    fresh = true;
+  }
+  if (born.size > 40) born.delete(born.keys().next().value);
+  return fresh;
+}
+
+/** How far open a rift is right now (0..1), or null once it has closed. */
+export function riftOpen(view3, view, r, now) {
+  const t0 = view3._rifts?.get(`${view.turn}:${r.kind}:${r.x}:${r.y}`);
+  if (t0 == null) return null;
+  const e = now - t0;
+  if (e > RIFT_MS) return null;
+  return Math.min(1, e / 600, (RIFT_MS - e) / 900);
+}
+
 export function noteMouths(view3, view, first) {
   const born = view3._born || (view3._born = new Map());
   let fresh = false;
@@ -978,7 +1023,7 @@ export function farSide(v, f) {
 }
 
 function leadType(f) {
-  const order = ['destroyer', 'fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
+  const order = ['alienCarrier', 'alienFighter', 'destroyer', 'fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
   const types = new Set((f.ships || []).map(s => s.type));
   for (const t of order) if (types.has(t)) return t;
   return 'fighter';

@@ -477,6 +477,15 @@ const RECIPES = {
     s.noise(b, t, { dur: 1.4, type: 'bandpass', from: 3200, to: 180, q: 2.2, gain: 0.1, attack: 0.5 });
     s.seq(b, t + 0.2, [1568, 1397, 1175, 988], 0.11, { type: 'sine', dur: 0.6, gain: 0.03 });
   } },
+  // Aliens: space tears open with a hiss, then an alien call - two
+  // detuned voices sliding against each other over a pulsing throb.
+  alien: { max: 1, gap: 0.8, build: (s, b, t) => {
+    s.noise(b, t, { dur: 0.7, type: 'bandpass', from: 5200, to: 600, q: 3, gain: 0.09, attack: 0.04 });
+    s.tone(b, t + 0.15, { type: 'sawtooth', from: 98, to: 82, dur: 1.4, gain: 0.07, filter: 700, attack: 0.2 });
+    s.tone(b, t + 0.3, { type: 'sine', from: 740, to: 494, dur: 0.9, gain: 0.05, attack: 0.15 });
+    s.tone(b, t + 0.32, { type: 'sine', from: 784, to: 466, dur: 0.9, gain: 0.045, attack: 0.15 });
+    s.seq(b, t + 0.35, [110, 110, 110], 0.32, { type: 'square', dur: 0.1, gain: 0.04, filter: 400 });
+  } },
   victory: { max: 1, build: (s, b, t) => {
     s.seq(b, t, [523, 659, 784, 1046], 0.11, { type: 'triangle', dur: 0.5, gain: 0.11 });
     s.tone(b, t + 0.45, { type: 'triangle', from: 523, dur: 1.3, gain: 0.08, attack: 0.03 });
@@ -492,7 +501,7 @@ export const SFX_NAMES = Object.keys(RECIPES);
 export const LOG_SFX = {
   combat: 'combat', invade: 'invade', colonize: 'colonize', settle: 'settle',
   build: 'build', tech: 'tech', terra: 'terra', arrive: 'arrive', warn: 'warn',
-  galaxy: 'expand', wormhole: 'wormhole',
+  galaxy: 'expand', wormhole: 'wormhole', alien: 'alien',
   lost: 'lost', eliminated: 'eliminated', victory: 'victory'
 };
 

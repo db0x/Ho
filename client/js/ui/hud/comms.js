@@ -21,7 +21,7 @@ export const commsMethods = {
         .join(', ');
     }
     if (Array.isArray(p.sides)) {
-      p.sides = p.sides.map(x => `${x.name} ${x.left}/${x.before}`).join(' vs. ');
+      p.sides = p.sides.map(x => `${x.alien ? t('alien.name') : x.name} ${x.left}/${x.before}`).join(' vs. ');
     }
     if (p.ship) p.ship = t(`ship.${p.ship}.name`);
     if (p.direction) p.direction = t(`dir.${p.direction}`);

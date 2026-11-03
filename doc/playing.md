@@ -12,6 +12,7 @@
 - [Two playing fields: classic and space](#two-playing-fields-classic-and-space)
 - [A galaxy without an edge](#a-galaxy-without-an-edge)
 - [Wormholes](#wormholes)
+- [Aliens](#aliens)
 - [The AI empires](#the-ai-empires)
 - [Watching](#watching)
 - [Ranking and victory](#ranking-and-victory)
@@ -251,6 +252,24 @@ Wormholes can be switched off in the lobby. The curious AI personalities –
 settler, raider and vulture – use them: a scout looks first, then colony ships
 follow to free worlds or a pack goes hunting on the far side; the raider also
 jumps blind. Before the wormhole collapses they come back.
+
+## Aliens
+
+From turn 30 on, aliens appear now and then: an **alien carrier** and several
+**alien fighters**. They appear within sight of a world, a few turns of flight
+away; the log names the target.
+
+- **Target:** the empire with the fewest alien attacks so far, with at least
+  three worlds. With six empires about every 15 turns somewhere in the galaxy.
+- **Strength:** weapons and shields of the empire under attack; 3 fighters at
+  first, up to 9 later.
+- **Effect:** they do not conquer. A world whose orbit they hold alone is
+  depopulated and becomes free. An empire's last world is never attacked.
+- **Carrier:** replaces one lost fighter per turn without a battle. Once it is
+  destroyed, the fighters withdraw. Otherwise they withdraw after two worlds,
+  15 turns, or heavy losses.
+
+Satellites or a fleet in orbit stop them. Aliens can be switched off in the lobby.
 
 ## The AI empires
 

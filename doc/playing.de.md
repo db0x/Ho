@@ -12,6 +12,7 @@
 - [Zwei Spielfelder: Klassik und Raum](#zwei-spielfelder-klassik-und-raum)
 - [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand)
 - [Wurmlöcher](#wurmlöcher)
+- [Aliens](#aliens)
 - [Die KI-Reiche](#die-ki-reiche)
 - [Zusehen](#zusehen)
 - [Rangliste und Sieg](#rangliste-und-sieg)
@@ -260,6 +261,24 @@ Wurmlöcher lassen sich in der Lobby abschalten. Die neugierigen KI-Charaktere �
 Siedler, Plünderer und Aasgeier – nutzen sie: Erst schaut ein Späher nach, dann
 folgen Kolonieschiffe zu freien Welten oder ein Rudel geht drüben auf Jagd; der
 Plünderer springt auch blind. Bevor das Wurmloch zusammenbricht, kehren sie heim.
+
+## Aliens
+
+Ab Runde 30 erscheinen gelegentlich Aliens: ein **Alien-Träger** und mehrere
+**Alien-Jäger**. Sie tauchen in Sichtweite einer Welt auf, ein paar Flugrunden
+entfernt; der Funk nennt das Ziel.
+
+- **Ziel:** das Reich mit den bisher wenigsten Alien-Angriffen, mit mindestens
+  drei Welten. Bei sechs Reichen etwa alle 15 Runden irgendwo in der Galaxie.
+- **Stärke:** Waffen und Schilde des angegriffenen Reichs; anfangs 3 Jäger,
+  später bis zu 9.
+- **Wirkung:** Sie erobern nicht. Eine Welt, deren Orbit sie allein halten,
+  wird entvölkert und frei. Die letzte Welt eines Reichs greifen sie nie an.
+- **Träger:** Ersetzt pro Runde ohne Kampf einen verlorenen Jäger. Wird er
+  zerstört, ziehen die Jäger ab. Sonst ziehen sie nach zwei Welten, 15 Runden
+  oder schweren Verlusten ab.
+
+Satelliten oder eine Flotte im Orbit halten sie auf. Abschaltbar in der Lobby.
 
 ## Die KI-Reiche
 

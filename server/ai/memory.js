@@ -1,6 +1,7 @@
 // The memory of an AI empire: what it noticed since its last move - lost
 // worlds, approaching fleets, fighting at the neighbors - and, for hard
 // empires, what its earlier strikes taught it.
+import { isAlien } from '../../shared/rules.js';
 import { planetById } from '../game/game.js';
 import { friendly } from './diplomacy.js';
 import { PERSONAS } from './personas.js';
@@ -77,7 +78,8 @@ export function perceive(game, bot, ai, mine, enemyWorlds) {
     const fire = f.ships.reduce((a, s) => a + s.attack, 0);
     if (fire <= 0) continue;
     threatened.set(target, (threatened.get(target) || 0) + fire);
-    ai.grudge[f.owner] = (ai.grudge[f.owner] || 0) + 0.3;
+    // The aliens are no empire to plan a war against - only a danger.
+    if (!isAlien(f.owner)) ai.grudge[f.owner] = (ai.grudge[f.owner] || 0) + 0.3;
   }
   for (const k of Object.keys(ai.grudge)) {
     ai.grudge[k] *= 0.97;
