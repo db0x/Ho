@@ -6,8 +6,9 @@
 
 import { compact } from './viewport.js';
 
-const TOP = 64;          // stay below the top bar
+const TOP = 72;          // below the top bar, level with the panel at the right edge
 const MARGIN = 8;        // minimum distance to the screen edge
+const GAP = 12;          // distance to the panel at the right edge
 const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // Order of the windows from back to front. The z values stay within a fixed
@@ -25,10 +26,12 @@ function bringToFront(el) {
 
 /**
  * @param {HTMLElement} el     the window itself
- * @param {object} o           { handle, grip, collapse, icon, key, x, y, w, h, minW, minH, onToggle }
+ * @param {object} o           { handle, grip, collapse, icon, key, x, y, w, h, minW, minH, avoid, onToggle }
  *   x/y: starting position without remembered geometry; without y the window sits at the bottom
  *   collapse: button that minimizes the window, icon: what stands in for it meanwhile
- * @returns {{refresh: () => void, toggle: (fold?: boolean) => void, collapsed: () => boolean}}
+ *   avoid: the panel pinned to the right edge - the window never reaches below
+ *     its bottom, and while it is slid out (.open) never beneath it
+ * @returns {{refresh: (glide?: boolean) => void, toggle: (fold?: boolean) => void, collapsed: () => boolean}}
  */
 export function makeDialog(el, o) {
   const narrow = compact;
@@ -37,6 +40,21 @@ export function makeDialog(el, o) {
   // On small devices the window is a sheet: position and size are handled by
   // the stylesheet there, not by this module. The remembered geometry is kept
   // and applies again as soon as there is room again.
+  // geo is where the player put the window, cur where it fits right now: a
+  // window pushed aside by the panel goes back once the panel is gone.
+  let cur = { ...geo };
+
+  /** Right and bottom edge of the room the window may use. */
+  function bounds() {
+    let right = innerWidth - MARGIN, bottom = innerHeight - MARGIN;
+    const r = o.avoid?.getBoundingClientRect();
+    if (r?.height) {
+      bottom = Math.min(bottom, r.bottom);
+      // Where the panel ends up, not where its slide currently is.
+      if (o.avoid.classList.contains('open')) right = Math.min(right, innerWidth - r.width - GAP);
+    }
+    return { right, bottom };
+  }
 
   function apply() {
     if (narrow.matches) {
@@ -45,19 +63,33 @@ export function makeDialog(el, o) {
       }
       return;
     }
-    geo.w = clamp(geo.w, minW, Math.max(minW, innerWidth - 2 * MARGIN));
-    geo.h = clamp(geo.h, minH, Math.max(minH, innerHeight - TOP - MARGIN));
+    const { right, bottom } = bounds();
     // Without a saved position and without a default, start at the bottom
     // left, where the log always used to sit.
-    if (geo.y == null) geo.y = innerHeight - geo.h - 12;
-    geo.x = clamp(geo.x, MARGIN, Math.max(MARGIN, innerWidth - geo.w - MARGIN));
-    geo.y = clamp(geo.y, TOP, Math.max(TOP, innerHeight - geo.h - MARGIN));
-    el.style.left = geo.x + 'px';
-    el.style.top = geo.y + 'px';
+    if (geo.y == null) geo.y = bottom - geo.h;
+    const w = clamp(geo.w, minW, Math.max(minW, right - MARGIN));
+    const h = clamp(geo.h, minH, Math.max(minH, bottom - TOP));
+    cur = {
+      x: clamp(geo.x, MARGIN, Math.max(MARGIN, right - w)),
+      y: clamp(geo.y, TOP, Math.max(TOP, bottom - h)),
+      w, h
+    };
+    el.style.left = cur.x + 'px';
+    el.style.top = cur.y + 'px';
     el.style.right = 'auto';
     el.style.bottom = 'auto';
-    el.style.width = geo.w + 'px';
-    el.style.height = geo.h + 'px';
+    el.style.width = cur.w + 'px';
+    el.style.height = cur.h + 'px';
+  }
+
+  /** Re-fit; glide: move along with the panel instead of jumping. */
+  function refresh(glide) {
+    if (glide && !narrow.matches) {
+      el.classList.add('dlg-glide');
+      clearTimeout(refresh.timer);
+      refresh.timer = setTimeout(() => el.classList.remove('dlg-glide'), 400);
+    }
+    apply();
   }
 
   /**
@@ -72,8 +104,11 @@ export function makeDialog(el, o) {
       if (e.button !== 0 || e.target.closest('button, input')) return;
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY;
-      const s = { x: geo.x, y: geo.y, w: geo.w, h: geo.h };
-      const maxW = innerWidth - 2 * MARGIN, maxH = innerHeight - TOP - MARGIN;
+      // Grabbed is what is seen - even if the panel pushed it there.
+      Object.assign(geo, cur);
+      const s = { ...cur };
+      const { right, bottom } = bounds();
+      const maxW = right - MARGIN, maxH = bottom - TOP;
       target.setPointerCapture(e.pointerId);
       el.classList.add('dlg-busy');
       const move = (ev) => {
@@ -90,6 +125,7 @@ export function makeDialog(el, o) {
         target.removeEventListener('pointerup', up);
         target.removeEventListener('pointercancel', up);
         el.classList.remove('dlg-busy');
+        Object.assign(geo, cur);
         save(o.key, geo);
       };
       target.addEventListener('pointermove', move);
@@ -134,7 +170,7 @@ export function makeDialog(el, o) {
   addEventListener('resize', apply);
   narrow.addEventListener('change', apply);
   if (geo.collapsed) toggle(true); else apply();
-  return { refresh: apply, toggle, collapsed: () => el.classList.contains('collapsed') };
+  return { refresh, toggle, collapsed: () => el.classList.contains('collapsed') };
 }
 
 function load(key) {

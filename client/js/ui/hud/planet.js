@@ -47,7 +47,12 @@ export const planetMethods = {
     const lim = terraLimits(radical);
     const dT = p.temp - IDEAL.temp, dG = p.grav - IDEAL.grav;
 
+    // Two parts: everything about the world scrolls, the shipyard below
+    // keeps its height. The scrolled position survives the rebuild.
+    const keep = box.querySelector('.sel-main')?.scrollTop || 0;
+    box.classList.add('split');
     box.innerHTML = `
+      <div class="sel-main">
       <div class="sel-head">
         <span id="thumb"></span>
         <div>
@@ -106,15 +111,6 @@ export const planetMethods = {
           </div>` : ''}
         `}
       </div>
-
-      ${p.pop >= 1 ? `
-      <div class="sec">
-        <h4>${t('yard.title')}</h4>
-        <div id="buildrows"></div>
-        <div class="small muted" id="buildsum"></div>
-        ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
-        ${this.recycleBlock('p:' + p.id)}
-      </div>` : `<div class="sec"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`}
       ` : ''}
 
       ${orbit.length ? `
@@ -134,7 +130,18 @@ export const planetMethods = {
         : (isMine && p.pop < cap
           ? `<div class="sel-actions"><button class="tiny" id="unload">${t('fleet.unload')}</button></div>`
           : '')) : ''}
+      </div>
+
+      ${isMine ? (p.pop >= 1 ? `
+      <div class="sel-yard">
+        <h4>${t('yard.title')}</h4>
+        <div id="buildrows"></div>
+        <div class="small muted" id="buildsum"></div>
+        ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
+        ${this.recycleBlock('p:' + p.id)}
+      </div>` : `<div class="sel-yard"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`) : ''}
     `;
+    box.querySelector('.sel-main').scrollTop = keep;
 
     const th = box.querySelector('#thumb');
     if (th) th.appendChild(planetThumb(p, 46, this.view.players.find(q => q.id === p.owner)?.color));
