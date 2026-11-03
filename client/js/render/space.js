@@ -280,7 +280,12 @@ export class SpaceView {
     }
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
     // Battles on top - they should stand out, even behind a nearby world.
-    this.battleFx.draw(ctx, performance.now(), (id) => {
+    this.battleFx.draw(ctx, performance.now(), (id, at) => {
+      if (at) {
+        const pr = this.project(at.x, at.y, at.z || 0);
+        return pr && { x: pr.x, y: pr.y, r: 5 * pr.s, s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)),
+          alpha: depthFade(pr.depth, this.cam.dist), shieldR: 0, shielded: false };
+      }
       const p = v.planets[id];
       const pr = p && this.project(p.x, p.y, p.z);
       if (!pr) return null;

@@ -15,7 +15,9 @@ export const fleetMethods = {
   fleetPanel(box, f) {
     if (!f) { box.innerHTML = ''; return; }
     const v = this.view;
-    this.lastFleetId = f.id;
+    // The last own fleet stays the one orders are for - also while a foreign
+    // one is looked at (to intercept it from its panel).
+    if (f.mine) this.lastFleetId = f.id;
     if (!f.mine && !v.spectator) {
       const pl = ownerOf(v, f.owner);
       // Detected means: course and arrival are known, the ships themselves are not.
@@ -33,7 +35,9 @@ export const fleetMethods = {
         box.innerHTML = `<div class="sel-head"><div><div class="sel-title" style="color:${pl.color}">${t('alien.fleet')}</div>
           ${whither}</div></div>
           <div class="fr-sub"><span class="fr-comp">${this.composition(f, pl.color)}</span></div>
-          <p class="hint-line">${t('alien.hint')}</p>`;
+          <p class="hint-line">${t('alien.hint')}</p>
+          ${this.chaseButton(f)}`;
+        this.wireChase(box, f);
         for (const el of box.querySelectorAll('.ci')) {
           el.appendChild(shipIcon(el.dataset.t, 18, el.dataset.c));
           // Each type opens its profile in the ship overview.
@@ -45,7 +49,9 @@ export const fleetMethods = {
       box.innerHTML = `<div class="sel-head"><div><div class="sel-title">${t('fleet.foreign')}</div>
         <div class="sel-sub" style="color:${pl?.color}">${pl?.name || '?'}</div>${whither}</div></div>
         <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>
-        ${names.length ? `<p class="hint-line">${t('fleet.namedSeen', { names: names.join(', ') })}</p>` : ''}`;
+        ${names.length ? `<p class="hint-line">${t('fleet.namedSeen', { names: names.join(', ') })}</p>` : ''}
+        ${this.chaseButton(f)}`;
+      this.wireChase(box, f);
       return;
     }
     const groups = {};
@@ -53,10 +59,12 @@ export const fleetMethods = {
     const where = f.at != null ? v.planets[f.at] : null;
     const destP = f.dest != null ? v.planets[f.dest] : null;
     const destM = f.hole ? courseTarget(v, f) : null;
+    // Intercepting: whom, and how soon they meet.
+    const prey = f.chase && f.aim ? v.fleets.find(x => x.id === f.chase) : null;
     const st = f.stats;
     // The path around the black hole counts, not the straight line.
-    const turnsTo = destP || destM
-      ? Math.max(1, Math.ceil(travelDistance(f, destP || destM, holeZone(v.galaxy)) / (st.speed || 1)))
+    const turnsTo = destP || destM || f.aim
+      ? Math.max(1, Math.ceil(travelDistance(f, destP || destM || f.aim, holeZone(v.galaxy)) / (st.speed || 1)))
       : 0;
 
     box.innerHTML = `
@@ -69,7 +77,9 @@ export const fleetMethods = {
             ${destP ? ' ' + t('fleet.destSuffix', { planet: destP.name, turns: turnsTo })
               .replace('<b>', '<b style="color:var(--gold)">') : ''}
             ${destM ? ' ' + t('fleet.holeSuffix', { turns: turnsTo })
-              .replace('<b>', '<b style="color:#cdb4ff">') : ''}</div>
+              .replace('<b>', '<b style="color:#cdb4ff">') : ''}
+            ${f.chase && f.aim ? ' ' + t('fleet.chaseSuffix', { player: escapeHtml(ownerOf(v, prey?.owner)?.name || '?'), turns: turnsTo })
+              .replace('<b>', '<b style="color:var(--bad)">') : ''}</div>
         </div>
       </div>
       <div class="statgrid cols4">
@@ -103,7 +113,7 @@ export const fleetMethods = {
         <h4>${t('fleet.orders')}</h4>
         <p class="hint-line" style="margin-top:0">${t('fleet.orderHint')}</p>
         <div class="sel-actions">
-          ${destP || destM ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
+          ${destP || destM || f.chase ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
           ${where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1
             ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
           ${f.ships.length > 1 ? `<button class="tiny" id="split" title="${t('fleet.splitKey')}">${t('fleet.split')}</button>` : ''}
@@ -253,7 +263,7 @@ export const fleetMethods = {
       right = `<span class="muted">${t('fleet.strengthUnknown')}</span>`;
     }
     const whither = arriving && Number.isFinite(turns) ? t('fleet.arrivesIn', { turns: t('word.turns', { n: turns, count: turns }) })
-      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : '';
+      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : f.chase ? `→ ${t('fleet.chasing')}` : '';
     return `<div class="fleetrow ${f.mine ? '' : 'foe'}" data-fleet="${f.id}">
       <div class="fr-top">
         <span class="dot" style="background:${color}"></span>
@@ -313,6 +323,24 @@ export const fleetMethods = {
       + `${t(typeof p.id === 'string' ? 'hole.courseButton' : 'planet.courseButton', { n: f.ships.length })}</button>`;
     return `<div class="sel-actions">${button}</div>`
       + (reason ? `<p class="hint-line" style="color:var(--bad)">${t('fleet.cannotReach', { reason })}</p>` : '');
+  },
+
+  /**
+   * Intercept this foreign fleet with the last own fleet - for touch, where
+   * there is no right click. Only for a fleet in flight that we are at war
+   * with, and only with an armed fleet of our own.
+   */
+  chaseButton(prey) {
+    const v = this.view;
+    const f = v.fleets.find(x => x.id === this.lastFleetId);
+    if (v.spectator || !f || !f.mine || prey.at != null || prey.allied) return '';
+    if (!f.ships.some(s => s.attack > 0)) return `<p class="hint-line">${t('fleet.chaseNeedsArms')}</p>`;
+    return `<div class="sel-actions"><button id="chase" class="primary">${t('fleet.chaseButton', { n: f.ships.length })}</button></div>`;
+  },
+
+  wireChase(box, prey) {
+    const b = box.querySelector('#chase');
+    if (b) b.onclick = () => this.app.orderChase(prey.id);
   },
 
   wireCourse(box, p) {

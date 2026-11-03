@@ -38,10 +38,10 @@ export function resolveTurn(game) {
   // 4) Movement - the aliens pick their targets first, like everyone else
   // gives orders before the turn ends.
   steerAliens(game);
-  const departures = moveFleets(game, entries);
+  const { departures, encounters } = moveFleets(game, entries);
 
-  // 5) Combat, intercepting and repairs
-  const fought = fightBattles(game, departures, entries);
+  // 5) Combat - in orbit and where chasers caught their target - intercepting and repairs
+  const fought = fightBattles(game, departures, entries, encounters);
 
   // 6) Colonization, invasion - and worlds the aliens overran
   colonize(game, entries);

@@ -22,6 +22,7 @@ export function logEntry(e) {
     type: e.type, planetId: e.planetId ?? null,
     key: e.key, params: e.params, because: e.because
   };
+  if (e.at) out.at = e.at;               // a battle in open space
   if (e.battle) out.battle = e.battle;
   return out;
 }

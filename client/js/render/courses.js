@@ -132,7 +132,17 @@ export const isMouth = (target) => typeof target?.id === 'string';
  */
 export function courseTarget(view, f) {
   if (f.hole) return view.wormholes?.find(m => m.id === f.hole) || null;
-  return f.dest != null ? view.planets[f.dest] || null : null;
+  if (f.dest != null) return view.planets[f.dest] || null;
+  // Intercepting: the point where it meets its target.
+  return f.aim ? { ...f.aim, aim: true, grav: 0.2 } : null;
+}
+
+/**
+ * Key of a battle in the log: turn and world - or turn and spot for a
+ * battle in open space. The log, the toasts and the replay share it.
+ */
+export function battleKey(turn, e) {
+  return e.planetId != null ? `${turn}:${e.planetId}` : `${turn}:@${e.at?.x},${e.at?.y}`;
 }
 
 /** The wormholes this empire knows both ends of, as supply links (shared/rules.js supplyNeed). */

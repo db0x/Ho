@@ -489,7 +489,13 @@ export class MapView {
     }
     ctx.globalAlpha = 1;
 
-    this.battleFx.draw(ctx, performance.now(), (id) => {
+    this.battleFx.draw(ctx, performance.now(), (id, at) => {
+      if (at) {
+        // In open space: a small spot to circle around, no world, no shield.
+        const [sx, sy] = this.w2s(at.x, at.y);
+        if (sx < -200 || sy < -200 || sx > this.w + 200 || sy > this.h + 200) return null;
+        return { x: sx, y: sy, r: 5 * Math.max(0.6, z), s: Math.max(0.55, Math.min(1.8, 0.7 + z * 0.45)), shieldR: 0, shielded: false };
+      }
       const p = v.planets[id];
       if (!p) return null;
       const [sx, sy] = this.w2s(p.x, p.y);

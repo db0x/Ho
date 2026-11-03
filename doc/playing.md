@@ -146,6 +146,15 @@ front, those who need protecting behind. A fleet that leaves while an armed enem
 holds the orbit is **intercepted** and has to survive three more rounds of combat.
 Every battle can be replayed afterwards: click its notice to open the recording.
 
+**Intercepting in flight:** an armed fleet can chase a foreign fleet it sees in
+flight – right-click it with your fleet selected, or use *Intercept* in its
+panel. Every turn your fleet heads for the point where it meets the target on
+its course. Where they come close enough, both stop and fight in open space,
+without battery or satellites; a survivor flies on afterwards. A faster fleet
+catches up, a slower one only head-on. If the target reaches an orbit, your
+fleet follows it there; if it goes out of sight, the chase ends. The AI
+empires intercept too.
+
 A world falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes
 hands.
@@ -363,6 +372,7 @@ returning to the start screen and staying as they are.
 | Move / zoom the map | Drag, mouse wheel, `+` / `−`, buttons at the top right |
 | Select | Left click on a world or fleet |
 | Set course | Pick a fleet, then **right-click** (or shift-click) the target world – or click the target world and use *Fleet here* in the panel |
+| Intercept | Pick an armed fleet, then **right-click** a foreign fleet in flight – or click it and use *Intercept* in its panel |
 | See where fleets go | Each course line starts at its fleet – fleets in orbit wait on the side facing their target – and ends in an arrowhead. Select a fleet or point at it: its line stands out with the turns until arrival |
 | Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds). This works in flight too: both parts fly on to the same target until you give the new fleet a course of its own. Quicker: select the fleet and press `S` – it falls apart into single ships right away, no dialog |
 | End turn | Button in the middle of the top bar or `space` |

@@ -7,14 +7,17 @@ import {
 import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
 import { planetById, playerById } from './game.js';
+import { nearestName } from './movement.js';
 
 /**
  * Every world with strangers in orbit sees a battle. Whoever departs while
  * an armed enemy is in orbit gets intercepted (see below), then the
  * destroyers repair their fleets where nobody fought.
+ * Fleets that caught each other in open space fight where they met.
+ * @param {{at: object, fleets: object[]}[]} encounters  from moveFleets
  * @returns {Set<number>} the worlds with a battle this turn
  */
-export function fightBattles(game, departures, entries) {
+export function fightBattles(game, departures, entries, encounters = []) {
   const rng = game.rng;
   const fought = new Set();          // worlds with a battle this turn - no repairs there
   // 5) Combat. Whoever departs while an armed enemy is in orbit gets
@@ -27,7 +30,17 @@ export function fightBattles(game, departures, entries) {
       .map(([f]) => f);
     if (resolveCombatAt(game, planet, entries, rng, fleeing)) fought.add(planet.id);
   }
+  // In open space: no world, no battery, no satellites - only the fleets.
+  for (const e of encounters) {
+    const group = e.fleets.filter(f => f.ships.length && f.at == null);
+    if (group.length < 2) continue;
+    const site = { id: null, name: nearestName(game, e.at), owner: null, pop: 0, defenses: null, at: e.at };
+    resolveCombatAt(game, site, entries, rng, [], group);
+  }
   cleanupFleets(game);
+  // Whoever chased a fleet that is gone now has nothing left to chase.
+  const left = new Set(game.fleets.map(f => f.id));
+  for (const f of game.fleets) if (f.chase && !left.has(f.chase)) { f.chase = null; f.aim = null; }
   repairFleets(game, fought, entries);
   return fought;
 }
@@ -73,12 +86,17 @@ function repairFleets(game, fought, entries) {
   }
 }
 
-/** @returns {boolean} whether there was a battle */
-function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
+/**
+ * A battle at a world - or, with `group`, between these fleets in open
+ * space (`planet` is then only the spot: no owner, no defenses).
+ * @returns {boolean} whether there was a battle
+ */
+function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null) {
   const sides = new Map();
   let battery = null;
+  const here = group ? (f => group.includes(f)) : (f => f.at === planet.id);
   for (const f of game.fleets) {
-    if (f.at !== planet.id || !f.ships.length) continue;
+    if (!here(f) || !f.ships.length) continue;
     if (!sides.has(f.owner)) sides.set(f.owner, []);
     sides.get(f.owner).push(...f.ships);
   }
@@ -173,7 +191,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   }
   // Remove the dead - satellites aboard go down with their transporter
   for (const f of game.fleets) {
-    if (f.at !== planet.id && !fleeing.includes(f)) continue;
+    if (!here(f) && !fleeing.includes(f)) continue;
     cargoLost(f, f.ships.filter(s => s.hp <= 0), planet, entries);
     f.ships = f.ships.filter(s => s.hp > 0);
   }
@@ -181,14 +199,15 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
 
   // Whoever still has weapons controls the orbit; defenseless ships are lost.
   const armedOwners = new Set();
-  for (const f of game.fleets) if (f.at === planet.id && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
+  for (const f of game.fleets) if (here(f) && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
   if (planet.defenses && planet.defenses.some(s => s.attack > 0)) armedOwners.add(planet.owner);
   if (battery && battery.hp > 0) armedOwners.add(planet.owner);
   // The orbit belongs to the armed if they are no longer at war with each
   // other - alone or as allies. Whoever is at war with them loses what is left.
   const scuttled = [];
   const victors = [...armedOwners];
-  if (victors.length && victors.every(a => victors.every(b => !hostile(game, a, b)))) {
+  // In open space nobody holds anything - whoever survives flies on.
+  if (!group && victors.length && victors.every(a => victors.every(b => !hostile(game, a, b)))) {
     for (const f of game.fleets) {
       if (f.at === planet.id && victors.some(v => hostile(game, v, f.owner)) && f.ships.length) {
         const p = playerById(game, f.owner);
@@ -204,7 +223,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   const tally = [];
   for (const [owner, n] of before) {
     const p = playerById(game, owner);
-    const left = (game.fleets.filter(f => (f.at === planet.id || fleeing.includes(f)) && f.owner === owner)
+    const left = (game.fleets.filter(f => (here(f) || fleeing.includes(f)) && f.owner === owner)
       .reduce((a, f) => a + f.ships.length, 0))
       + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0);
     // The aliens have no name of their own - the client gives them one.
@@ -212,7 +231,10 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = []) {
   }
   entries.push({
     type: 'combat', planetId: planet.id, playerIds: [...before.keys()],
-    key: 'log.battle', params: { planet: planet.name, sides: tally },
+    ...(group
+      ? { at: { x: Math.round(planet.at.x), y: Math.round(planet.at.y), z: Math.round(planet.at.z || 0) },
+        key: 'log.battleSpace', params: { near: planet.name, sides: tally } }
+      : { key: 'log.battle', params: { planet: planet.name, sides: tally } }),
     battle: { sides: owners, units, rounds, scuttled, fled: [...escaping].map(s => idx.get(s)) }
   });
   cleanupFleets(game);

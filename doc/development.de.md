@@ -159,6 +159,7 @@ npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, 
 npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
 npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzte Welt verschont, Träger, Entwicklungsmodus
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
+npm run test:chase     # Abfangen im Flug: Einholen, Anhalten, Tempo, Befehle, Orbit und Sicht, KI
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat
 npm run test:auth      # Zugang: Hashes, Konten, Profil, Anmeldung, Rateschutz

@@ -156,6 +156,7 @@ npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, c
 npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
 npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last world spared, carrier, dev mode
 node test/intercept.js # interception when leaving a contested orbit
+npm run test:chase     # intercepting in flight: catch, stop, speed, orders, orbit and sight, AI
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat
 npm run test:auth      # access: hashes, accounts, profile, sign-in, rate limit

@@ -149,6 +149,15 @@ bewaffneter Gegner im Orbit steht, wird **abgefangen** und muss noch drei
 Gefechtsrunden überstehen. Jede Schlacht lässt sich nachträglich ansehen: ein
 Klick auf die Meldung öffnet die Aufzeichnung.
 
+**Abfangen im Flug:** Eine bewaffnete Flotte kann eine fremde Flotte verfolgen,
+die sie im Flug sieht – Rechtsklick darauf bei gewählter eigener Flotte, oder
+*Abfangen* in deren Panel. Jede Runde hält deine Flotte auf den Punkt zu, an dem
+sie das Ziel auf seinem Kurs trifft. Kommen sie sich nah genug, halten beide an
+und kämpfen im freien Raum, ohne Abwehrbatterie und Satelliten; wer überlebt,
+fliegt danach weiter. Eine schnellere Flotte holt ein, eine langsamere nur im
+Gegenkurs. Erreicht das Ziel einen Orbit, folgt deine Flotte dorthin; gerät es
+außer Sicht, endet die Verfolgung. Auch die KI-Reiche fangen ab.
+
 Eine Welt fällt, wenn ein Angreifer den Orbit hält und weder
 Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht
 dabei zurück, der Rest wechselt den Besitzer.
@@ -379,6 +388,7 @@ nur zwischen Rückkehr zur Startseite und Bleiben wählen.
 | Karte bewegen / zoomen | Ziehen, Mausrad, `+` / `−`, Knöpfe oben rechts |
 | Auswählen | Linksklick auf Welt oder Flotte |
 | Kurs setzen | Flotte wählen, dann **Rechtsklick** (oder Shift-Klick) auf die Zielwelt – oder Zielwelt anklicken und im Panel *Flotte hierher* |
+| Abfangen | Bewaffnete Flotte wählen, dann **Rechtsklick** auf eine fremde Flotte im Flug – oder sie anklicken und im Panel *Abfangen* |
 | Sehen, wohin Flotten fliegen | Jede Kurslinie beginnt an ihrer Flotte – Flotten im Orbit warten auf der Seite zu ihrem Ziel – und endet in einer Pfeilspitze. Flotte auswählen oder darauf zeigen: Ihre Linie wird hervorgehoben, mit den Runden bis zur Ankunft |
 | Flotte teilen | Flotte wählen, *Flotte teilen …*, dann Schiffe von einer Spalte in die andere ziehen – Antippen verschiebt ein einzelnes Schiff. *Jedes Schiff als eigene Flotte* macht aus der rechten Spalte Einzelflotten; *Alle einzeln* zerlegt die ganze Flotte auf einmal (etwa Kolonieschiffe für mehrere Welten). Das geht auch im Flug: Beide Teile fliegen weiter zum selben Ziel, bis die neue Flotte einen eigenen Kurs bekommt. Schneller: Flotte wählen und `S` drücken – sie zerfällt sofort in Einzelschiffe, ohne Dialog |
 | Zug beenden | Knopf in der Mitte der Kopfleiste oder `Leertaste` |

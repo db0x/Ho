@@ -126,7 +126,7 @@ export function orderFleets(s) {
     .filter(f => f.dest != null && isScout(f)).map(f => f.dest));
   // Free worlds held by a foreign ship - nobody settles there until it is gone.
   const { blocked, escorted } = clearOrbits(s, claimed);
-  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && f.ships.length)) {
+  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && !f.chase && f.ships.length)) {
     const st = fleetStats(fleet);
     if (st.speed <= 0 || fleet.ships.some(s => s.cargo)) continue;
     const here = fleet.at !== null ? planetById(game, fleet.at) : fleet;
@@ -228,7 +228,7 @@ function clearOrbits(s, claimed) {
   for (const [id, need] of blocked) {
     if (!wanted.has(id) || escorted.has(id)) continue;
     const p = planets[id];
-    const guards = myFleets.filter(f => f.dest == null && !f.hole && f.ships.length && strike(f) >= need
+    const guards = myFleets.filter(f => f.dest == null && !f.hole && !f.chase && f.ships.length && strike(f) >= need
       && fleetStats(f).speed > 0 && !f.ships.some(x => x.colonists > 0 || x.cargo)
       && !(f.at != null && threatened.has(f.at)));
     const g = guards.map(f => ({ f, d: travelDistance(f.at != null ? planets[f.at] : f, p, zone) }))
