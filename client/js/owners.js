@@ -1,7 +1,7 @@
 // Who a fleet belongs to: an empire of the game - or the aliens, who are no
 // empire and have no place in the list of players, but still need a name
 // and a color wherever a fleet or a battle shows its owner.
-import { ALIEN_ID, ALIEN_COLOR } from '../../shared/rules.js';
+import { ALIEN_ID, ALIEN_COLOR } from '../shared/rules.js';
 import { t } from './i18n.js';
 
 /** The empire with this id, the aliens, or null. */

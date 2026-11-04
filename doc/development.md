@@ -150,6 +150,7 @@ start screen down to a 16-point tab icon.
 ```
 npm test               # all test runs
 npm run test:i18n      # catalogues: same keys, same placeholders, server keys covered
+npm run test:imports   # browser imports resolve, also when served under a sub-path
 npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
 npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
