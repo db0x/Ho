@@ -7,6 +7,7 @@
 //   - a grid in the galaxy's mid-plane,
 //   - a plumb line from every world to that plane (shows the height),
 //   - size and brightness by distance.
+import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
 import { dist, holeZone, route, routeLength, reachOutline, WORMHOLE } from '../../shared/rules.js';
@@ -19,7 +20,7 @@ import {
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
 import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint, courseTarget, isMouth } from './courses.js';
-import { noteMouths, mouthOpen, mouthLines, farSide, HOLE_OPEN_MS } from './map.js';
+import { noteMouths, mouthOpen, mouthLines, farSide, HOLE_OPEN_MS, noteRifts, riftOpen, RIFT_MS } from './map.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -186,6 +187,7 @@ export class SpaceView {
     this.view = view;
     this.poke(900);
     if (noteMouths(this, view, first)) this.poke(HOLE_OPEN_MS + 200);
+    if (noteRifts(this, view)) this.poke(RIFT_MS + 200);
     if (first) {
       this.fit();
       const home = view.me ? view.planets.find(p => p.id === view.me.homeworld) : null;
@@ -213,7 +215,7 @@ export class SpaceView {
     this.hit = [];
 
     const v = this.view;
-    const colorOf = id => (v.players.find(p => p.id === id) || {}).color || '#889';
+    const colorOf = id => ownerColor(v, id);
 
     this.drawBackdrop(ctx, colorOf);
     this._spots = this.fleetSpots(v);
@@ -248,6 +250,12 @@ export class SpaceView {
       const pr = this.project(m.x, m.y, m.z || 0);
       if (pr) items.push({ depth: pr.depth, kind: 'mouth', m, pr });
     }
+    const now = performance.now();
+    for (const r of v.rifts || []) {
+      const open = riftOpen(this, v, r, now);
+      const pr = open != null && this.project(r.x, r.y, r.z || 0);
+      if (pr) items.push({ depth: pr.depth, kind: 'rift', open, pr });
+    }
     items.sort((a, b) => b.depth - a.depth);
 
     // Names belong in the same order as their world: collected and drawn at
@@ -262,6 +270,9 @@ export class SpaceView {
       } else if (it.kind === 'hole') {
         ctx.globalAlpha = this.dim(null);
         this.drawHole(ctx, it, labels);
+      } else if (it.kind === 'rift') {
+        drawWormhole(ctx, it.pr.x, it.pr.y, this.mouthRadius(it.pr) * 1.3, this.phase,
+          { seed: 'rift', open: it.open, alien: true, alpha: depthFade(it.pr.depth, this.cam.dist) });
       } else this.drawFleet(ctx, it, colorOf);
       ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : it.kind === 'hole' || it.kind === 'mouth' ? this.dim(null) : 1;
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
@@ -269,7 +280,12 @@ export class SpaceView {
     }
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
     // Battles on top - they should stand out, even behind a nearby world.
-    this.battleFx.draw(ctx, performance.now(), (id) => {
+    this.battleFx.draw(ctx, performance.now(), (id, at) => {
+      if (at) {
+        const pr = this.project(at.x, at.y, at.z || 0);
+        return pr && { x: pr.x, y: pr.y, r: 5 * pr.s, s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)),
+          alpha: depthFade(pr.depth, this.cam.dist), shieldR: 0, shielded: false };
+      }
       const p = v.planets[id];
       const pr = p && this.project(p.x, p.y, p.z);
       if (!pr) return null;
@@ -1015,7 +1031,7 @@ function makeStars(n) {
   return stars;
 }
 function leadType(f) {
-  const order = ['destroyer', 'fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
+  const order = ['alienCarrier', 'alienFighter', 'destroyer', 'fighter', 'colony', 'transport', 'tanker', 'scout', 'satellite'];
   const types = new Set((f.ships || []).map(s => s.type));
   for (const t of order) if (types.has(t)) return t;
   return 'fighter';

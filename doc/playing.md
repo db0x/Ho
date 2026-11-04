@@ -12,6 +12,7 @@
 - [Two playing fields: classic and space](#two-playing-fields-classic-and-space)
 - [A galaxy without an edge](#a-galaxy-without-an-edge)
 - [Wormholes](#wormholes)
+- [Aliens](#aliens)
 - [The AI empires](#the-ai-empires)
 - [Watching](#watching)
 - [Ranking and victory](#ranking-and-victory)
@@ -145,6 +146,15 @@ front, those who need protecting behind. A fleet that leaves while an armed enem
 holds the orbit is **intercepted** and has to survive three more rounds of combat.
 Every battle can be replayed afterwards: click its notice to open the recording.
 
+**Intercepting in flight:** an armed fleet can chase a foreign fleet it sees in
+flight – right-click it with your fleet selected, or use *Intercept* in its
+panel. Every turn your fleet heads for the point where it meets the target on
+its course. Where they come close enough, both stop and fight in open space,
+without battery or satellites; a survivor flies on afterwards. A faster fleet
+catches up, a slower one only head-on. If the target reaches an orbit, your
+fleet follows it there; if it goes out of sight, the chase ends. The AI
+empires intercept too. Intercepting can be switched off in the lobby.
+
 A world falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes
 hands.
@@ -252,6 +262,24 @@ settler, raider and vulture – use them: a scout looks first, then colony ships
 follow to free worlds or a pack goes hunting on the far side; the raider also
 jumps blind. Before the wormhole collapses they come back.
 
+## Aliens
+
+From turn 30 on, aliens appear now and then: an **alien carrier** and several
+**alien fighters**. They appear within sight of a world, a few turns of flight
+away; the log names the target.
+
+- **Target:** the empire with the fewest alien attacks so far, with at least
+  three worlds. With six empires about every 15 turns somewhere in the galaxy.
+- **Strength:** weapons and shields of the empire under attack; 3 fighters at
+  first, up to 9 later.
+- **Effect:** they do not conquer. A world whose orbit they hold alone is
+  depopulated and becomes free. An empire's last world is never attacked.
+- **Carrier:** replaces one lost fighter per turn without a battle. Once it is
+  destroyed, the fighters withdraw. Otherwise they withdraw after two worlds,
+  15 turns, or heavy losses.
+
+Satellites or a fleet in orbit stop them. Aliens can be switched off in the lobby.
+
 ## The AI empires
 
 AI empires enter under names of their own – from *Admiral Wobblebeard* to *Czarina
@@ -344,6 +372,7 @@ returning to the start screen and staying as they are.
 | Move / zoom the map | Drag, mouse wheel, `+` / `−`, buttons at the top right |
 | Select | Left click on a world or fleet |
 | Set course | Pick a fleet, then **right-click** (or shift-click) the target world – or click the target world and use *Fleet here* in the panel |
+| Intercept | Pick an armed fleet, then **right-click** a foreign fleet in flight – or click it and use *Intercept* in its panel |
 | See where fleets go | Each course line starts at its fleet – fleets in orbit wait on the side facing their target – and ends in an arrowhead. Select a fleet or point at it: its line stands out with the turns until arrival |
 | Split a fleet | Select the fleet, *Split fleet …*, then drag ships from one column to the other – a tap moves a single ship. *Each ship as a fleet of its own* turns the right column into single-ship fleets; *All single* breaks up the whole fleet at once (e.g. colony ships for several worlds). This works in flight too: both parts fly on to the same target until you give the new fleet a course of its own. Quicker: select the fleet and press `S` – it falls apart into single ships right away, no dialog |
 | End turn | Button in the middle of the top bar or `space` |

@@ -21,6 +21,7 @@ import { openPassword, bindPassword } from './ui/password.js';
 import { openDelete, bindDelete } from './ui/delete.js';
 import { openGameEnd, bindGameEnd } from './ui/gameend.js';
 import { openBattle } from './ui/battle.js';
+import { battleKey } from './render/courses.js';
 import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
@@ -167,8 +168,8 @@ const app = {
     const b = app.battles.get(key);
     const v = map?.view;
     if (!b || !v) return;
-    openBattle({ battle: b.battle, planet: v.planets[b.planetId], players: v.players, you: v.you,
-      alliances: v.diplomacy?.alliances || [] });
+    openBattle({ battle: b.battle, planet: b.planetId != null ? v.planets[b.planetId] : null, near: b.near,
+      players: v.players, you: v.you, alliances: v.diplomacy?.alliances || [] });
   },
   send: (m) => net.send(m),
   setSelection(sel) {
@@ -198,6 +199,16 @@ const app = {
     if (!fleetId) return;
     net.send({ t: 'orders', move: { fleetId, planetId } });
     sfx.play('course', { pan: panOf(planetId) });
+  },
+  /** Intercept a foreign fleet - the server finds the meeting point. */
+  orderChase(target) {
+    const fleetId = app.orderFleet();
+    if (!fleetId) return;
+    const prey = map?.view?.fleets.find(f => f.id === target);
+    // Switched off in the lobby: a right click on a fleet does nothing.
+    if (map?.view?.interception === false || !prey || prey.mine || prey.allied) { sfx.play('deny'); return; }
+    net.send({ t: 'orders', move: { fleetId, chase: target } });
+    sfx.play('course');
   },
   /** Course into a wormhole mouth: the fleet jumps when it gets there. */
   orderHole(hole) {
@@ -238,7 +249,9 @@ const app = {
   orderFleet() {
     if (app.spectator) return null;
     const sel = app.selection;
-    const fleetId = sel?.type === 'fleet' ? sel.id : hud?.lastFleetId;
+    // A foreign fleet in the panel: the order is for the last own one.
+    const picked = sel?.type === 'fleet' ? map?.view?.fleets.find(f => f.id === sel.id) : null;
+    const fleetId = picked?.mine ? picked.id : hud?.lastFleetId;
     // Only order a fleet that really exists in this view and belongs to us -
     // otherwise the server swallows the order and it looks as if the button
     // did not register.
@@ -430,11 +443,11 @@ net.on('view', (m) => {
     // pop-ups, otherwise they plaster the screen at a fast pace.
     const loud = view.spectator
       ? ['eliminated', 'victory']
-      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole'];
+      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole', 'alien'];
     for (const l of settled(view)) {
       for (const e of l.entries) {
         if (!loud.includes(e.type)) continue;
-        const key = `${l.turn}:${e.planetId}`;
+        const key = battleKey(l.turn, e);
         hud.toast(hud.logText(e), null, app.battles.has(key) && e.battle ? () => app.openBattle(key) : null);
       }
     }
@@ -451,10 +464,11 @@ function collectBattles(view) {
   const fresh = [];
   for (const l of view.log) {
     for (const e of l.entries) {
-      if (!e.battle || e.planetId == null) continue;
-      const key = `${l.turn}:${e.planetId}`;
-      if (!app.battles.has(key)) fresh.push({ planetId: e.planetId, battle: e.battle });
-      app.battles.set(key, { planetId: e.planetId, battle: e.battle });
+      if (!e.battle || (e.planetId == null && !e.at)) continue;
+      const key = battleKey(l.turn, e);
+      const b = { planetId: e.planetId, at: e.at || null, near: e.params?.near ?? null, battle: e.battle };
+      if (!app.battles.has(key)) fresh.push(b);
+      app.battles.set(key, b);
     }
   }
   while (app.battles.size > 40) app.battles.delete(app.battles.keys().next().value);
@@ -495,6 +509,7 @@ function bindGame() {
   map.onOrder = (hit) => {
     if (hit?.type === 'planet') app.order(hit.id);
     if (hit?.type === 'hole') app.orderHole(hit.id);
+    if (hit?.type === 'fleet') app.orderChase(hit.id);
   };
   map.onHoverChange = () => {};
 
@@ -729,7 +744,7 @@ function panOf(planetId) {
 }
 
 // Important things first: with many events, the rest falls by the wayside.
-const SFX_PRIO = ['victory', 'eliminated', 'lost', 'invade', 'combat', 'wormhole', 'expand',
+const SFX_PRIO = ['victory', 'eliminated', 'lost', 'alien', 'invade', 'combat', 'wormhole', 'expand',
   'colonize', 'settle', 'tech', 'build', 'terra', 'arrive', 'warn'];
 
 /**

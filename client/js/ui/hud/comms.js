@@ -1,6 +1,7 @@
 // Log and chat: what happened each turn in the player's language, the game
 // chat with its unread count, and the toasts that pop up for news.
 import { t } from '../../i18n.js';
+import { battleKey } from '../../render/courses.js';
 import { compact } from '../../ui/viewport.js';
 import { fmt1, escapeHtml } from './format.js';
 
@@ -21,7 +22,7 @@ export const commsMethods = {
         .join(', ');
     }
     if (Array.isArray(p.sides)) {
-      p.sides = p.sides.map(x => `${x.name} ${x.left}/${x.before}`).join(' vs. ');
+      p.sides = p.sides.map(x => `${x.alien ? t('alien.name') : x.name} ${x.left}/${x.before}`).join(' vs. ');
     }
     if (p.ship) p.ship = t(`ship.${p.ship}.name`);
     if (p.direction) p.direction = t(`dir.${p.direction}`);
@@ -38,7 +39,7 @@ export const commsMethods = {
     box.innerHTML = this.view.log.slice().reverse().map(l => `
       <div class="logturn">${t('log.turnHeader', { turn: l.turn })}</div>
       ${l.entries.map(e => {
-        const key = `${l.turn}:${e.planetId}`;
+        const key = battleKey(l.turn, e);
         const replay = e.type === 'combat' && this.app.battles?.has(key)
           ? `<button class="tiny bt-watch" data-b="${key}" title="${escapeHtml(t('battle.watch'))}">▶</button>` : '';
         return `<div class="logline ${e.type} ${e.planetId != null ? 'clickable' : ''}"

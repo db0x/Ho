@@ -25,6 +25,7 @@ server/
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
+  aliens.js          Aliens: Risse, Überfälle, überrannte Welten, Abzug, Testhilfe im Entwicklungsmodus
   shipnames.js       Namen für die Träger: historische Schiffe und einige aus Filmen und Serien
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
@@ -156,7 +157,9 @@ npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
 npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
+npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzte Welt verschont, Träger, Entwicklungsmodus
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
+npm run test:chase     # Abfangen im Flug: Einholen, Anhalten, Tempo, Befehle, Orbit und Sicht, KI
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat
 npm run test:auth      # Zugang: Hashes, Konten, Profil, Anmeldung, Rateschutz

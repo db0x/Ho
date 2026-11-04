@@ -2,6 +2,7 @@
 // remembers from earlier, and the view of the game built from that for its
 // player - fog of war included. Spectators get the view without fog.
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
+import { riftView } from '../aliens.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
 import { round1 } from './combat.js';
 import { teamOf, alliesOf, diplomacyView } from './diplomacy.js';
@@ -87,6 +88,12 @@ export function seesFleet(game, playerId, f) {
   return inSight(game, playerId, f);
 }
 
+/** Whom a fleet chases and the meeting point it heads for - for course lines and panels. */
+function chaseView(game, f) {
+  if (!f.chase || !f.aim) return {};
+  return { chase: f.chase, aim: { x: Math.round(f.aim.x), y: Math.round(f.aim.y), z: Math.round(f.aim.z || 0) } };
+}
+
 export function buildView(game, player) {
   const vis = new Set();   // planets with current sight - own and allied eyes
   const team = teamOf(game, player.id);
@@ -136,6 +143,7 @@ export function buildView(game, player) {
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole,
+        ...chaseView(game, f),
         mine: true,
         ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
           ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}) })),
@@ -148,13 +156,17 @@ export function buildView(game, player) {
       // know its course and arrival - what it flies with stays hidden.
       // A course to a wormhole only shows if its mouth is in sight.
       const mouth = f.hole && player.seenMouths.has(f.hole) ? findMouth(game, f.hole)?.mouth : null;
-      const target = mouth || (f.dest != null ? planetById(game, f.dest) : null);
+      // A chaser shows where it is heading - whom it chases only if that one is in sight too.
+      const prey = f.chase ? game.fleets.find(g => g.id === f.chase) : null;
+      const chasing = prey && seesFleet(game, player.id, prey) ? chaseView(game, f) : {};
+      const target = mouth || (f.dest != null ? planetById(game, f.dest) : chasing.aim || null);
       const speed = target ? fleetStats(f).speed : 0;
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0),
         dest: f.dest != null && !mouth ? f.dest : null,
         hole: mouth ? mouth.id : null,
+        ...chasing,
         eta: target && speed > 0
           ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
@@ -188,6 +200,9 @@ export function buildView(game, player) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, player),
+    rifts: riftView(game, player),
+    aliens: game.settings.aliens !== false,
+    interception: game.settings.interception !== false,
     me: {
       id: player.id, name: player.name, color: player.color, emblem: player.emblem, avatar: player.avatar,
       // Accurate to one decimal, as the server computes - with the rounded
@@ -237,6 +252,7 @@ export function buildSpectatorView(game) {
   const fleets = game.fleets.filter(f => f.ships.length).map(f => ({
     id: f.id, owner: f.owner, at: f.at,
     x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole, mine: false,
+    ...chaseView(game, f),
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
       attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
@@ -269,6 +285,9 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, null),
+    rifts: riftView(game, null),
+    aliens: game.settings.aliens !== false,
+    interception: game.settings.interception !== false,
     diplomacy: diplomacyView(game, null),
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,

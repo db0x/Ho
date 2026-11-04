@@ -207,8 +207,9 @@ export class BattleFx {
   }
 
   /**
-   * @param place (planetId) => {x, y, r, s, alpha} | null - screen position of
-   *   the world, its radius in pixels and the scale for ships
+   * @param place (planetId, at) => {x, y, r, s, alpha} | null - screen position of
+   *   the world (or of the spot in open space, `at`), its radius in pixels
+   *   and the scale for ships
    */
   draw(ctx, now, place, colorOf) {
     if (!this.items.length) return;
@@ -217,7 +218,7 @@ export class BattleFx {
     for (const it of this.items) {
       const T = sec - it.t0;
       if (T < 0) continue;
-      const pl = place(it.planetId);
+      const pl = place(it.planetId, it.at);
       soundtrack(it, T, pl, ctx.canvas.clientWidth);
       if (!pl) continue;
       drawMapBattle(ctx, it, T, pl, colorOf);

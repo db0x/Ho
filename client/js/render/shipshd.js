@@ -5,6 +5,7 @@
 // Every type has its own module in ./shipshd/, drawn with the parts in
 // ./shipshd/kit.js; this one keeps the finished images and draws them.
 import { SHIP_SCALE } from './ships.js';
+import { alienCarrier, alienFighter } from './shipshd/alien.js';
 import { colony } from './shipshd/colony.js';
 import { destroyer } from './shipshd/destroyer.js';
 import { fighter } from './shipshd/fighter.js';
@@ -14,7 +15,7 @@ import { scout } from './shipshd/scout.js';
 import { tanker } from './shipshd/tanker.js';
 import { transport } from './shipshd/transport.js';
 
-const TYPES = { scout, fighter, satellite, colony, tanker, transport, destroyer };
+const TYPES = { scout, fighter, satellite, colony, tanker, transport, destroyer, alienFighter, alienCarrier };
 
 const cache = new Map();
 
@@ -61,5 +62,7 @@ export function drawShipHD(ctx, o) {
   ctx.drawImage(sp.canvas, -sp.half, -sp.half);
   ctx.scale(S, S);
   for (const l of def.lights) light(ctx, l.x, l.y, l.r, l.color, t, l.off, l.strobe);
+  // Moving parts of their own - the aliens' eye and glowing core.
+  def.anim?.(ctx, t);
   ctx.restore();
 }

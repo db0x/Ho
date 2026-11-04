@@ -1,6 +1,7 @@
 // The end of a turn: every phase in its order, then the tally of every
 // empire, eliminations and the end of the game.
 import { cargoOf } from '../../shared/rules.js';
+import { steerAliens, alienTurn } from '../aliens.js';
 import { wormholeTurn, spotWormholes } from '../wormholes.js';
 import { colonize } from './colonization.js';
 import { fightBattles } from './combat.js';
@@ -34,14 +35,17 @@ export function resolveTurn(game) {
   // 3) Terraforming
   terraform(game, entries);
 
-  // 4) Movement
-  const departures = moveFleets(game, entries);
+  // 4) Movement - the aliens pick their targets first, like everyone else
+  // gives orders before the turn ends.
+  steerAliens(game);
+  const { departures, encounters } = moveFleets(game, entries);
 
-  // 5) Combat, intercepting and repairs
-  fightBattles(game, departures, entries);
+  // 5) Combat - in orbit and where chasers caught their target - intercepting and repairs
+  const fought = fightBattles(game, departures, entries, encounters);
 
-  // 6) Colonization and invasion
+  // 6) Colonization, invasion - and worlds the aliens overran
   colonize(game, entries);
+  alienTurn(game, entries, fought);
 
   // 7) Economy
   runEconomy(game, entries);

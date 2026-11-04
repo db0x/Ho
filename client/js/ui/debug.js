@@ -2,8 +2,8 @@
 // without sign-in): start a test battle or play any sound effect without
 // having to play towards it - purely in the browser, the battle is rolled
 // here with the server's combat rules. In a running game it also steps in:
-// opening and closing wormholes, and a destroyer right away - that does go
-// to the server.
+// opening and closing wormholes, a destroyer and aliens right away - that
+// does go to the server.
 // Opened with Ctrl+Shift+D, in the start menu as in a game.
 import { SHIP_TYPES, shipStats, batteryStats, COMBAT_ROUNDS, PLAYER_COLORS } from '../../shared/rules.js';
 import { openBattle } from './battle.js';
@@ -69,6 +69,15 @@ export class DebugDialog {
     this.toggle(false);
   }
 
+  /** Aliens at the selected world - without a selection the server picks one of the player's. */
+  aliens() {
+    const sel = this.app?.selection;
+    const planetId = sel?.type === 'planet' ? sel.id
+      : sel?.type === 'fleet' ? this.app.map?.view?.fleets.find(f => f.id === sel.id)?.at ?? null : null;
+    this.app.send({ t: 'dev', action: 'aliens', planetId });
+    this.toggle(false);
+  }
+
   hole(action) {
     const at = action === 'openHere' ? this.selectionPoint() : null;
     if (action === 'openHere' && !at) { sfx.play('deny'); return; }
@@ -88,6 +97,7 @@ export class DebugDialog {
       if (a === 'reset') { this.cfg = structuredClone(DEFAULTS); this.render(); }
       if (a === 'fight') this.fight();
       if (a === 'destroyer') this.destroyer();
+      if (a === 'aliens') this.aliens();
       const hole = e.target.closest('[data-hole]')?.dataset.hole;
       if (hole) this.hole(hole);
       const snd = e.target.closest('[data-play]');
@@ -128,7 +138,12 @@ export class DebugDialog {
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="destroyer">${t('dev.destroyer')}</button>
       </div>
-      <p class="muted small">${t('dev.destroyerHint')}</p>` : ''}`;
+      <p class="muted small">${t('dev.destroyerHint')}</p>` : ''}
+      ${running ? `<h3>${t('alien.name')}</h3>
+      <div class="debug-actions debug-dev">
+        <button type="button" class="tiny" data-a="aliens">${t('dev.aliens')}</button>
+      </div>
+      <p class="muted small">${t('dev.aliensHint')}</p>` : ''}`;
     this.modal.innerHTML = `<div class="modal-box debug-box">
       <h2>${t('debug.title')}</h2>${holes}
       <h3>${t('debug.battle')}</h3>

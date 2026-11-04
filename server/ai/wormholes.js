@@ -37,7 +37,7 @@ export function wormholeTrips(s) {
     ai, game, bot, zone, P, strikePower, home, settleable, inRange, solo, enemyWorlds, price, margin
   } = s;
   ai.trips = ai.trips || {};          // wormhole -> turn before which nothing else is sent
-  const idle = game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && f.ships.length
+  const idle = game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && !f.chase && f.ships.length
     && fleetStats(f).speed > 0 && !f.ships.some(s => s.cargo) && !backDoor(s, f));
   for (const h of game.wormholes) {
     if ((ai.trips[h.id] || 0) > game.turn) continue;
@@ -99,7 +99,7 @@ export function wormholeTrips(s) {
  */
 export function comeBack(s) {
   const { game, bot, zone } = s;
-  for (const f of game.fleets.filter(f => f.owner === bot.id && !f.hole && f.ships.length)) {
+  for (const f of game.fleets.filter(f => f.owner === bot.id && !f.hole && !f.chase && f.ships.length)) {
     const door = backDoor(s, f);
     if (!door) continue;
     // Late enough that the way back to the mouth still fits before it collapses.

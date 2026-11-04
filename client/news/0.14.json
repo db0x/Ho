@@ -1,0 +1,14 @@
+{
+  "de": [
+    "Aliens: Ab Runde 30 erscheinen gelegentlich Aliens (ein Träger, mehrere Jäger) in Sichtweite einer Welt und greifen sie an. Sie erobern nicht – eine Welt, deren Orbit sie allein halten, wird entvölkert und frei. Ohne Träger ziehen die Jäger ab. Abschaltbar in der Lobby.",
+    "Abfangen im Flug: Eine bewaffnete Flotte kann eine sichtbare fremde Flotte verfolgen (Rechtsklick darauf, oder „Abfangen“ im Panel). Treffen sie sich, kämpfen sie im freien Raum, ohne Abwehrbatterie. Auch die KI fängt ab, die schwere gezielter. Abschaltbar in der Lobby."
+  ],
+  "en": [
+    "Aliens: from turn 30 on, aliens (a carrier and several fighters) occasionally appear within sight of a world and attack it. They do not conquer – a world whose orbit they hold alone is depopulated and becomes free. Without the carrier the fighters withdraw. Can be switched off in the lobby.",
+    "Intercepting in flight: an armed fleet can chase a foreign fleet in sight (right-click it, or “Intercept” in its panel). Where they meet, they fight in open space, without a defence battery. The AI intercepts too, the hard one more selectively. Can be switched off in the lobby."
+  ],
+  "uk": [
+    "Інопланетяни: від 30-го ходу зрідка з’являються інопланетяни (носій і кілька винищувачів) у зоні видимості світу й атакують його. Вони не завойовують – світ, чию орбіту вони самі утримують, знелюднюється і стає вільним. Без носія винищувачі відходять. Вимикається в лобі.",
+    "Перехоплення в польоті: озброєний флот може переслідувати видимий чужий флот (правий клік на нього або «Перехопити» на панелі). Де вони зустрінуться, там і б’ються у відкритому космосі, без оборонної батареї. ШІ теж перехоплює, складний – вибірковіше. Вимикається в лобі."
+  ]
+}

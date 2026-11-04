@@ -1,5 +1,6 @@
 // Ship graphics. Every class has its own silhouette; drawn pointing to the
 // right, the caller rotates.
+import { raiderWing, raiderHead, raiderHump, star, starArms, armHalf } from './alienshapes.js';
 
 function hullGradient(ctx, len) {
   const g = ctx.createLinearGradient(0, -len * 0.4, 0, len * 0.4);
@@ -609,9 +610,79 @@ function drawTanker(ctx, L, color, phase) {
   outline(ctx, fine(L) * 0.8);
 }
 
+/* ---------------------------------------------------------------- Aliens */
+// Not of this galaxy: organic green armour instead of grey plates, no
+// windows, no empire stripes. The fighter is a crescent with its claws
+// reaching forward; the carrier two needle-armed three-pointed stars
+// stacked crosswise.
+const ALIEN_GLOW = '#7dffa8';
+
+function alienMetal(ctx, y0, y1) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, '#b6ffd0');
+  g.addColorStop(0.35, '#4fc27f');
+  g.addColorStop(0.62, '#23764a');
+  g.addColorStop(1, '#0d3220');
+  return g;
+}
+
+function paintPulse(ctx, x, y, r, phase) {
+  const a = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(phase * 2.4), 2);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+  g.addColorStop(0, `rgba(220,255,230,${a})`);
+  g.addColorStop(0.35, `rgba(90,255,140,${a * 0.8})`);
+  g.addColorStop(1, 'rgba(60,255,120,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+}
+
+/** A green light that swells and fades - arm tips and the carrier's core. */
+function pulse(ctx, x, y, r, phase) {
+  if (collect) { collect.push({ over: true, run: (c, ph) => paintPulse(c, x, y, r, ph + phase) }); return; }
+  paintPulse(ctx, x, y, r, phase);
+}
+
+function drawAlienFighter(ctx, L, color, phase) {
+  // A crescent with long thin claws reaching forward past the head.
+  const u = L / 100;
+  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.46, s * 4 * u, L * 0.1, phase + s, ALIEN_GLOW);
+  raiderWing(ctx, u);
+  ctx.fillStyle = alienMetal(ctx, -38 * u, 38 * u); ctx.fill(); outline(ctx, 1);
+  for (const s of [-1, 1]) seam(ctx, L, [[-36 * u, s * 18 * u], [-20 * u, s * 29 * u], [10 * u, s * 31 * u], [40 * u, s * 22 * u]]);
+  edgeLight(ctx, L, [[52 * u, -16 * u], [30 * u, -30 * u], [0, -36 * u], [-24 * u, -33 * u]], 0.4);
+  ctx.fillStyle = '#123b26';
+  for (const s of [-1, 1]) ctx.fillRect(0, s * 5 * u - 0.7 * u, 16 * u, 1.4 * u);
+  raiderHead(ctx, u);
+  ctx.fillStyle = alienMetal(ctx, -12 * u, 12 * u); ctx.fill(); outline(ctx, 0.8);
+  raiderHump(ctx, u);
+  ctx.fillStyle = alienMetal(ctx, -7 * u, 7 * u); ctx.fill(); outline(ctx, 0.6);
+  ctx.fillStyle = '#05140c';
+  ctx.beginPath(); ctx.ellipse(7.5 * u, 0, 1.6 * u, 5.5 * u, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawAlienCarrier(ctx, L, color, phase) {
+  // Two needle-armed three-pointed stars stacked a sixth of a turn apart:
+  // the lower one segmented and in shadow, the upper one smooth.
+  const u = L / 100;
+  star(ctx, Math.PI / 3, 47, 3.2, u);
+  ctx.fillStyle = '#17482d'; ctx.fill(); outline(ctx, 0.9);
+  for (const a of starArms(Math.PI / 3)) {
+    const c = Math.cos(a), s = Math.sin(a);
+    for (const r of [12, 18, 24, 30, 36]) {
+      const w = armHalf(r, 47, 3.2);
+      seam(ctx, L, [[(r * c - s * w) * u, (r * s + c * w) * u], [(r * c + s * w) * u, (r * s - c * w) * u]]);
+    }
+  }
+  star(ctx, 0, 50, 3.8, u);
+  ctx.fillStyle = alienMetal(ctx, -50 * u, 50 * u); ctx.fill(); outline(ctx, 1);
+  for (const a of starArms(0)) edgeLight(ctx, L, [[Math.cos(a) * 6 * u, Math.sin(a) * 6 * u], [Math.cos(a) * 46 * u, Math.sin(a) * 46 * u]], 0.4);
+  pulse(ctx, 0, 0, 2.2 * u, phase);
+}
+
 const DRAW = {
   scout: drawScout, fighter: drawFighter, satellite: drawSatellite,
-  colony: drawColony, tanker: drawTanker, transport: drawTransport, destroyer: drawDestroyer
+  colony: drawColony, tanker: drawTanker, transport: drawTransport, destroyer: drawDestroyer,
+  alienFighter: drawAlienFighter, alienCarrier: drawAlienCarrier
 };
 
 /* ------------------------------------------------------------- Sprites */
@@ -630,7 +701,7 @@ const MAX_SHIPS = 400;
  * smaller, the fighter slightly bigger, the destroyer clearly the largest. The detailed drawing (shipshd.js)
  * uses the same factors.
  */
-export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5 };
+export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5, alienFighter: 1, alienCarrier: 1.45 };
 /**
  * How far the middle of a hull lies ahead of the origin, in units of the
  * length/100: the destroyer's bow reaches out to 52, its stern only to -40.

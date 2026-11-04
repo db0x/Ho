@@ -97,6 +97,8 @@ export function sanitizeSettings(s) {
   if (typeof s.wormholes === 'boolean') out.wormholes = s.wormholes;
   if (typeof s.capitalShips === 'boolean') out.capitalShips = s.capitalShips;
   if (typeof s.alliances === 'boolean') out.alliances = s.alliances;
+  if (typeof s.aliens === 'boolean') out.aliens = s.aliens;
+  if (typeof s.interception === 'boolean') out.interception = s.interception;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;
   return out;

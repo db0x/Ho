@@ -3,6 +3,7 @@
 // and round by round the shots fly that the server rolled. Seeking forwards
 // and backwards works at any time: the state at every moment follows from
 // the timeline, nothing is accumulated.
+import { ownerOf } from '../owners.js';
 import { drawShipHD } from '../render/shipshd.js';
 import { planetSprite, blitPlanet } from '../render/planets.js';
 import { hexRgb, drawHexShield, drawShieldHit } from '../render/fx.js';
@@ -71,7 +72,8 @@ function action(a) {
 }
 
 /**
- * @param {{battle:object, planet:object, players:object[], you:string|null, alliances?:object[]}} o
+ * @param {{battle:object, planet:object|null, near?:string, players:object[], you:string|null, alliances?:object[]}} o
+ *   planet: null for a battle in open space - then near names the closest world
  */
 export function openBattle(o) {
   if (!o?.battle) return;
@@ -90,11 +92,14 @@ function close() {
   modal?.classList.add('hidden');
 }
 
-const player = (id) => st.players.find(p => p.id === id) || { name: '?', color: '#9fb0c8' };
+const player = (id) => ownerOf(st, id) || { name: '?', color: '#9fb0c8' };
 
 function labels() {
   const { battle } = st;
-  modal.querySelector('.bt-title').textContent = t('battle.title', { planet: st.planet?.name || '?' });
+  // A battle in open space has no world - only the one it was closest to.
+  modal.querySelector('.bt-title').textContent = st.planet
+    ? t('battle.title', { planet: st.planet.name })
+    : t('battle.titleSpace', { near: st.near || '?' });
   modal.querySelector('.bt-close').textContent = t('battle.close');
   modal.querySelector('.bt-speed').textContent = `${st.speed}×`;
   modal.querySelector('.bt-speed').title = t('battle.speed');

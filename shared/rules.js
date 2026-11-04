@@ -125,6 +125,62 @@ export const SHIP_DEFS = {
 };
 
 /**
+ * Alien ships: nobody can build them. They come out of a rift from another
+ * galaxy, always a carrier with a swarm of fighters. Green, and drawn in
+ * their own shapes (ships.js, shipshd/alien.js).
+ */
+export const ALIEN_TYPES = ['alienCarrier', 'alienFighter'];
+Object.assign(SHIP_DEFS, {
+  // A fighter of the same level, only a little faster - alone no match for
+  // a defended world.
+  alienFighter: {
+    icon: 'alienFighter',
+    money: 0, metal: 0, hull: 22,
+    techs: ['speed', 'weapons', 'shields'],
+    attackMul: 1, shieldMul: 1, speedMul: 1.1, rangeMul: 1,
+    alien: true
+  },
+  // The heart of the swarm: it leads the fighters and sends new ones out
+  // while it lives. Big and drawing the fire like a destroyer, but with few
+  // guns - shoot it down and the swarm breaks off.
+  alienCarrier: {
+    icon: 'alienCarrier',
+    money: 0, metal: 0, hull: 210,
+    techs: ['speed', 'weapons', 'shields'],
+    attackMul: 2, shieldMul: 1, speedMul: 0.9, rangeMul: 1,
+    guns: 3, weight: 3, alien: true
+  }
+});
+
+/**
+ * Aliens: rare raids out of another galaxy. They do not conquer and do not
+ * build - a world they overrun is left empty. Balanced so that an empire
+ * that sees them coming can beat them: they come within sight, a few turns
+ * away, with the technology of the empire they visit.
+ */
+export const ALIEN_ID = 'aliens';
+export const ALIEN_COLOR = '#5dff8a';
+export const ALIENS = {
+  firstTurn: 30,        // none before this turn
+  minWorlds: 3,         // only empires with at least this many worlds are visited
+  // Turns between two raids in the whole galaxy: shorter with more empires,
+  // so that every empire gets its share once in a long game.
+  interval: n => Math.max(14, Math.min(45, Math.round(90 / Math.max(1, n)))),
+  maxActive: n => 1 + Math.floor(n / 6),
+  fighters: turn => Math.min(9, 3 + Math.floor((turn - 30) / 30)),   // the swarm at the start
+  techBonus: 0,         // levels above the visited empire (weapons, shields)
+  approach: 2,          // turns of flight from the rift to the first world
+  distance: [120, 260], // ly from the rift to the first world (always in sight)
+  raids: 2,             // worlds overrun before they go home
+  life: 15,             // turns at most, then they leave through a rift
+  hunt: 450,            // ly they look around for the next world
+  relaunch: 1           // fighters a carrier sends out per turn without a battle
+};
+
+/** Is this an alien - fleet owner or ship type? */
+export const isAlien = (ownerOrType) => ownerOrType === ALIEN_ID || !!SHIP_DEFS[ownerOrType]?.alien;
+
+/**
  * The ship types of a game: without the lobby option "capital ships" it is
  * classic Ho!! - no destroyers.
  * @param {{capitalShips?: boolean}} settings
