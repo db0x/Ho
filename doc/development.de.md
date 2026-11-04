@@ -153,7 +153,7 @@ Pfade) und skaliert vom Startbildschirm bis zum 16-Punkte-Tabsymbol.
 ```
 npm test               # alle Testläufe
 npm run test:i18n      # Kataloge: gleiche Schlüssel, gleiche Platzhalter, Serverschlüssel
-npm run test:imports   # Imports im Browser lösen sich auf, auch unter einem Unterpfad
+npm run test:imports   # Imports im Browser lösen sich unter einem Unterpfad auf; Anmeldeseite lädt ohne Sitzung
 npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch

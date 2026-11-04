@@ -57,7 +57,8 @@ const PUBLIC_EXACT = new Set([
 ]);
 const PUBLIC_PREFIX = ['/css/', '/img/', '/i18n/'];
 
-function isPublic(urlPath) {
+/** Free without sign-in? test/imports.js checks it against what login.html loads. */
+export function isPublic(urlPath) {
   return PUBLIC_EXACT.has(urlPath) || PUBLIC_PREFIX.some(p => urlPath.startsWith(p));
 }
 
