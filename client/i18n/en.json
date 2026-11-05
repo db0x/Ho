@@ -559,6 +559,8 @@
   "map.territory": "Territory",
   "map.territoryTitle": "Shade the empires’ territory",
   "map.stars": "Stars",
+  "map.lite": "Fewer effects",
+  "map.liteTitle": "Less load on computer and battery: single pixel density, and while you do nothing the picture stands still.",
   "map.starsTitle": "Starfield in the background",
   "map.sound": "Sound",
   "map.soundTitle": "Sound effects",

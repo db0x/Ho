@@ -92,8 +92,11 @@ export class MapView {
   }
 
   // ------------------------------------------------------------- Camera
+  /** Pixel density of the map: the screen's (at most 2), 1 with "Fewer effects". */
+  targetDpr() { return this.lite ? 1 : Math.min(2, window.devicePixelRatio || 1); }
+
   resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = this.targetDpr();
     // Cached, because every access to clientWidth forces a layout
     // recalculation - and w2s() asks for it hundreds of times per frame.
     this._w = this.cv.clientWidth;
@@ -925,7 +928,7 @@ export class MapView {
       const h = this.pick(e.offsetX, e.offsetY);
       const changed = JSON.stringify(h) !== JSON.stringify(this.hover);
       this.hover = h;
-      if (changed) this.onHoverChange(h);
+      if (changed) { this.onHoverChange(h); this.poke(150); }
       cv.style.cursor = h ? 'pointer' : 'grab';
     });
 

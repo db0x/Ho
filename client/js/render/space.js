@@ -26,6 +26,11 @@ const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
 const PITCH_MAX = 1.5;           // just under 86°, otherwise the basis flips
 const ORBIT_R = 20;
+// Projected and twinkling anew every frame - 2400 fill the sky just as well
+// as the 4000 before and cost little more than half.
+const STAR_COUNT = 2400;
+// Territory layer at this fraction of the CSS resolution.
+const TERR_RES = 0.5;
 // Three star sizes as on the flat map. Instead of drifting, the sky rotates
 // slowly - the larger (i.e. imagined closer), the faster.
 const SKY_CLASSES = [
@@ -54,15 +59,18 @@ export class SpaceView {
     this.onSelect = () => {};
     this.onOrder = () => {};
     this.onHoverChange = () => {};
-    this.stars = makeStars(4000);
+    this.stars = makeStars(STAR_COUNT);
     this.battleFx = new BattleFx();
     this._bind();
     this.resize();
   }
 
   // --------------------------------------------------------------- Camera
+  /** Pixel density of the map: the screen's (at most 2), 1 with "Fewer effects". */
+  targetDpr() { return this.lite ? 1 : Math.min(2, window.devicePixelRatio || 1); }
+
   resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = this.targetDpr();
     this._w = this.cv.clientWidth;
     this._h = this.cv.clientHeight;
     this.cv.width = Math.round(this._w * dpr);
@@ -371,7 +379,24 @@ export class SpaceView {
     ctx.globalAlpha = this.dim(null);
     this.drawGrid(ctx);
     ctx.globalAlpha = 1;
-    if (this.showTerritory) this.drawTerritory(ctx, colorOf);
+    if (this.showTerritory) {
+      // The territory blobs are soft anyway - at half the CSS resolution
+      // (a quarter or less of the pixels at DPR 2) they look the same, and
+      // while the camera moves they are redrawn every frame.
+      if (!this._terr) this._terr = document.createElement('canvas');
+      const tc = this._terr;
+      const tw = Math.max(1, Math.round(this.w * TERR_RES)), th = Math.max(1, Math.round(this.h * TERR_RES));
+      if (tc.width !== tw || tc.height !== th) { tc.width = tw; tc.height = th; this._terrCtx = null; }
+      const tx = this._terrCtx || (this._terrCtx = tc.getContext('2d'));
+      tx.setTransform(1, 0, 0, 1, 0, 0);
+      tx.clearRect(0, 0, tw, th);
+      tx.setTransform(TERR_RES, 0, 0, TERR_RES, 0, 0);
+      this.drawTerritory(tx, colorOf);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(tc, 0, 0, this.w, this.h);
+      ctx.restore();
+    }
   }
 
   /** Stars are far away: only the rotation counts - and it differs a little
@@ -991,7 +1016,7 @@ export class SpaceView {
       const h = this.pick(e.offsetX, e.offsetY);
       const changed = JSON.stringify(h) !== JSON.stringify(this.hover);
       this.hover = h;
-      if (changed) this.onHoverChange(h);
+      if (changed) { this.onHoverChange(h); this.poke(150); }
       cv.style.cursor = h ? 'pointer' : 'grab';
     });
 

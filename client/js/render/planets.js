@@ -46,6 +46,34 @@ function mix(a, b, f) {
   return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * f));
 }
 
+// Owner rings with their glow, prerendered: shadowBlur per world and frame
+// was one of the most expensive calls on the map.
+const ringCache = new SpriteCache(4e6);
+
+/** Ring in the owner's color around a world of radius r, glow included. */
+function ringSprite(color, r) {
+  const rr = radiusStep(r);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const key = `${color}|${rr}|${dpr}`;
+  const hit = ringCache.get(key);
+  if (hit && hit.canvas.width) return hit;
+  const lw = Math.min(3.6, Math.max(1.4, rr * 0.11));
+  const R = rr + lw * 1.4;
+  const half = Math.ceil(R + lw + 12);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = Math.ceil(half * 2 * dpr);
+  const g = cv.getContext('2d');
+  g.scale(dpr, dpr);
+  g.strokeStyle = color;
+  g.lineWidth = lw;
+  g.shadowColor = color;
+  g.shadowBlur = 10 * dpr;
+  g.beginPath(); g.arc(half, half, R, 0, Math.PI * 2); g.stroke();
+  const sp = { canvas: cv, half, rr };
+  ringCache.set(key, sp);
+  return sp;
+}
+
 /**
  * Renders a planet's sphere into its own canvas (cached).
  * @param {object} planet
@@ -276,13 +304,9 @@ export function drawPlanet(ctx, planet, x, y, zoom, opts = {}) {
 
   // Ownership ring
   if (ownerColor) {
-    ctx.save();
-    ctx.strokeStyle = ownerColor;
-    ctx.lineWidth = Math.min(3.6, Math.max(1.4, r * 0.11));
-    ctx.shadowColor = ownerColor;
-    ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth * 1.4, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
+    const ring = ringSprite(ownerColor, r);
+    const k = r / ring.rr;
+    ctx.drawImage(ring.canvas, x - ring.half * k, y - ring.half * k, ring.half * 2 * k, ring.half * 2 * k);
   }
 
   // Homeworld marker

@@ -174,7 +174,7 @@ const app = {
   send: (m) => net.send(m),
   setSelection(sel) {
     app.selection = sel;
-    if (map) map.selection = sel;
+    if (map) { map.selection = sel; map.poke(); }
     if (hud) hud.selection();
     // On a phone the panel is not visible alongside: tapped means opened -
     // at half height, so the map stays big enough to play on - and tapping
@@ -641,12 +641,13 @@ function bindGame() {
   let mapOpts = {};
   try { mapOpts = JSON.parse(localStorage.getItem(MAP_OPTS) || '{}') || {}; } catch {}
   for (const [id, prop] of [['#chk-names', 'showNames'], ['#chk-range', 'showRange'],
-    ['#chk-terr', 'showTerritory'], ['#chk-stars', 'showStars']]) {
+    ['#chk-terr', 'showTerritory'], ['#chk-stars', 'showStars'], ['#chk-lite', 'lite']]) {
     const box = $(id);
     if (typeof mapOpts[prop] === 'boolean') box.checked = mapOpts[prop];
     map[prop] = box.checked;
     box.onchange = (e) => {
       map[prop] = mapOpts[prop] = e.target.checked;
+      map.poke();
       try { localStorage.setItem(MAP_OPTS, JSON.stringify(mapOpts)); } catch {}
     };
   }
@@ -780,23 +781,41 @@ function playTurnSounds(view) {
 // Debug access for the console and automated tests
 window.__ho = { app, get map() { return map; }, get view() { return map?.view; }, net, sfx };
 
-// When idle, a fraction of the frame rate is enough: the game is turn-based,
-// only stars, course lines and orbits twinkle. Full rate on input and after
-// a new view (map.poke()).
-const IDLE_FPS = 20;
+// Frame rate by situation - the game is turn-based, only stars, course lines
+// and orbits move by themselves:
+// - busy (input, a new view, battles, a wormhole opening; map.poke()): at
+//   most 60, even on a 144 Hz screen;
+// - idle: 20; after 10 s without input or with the window out of focus: 5;
+// - "Fewer effects": nothing at all while idle - the picture stands still until
+//   something happens.
+const BUSY_FPS = 60, IDLE_FPS = 20, REST_FPS = 5, REST_AFTER = 10000;
 let last = performance.now();
-let lastDraw = 0;
+let lastDraw = 0, lastTimer = 0, lastInput = performance.now();
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
+  addEventListener(ev, () => {
+    lastInput = performance.now();
+    // A click or key may change what the map shows (a button in a panel, a
+    // shortcut) - a short burst of frames picks that up even with "Fewer effects".
+    // Hovering over the map pokes on its own once the target changes.
+    if (ev !== 'pointermove') map?.poke(400);
+  }, { passive: true, capture: true });
+}
 function loop(now) {
   requestAnimationFrame(loop);
   if (document.hidden) { last = now; return; }
-  if (!map.busy && now - lastDraw < 1000 / IDLE_FPS - 1) return;
+  // The turn clock ticks on even while the map stands still.
+  if (now - lastTimer > 250) { lastTimer = now; hud.timer(); }
+  const resting = now - lastInput > REST_AFTER || !document.hasFocus();
+  const fps = map.busy ? BUSY_FPS : map.lite ? 0 : resting ? REST_FPS : IDLE_FPS;
+  // A resize clears the canvas - then draw at once, whatever the rate.
+  const resized = map.cv.clientWidth !== map.w || map.cv.clientHeight !== map.h
+    || map.targetDpr() !== map.dpr;
+  if (!resized && (!fps || now - lastDraw < 1000 / fps - 2)) return;
   const dt = Math.min(0.12, (now - last) / 1000);
   last = now;
   lastDraw = now;
-  if (map.cv.clientWidth !== map.w || map.cv.clientHeight !== map.h
-    || Math.min(2, window.devicePixelRatio || 1) !== map.dpr) map.resize();
+  if (resized) map.resize();
   map.draw(dt);
-  hud.timer();
 }
 
 function showTurnBanner(view) {

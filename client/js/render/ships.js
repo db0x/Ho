@@ -770,15 +770,10 @@ export function drawShip(ctx, o) {
   ctx.save();
   ctx.translate(o.x, o.y);
   ctx.rotate(o.angle || 0);
-  // Flames lie beneath the hull, the blinking light above it - the still image in between.
-  // The shadow only applies to the moving parts; the sprite already contains it.
-  if (sp.anim.length && o.shadow !== false) {
-    ctx.shadowColor = 'rgba(0,0,0,.6)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
-  }
+  // Flames lie beneath the hull, the blinking light above it - the still image
+  // in between. The moving parts get no shadow of their own: a shadowBlur per
+  // ship and frame cost far more than it showed.
   for (const a of sp.anim) if (!a.over) a.run(ctx, phase);
-  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
   ctx.drawImage(sp.canvas, -sp.half, -sp.half, sp.size, sp.size);
   for (const a of sp.anim) if (a.over) a.run(ctx, phase);
   ctx.restore();
