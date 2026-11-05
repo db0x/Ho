@@ -108,18 +108,16 @@ export const alienCarrier = {
   engines: [],
   lights: [],
   body(ctx, color, S) {
-    // The lower star, a sixth of a turn offset: ribbed, machinery, in shade
+    // The lower star, a sixth of a turn offset: smooth, in shade, darker
+    // towards the tips
     const lower = () => star(ctx, Math.PI / 3, 47, 3.2);
     lower(); fillShadowed(ctx, shell(ctx, -46, 46, '#21603b'), S);
     inside(ctx, lower, () => {
-      for (const a of starArms(Math.PI / 3)) {
-        // Segments like vertebrae, a darker spine along the middle
-        for (let r = 8; r < 42; r += 3.2) {
-          const w = armHalf(r, 47);
-          line(ctx, [along(a, r, -w), along(a, r + 1, 0), along(a, r, w)], 0.4, 0.6);
-        }
-        line(ctx, [along(a, 6, 0), along(a, 44, 0)], 0.6, 0.45);
-      }
+      const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 47);
+      g.addColorStop(0, 'rgba(4,20,10,0)');
+      g.addColorStop(1, 'rgba(4,20,10,.55)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-48, -48, 96, 96);
     });
     bevel(ctx, lower, 0.7);
     // The upper star: smooth, a bright ridge along every arm

@@ -82,7 +82,8 @@ export class Lobby {
       '#s-ppp': ['planetsPerPlayer', v => t('word.worlds', { n: v }), '#v-ppp'],
       '#s-money': ['startMoney', v => `${num(+v)} ${t('unit.cr')}`, '#v-money'],
       '#s-metal': ['startMetal', v => `${num(+v)} ${t('unit.metal')}`, '#v-metal'],
-      '#s-timer': ['turnTimer', v => +v === 0 ? t('lobby.noLimit') : t('unit.seconds', { n: v }), '#v-timer']
+      '#s-timer': ['turnTimer', v => +v === 0 ? t('lobby.noLimit') : t('unit.seconds', { n: v }), '#v-timer'],
+      '#s-alienlevel': ['alienLevel', v => t(`lobby.alienLevel.${v}`), '#v-alienlevel']
     };
     for (const [sel, [key, fmt, out]] of Object.entries(sliders)) {
       $(sel).oninput = () => {
@@ -451,6 +452,12 @@ export class Lobby {
     $('#s-aliens').checked = s.aliens !== false;
     $('#v-aliens').textContent = t(s.aliens !== false ? 'word.yes' : 'word.no');
     $('#s-aliens').disabled = !this.isHost;
+    // Without aliens there is no strength to pick.
+    const level = s.alienLevel || 2;
+    $('#s-alienlevel').value = level;
+    $('#v-alienlevel').textContent = t(`lobby.alienLevel.${level}`);
+    $('#row-alienlevel').classList.toggle('hidden', s.aliens === false);
+    $('#hint-alienlevel').classList.toggle('hidden', s.aliens === false);
     $('#s-intercept').checked = s.interception !== false;
     $('#v-intercept').textContent = t(s.interception !== false ? 'word.yes' : 'word.no');
     $('#s-intercept').disabled = !this.isHost;

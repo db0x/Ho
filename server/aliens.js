@@ -10,7 +10,7 @@
 // a fleet to the threatened world holds it - and whoever shoots down the
 // carrier breaks up the swarm. Every empire gets its turn: the next raid
 // goes to the empire visited least so far.
-import { ALIENS, ALIEN_ID, SHIP_DEFS, holeZone, dist, travelDistance } from '../shared/rules.js';
+import { alienRules, ALIEN_ID, SHIP_DEFS, holeZone, dist, travelDistance } from '../shared/rules.js';
 import { makeRng } from './galaxy.js';
 import { SCAN } from './wormholes.js';
 import { newFleet, addShip, cleanupFleets } from './game/fleets.js';
@@ -73,9 +73,10 @@ function rift(game, point, kind) {
  */
 function pickVictim(game, rng) {
   const st = stateOf(game);
+  const A = alienRules(game);
   const busy = new Set(alienFleets(game).map(f => f.alien?.target));
   const able = game.players.filter(p => p.alive && !busy.has(p.id)
-    && worldsOf(game, p.id).length >= ALIENS.minWorlds);
+    && worldsOf(game, p.id).length >= A.minWorlds);
   if (!able.length) return null;
   const fewest = Math.min(...able.map(p => st.visits[p.id] || 0));
   const pool = able.filter(p => (st.visits[p.id] || 0) === fewest);
@@ -97,8 +98,9 @@ function pickWorld(game, player, rng) {
  */
 function riftSpot(game, world, speed, rng) {
   const zone = holeZone(game.galaxy);
-  const [lo, hi] = ALIENS.distance;
-  const want = Math.max(lo, Math.min(hi, speed * ALIENS.approach));
+  const A = alienRules(game);
+  const [lo, hi] = A.distance;
+  const want = Math.max(lo, Math.min(hi, speed * A.approach));
   for (let i = 0; i < 60; i++) {
     const ang = rng() * Math.PI * 2;
     const d = want * (0.9 + rng() * 0.2) * (i < 40 ? 1 : 0.8);
@@ -125,22 +127,24 @@ export function spawnAliens(game, entries, o = {}) {
   if (!player) return null;
   const world = o.world && o.world.owner === player.id ? o.world : pickWorld(game, player, rng);
   if (!world) return null;
-  // The technology of the empire they visit: a match, not a massacre.
+  // The technology of the empire they visit - on the higher levels a step
+  // or two ahead of it.
+  const A = alienRules(game);
   const t = player.tech;
   const tech = {
     range: 1, mini: 1, radical: 1, recycling: 1,
     speed: t.speed || 1,
-    weapons: (t.weapons || 1) + ALIENS.techBonus,
-    shields: (t.shields || 1) + ALIENS.techBonus
+    weapons: (t.weapons || 1) + A.techBonus,
+    shields: (t.shields || 1) + A.techBonus
   };
-  const fighters = ALIENS.fighters(Math.max(ALIENS.firstTurn, game.turn));
+  const fighters = A.fighters(Math.max(A.firstTurn, game.turn));
   const speed = SHIP_DEFS.alienCarrier.speedMul * (42 + 13 * (tech.speed - 1));
   const at = riftSpot(game, world, speed, rng);
   if (!at) return null;
 
   const f = newFleet(game, ALIEN_ID, null);
   f.x = at.x; f.y = at.y; f.z = at.z;
-  addShip(game, f, 'alienCarrier', tech);
+  for (let i = 0; i < A.carriers(fighters); i++) addShip(game, f, 'alienCarrier', tech);
   for (let i = 0; i < fighters; i++) addShip(game, f, 'alienFighter', tech);
   f.dest = world.id;
   f.alien = {
@@ -166,6 +170,7 @@ export function spawnAliens(game, entries, o = {}) {
  */
 export function steerAliens(game) {
   game.alienRifts = [];
+  const A = alienRules(game);
   for (const f of alienFleets(game)) {
     const a = f.alien || (f.alien = { target: null, full: 0, raids: 0, born: game.turn, hp0: 1 });
     if (a.leaving) continue;
@@ -179,7 +184,7 @@ export function steerAliens(game) {
       if (here && here.owner && (here.pop >= 0.5 || here.defenses?.length)
         && (a.dev || worldsOf(game, here.owner).length >= 2)) continue;
     }
-    if (a.raids >= ALIENS.raids) { a.leaving = true; continue; }
+    if (a.raids >= A.raids) { a.leaving = true; continue; }
     const prey = pickPrey(game, f);
     if (prey) f.dest = prey.id;
     else a.leaving = true;
@@ -192,12 +197,13 @@ export function steerAliens(game) {
  * knock anybody out of the game.
  */
 function pickPrey(game, f) {
+  const { hunt } = alienRules(game);
   const zone = holeZone(game.galaxy);
   let best = null, bs = Infinity;
   for (const p of game.galaxy.planets) {
     if (p.id === f.at || !fairGame(game, p, f.alien)) continue;
     const d = travelDistance(f, p, zone);
-    if (d > ALIENS.hunt) continue;
+    if (d > hunt) continue;
     const score = d * (p.owner === f.alien.target ? 0.7 : 1) * (p.isHomeworld ? 3 : 1);
     if (score < bs) { bs = score; best = p; }
   }
@@ -238,6 +244,7 @@ export function overrun(game, planet, entries) {
  * @param {Set<number>} fought worlds with a battle this turn
  */
 export function alienTurn(game, entries, fought = new Set()) {
+  const A = alienRules(game);
   for (const f of alienFleets(game)) {
     const a = f.alien;
     if (!a) continue;
@@ -251,7 +258,7 @@ export function alienTurn(game, entries, fought = new Set()) {
       continue;
     }
     const hp = f.ships.reduce((s, x) => s + x.hp, 0);
-    if (a.leaving || a.raids >= ALIENS.raids || game.turn - a.born >= ALIENS.life || hp < a.hp0 * 0.3) {
+    if (a.leaving || a.raids >= A.raids || game.turn - a.born >= A.life || hp < a.hp0 * A.retreat) {
       entries.push({ type: 'alien', playerIds: watchers(game, here), planetId: f.at ?? nearest(game, f)?.id ?? null,
         key: 'log.alienLeft', params: { near: (f.at != null ? here : nearest(game, f))?.name ?? '?' } });
       rift(game, f, 'close');
@@ -261,18 +268,18 @@ export function alienTurn(game, entries, fought = new Set()) {
     // The carrier sends out new fighters - but not in the middle of a battle.
     if (f.at != null && fought.has(f.at)) continue;
     const have = f.ships.filter(s => s.type === 'alienFighter').length;
-    for (let i = 0; i < ALIENS.relaunch && have + i < a.full; i++) addShip(game, f, 'alienFighter', a.tech);
+    for (let i = 0; i < A.relaunch && have + i < a.full; i++) addShip(game, f, 'alienFighter', a.tech);
   }
   cleanupFleets(game);
 
-  if (game.settings.aliens === false || game.turn < ALIENS.firstTurn) return;
+  if (game.settings.aliens === false || game.turn < A.firstTurn) return;
   const st = stateOf(game);
   const rng = rngOf(game);
   const alive = game.players.filter(p => p.alive).length;
-  const interval = ALIENS.interval(alive);
-  if (st.next == null) st.next = ALIENS.firstTurn + Math.floor(rng() * interval);
+  const interval = A.interval(alive);
+  if (st.next == null) st.next = A.firstTurn + Math.floor(rng() * interval);
   if (game.turn < st.next) return;
-  if (alienFleets(game).length >= ALIENS.maxActive(alive)) return;
+  if (alienFleets(game).length >= A.maxActive(alive)) return;
   const f = spawnAliens(game, entries);
   // Nobody to visit right now: try again soon.
   st.next = game.turn + (f ? Math.round(interval * (0.7 + rng() * 0.6)) : 3);

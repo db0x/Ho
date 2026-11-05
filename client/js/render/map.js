@@ -1,7 +1,7 @@
 // Star map: camera, background, planets, fleets, course lines.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -443,7 +443,7 @@ export class MapView {
         const spot = spots.get(f.id);
         if (!spot) continue;
         const { x, y, idx } = spot;
-        drawShip(ctx, { type: lead, x, y, angle: spot.heading, len: 24 * scale, color: col, phase: this.phase + idx });
+        drawFleetShips(ctx, { x, y, angle: spot.heading, len: 24 * scale, color: col, phase: this.phase + idx }, f, lead);
         const n = f.ships ? f.ships.length : f.count;
         if (n > 1) this.badge(ctx, x + 13 * scale, y - 11 * scale, '×' + n, col);
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, x, y, 16 * scale);
@@ -452,7 +452,7 @@ export class MapView {
         const spot = spots.get(f.id);
         const sx = spot.x, sy = spot.y, ang = spot.heading;
         drawTrail(ctx, sx, sy, ang, 46 * scale, col);
-        drawShip(ctx, { type: lead, x: sx, y: sy, angle: ang, len: 26 * scale, color: col, phase: this.phase });
+        drawFleetShips(ctx, { x: sx, y: sy, angle: ang, len: 26 * scale, color: col, phase: this.phase }, f, lead);
         const n = f.ships ? f.ships.length : f.count;
         if (n > 1) this.badge(ctx, sx + 15 * scale, sy - 12 * scale, '×' + n, col);
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, sx, sy, 17 * scale);

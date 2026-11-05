@@ -8,17 +8,19 @@ import { addPlayer } from '../server/game/players.js';
 import { resolveTurn } from '../server/game/turn.js';
 import { newFleet, addShip } from '../server/game/fleets.js';
 import { spawnAliens, alienTurn, alienFleets, devAliens } from '../server/aliens.js';
-import { ALIENS, ALIEN_ID, dist } from '../shared/rules.js';
+import { ALIENS, ALIEN_ID, alienRules, dist } from '../shared/rules.js';
+import { sanitizeSettings } from '../server/hub/lobby.js';
 import { runBot } from '../server/ai/bot.js';
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };
 
-/** Three empires, each with its homeworld and three colonies nearby. */
-function setup(seed = 11) {
+/** Three empires, each with its homeworld and three colonies nearby - on the easy level unless told otherwise. */
+function setup(seed = 11, level = 1) {
   const g = createGame('Aliens');
   g.settings.seed = seed;
   g.settings.turnTimer = 0;
+  g.settings.alienLevel = level;
   for (const name of ['Ann', 'Bob', 'Cid']) addPlayer(g, { name });
   startGame(g);
   for (const p of g.players) {
@@ -183,8 +185,8 @@ function swarmAt(g, world, fighters, tech) {
 
 // 8) Rare, and switched off in the lobby means never
 {
-  const count = (on) => {
-    const g = setup(21);
+  const count = (on, level = 1) => {
+    const g = setup(21, level);
     g.settings.aliens = on;
     g.turn = 1;
     let raids = 0;
@@ -203,7 +205,47 @@ function swarmAt(g, world, fighters, tech) {
   console.log(`Rare: ${on} raids in 200 turns with three empires; none when switched off.`);
 }
 
-// 9) Dev mode: aliens at the selected world right away
+// 9) Strength levels: the stronger, the more often, the bigger, the better armed
+{
+  const count = (level) => {
+    const g = setup(21, level);
+    g.turn = 1;
+    let raids = 0;
+    for (; g.turn < 200; g.turn++) {
+      const e = [];
+      alienTurn(g, e);
+      raids += e.filter(x => x.key === 'log.alienRift').length;
+      g.fleets = [];
+    }
+    return raids;
+  };
+  const raids = [1, 2, 3].map(count);
+  assert(raids[0] < raids[1] && raids[1] < raids[2], `Raids do not grow with the level: ${raids.join('/')}`);
+  const swarm = (level) => {
+    const g = setup(11, level);
+    g.turn = 120;
+    const f = spawnAliens(g, []);
+    const victim = g.players.find(p => p.id === f.alien.target);
+    return { f, victim, fighters: f.ships.filter(s => s.type === 'alienFighter').length,
+      carriers: f.ships.filter(s => s.type === 'alienCarrier').length };
+  };
+  const [easy, mid, hard] = [1, 2, 3].map(swarm);
+  assert(easy.fighters < mid.fighters && mid.fighters < hard.fighters,
+    `Swarms do not grow with the level: ${easy.fighters}/${mid.fighters}/${hard.fighters}`);
+  assert(easy.carriers === 1 && mid.carriers === 1 && hard.carriers === 2, 'Wrong number of carriers per level');
+  for (const [lv, sw] of [[1, easy], [2, mid], [3, hard]]) {
+    const bonus = alienRules(lv).techBonus;
+    assert(sw.f.ships.every(s => s.tech.weapons === sw.victim.tech.weapons + bonus),
+      `Level ${lv}: the aliens are not ${bonus} weapon levels ahead`);
+  }
+  // Without the setting (older games) it is the medium level; the lobby keeps it in range.
+  assert(alienRules({ settings: {} }).techBonus === alienRules(2).techBonus, 'No default level');
+  assert(sanitizeSettings({ alienLevel: 7 }).alienLevel === 3 && sanitizeSettings({ alienLevel: 0 }).alienLevel === 1,
+    'The lobby lets an alien level out of range through');
+  console.log(`Levels: ${raids.join('/')} raids in 200 turns, ${easy.fighters}/${mid.fighters}/${hard.fighters} fighters at turn 120.`);
+}
+
+// 10) Dev mode: aliens at the selected world right away
 {
   const g = setup();
   const [, bob] = g.players;
@@ -216,7 +258,7 @@ function swarmAt(g, world, fighters, tech) {
   console.log(`Dev mode: aliens heading for ${world.name}.`);
 }
 
-// 10) A whole game with AI empires and aliens: the AI copes, nothing breaks
+// 11) A whole game with AI empires and aliens: the AI copes, nothing breaks
 {
   const g = createGame('AI');
   g.settings.seed = 77;

@@ -281,21 +281,32 @@ Plünderer springt auch blind. Bevor das Wurmloch zusammenbricht, kehren sie hei
 
 ## Aliens
 
-Ab Runde 30 erscheinen gelegentlich Aliens: ein **Alien-Träger** und mehrere
+Gelegentlich erscheinen Aliens: ein **Alien-Träger** und mehrere
 **Alien-Jäger**. Sie tauchen in Sichtweite einer Welt auf, ein paar Flugrunden
-entfernt; der Funk nennt das Ziel.
+entfernt; der Funk nennt das Ziel. Auf der Karte umschwirren die Jäger ihren
+Träger als Wolke.
 
-- **Ziel:** das Reich mit den bisher wenigsten Alien-Angriffen, mit mindestens
-  drei Welten. Bei sechs Reichen etwa alle 15 Runden irgendwo in der Galaxie.
-- **Stärke:** Waffen und Schilde des angegriffenen Reichs; anfangs 3 Jäger,
-  später bis zu 9.
+- **Ziel:** das Reich mit den bisher wenigsten Alien-Angriffen.
 - **Wirkung:** Sie erobern nicht. Eine Welt, deren Orbit sie allein halten,
   wird entvölkert und frei. Die letzte Welt eines Reichs greifen sie nie an.
-- **Träger:** Ersetzt pro Runde ohne Kampf einen verlorenen Jäger. Wird er
-  zerstört, ziehen die Jäger ab. Sonst ziehen sie nach zwei Welten, 15 Runden
-  oder schweren Verlusten ab.
+- **Träger:** Ersetzt pro Runde ohne Kampf verlorene Jäger. Sind alle Träger
+  zerstört, ziehen die Jäger ab. Sonst ziehen sie nach einigen Welten, einigen
+  Runden oder schweren Verlusten ab.
 
-Satelliten oder eine Flotte im Orbit halten sie auf. Abschaltbar in der Lobby.
+Die Stärke stellt der Gastgeber in der Lobby ein (oder schaltet sie ab):
+
+| | Leicht | Mittel | Stark |
+|---|---|---|---|
+| Erster Angriff | Runde 30 | Runde 25 | Runde 20 |
+| Abstand (sechs Reiche) | etwa 15 Runden | etwa 10 Runden | etwa 6 Runden |
+| Besuchte Reiche | ab 3 Welten | ab 3 Welten | ab 2 Welten |
+| Jäger | 3, später bis 9 | 5, später bis 14 | 8, später bis 22 |
+| Träger | 1 | 1 | 2 ab 14 Jägern |
+| Waffen und Schilde | wie das Reich | +1 Stufe | +2 Stufen |
+| Welten pro Angriff | 2 | 3 | 5 |
+| Ersatzjäger pro Runde | 1 | 2 | 3 |
+
+Satelliten oder eine Flotte im Orbit halten sie auf.
 
 ## Die KI-Reiche
 
