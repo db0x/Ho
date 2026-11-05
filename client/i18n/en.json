@@ -570,6 +570,7 @@
   "map.tooltipPop": "Pop. {pop}M · metal {ore}",
   "map.tooltipSeen": "last seen: turn {turn}",
   "map.tooltipHeight": "Height {z} ly",
+  "map.reachNeed": "{need} / {range} ly",
   "map.turnsBadge": "{n}",
   "quit.title": "Leave the game?",
   "quit.player": "You return to the start screen. Your empire stays in the game and will be skipped – you cannot come back afterwards.",

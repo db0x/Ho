@@ -237,6 +237,13 @@ Drei Lesehilfen halten den Raum lesbar: ein **Gitter** in der Mittelebene, ein
 Abstufung von Größe und Helligkeit nach Entfernung. Steuerung siehe
 [Steuerung](#steuerung).
 
+Die Reichweite ist im Raum eine Kugel um jede bewohnte Welt – zeichnen lässt sich
+das nicht lesbar. Mit dem Schalter *Reichweite* markiert die Raumansicht deshalb die
+**Ziele**: Welten, die die gewählte Flotte erreicht, bekommen einen blauen Schimmer
+(violett: nur durch ein Wurmloch), alle anderen treten zurück. Fährt die Maus über
+eine Welt, zeigt eine Linie den Weg der Versorgung von der nächsten eigenen Welt,
+beschriftet mit *nötig / Reichweite* – rot, wenn es zu weit ist.
+
 ## Eine Galaxie ohne Rand
 
 Kommt eine Flotte oder besiedelte Welt der Grenze näher als 200 Lj, schiebt sich

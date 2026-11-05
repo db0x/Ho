@@ -570,6 +570,7 @@
   "map.tooltipPop": "Bev. {pop} Mio · Metall {ore}",
   "map.tooltipSeen": "letzte Sichtung: Runde {turn}",
   "map.tooltipHeight": "Höhe {z} Lj",
+  "map.reachNeed": "{need} / {range} Lj",
   "map.turnsBadge": "{n}",
   "quit.title": "Partie verlassen?",
   "quit.player": "Du kehrst zum Startbildschirm zurück. Dein Imperium bleibt in der Partie stehen und wird übersprungen – zurückkommen kannst du danach nicht mehr.",

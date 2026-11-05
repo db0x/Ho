@@ -10,7 +10,7 @@
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail } from './ships.js';
-import { dist, holeZone, route, routeLength, reachOutline, WORMHOLE } from '../../shared/rules.js';
+import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
@@ -19,8 +19,8 @@ import {
   drawWormhole, drawWormLink, WORMHOLE_MIN_PX
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
-import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint, courseTarget, isMouth } from './courses.js';
-import { noteMouths, mouthOpen, mouthLines, farSide, HOLE_OPEN_MS, noteRifts, riftOpen, RIFT_MS } from './map.js';
+import { orbitSlots, fanOut, courseStyle, arrowHead, midpoint, courseTarget, isMouth, portalsOf } from './courses.js';
+import { noteMouths, mouthOpen, mouthLines, HOLE_OPEN_MS, noteRifts, riftOpen, RIFT_MS } from './map.js';
 
 const FOV = 50 * Math.PI / 180;
 const NEAR = 2;
@@ -223,7 +223,8 @@ export class SpaceView {
     this.drawLinks(ctx);
     ctx.globalAlpha = 1;
     this.drawCourses(ctx);
-    if (this.showRange) this.drawRange(ctx);
+    // Marks, dimming and supply line only with "Show range" switched on.
+    this._reach = this.showRange ? this.reachMap() : null;
 
     // Everything spatial from back to front - the painter's algorithm replaces
     // the depth buffer that a 2D canvas does not have.
@@ -293,7 +294,10 @@ export class SpaceView {
         s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)), alpha: depthFade(pr.depth, this.cam.dist),
         shieldR: planetRadius(p) * pr.s * 1.14 + 20 * orbitScale(pr.s), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
-    if (this.hover?.type === 'planet') this.tooltip(ctx, v.planets[this.hover.id]);
+    if (this.hover?.type === 'planet') {
+      this.drawSupplyLine(ctx, v.planets[this.hover.id]);
+      this.tooltip(ctx, v.planets[this.hover.id]);
+    }
     if (this.hover?.type === 'hole') {
       const m = v.wormholes?.find(x => x.id === this.hover.id);
       const pr = m && this.project(m.x, m.y, m.z || 0);
@@ -557,53 +561,117 @@ export class SpaceView {
     return spots;
   }
 
-  /** Range as a circle at the world's height - a sphere would be unreadable. */
-  drawRange(ctx) {
+  /**
+   * Range in space: the reach is a sphere around every own world, and drawn
+   * spheres cannot be read. So instead of the space the targets are marked -
+   * each world reachable for the selected own fleet gets a halo, the rest
+   * recede. Same rule as the server (supplyNeed in shared/rules.js): distance
+   * from the nearest supply base along the flyable path, a known wormhole
+   * carrying the supply to its far side.
+   * Per planet: {need, ok, via, base} - via is the portal used, if any.
+   * Cached per view, fleet and range; null without a selected own fleet.
+   */
+  reachMap() {
     const v = this.view;
-    const sel = this.selection?.type === 'fleet' ? v.fleets.find(f => f.id === this.selection.id) : null;
-    const range = sel?.mine ? (sel.stats.range || 0) : 0;
-    if (!range) return;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(120,180,255,.22)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 6]);
+    const f = this.selection?.type === 'fleet' ? v.fleets.find(x => x.id === this.selection.id) : null;
+    if (!f?.mine || !(f.stats?.speed > 0)) return null;
+    const range = f.stats.range || 0;
+    const key = `${f.id}|${range}|${f.at}|${Math.round(f.x)}|${Math.round(f.y)}|${Math.round(f.z || 0)}`;
+    if (this._reachFor === v && this._reachKey === key) return this._reachMap;
     const zone = holeZone(v.galaxy);
-    this._reach = this._reach || new Map();
-    for (const p of v.planets) {
-      if (!suppliesMe(v, p.owner) || !(p.pop > 0.5)) continue;
-      // Not a circle but the actually reachable outline - at the black hole
-      // it has a dent (see reachOutline in shared/rules.js).
-      const key = `${p.id}|${Math.round(range)}|${zone ? 1 : 0}`;
-      let u = this._reach.get(key);
-      if (!u) {
-        u = reachOutline(p, range, zone, 48);
-        if (this._reach.size > 64) this._reach.clear();
-        this._reach.set(key, u);
+    const bases = v.planets.filter(p => suppliesMe(v, p.owner) && p.pop > 0.5);
+    const nearest = (pt) => {
+      let best = null, d = Infinity;
+      for (const b of bases) {
+        const x = travelDistance(b, pt, zone);
+        if (x < d) { d = x; best = b; }
       }
-      ctx.beginPath();
-      for (let i = 0; i < u.length; i++) {
-        const a = u[i], b = u[(i + 1) % u.length];
-        this.seg(ctx, [a.x, a.y, a.z], [b.x, b.y, b.z]);
-      }
-      ctx.stroke();
+      return { base: best, d };
+    };
+    // Portals that carry the supply to this fleet: only for a fleet on the
+    // far side (as in supplyNeed).
+    const direct = bases.length ? supplyDistance(bases, f, zone) : Infinity;
+    const portals = [];
+    for (const { a, b } of portalsOf(v)) {
+      const home = nearest(a);
+      if (home.base && home.d + travelDistance(b, f, zone) < direct) portals.push({ a, b, home });
     }
-    // Beyond a known wormhole: what is left of the range after the way to it.
-    ctx.strokeStyle = 'rgba(190,150,255,.3)';
-    for (const { mouth, left } of farSide(v, sel)) {
-      const u = reachOutline(mouth, left, zone, 48);
+    const map = new Map();
+    for (const p of v.planets) {
+      const h = nearest(p);
+      let r = { need: h.d, base: h.base, via: null };
+      for (const w of portals) {
+        const n = w.home.d + travelDistance(w.b, p, zone);
+        if (n < r.need) r = { need: n, base: w.home.base, via: w };
+      }
+      if (!r.base) continue;
+      r.need = Math.round(r.need);
+      r.ok = r.need <= range;
+      map.set(p.id, r);
+    }
+    map.range = range;
+    this._reachFor = v; this._reachKey = key; this._reachMap = map;
+    return map;
+  }
+
+  /**
+   * On hover with an own fleet selected: the line the supply runs along, from
+   * the nearest own world (through the wormhole, if that is shorter) to the
+   * target, labeled "need / range" - red if it is too far.
+   */
+  drawSupplyLine(ctx, p) {
+    const r = p && this._reach?.get(p.id);
+    if (!r || r.need === 0) return;
+    const zone = holeZone(this.view.galaxy);
+    const color = r.ok ? (r.via ? '#c4a0ff' : '#8cc4ff') : '#ff7a7a';
+    const legs = r.via
+      ? [[r.base, ...route(r.base, r.via.a, zone)], [r.via.b, ...route(r.via.b, p, zone)]]
+      : [[r.base, ...route(r.base, p, zone)]];
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([2, 5]);
+    ctx.lineDashOffset = -this.phase * 10;
+    const pts = [];
+    for (const leg of legs) {
       ctx.beginPath();
-      for (let i = 0; i < u.length; i++) {
-        const a = u[i], b = u[(i + 1) % u.length];
-        this.seg(ctx, [a.x, a.y, a.z], [b.x, b.y, b.z]);
+      for (let i = 0; i + 1 < leg.length; i++) {
+        this.seg(ctx, [leg[i].x, leg[i].y, leg[i].z || 0], [leg[i + 1].x, leg[i + 1].y, leg[i + 1].z || 0]);
       }
       ctx.stroke();
+      for (const w of leg) {
+        const q = this.project(w.x, w.y, w.z || 0);
+        if (q) pts.push([q.x, q.y]);
+      }
     }
     ctx.restore();
+    if (pts.length > 1) {
+      this.badge(ctx, ...midpoint(pts), t('map.reachNeed', { need: r.need, range: this._reach.range }), color, true);
+    }
+  }
+
+  /** Halo behind a world the selected fleet can reach. */
+  drawReachHalo(ctx, x, y, r, via) {
+    const rgb = via ? '176,112,255' : '90,160,255';
+    // Kept quiet: it marks, it should not compete with the owner rings.
+    const R = r * 1.15 + 7;
+    const g = ctx.createRadialGradient(x, y, r * 0.95, x, y, R);
+    g.addColorStop(0, `rgba(${rgb},.14)`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(${rgb},.28)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.1 + 5, 0, Math.PI * 2); ctx.stroke();
   }
 
   drawWorld(ctx, it, colorOf, labels) {
     const { p, pr } = it;
-    const ctxAlpha = depthFade(pr.depth, this.cam.dist) * this.dim(p.owner);
+    const reach = this._reach?.get(p.id);
+    // With a fleet selected, worlds out of its range recede.
+    const ctxAlpha = depthFade(pr.depth, this.cam.dist) * this.dim(p.owner)
+      * (this._reach && !reach?.ok ? 0.4 : 1);
     // Plumb line to the mid-plane: only that shows how high the world lies
     if (Math.abs(p.z || 0) > 1) {
       const foot = this.project(p.x, p.y, 0);
@@ -627,6 +695,7 @@ export class SpaceView {
     const scale = pr.s;
     ctx.save();
     ctx.globalAlpha = ctxAlpha;
+    if (reach?.ok && reach.need > 0) this.drawReachHalo(ctx, pr.x, pr.y, planetRadius(p) * scale, reach.via);
     drawPlanet(ctx, p, pr.x, pr.y, scale, {
       scale,
       ownerColor: p.owner ? colorOf(p.owner) : null,

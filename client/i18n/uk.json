@@ -596,6 +596,7 @@
   "map.tooltipPop": "Нас. {pop} млн · метал {ore}",
   "map.tooltipSeen": "востаннє бачили: хід {turn}",
   "map.tooltipHeight": "Висота {z} св. р.",
+  "map.reachNeed": "{need} / {range} св. р.",
   "map.turnsBadge": "{n}",
   "quit.title": "Покинути гру?",
   "quit.player": "Ви повернетеся на стартовий екран. Ваша імперія лишається в грі й буде пропускатися – повернутися потім не вийде.",

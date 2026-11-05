@@ -116,6 +116,10 @@ export function startGame(game) {
     const settlers = newFleet(game, p.id, home);
     addShip(game, settlers, 'colony', p.tech);
   });
+  // A solo game still gets a galaxy for two (size, spacing). The spare home
+  // stays a fine world but is nobody's homeworld - otherwise the map marks it
+  // as one.
+  for (const id of game.galaxy.homeworlds.slice(n)) game.galaxy.planets[id].isHomeworld = false;
 
   updateVisibility(game);
   pushLog(game, [{ type: 'start', key: 'log.start',

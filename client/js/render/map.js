@@ -328,50 +328,19 @@ export class MapView {
       ? v.fleets.find(f => f.id === this.selection.id) : null;
     if ((this.showRange || selFleet) && selFleet?.mine) {
       const range = selFleet.stats.range || 0;
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      for (const p of v.planets) {
-        if (!suppliesMe(v, p.owner) || !(p.pop > 0.5)) continue;
-        const [sx, sy] = this.w2s(p.x, p.y);
-        const rr = range * this.cam.zoom;
-        // Outline instead of a circle: at the black hole the fleet reaches less
-        // far because it has to go around. A full circle would show worlds as
-        // reachable that the server then rejects.
-        const outline = this.reachArea(p, range);
-        const g2 = ctx.createRadialGradient(sx, sy, rr * 0.75, sx, sy, rr);
-        g2.addColorStop(0, 'rgba(60,110,190,0.02)');
-        g2.addColorStop(0.92, 'rgba(90,150,230,0.07)');
-        g2.addColorStop(1, 'rgba(120,190,255,0)');
-        ctx.fillStyle = g2;
-        ctx.beginPath();
-        outline.forEach((q, i) => {
-          const [qx, qy] = this.w2s(q.x, q.y);
-          i === 0 ? ctx.moveTo(qx, qy) : ctx.lineTo(qx, qy);
-        });
-        ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(120,180,255,.22)';
-        ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      // Outline instead of a circle: at the black hole the fleet reaches less
+      // far because it has to go around. A full circle would show worlds as
+      // reachable that the server then rejects.
+      const home = v.planets
+        .filter(p => suppliesMe(v, p.owner) && p.pop > 0.5)
+        .map(p => ({ center: p, outline: this.reachArea(p, range) }));
+      // All areas together form one surface: same tint everywhere, dashed
+      // line only along its outer edge.
+      this.drawUnion(ctx, home, 'rgba(70,125,210,0.06)', 'rgba(120,180,255,.3)');
       // Beyond a known wormhole the supply reaches as far as is left after
       // the way to its mouth.
-      for (const { mouth, left } of farSide(v, selFleet)) {
-        const outline = this.reachArea(mouth, left);
-        ctx.beginPath();
-        outline.forEach((q, i) => {
-          const [qx, qy] = this.w2s(q.x, q.y);
-          i === 0 ? ctx.moveTo(qx, qy) : ctx.lineTo(qx, qy);
-        });
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(176,112,255,0.05)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(190,150,255,.3)';
-        ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-      ctx.restore();
+      const far = farSide(v, selFleet).map(({ mouth, left }) => ({ center: mouth, outline: this.reachArea(mouth, left) }));
+      this.drawUnion(ctx, far, 'rgba(176,112,255,0.05)', 'rgba(190,150,255,.3)');
     }
 
     this.drawMouths(ctx, v);
@@ -699,6 +668,61 @@ export class MapView {
       ctx.drawImage(glowSprite(colors.get(p.owner) || '#8899aa'), sx - r, sy - r, r * 2, r * 2);
     }
     ctx.restore();
+  }
+
+  /**
+   * Draws the union of several areas as one surface. Fill: all outlines go
+   * into one path (nonzero winding), so overlaps are filled only once and
+   * never get brighter. Border: every outline is stroked on an offscreen
+   * layer, then everything inside any area (each outline pulled in a little
+   * towards its center) is erased, so only the outer edge of the union
+   * remains.
+   * @param areas [{center, outline}] - world coordinates
+   */
+  drawUnion(ctx, areas, fill, stroke) {
+    if (!areas.length) return;
+    const trace = (c, list, inset) => {
+      c.beginPath();
+      for (const { center, outline } of list) {
+        const [cx, cy] = this.w2s(center.x, center.y);
+        outline.forEach((q, i) => {
+          let [qx, qy] = this.w2s(q.x, q.y);
+          if (inset) {
+            const d = Math.hypot(qx - cx, qy - cy);
+            const k = d > inset ? (d - inset) / d : 0;
+            qx = cx + (qx - cx) * k; qy = cy + (qy - cy) * k;
+          }
+          i === 0 ? c.moveTo(qx, qy) : c.lineTo(qx, qy);
+        });
+        c.closePath();
+      }
+    };
+    // All outlines run the same way round, so 'nonzero' fills the union.
+    ctx.save();
+    ctx.fillStyle = fill;
+    trace(ctx, areas, 0);
+    ctx.fill('nonzero');
+    ctx.restore();
+
+    if (!this._union) this._union = document.createElement('canvas');
+    const cv = this._union;
+    const W = Math.max(1, Math.round(this.w * this.dpr)), H = Math.max(1, Math.round(this.h * this.dpr));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; this._unionCtx = null; }
+    const lc = this._unionCtx || (this._unionCtx = cv.getContext('2d'));
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.globalCompositeOperation = 'source-over';
+    lc.clearRect(0, 0, W, H);
+    lc.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    lc.strokeStyle = stroke;
+    lc.lineWidth = 1; lc.setLineDash([4, 6]);
+    for (const a of areas) { trace(lc, [a], 0); lc.stroke(); }
+    lc.setLineDash([]);
+    lc.globalCompositeOperation = 'destination-out';
+    lc.fillStyle = '#000';
+    trace(lc, areas, 1.5);
+    lc.fill('nonzero');
+    lc.globalCompositeOperation = 'source-over';
+    ctx.drawImage(cv, 0, 0, this.w, this.h);
   }
 
   /**

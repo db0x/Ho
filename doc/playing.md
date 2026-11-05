@@ -228,6 +228,12 @@ Three reading aids keep space legible: a **grid** in the mid-plane, a **plumb
 line** from every world down to it (that is how you read its height) and a grading
 of size and brightness by distance. For the controls see [Controls](#controls).
 
+In space the range is a sphere around every inhabited world – which cannot be
+drawn legibly. So with the *Range* switch the space view marks the **targets** instead:
+worlds the selected fleet can reach get a blue glow (purple: only through a
+wormhole), all others recede. Hovering over a world shows the line the supply runs
+along from your nearest world, labelled *needed / range* – red if it is too far.
+
 ## A galaxy without an edge
 
 When a fleet or settled world comes closer than 200 ly to the border, the map
