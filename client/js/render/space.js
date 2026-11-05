@@ -9,7 +9,7 @@
 //   - size and brightness by distance.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips } from './ships.js';
 import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -795,11 +795,11 @@ export class SpaceView {
     const spot = this._spots?.get(f.id);
     let x = spot?.x ?? pr.x, y = spot?.y ?? pr.y;
     if (f.at != null) {
-      drawShip(ctx, { type: lead, x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) });
+      drawFleetShips(ctx, { x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) }, f, lead);
     } else {
       const ang = spot?.heading ?? this.headingAngle(f, x, y) ?? 0;
       drawTrail(ctx, x, y, ang, 46 * scale, col);
-      drawShip(ctx, { type: lead, x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase });
+      drawFleetShips(ctx, { x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase }, f, lead);
     }
     const n = f.ships ? f.ships.length : f.count;
     if (n > 1) this.badge(ctx, x + 13 * scale, y - 11 * scale, '×' + n, col);

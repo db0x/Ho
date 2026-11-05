@@ -174,8 +174,44 @@ export const ALIENS = {
   raids: 2,             // worlds overrun before they go home
   life: 15,             // turns at most, then they leave through a rift
   hunt: 450,            // ly they look around for the next world
-  relaunch: 1           // fighters a carrier sends out per turn without a battle
+  relaunch: 1,          // fighters a carrier sends out per turn without a battle
+  retreat: 0.3,         // they leave once the swarm is down to this share of its hull
+  carriers: fighters => 1  // carriers in a swarm of this many fighters
 };
+
+/**
+ * How strong the aliens are - the lobby option "alienLevel": 1 easy (the
+ * raids as they always were), 2 medium, 3 strong. The stronger, the more
+ * often they come, the bigger the swarm, the better their technology and the
+ * longer they stay.
+ */
+export const ALIEN_LEVELS = [1, 2, 3];
+export const ALIEN_LEVEL_DEFAULT = 2;
+const ALIEN_LEVEL_RULES = {
+  1: {},
+  2: {
+    firstTurn: 25,
+    interval: n => Math.max(9, Math.min(30, Math.round(60 / Math.max(1, n)))),
+    maxActive: n => 2 + Math.floor(n / 5),
+    fighters: turn => Math.min(14, 5 + Math.floor((turn - 25) / 22)),
+    techBonus: 1, raids: 3, life: 20, hunt: 550, relaunch: 2, retreat: 0.2
+  },
+  3: {
+    firstTurn: 20, minWorlds: 2,
+    interval: n => Math.max(5, Math.min(18, Math.round(36 / Math.max(1, n)))),
+    maxActive: n => 3 + Math.floor(n / 4),
+    fighters: turn => Math.min(22, 8 + Math.floor((turn - 20) / 15)),
+    techBonus: 2, raids: 5, life: 28, hunt: 700, relaunch: 3, retreat: 0.1,
+    carriers: fighters => fighters >= 14 ? 2 : 1
+  }
+};
+
+/** The alien rules for a level (1-3) - or for a game, by its settings. */
+export function alienRules(levelOrGame) {
+  const lv = typeof levelOrGame === 'object' && levelOrGame
+    ? levelOrGame.settings?.alienLevel : levelOrGame;
+  return { ...ALIENS, ...(ALIEN_LEVEL_RULES[lv] || ALIEN_LEVEL_RULES[ALIEN_LEVEL_DEFAULT]) };
+}
 
 /** Is this an alien - fleet owner or ship type? */
 export const isAlien = (ownerOrType) => ownerOrType === ALIEN_ID || !!SHIP_DEFS[ownerOrType]?.alien;

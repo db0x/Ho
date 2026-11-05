@@ -270,21 +270,32 @@ jumps blind. Before the wormhole collapses they come back.
 
 ## Aliens
 
-From turn 30 on, aliens appear now and then: an **alien carrier** and several
-**alien fighters**. They appear within sight of a world, a few turns of flight
-away; the log names the target.
+Now and then aliens appear: an **alien carrier** and several **alien
+fighters**. They appear within sight of a world, a few turns of flight away;
+the log names the target. On the map you see the carrier with its fighters
+swarming around it like a cloud.
 
-- **Target:** the empire with the fewest alien attacks so far, with at least
-  three worlds. With six empires about every 15 turns somewhere in the galaxy.
-- **Strength:** weapons and shields of the empire under attack; 3 fighters at
-  first, up to 9 later.
+- **Target:** the empire with the fewest alien attacks so far.
 - **Effect:** they do not conquer. A world whose orbit they hold alone is
   depopulated and becomes free. An empire's last world is never attacked.
-- **Carrier:** replaces one lost fighter per turn without a battle. Once it is
-  destroyed, the fighters withdraw. Otherwise they withdraw after two worlds,
-  15 turns, or heavy losses.
+- **Carrier:** replaces lost fighters every turn without a battle. Once all
+  carriers are destroyed, the fighters withdraw. Otherwise they withdraw after
+  a few worlds, after some turns, or after heavy losses.
 
-Satellites or a fleet in orbit stop them. Aliens can be switched off in the lobby.
+The host sets their strength in the lobby (or switches them off):
+
+| | Easy | Medium | Strong |
+|---|---|---|---|
+| First raid | turn 30 | turn 25 | turn 20 |
+| Interval (six empires) | about 15 turns | about 10 turns | about 6 turns |
+| Visited empires | 3+ worlds | 3+ worlds | 2+ worlds |
+| Fighters | 3, later up to 9 | 5, later up to 14 | 8, later up to 22 |
+| Carriers | 1 | 1 | 2 from 14 fighters on |
+| Weapons and shields | like the empire | +1 level | +2 levels |
+| Worlds per raid | 2 | 3 | 5 |
+| Fighters replaced per turn | 1 | 2 | 3 |
+
+Satellites or a fleet in orbit stop them.
 
 ## The AI empires
 

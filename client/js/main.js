@@ -148,6 +148,20 @@ bindKeys(() => ({
   dev: devMode
 }));
 $('#help-keys').onclick = () => toggleKeys(true);
+
+/**
+ * Escape closes a dialog, like every other one. On the document in the
+ * capture phase: after whatever lies above it (key overview, ship profile -
+ * they stop the key on the window first), before the map, which would
+ * otherwise also drop its selection.
+ */
+function escCloses(el, close = () => el.classList.add('hidden')) {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.classList.contains('hidden')) { e.stopPropagation(); close(); }
+  }, true);
+}
+escCloses($('#help'));
+escCloses($('#quit'));
 account();
 let map = null;
 let hud = null;

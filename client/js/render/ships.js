@@ -1,6 +1,6 @@
 // Ship graphics. Every class has its own silhouette; drawn pointing to the
 // right, the caller rotates.
-import { raiderWing, raiderHead, raiderHump, star, starArms, armHalf } from './alienshapes.js';
+import { raiderWing, raiderHead, raiderHump, star, starArms } from './alienshapes.js';
 
 function hullGradient(ctx, len) {
   const g = ctx.createLinearGradient(0, -len * 0.4, 0, len * 0.4);
@@ -662,17 +662,13 @@ function drawAlienFighter(ctx, L, color, phase) {
 
 function drawAlienCarrier(ctx, L, color, phase) {
   // Two needle-armed three-pointed stars stacked a sixth of a turn apart:
-  // the lower one segmented and in shadow, the upper one smooth.
+  // the lower one smooth and in shadow, the upper one lit.
   const u = L / 100;
   star(ctx, Math.PI / 3, 47, 3.2, u);
-  ctx.fillStyle = '#17482d'; ctx.fill(); outline(ctx, 0.9);
-  for (const a of starArms(Math.PI / 3)) {
-    const c = Math.cos(a), s = Math.sin(a);
-    for (const r of [12, 18, 24, 30, 36]) {
-      const w = armHalf(r, 47, 3.2);
-      seam(ctx, L, [[(r * c - s * w) * u, (r * s + c * w) * u], [(r * c + s * w) * u, (r * s - c * w) * u]]);
-    }
-  }
+  const shade = ctx.createRadialGradient(0, 0, 0, 0, 0, 47 * u);
+  shade.addColorStop(0, '#2a7148');
+  shade.addColorStop(1, '#0f3320');
+  ctx.fillStyle = shade; ctx.fill(); outline(ctx, 0.9);
   star(ctx, 0, 50, 3.8, u);
   ctx.fillStyle = alienMetal(ctx, -50 * u, 50 * u); ctx.fill(); outline(ctx, 1);
   for (const a of starArms(0)) edgeLight(ctx, L, [[Math.cos(a) * 6 * u, Math.sin(a) * 6 * u], [Math.cos(a) * 46 * u, Math.sin(a) * 46 * u]], 0.4);
@@ -777,6 +773,81 @@ export function drawShip(ctx, o) {
   ctx.drawImage(sp.canvas, -sp.half, -sp.half, sp.size, sp.size);
   for (const a of sp.anim) if (a.over) a.run(ctx, phase);
   ctx.restore();
+}
+
+/**
+ * An alien swarm on the map: the carrier, its fighters around it. Big
+ * swarms show at most SWARM_MAX fighters - the badge tells the full number.
+ * Two looks, SWARM_STYLE picks one:
+ * - 'cloud': the fighters circle the carrier like a swarm of insects, each
+ *   on an orbit of its own - other radius, speed and direction, a little
+ *   breathing in and out.
+ * - 'formation': the carrier in the lead, the fighters fanned out behind
+ *   it in a V, each one drifting a little on its own.
+ * Positions are in the carrier's frame (x ahead), in units of `len`.
+ */
+const SWARM_STYLE = 'cloud';
+const SWARM_MAX = 8;
+const CARRIER_SPIN = 0.175;  // radians per second
+/** A fixed "random" number in [0, 1) per fighter and purpose - the same every frame. */
+const hash = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+
+function cloudSpot(i, phase, cx) {
+  const dir = hash(i, 1) < 0.7 ? 1 : -1;               // most go round one way, some against it
+  const speed = 0.35 + hash(i, 2) * 0.45;               // radians per second
+  const a = hash(i, 3) * Math.PI * 2 + dir * speed * phase;
+  const r = 0.95 + hash(i, 4) * 0.7 + Math.sin(phase * (0.5 + hash(i, 5)) + i) * 0.12;
+  const squash = 0.65 + hash(i, 6) * 0.35;              // orbits a little flattened, tilted at random
+  const tilt = hash(i, 7) * Math.PI;
+  const ex = Math.cos(a) * r, ey = Math.sin(a) * r * squash;
+  const ct = Math.cos(tilt), st = Math.sin(tilt);
+  // Heading along the orbit: the derivative of the point.
+  const vx = -Math.sin(a) * dir, vy = Math.cos(a) * squash * dir;
+  return { dx: cx + ex * ct - ey * st, dy: ex * st + ey * ct, heading: Math.atan2(vx * st + vy * ct, vx * ct - vy * st) };
+}
+
+export function drawAlienSwarm(ctx, o, ships) {
+  const len = o.len || 26;
+  const phase = o.phase || 0;
+  const angle = o.angle || 0;
+  const carriers = ships.filter(s => s.type === 'alienCarrier').length;
+  const fighters = Math.min(SWARM_MAX, ships.filter(s => s.type === 'alienFighter').length);
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const at = (dx, dy) => [o.x + (dx * cos - dy * sin) * len, o.y + (dx * sin + dy * cos) * len];
+  const fl = len * 0.6;
+  const fighter = (dx, dy, heading, i) => {
+    const [x, y] = at(dx, dy);
+    drawShip(ctx, { type: 'alienFighter', x, y, angle: angle + heading, len: fl, color: o.color, phase: phase + i, shadow: o.shadow });
+  };
+  // Two carriers one behind the other; the cloud circles the pair.
+  const mid = -(carriers - 1) * 0.7;
+  const cloud = SWARM_STYLE === 'cloud' ? [...Array(fighters).keys()].map(i => ({ i, ...cloudSpot(i, phase, mid) })) : [];
+  // On one half of their orbit the fighters pass behind the carrier, on
+  // the other in front of it.
+  for (const c of cloud) if (c.dy < 0) fighter(c.dx, c.dy, c.heading, c.i);
+  if (SWARM_STYLE !== 'cloud') {
+    for (let i = 0; i < fighters; i++) {
+      const row = 1 + (i >> 1), side = i & 1 ? 1 : -1;
+      const wob = phase * 1.3 + i * 2.1;
+      fighter(0.15 - row * 0.45 + Math.sin(wob) * 0.04, side * (0.3 + row * 0.38) + Math.cos(wob * 0.8) * 0.04, 0, i);
+    }
+  }
+  // The carriers turn slowly about their core - a second one the other way.
+  for (let i = carriers - 1; i >= 0; i--) {
+    const [x, y] = at(-i * 1.4, 0);
+    const spin = phase * CARRIER_SPIN * (i & 1 ? -1 : 1);
+    drawShip(ctx, { type: 'alienCarrier', x, y, angle: angle + spin, len, color: o.color, phase: phase + i, shadow: o.shadow });
+  }
+  for (const c of cloud) if (c.dy >= 0) fighter(c.dx, c.dy, c.heading, c.i);
+}
+
+/**
+ * The ships of a fleet on the map: an alien swarm as a whole swarm, any
+ * other fleet by its leading ship.
+ */
+export function drawFleetShips(ctx, o, f, lead) {
+  if (f.ships?.some(s => s.type === 'alienCarrier')) drawAlienSwarm(ctx, o, f.ships);
+  else drawShip(ctx, { ...o, type: lead });
 }
 
 /** Engine trail for flying fleets. */

@@ -47,12 +47,16 @@ export function raiderHump(ctx, u = 1) {
 /** Where the arms of a star point: three, a third of a turn apart. */
 export const starArms = (offset) => [0, 1, 2].map(i => offset + i * Math.PI * 2 / 3);
 
-/** Half width of an arm at radius r: a tube almost to the end, then a needle point. */
+/**
+ * Half width of an arm at radius r: flared at the root, where it grows out
+ * of the core, then a tube almost to the end and a needle point.
+ */
 export function armHalf(r, len, thick) {
   const f = Math.min(1, Math.max(0, (r - ROOT) / (len - ROOT)));
-  return thick * (1 - Math.pow(f, 2.4));
+  return thick * (1 - Math.pow(f, 2.4)) * (1 + FLARE * Math.pow(1 - f, 4));
 }
 const ROOT = 7;
+const FLARE = 0.8;      // the root is this much wider than the tube
 
 /**
  * One star of the base ship: three long tubular arms ending in needle
@@ -78,7 +82,8 @@ export function star(ctx, offset, len, thick, u = 1) {
     }
     // The hollow over to the next arm
     const b = arms[(i + 1) % 3], mid = (a + b) / 2 + (i === 2 ? Math.PI : 0);
-    ctx.quadraticCurveTo(Math.cos(mid) * thick * 1.2 * u, Math.sin(mid) * thick * 1.2 * u, ...at(b, ROOT, -thick));
+    const root = armHalf(ROOT, len, thick);
+    ctx.quadraticCurveTo(Math.cos(mid) * root * 1.1 * u, Math.sin(mid) * root * 1.1 * u, ...at(b, ROOT, -root));
   });
   ctx.closePath();
 }
