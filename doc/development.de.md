@@ -25,7 +25,7 @@ server/
   game.js            Spielzustand, Zugauflösung, Sichten (Spieler und Zuschauer)
   galaxy.js          Sternkarte: Streufeld oder Spirale, Ausdehnung (deterministisch über einen geheimen Seed)
   wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
-  aliens.js          Aliens: Risse, Überfälle, überrannte Welten, Abzug, Testhilfe im Entwicklungsmodus
+  aliens.js          Aliens: Risse, Überfälle, überrannte Planeten, Abzug, Testhilfe im Entwicklungsmodus
   shipnames.js       Namen für die Träger: historische Schiffe und einige aus Filmen und Serien
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
@@ -56,7 +56,7 @@ test/                siehe Tests
 ## Grundsätze
 
 **Der Server rechnet, der Client zeigt an.** Jeder Spieler bekommt eine eigene,
-gefilterte Sicht: unerforschte Welten sind nur Positionen, einmal besuchte zeigen
+gefilterte Sicht: unerforschte Planeten sind nur Positionen, einmal besuchte zeigen
 den letzten bekannten Stand, und von fremden Flotten ist nur die Schiffszahl
 sichtbar – nie Technikstand oder Hülle.
 
@@ -66,8 +66,8 @@ Ergebnis selbst aus. Außerdem:
 - Der Seed der Karte ist ein 128-Bit-Geheimnis, das der Server würfelt – Spieler
   können ihn weder setzen noch sehen –, und Karte wie Kampf nutzen einen
   kryptografischen Generator (HMAC-SHA256, `makeRng` in `server/galaxy.js`). Mit einem
-  kleinen 32-Bit-Generator ließe sich der Seed aus den Weltpositionen, die jeder sieht,
-  durchprobieren – und damit jede verborgene Welt und jeder künftige Kampfwurf.
+  kleinen 32-Bit-Generator ließe sich der Seed aus den Planetenpositionen, die jeder sieht,
+  durchprobieren – und damit jeder verborgene Planet und jeder künftige Kampfwurf.
 - Ein Platz pro Konto und Partie; ein Admin kann einer Partie, in der er mitspielt,
   nicht ohne Nebel zusehen.
 - Systemmeldungen tragen ein eigenes Kennzeichen, Namen wie „System“ oder „Admin“
@@ -76,7 +76,7 @@ Ergebnis selbst aus. Außerdem:
   Server flutet, wird getrennt. Nachrichten sind auf 256 KB begrenzt.
 
 **Aufklärung reicht bis zum Kurs.** Eine fremde Flotte wird geortet, wenn sie bei
-einer sichtbaren Welt steht, näher als 300 Lj an einer eigenen Welt oder näher als
+einem sichtbaren Planeten steht, näher als 300 Lj an einem eigenen Planeten oder näher als
 240 Lj an einer eigenen Flotte. Dann sieht man auch, wohin sie fliegt und wann sie
 ankommt – womit sie fliegt, bleibt verdeckt.
 
@@ -136,7 +136,7 @@ keine Notizen hat.
 Die Effekte werden im Browser **synthetisiert** – keine Audiodateien, keine
 Abhängigkeit. Jeder Klang entsteht aus Oszillatoren und gefiltertem Rauschen; die
 Rezepttabelle in `client/js/audio/sfx.js` legt Tonhöhen, Hüllkurven und Filter
-fest. Ereignisse mit Planetenbezug klingen dort, wo die Welt auf dem Bildschirm
+fest. Ereignisse mit Planetenbezug klingen dort, wo der Planet auf dem Bildschirm
 liegt. Viele gleichzeitige Ereignisse werden gestaffelt, nach Wichtigkeit sortiert
 und begrenzt. Nach 20 Sekunden Stille hält sich der Audiokontext an.
 
@@ -158,14 +158,14 @@ npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
 npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
-npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzte Welt verschont, Träger, Entwicklungsmodus
+npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzter Planet verschont, Träger, Entwicklungsmodus
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:chase     # Abfangen im Flug: Einholen, Anhalten, Tempo, Befehle, Orbit und Sicht, KI
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus
 npm run test:net       # echter Server, 16 Clients, Simultanzug, Farbwahl, Trennung, Chat
 npm run test:auth      # Zugang: Hashes, Konten, Profil, Anmeldung, Rateschutz
 npm run test:ai        # schwere KI lernt aus gescheiterten Angriffen
-npm run test:colonies  # schwere KI: Kolonieschiffe aus der nächsten Werft, eins pro Welt
+npm run test:colonies  # schwere KI: Kolonieschiffe aus der nächsten Werft, eins pro Planet
 npm run test:midflight # Teilen im Flug, Ausfälle und Hinterhalte der schweren KI
 npm run test:news      # Änderungsnotizen: einmal pro Konto, Notizen zur aktuellen Version
 npm run test:idle      # Zombie-Partien: nach der Ruhefrist verworfen, aktive bleiben
@@ -180,4 +180,4 @@ mit `HO_SEED=…` lässt sich ein anderer Verlauf wählen.
 - Dauerhafte Speicherung laufender Partien (derzeit nur im Serverspeicher)
 - Hintergrundklang (bisher nur Effekte, keine Atmosphäre und keine Musik)
 - Eine in die Enge getriebene KI igelt sich nur ein: sie häuft Schiffe auf ihrer
-  letzten Welt an, statt auszubrechen
+  letzten Planeten an, statt auszubrechen

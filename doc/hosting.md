@@ -216,10 +216,10 @@ the open sessions. Such a game is not recorded.
 **Game statistics** go to `stats.json` next to `users.json`: one record per game
 opened with *Host a new game* (not the instant game against the AI), written when
 the game is first decided or when everybody has left it or it was discarded as idle.
-Per empire it holds account, name, AI level and persona, place, how it ended
-(winner, eliminated in turn …, left in turn …) and the final values (worlds,
+Per colony it holds account, name, AI level and persona, place, how it ended
+(winner, eliminated in turn …, left in turn …) and the final values (planets,
 population, ships, kills, losses, peaks, tech levels). The **ranking** in the start
-menu is computed from it – an Elo rating, AI empires at a fixed 1000 (normal) or
+menu is computed from it – an Elo rating, AI colonies at a fixed 1000 (normal) or
 1200 (hard), games of at least 10 turns, listed from 3 games on. Deleting an
 account removes its name and account from all records; the games themselves stay.
 

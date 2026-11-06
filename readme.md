@@ -10,10 +10,10 @@
 A space strategy game in the spirit of **Spaceward Ho!** – in the browser, for up to
 16 players at once.
 
-![Classic star map with twelve AI empires](doc/screenshots/map-classic-en.webp)
+![Classic star map with twelve AI colonies](doc/screenshots/map-classic-en.webp)
 
-*Twelve AI empires at turn 45. Colour shows a world's temperature, size its
-gravity; settled worlds tint their surroundings in their empire's colour.*
+*Twelve AI colonies at turn 45. Colour shows a planet's temperature, size its
+gravity; settled planets tint their surroundings in their colony's colour.*
 
 - **Simultaneous turns** for up to 16 players – friends via a four-letter code,
   empty seats filled with AI.
@@ -31,7 +31,7 @@ gravity; settled worlds tint their surroundings in their empire's colour.*
 - **On the go too:** on phones and tablets with an interface of its own – a bar
   along the bottom, sheets instead of windows, gestures for map and space.
 
-<p align="center"><img src="doc/screenshots/phone-en.webp" width="560" alt="Ho!! on a phone: the map with fleets and courses on the left, the home world's sheet on the right"></p>
+<p align="center"><img src="doc/screenshots/phone-en.webp" width="560" alt="Ho!! on a phone: the map with fleets and courses on the left, the home planet's sheet on the right"></p>
 
 ## Quick start
 

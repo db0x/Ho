@@ -363,7 +363,7 @@ function nextName(galaxy, rng, id) {
     const n = pick(rng, SYL_A) + pick(rng, SYL_B) + pick(rng, SYL_C);
     if (!galaxy.used.has(n)) { galaxy.used.add(n); return n; }
   }
-  const n = `World-${id + 1}`;
+  const n = `Planet-${id + 1}`;
   galaxy.used.add(n);
   return n;
 }
@@ -374,7 +374,7 @@ function nextName(galaxy, rng, id) {
  */
 function makePlanet(id, x, y, src, rng, h = 0, z = 0) {
   const name = Array.isArray(src)
-    ? (src.length ? src.pop() : `World-${id + 1}`)
+    ? (src.length ? src.pop() : `Planet-${id + 1}`)
     : nextName(src, rng, id);
   const hc = Math.min(h, 2.5);
   // Temperature: rather extreme further out; produces a mix of gems and

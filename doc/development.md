@@ -25,7 +25,7 @@ server/
   game.js            Game state, turn resolution, views (player and spectator)
   galaxy.js          Star map: scatter or spiral, expansion (deterministic via a secret seed)
   wormholes.js       Wormholes: opening, sight, jump, collapse, dev-mode aids
-  aliens.js          Aliens: rifts, raids, overrunning worlds, leaving, dev-mode aid
+  aliens.js          Aliens: rifts, raids, overrunning planets, leaving, dev-mode aid
   shipnames.js       Names for the destroyers: historical ships and a few from films and series
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
@@ -56,7 +56,7 @@ test/                see Tests
 ## Principles
 
 **The server computes, the client displays.** Every player gets their own filtered
-view: unexplored worlds are positions only, worlds visited once show the last known
+view: unexplored planets are positions only, planets visited once show the last known
 state, and of foreign fleets only the ship count is visible – never tech level or
 hull.
 
@@ -66,7 +66,7 @@ result itself. On top of that:
 - The map seed is a 128-bit secret rolled by the server – players can neither set
   nor see it – and map and combat use a cryptographic generator (HMAC-SHA256,
   `makeRng` in `server/galaxy.js`). With a small 32-bit generator the seed could be
-  brute-forced from the world positions everyone sees, and with it every hidden world
+  brute-forced from the planet positions everyone sees, and with it every hidden planet
   and every future combat roll.
 - One seat per account and game; an admin cannot watch a game without fog of war
   while playing in it.
@@ -76,7 +76,7 @@ result itself. On top of that:
   connection closed. Messages are limited to 256 KB.
 
 **Reconnaissance reaches as far as the course.** A foreign fleet is detected when it
-sits at a visible world, closer than 300 ly to one of your worlds or closer than
+sits at a visible planet, closer than 300 ly to one of your planets or closer than
 240 ly to one of your fleets. You then also see where it is heading and when it
 arrives – what it flies with stays hidden.
 
@@ -133,7 +133,7 @@ release in `package.json` has no notes.
 The effects are **synthesised** in the browser – no audio files, no dependency.
 Every sound is made from oscillators and filtered noise; the recipe table in
 `client/js/audio/sfx.js` sets pitches, envelopes and filters. Events tied to a
-planet sound from where the world sits on screen. Many simultaneous events are
+planet sound from where the planet sits on screen. Many simultaneous events are
 staggered, sorted by importance and capped. After 20 seconds of silence the audio
 context suspends itself.
 
@@ -155,14 +155,14 @@ npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
 npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
 npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
-npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last world spared, carrier, dev mode
+npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last planet spared, carrier, dev mode
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:chase     # intercepting in flight: catch, stop, speed, orders, orbit and sight, AI
 npm run test:budget    # budget: forecast = charges, no order fails
 npm run test:net       # real server, 16 clients, simultaneous turns, colours, disconnect, chat
 npm run test:auth      # access: hashes, accounts, profile, sign-in, rate limit
 npm run test:ai        # hard AI learns from failed strikes
-npm run test:colonies  # hard AI: colony ships from the nearest yard, one per world
+npm run test:colonies  # hard AI: colony ships from the nearest yard, one per planet
 npm run test:midflight # splitting in flight, hard AI sorties and ambushes
 npm run test:news      # change notes: once per account, notes for the current release
 npm run test:idle      # zombie games: discarded after the idle limit, active ones stay
@@ -176,5 +176,5 @@ picks a different run.
 - Diplomacy and alliances
 - Persistent storage of running games (currently in server memory only)
 - Ambient sound (effects only so far, no atmosphere and no music)
-- A cornered AI just digs in: it piles ships up on its last world instead of
+- A cornered AI just digs in: it piles ships up on its last planet instead of
   breaking out

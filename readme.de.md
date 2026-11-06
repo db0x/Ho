@@ -10,11 +10,11 @@
 Ein Weltraum-Strategiespiel im Geist von **Spaceward Ho!** – im Browser, für bis zu
 16 Spieler gleichzeitig.
 
-![Klassische Sternkarte mit zwölf KI-Reichen](doc/screenshots/map-classic-de.webp)
+![Klassische Sternkarte mit zwölf KI-Kolonien](doc/screenshots/map-classic-de.webp)
 
-*Zwölf KI-Reiche in Runde 45. Die Farbe einer Welt zeigt ihre Temperatur, die
-Größe ihre Schwerkraft; besiedelte Welten färben ihre Umgebung in der Farbe ihres
-Reiches.*
+*Zwölf KI-Kolonien in Runde 45. Die Farbe eines Planeten zeigt seine Temperatur,
+die Größe seine Schwerkraft; besiedelte Planeten färben ihre Umgebung in der Farbe
+ihrer Kolonie.*
 
 - **Gleichzeitige Züge** für bis zu 16 Spieler – Freunde per vierstelligem Code,
   freie Plätze mit KI.
@@ -33,7 +33,7 @@ Reiches.*
 - **Auch unterwegs:** auf Telefon und Tablet mit eigener Oberfläche – Leiste
   unten, Blätter statt Fenster, Gesten für Karte und Raum.
 
-<p align="center"><img src="doc/screenshots/phone-de.webp" width="560" alt="Ho!! auf dem Telefon: links die Karte mit Flotten und Kursen, rechts das Blatt der Heimatwelt"></p>
+<p align="center"><img src="doc/screenshots/phone-de.webp" width="560" alt="Ho!! auf dem Telefon: links die Karte mit Flotten und Kursen, rechts das Blatt des Heimatplaneten"></p>
 
 ## Schnellstart
 

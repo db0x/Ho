@@ -221,11 +221,11 @@ mit ihnen die offenen Sitzungen. Eine solche Partie wird nicht gespeichert.
 **Spielstatistik** landet in `stats.json` neben der `users.json`: ein Eintrag pro
 Partie, die über *Neue Partie eröffnen* gestartet wurde (nicht das Sofortspiel gegen
 die KI), geschrieben, sobald die Partie zum ersten Mal entschieden ist oder alle sie
-verlassen haben oder sie wegen Untätigkeit verworfen wurde. Pro Imperium: Konto,
+verlassen haben oder sie wegen Untätigkeit verworfen wurde. Pro Kolonie: Konto,
 Name, KI-Stufe und -Charakter, Platz, wie es endete (Sieger, ausgeschieden in Runde
-…, verlassen in Runde …) und die Endwerte (Welten, Bevölkerung, Schiffe,
+…, verlassen in Runde …) und die Endwerte (Planeten, Bevölkerung, Schiffe,
 Abschüsse, Verluste, Höchstwerte, Techstufen). Die **Rangliste** im Startmenü wird
-daraus berechnet – eine Elo-Wertung, KI-Imperien fest mit 1000 (normal) bzw. 1200
+daraus berechnet – eine Elo-Wertung, KI-Kolonien fest mit 1000 (normal) bzw. 1200
 (schwer), Partien ab 10 Runden, gelistet ab 3 Partien. Wird ein Konto gelöscht,
 verschwinden sein Name und Konto aus allen Einträgen; die Partien selbst bleiben.
 
