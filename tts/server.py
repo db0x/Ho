@@ -13,6 +13,9 @@ instead of minutes. Lines with names are never kept here.
 
 One sentence at a time (the model takes all cores anyway); when too many
 wait, it says 503 and the game leaves that line out.
+
+TTS_ENABLED=off (HO_SPEECH in the .env): it ends right away, without loading
+the model - nothing runs, nothing is spoken.
 """
 import hashlib
 import json
@@ -22,10 +25,17 @@ import threading
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-from speech import Speaker
-
 PORT = int(os.environ.get('TTS_PORT', '5005'))
 MODEL = os.environ.get('TTS_MODEL_DIR', '/models')
+
+if os.environ.get('TTS_ENABLED', 'on').strip().lower() in ('off', '0', 'false', 'no'):
+    print('Speech switched off (HO_SPEECH=off) - the service does not start.', file=sys.stderr, flush=True)
+    sys.exit(0)
+if not os.path.exists(os.path.join(MODEL, 'kokoro-v1.0.onnx')):
+    print(f'No voice model in {MODEL} - built with HO_SPEECH=off? Build again with it on.', file=sys.stderr, flush=True)
+    sys.exit(0)
+
+from speech import Speaker  # noqa: E402 - only once it is clear the service runs
 MAX_WAITING = int(os.environ.get('TTS_MAX_WAITING', '6'))
 MAX_TEXT = 300
 CACHE = os.environ.get('TTS_CACHE_DIR', '')

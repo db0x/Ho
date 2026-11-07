@@ -68,8 +68,12 @@ hat sie in Sekunden zurück. Sprüche mit Namen (*„Kepler Prime is mine
 now, Olena.“*) werden gesprochen, wenn sie gebraucht werden, und landen ebenfalls
 dort (höchstens 3000, die ältesten gehen).
 
-Ohne den Dienst – `HO_TTS=` leer in der `.env`, schlicht `npm start` oder der
-Container ist aus – läuft das Spiel wie immer, nur der Funk bleibt stumm. Der
+Wer ganz ohne Stimmen auskommen will, setzt `HO_SPEECH=off` in die `.env` und
+ruft `docker compose up -d --build`: Der Sprachdienst beendet sich dann gleich beim
+Start, sein Image kommt ohne Stimmmodell, und der Spielserver lässt ihn in Ruhe.
+
+Ohne den Dienst – abgeschaltet, schlicht `npm start` oder der Container ist aus –
+läuft das Spiel wie immer, nur der Funk bleibt stumm. Der
 Spielserver schaut alle 30 Sekunden, ob er wieder da ist. Admins sehen den Zustand
 in der Lobby unter dem Schalter *Funksprüche*: nicht eingerichtet, nicht
 erreichbar oder wie weit die Vorbereitung ist.
@@ -227,6 +231,7 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
 | `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |
 | `HO_IDLE_HOURS` | `4` | eine Partie, in der sich so lange niemand bewegt hat (Befehle, Zug beenden, Chat …), wird verworfen – auch wenn noch ein Tab offen ist; ist niemand verbunden, schon nach der halben Zeit |
+| `HO_SPEECH` | an | `off` schaltet die Stimmen der Funksprüche ganz ab: kein Sprachdienst, kein Stimmmodell im Image, stummer Funk |
 | `HO_TTS` | Docker: `http://tts:5005`, sonst leer | Adresse des Sprachdienstes für die Funksprüche; leer = der Funk bleibt stumm |
 | `HO_TTS_CACHE` | Docker: `/data/tts-cache`, sonst ein Temp-Ordner | wo die gesprochenen Sprüche liegen |
 | `HO_LANG` | aus der Umgebung | Sprache des Werkzeugs `users.js` |

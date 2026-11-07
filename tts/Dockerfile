@@ -11,8 +11,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # The model, pinned by checksum: a changed file must not slip in unnoticed.
+# SPEECH=off (HO_SPEECH in the .env): no model - the service is switched off.
+ARG SPEECH=on
 ARG MODELS=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
 RUN mkdir /models \
+ && if [ "$SPEECH" = "off" ]; then echo "Speech switched off: no voice model."; exit 0; fi \
  && curl -fsSL -o /models/kokoro-v1.0.onnx $MODELS/kokoro-v1.0.onnx \
  && curl -fsSL -o /models/voices-v1.0.bin $MODELS/voices-v1.0.bin \
  && echo "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5  /models/kokoro-v1.0.onnx" | sha256sum -c - \

@@ -6,14 +6,17 @@
 // A missing or broken service must never get in the way of a game: every
 // call has a timeout, nothing throws past this module, and while the service
 // is down the radio simply stays silent. A health check notices when it is
-// back. Its state (off, checking, down, warming, ok) is shown to admins in
-// the lobby.
+// back. Its state (disabled, off, checking, down, warming, ok) is shown to
+// admins in the lobby. HO_SPEECH=off switches all of it off on purpose.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const URL_ = process.env.HO_TTS || '';
+// HO_SPEECH=off: the radio has no voices on this server - the service is
+// left alone even if an address is set.
+const SWITCHED_OFF = /^(off|0|false|no)$/i.test((process.env.HO_SPEECH || 'on').trim());
+const URL_ = SWITCHED_OFF ? '' : (process.env.HO_TTS || '');
 const CACHE = process.env.HO_TTS_CACHE || path.join(os.tmpdir(), 'ho-radio-tts');
 // How long a line may take to be spoken.
 const TIMEOUT_MS = 6000;
@@ -27,7 +30,7 @@ const MAX_NAMED = 3000;
 const pending = new Map();        // key -> Promise
 const fixed = new Map();          // key -> {text, voice, speed}: may be spoken on request
 const listeners = new Set();
-let status = { state: URL_ ? 'checking' : 'off', done: 0, total: 0 };
+let status = { state: SWITCHED_OFF ? 'disabled' : URL_ ? 'checking' : 'off', done: 0, total: 0 };
 let timer = null, warming = false, made = 0, started = false;
 
 export const ttsEnabled = () => !!URL_;
@@ -111,7 +114,7 @@ export function speak(text, voice, speed = 1) {
 
 /** The service stopped answering: silent until the health check finds it again. */
 function lost(e) {
-  if (status.state === 'down' || status.state === 'off') return;
+  if (!['checking', 'warming', 'ok'].includes(status.state)) return;
   console.warn(`Speech service lost (${e.name === 'TimeoutError' ? 'timeout' : e.message}) - radio silent until it is back.`);
   setStatus({ state: 'down' });
   schedule(CHECK_DOWN_MS);

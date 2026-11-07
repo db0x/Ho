@@ -164,6 +164,21 @@ const off = execFileSync(process.execPath, ['--input-type=module', '-e', `
 const o = JSON.parse(off.trim().split('\n').pop());
 assert(o.state === 'off' && o.silent && o.refused && o.code === 503, `without a service: off, silent, 503 (${off.trim()})`);
 
+// ------------------------------------------- switched off in the .env
+const sw = execFileSync(process.execPath, ['--input-type=module', '-e', `
+  const { ttsStatus, ttsEnabled, startTts } = await import('./server/radio/tts.js');
+  const { radioTurn } = await import('./server/radio/chatter.js');
+  const { createGame, startGame } = await import('./server/game/game.js');
+  const { addPlayer } = await import('./server/game/players.js');
+  startTts();
+  const g = createGame('Off'); addPlayer(g, { name: 'A' }); addPlayer(g, { isBot: true, persona: 'raider' }); startGame(g);
+  const silent = radioTurn(g, [{ type: 'alien', playerIds: [g.players[0].id], key: 'log.alienRift', params: {} }], () => 0).size === 0;
+  console.log(JSON.stringify({ state: ttsStatus().state, enabled: ttsEnabled(), silent }));
+`], { env: { ...process.env, HO_SPEECH: 'off', HO_TTS: `http://127.0.0.1:${port}`, HO_TTS_CACHE: path.join(cache, 'sw') },
+  cwd: new URL('..', import.meta.url).pathname }).toString();
+const w = JSON.parse(sw.trim().split('\n').pop());
+assert(w.state === 'disabled' && !w.enabled && w.silent, `HO_SPEECH=off: disabled, silent, the service left alone (${sw.trim()})`);
+
 fake.close();
 fs.rmSync(cache, { recursive: true, force: true });
 if (errors) { console.error(`${errors} error(s).`); process.exit(1); }

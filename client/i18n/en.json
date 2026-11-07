@@ -571,6 +571,7 @@
   "radio.important": "Important only",
   "radio.off": "Off",
   "radio.alien": "[alien transmission]",
+  "radio.note.disabled": "Admin note: radio chatter with voices is switched off on this server (HO_SPEECH=off).",
   "radio.note.off": "Admin note: no speech service is set up (HO_TTS) – radio chatter stays silent.",
   "radio.note.down": "Admin note: the speech service is not reachable – radio chatter stays silent until it is back.",
   "radio.note.warming": "Admin note: the speech service is preparing the radio lines ({done} of {total}) – until then some come a little late.",

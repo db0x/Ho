@@ -348,12 +348,12 @@ export class Lobby {
   /**
    * Admins only: how the speech service of the radio chatter is doing - a
    * note under the switch while it is missing, down or still preparing.
-   * @param {{state: 'off'|'checking'|'down'|'warming'|'ok', done?: number, total?: number} | undefined} status
+   * @param {{state: 'disabled'|'off'|'checking'|'down'|'warming'|'ok', done?: number, total?: number} | undefined} status
    */
   setRadioStatus(status) {
     this.radioStatus = status;
     const el = $('#radio-note');
-    const show = !!status && ['off', 'down', 'warming'].includes(status.state);
+    const show = !!status && ['disabled', 'off', 'down', 'warming'].includes(status.state);
     el.classList.toggle('hidden', !show);
     if (show) el.textContent = t(`radio.note.${status.state}`, { done: status.done ?? 0, total: status.total ?? 0 });
   }
