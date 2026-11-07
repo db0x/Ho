@@ -5,6 +5,8 @@ import { runBot } from '../ai/bot.js';
 import { lobbyView, allReady } from '../game/game.js';
 import { buildView } from '../game/intel.js';
 import { resolveTurn } from '../game/turn.js';
+import { radioTurn } from '../radio/chatter.js';
+import { speak } from '../radio/tts.js';
 import { recordGame } from '../stats.js';
 import { conns, send } from './connections.js';
 import { spectatorView } from './spectators.js';
@@ -62,7 +64,32 @@ export function maybeResolve(game) {
   // Decided: into the statistics - a continuation afterwards no longer counts.
   if (game.state === 'over') record(game);
   broadcastView(game, { resolved: true, entryCount: entries.length });
+  deliverRadio(game, radioTurn(game, entries));
   return true;
+}
+
+/**
+ * After the view: the radio chatter of the turn - a line and a short call per
+ * player at most. Each goes out only once it is spoken: a line with names
+ * waits for the speech service and falls back to its fixed line; a fixed line
+ * is usually prepared already. What cannot be spoken is left out - the game
+ * never waits for the radio, and nothing here may throw.
+ */
+export async function deliverRadio(game, out) {
+  try {
+    for (const [id, msgs] of out) {
+      const ready = await Promise.all(msgs.map(async ({ named, line, ...msg }) => {
+        if (named) {
+          try { return { ...msg, ...(await speak(named.say, named.voice, named.speed)), text: named.text }; } catch {}
+        }
+        try { return { ...msg, ...(await speak(line.say, line.voice, line.speed)) }; } catch { return null; }
+      }));
+      const c = conns.get(game.players.find(p => p.id === id)?.connId);
+      if (c && c.gameId === game.id) for (const msg of ready) if (msg) send(c.ws, msg);
+    }
+  } catch (e) {
+    console.warn('Radio chatter not delivered:', e.message);
+  }
 }
 
 /** Into the statistics; a full disk must not take the game down with it. */

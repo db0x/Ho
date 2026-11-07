@@ -317,6 +317,12 @@
           <b id="v-intercept" class="ro-only"></b>
         </label>
         <p class="muted small" data-i18n="lobby.interceptHint"></p>
+        <label class="chk" style="padding:0;margin-top:10px">
+          <input type="checkbox" id="s-radio" checked> <span data-i18n="lobby.radio"></span>
+          <b id="v-radio" class="ro-only"></b>
+        </label>
+        <p class="muted small" data-i18n="lobby.radioHint"></p>
+        <p class="small radio-note hidden" id="radio-note" role="status"></p>
         <div id="row-voice" class="hidden">
           <label class="chk" style="padding:0;margin-top:10px">
             <input type="checkbox" id="s-voice"> <span data-i18n="lobby.voice"></span>
@@ -407,6 +413,12 @@
           <label class="chk" data-i18n-attr="title:map.soundTitle"><input type="checkbox" id="chk-sound"> <span data-i18n="map.sound"></span></label>
           <div class="volrow"><span data-i18n="map.volume"></span>
             <input type="range" id="snd-vol" min="0" max="100" step="5" data-i18n-attr="title:map.volume"></div>
+          <label class="langrow" data-i18n-attr="title:radio.settingTitle"><span data-i18n="radio.setting"></span>
+            <select id="sel-radio">
+              <option value="all" data-i18n="radio.all"></option>
+              <option value="important" data-i18n="radio.important"></option>
+              <option value="off" data-i18n="radio.off"></option>
+            </select></label>
           <div id="voice-opts" class="hidden">
             <div class="voice-head" data-i18n="voice.title"></div>
             <label class="chk hidden" id="row-voice-allow" data-i18n-attr="title:voice.allowTitle"><input type="checkbox" id="chk-voice-allow"> <span data-i18n="voice.allowAll"></span></label>

@@ -8,10 +8,11 @@ import { WebSocketServer } from 'ws';
 import * as friends from './friends.js';
 import { handleAuth, gate, checkUpgrade, authEnabled } from './auth.js';
 import { DEV } from './hub/dev.js';
-import { attach, startTimers } from './hub/hub.js';
+import { attach, startTimers, startRadio } from './hub/hub.js';
 import { VERSION } from './hub/news.js';
 import { startVoice } from './hub/voice.js';
 import { handleAvatar } from './profile.js';
+import { handleRadio } from './radio/index.js';
 import { ensureHandles, userFile, listUsers } from './userstore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +46,7 @@ const server = http.createServer((req, res) => {
   if (handleAuth(req, res, rel)) return;
   if (!gate(req, res, rel)) return;
   if (handleAvatar(req, res, rel)) return;
+  if (handleRadio(req, res, rel)) return;
   // /shared/* comes from the shared directory, everything else from /client
   const base = rel.startsWith('/shared/') ? ROOT : path.join(ROOT, 'client');
   const file = path.normalize(path.join(base, rel));
@@ -92,6 +94,7 @@ server.listen(PORT, async () => {
   }
   if (DEV) console.warn(`Dev mode: ON (HO_DEV) - testing aids for ${authEnabled() ? 'admins' : 'everyone'}.`);
   await startVoice();
+  startRadio();
   if (!authEnabled()) {
     console.warn('Access: DISABLED (HO_AUTH=off) - anyone with the URL can play.');
     return;

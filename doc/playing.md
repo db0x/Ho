@@ -359,6 +359,28 @@ A hard AI colony betrays with a plan: its fleets first gather in the ally's orbi
 as guests, and only once enough of them are there does it give notice – when
 the notice runs out, the battle starts right inside the ally's defences.
 
+### Radio chatter
+
+Now and then an AI colony gets on the radio – with a voice of its own for each
+personality, in English: when it first clashes with you, attacks your planets,
+takes one or loses one, allies with you or gives notice. The aliens speak up
+too, in a language nobody understands. What is said also shows on the comms,
+marked 📻. Many lines name names – your
+planet, you, the colony or its destroyer: *"Kepler Prime is mine now, Olena."* In the thick of a battle with you there are short calls on top –
+*Open fire!*, *Jackpot!*, *Breach!* – those only sound.
+
+Your own fleets answer too, short and snappy, each with a voice of its own: when
+you pick one (*"Yes?"*), send it off (*"On it."*), into battle (*"Charge!"*), to
+settle a free planet (*"New home!"*), after a foreign fleet or into a wormhole – right away or not at all, not every time, and with over a hundred
+lines rarely the same twice.
+
+It stays sparse: only what concerns you, at most one line per turn (the most
+important one, plus one short call from someone else), a colony keeps quiet for a few turns after it spoke, and while
+somebody talks on the CB radio it waits. The host switches it off in the lobby
+(*Radio chatter*); in the menu ⚙ every player picks *All* (with the crew's answers), *Important only*
+(first clash, betrayal, a lost planet, aliens appearing) or *Off*. Volume and
+mute follow the sound.
+
 ## Watching
 
 *Watch a game* sets up a game with 4 to 16 AI colonies. There is no colony of your

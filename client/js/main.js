@@ -26,6 +26,8 @@ import { MapView } from './render/map.js';
 import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
 import { Voice } from './voice.js';
+import { radio } from './audio/radio.js';
+import { crewSay, orderKind, hasColonists } from './audio/crew.js';
 import { enhanceSelects, syncSelects } from './ui/select.js';
 import { compact } from './ui/viewport.js';
 import { bindTips } from './ui/tips.js';
@@ -187,6 +189,11 @@ const app = {
   },
   send: (m) => net.send(m),
   setSelection(sel) {
+    // An own fleet newly picked may answer over the radio.
+    if (sel?.type === 'fleet' && (app.selection?.type !== 'fleet' || app.selection.id !== sel.id) && !app.spectator) {
+      const f = map?.view?.fleets.find(x => x.id === sel.id);
+      if (f?.mine) crewSay(hasColonists(f) ? 'selectColony' : 'select', f);
+    }
     app.selection = sel;
     if (map) { map.selection = sel; map.poke(); }
     if (hud) hud.selection();
@@ -213,6 +220,8 @@ const app = {
     if (!fleetId) return;
     net.send({ t: 'orders', move: { fleetId, planetId } });
     sfx.play('course', { pan: panOf(planetId) });
+    const fleet = map?.view?.fleets.find(f => f.id === fleetId);
+    crewSay(orderKind(map?.view, fleet, planetId), fleet);
   },
   /** Intercept a foreign fleet - the server finds the meeting point. */
   orderChase(target) {
@@ -223,6 +232,7 @@ const app = {
     if (map?.view?.interception === false || !prey || prey.mine || prey.allied) { sfx.play('deny'); return; }
     net.send({ t: 'orders', move: { fleetId, chase: target } });
     sfx.play('course');
+    crewSay('chase', map?.view?.fleets.find(f => f.id === fleetId));
   },
   /** Course into a wormhole mouth: the fleet jumps when it gets there. */
   orderHole(hole) {
@@ -230,6 +240,7 @@ const app = {
     if (!fleetId) return;
     net.send({ t: 'orders', move: { fleetId, hole } });
     sfx.play('course');
+    crewSay('hole', map?.view?.fleets.find(f => f.id === fleetId));
   },
   /**
    * The next fleet in the same orbit as the selected one (back with -1),
@@ -309,6 +320,7 @@ net.on('hello', (m) => {
   }
   voice.configure(m.voice);
   lobby.setVoice(!!m.voice);
+  lobby.setRadioStatus(m.radio);
   lobby.showOpenGames(m.openGames);
   lobby.showMySeats(m.mySeats);
   if (m.profile) lobby.setProfile(m.profile, true);
@@ -502,6 +514,19 @@ net.on('chat', (m) => {
 });
 
 net.on('voice', (m) => voice.onState(m));
+// Radio chatter of the AI colonies and the aliens - the server picks the line,
+// the player how much of it they want (radio.level). The subtitle goes on the
+// comms when the line is actually spoken - short calls ("Open fire!") only
+// sound, they would flood the comms.
+net.on('radio', (m) => radio.receive(m));
+net.on('radioStatus', (m) => lobby.setRadioStatus(m.radio));
+radio.blocked = () => !!voice.floor;
+radio.onLine((item) => {
+  if (item.debug || item.short) return;
+  const alien = item.speaker === 'alien';
+  hud?.chat(alien ? t('alien.name') : item.name || '?', alien ? t('radio.alien') : item.clip.text,
+    { fromId: alien ? null : item.from, radio: true });
+});
 net.on('rtc', (m) => voice.onSignal(m));
 
 net.on('close', () => {
@@ -671,6 +696,10 @@ function bindGame() {
   snd.onchange = e => { sfx.setEnabled(e.target.checked); if (e.target.checked) sfx.play('select'); };
   vol.oninput = e => sfx.setVolume(+e.target.value / 100);
   vol.onchange = () => sfx.play('select');
+  const radioSel = $('#sel-radio');
+  radioSel.value = radio.level;
+  syncSelects();
+  radioSel.onchange = e => radio.setLevel(e.target.value);
   // Full screen where the browser can do it (Android, iPad, desktop). Safari on
   // the iPhone cannot - there only "Add to Home Screen" helps (manifest).
   // Started from the home screen, the browser bars are gone anyway.

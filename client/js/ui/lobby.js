@@ -118,6 +118,9 @@ export class Lobby {
     $('#s-capitals').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { capitalShips: $('#s-capitals').checked } });
     };
+    $('#s-radio').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { radio: $('#s-radio').checked } });
+    };
     $('#s-intercept').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { interception: $('#s-intercept').checked } });
     };
@@ -342,6 +345,19 @@ export class Lobby {
   /** The CB radio switch only exists where the server offers CB radio. */
   setVoice(offered) { $('#row-voice').classList.toggle('hidden', !offered); }
 
+  /**
+   * Admins only: how the speech service of the radio chatter is doing - a
+   * note under the switch while it is missing, down or still preparing.
+   * @param {{state: 'off'|'checking'|'down'|'warming'|'ok', done?: number, total?: number} | undefined} status
+   */
+  setRadioStatus(status) {
+    this.radioStatus = status;
+    const el = $('#radio-note');
+    const show = !!status && ['off', 'down', 'warming'].includes(status.state);
+    el.classList.toggle('hidden', !show);
+    if (show) el.textContent = t(`radio.note.${status.state}`, { done: status.done ?? 0, total: status.total ?? 0 });
+  }
+
   show(which) {
     for (const s of ['menu', 'lobby', 'game']) {
       document.querySelector('#screen-' + s).classList.toggle('hidden', s !== which);
@@ -461,6 +477,9 @@ export class Lobby {
     $('#s-intercept').checked = s.interception !== false;
     $('#v-intercept').textContent = t(s.interception !== false ? 'word.yes' : 'word.no');
     $('#s-intercept').disabled = !this.isHost;
+    $('#s-radio').checked = s.radio !== false;
+    $('#v-radio').textContent = t(s.radio !== false ? 'word.yes' : 'word.no');
+    $('#s-radio').disabled = !this.isHost;
     $('#s-voice').checked = !!s.voice;
     $('#v-voice').textContent = t(s.voice ? 'word.yes' : 'word.no');
     $('#s-voice').disabled = !this.isHost;
@@ -488,6 +507,7 @@ export class Lobby {
     if (this.lobby) this.update({ lobby: this.lobby, host: this.isHost, you: this.youId }, false);
     if (this.openGames) this.showOpenGames(this.openGames);
     if (this.mySeats) this.showMySeats(this.mySeats);
+    this.setRadioStatus(this.radioStatus);
     this.profileHint();
   }
 

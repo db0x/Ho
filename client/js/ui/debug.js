@@ -3,12 +3,14 @@
 // having to play towards it - purely in the browser, the battle is rolled
 // here with the server's combat rules. In a running game it also steps in:
 // opening and closing wormholes, a destroyer and aliens right away - that
-// does go to the server.
+// does go to the server. And it plays the radio chatter of the AI colonies
+// and the aliens, clip by clip.
 // Opened with Ctrl+Shift+D, in the start menu as in a game.
 import { SHIP_TYPES, shipStats, batteryStats, COMBAT_ROUNDS, PLAYER_COLORS } from '../../shared/rules.js';
 import { openBattle } from './battle.js';
 import { sfx, SFX_NAMES } from '../audio/sfx.js';
-import { t, onLocaleChange } from '../i18n.js';
+import { radio } from '../audio/radio.js';
+import { t, hasKey, onLocaleChange } from '../i18n.js';
 
 // Satellites cannot fly - only the defender has them, around the world.
 const ATTACKER_TYPES = SHIP_TYPES.filter(s => s !== 'satellite');
@@ -25,6 +27,11 @@ export class DebugDialog {
     this.app = null;            // set in dev mode: the game it may step into
     this.cfg = structuredClone(DEFAULTS);
     this.modal = null;
+    // What is being said shows in the dialog - the subtitle.
+    radio.onLine(({ speaker, clip }) => {
+      const el = this.modal?.querySelector('[data-out="radio"]');
+      if (el) el.textContent = `${speaker}: ${clip.text}`;
+    });
     addEventListener('keydown', (e) => {
       if (!this.enabled || !(e.ctrlKey && e.shiftKey && e.code === 'KeyD')) return;
       e.preventDefault();
@@ -35,7 +42,7 @@ export class DebugDialog {
 
   setEnabled(on) {
     this.enabled = !!on;
-    if (!this.enabled) this.modal?.classList.add('hidden');
+    if (!this.enabled) { this.modal?.classList.add('hidden'); radio.stop(); }
   }
 
   /** Dev mode: the app whose game the wormhole tools act on, or null. */
@@ -48,6 +55,21 @@ export class DebugDialog {
     if (!this.modal) this.build();
     else if (show) this.render();        // the game may have started meanwhile
     this.modal.classList.toggle('hidden', !show);
+    if (!show) radio.stop();
+  }
+
+  /** One row of buttons per speaker, once the clip list is there. */
+  async fillRadio() {
+    const m = await radio.load();
+    const el = this.modal?.querySelector('.debug-radio');
+    if (!el) return;
+    // The crew has four voices with the same lines - the first stands for all.
+    const rows = Object.entries(m).filter(([speaker]) => !/^crew[2-9]/.test(speaker)).map(([speaker, events]) => `<div class="debug-radio-row">
+      <span>${speaker === 'alien' ? t('alien.name') : hasKey(`persona.${speaker}`) ? t(`persona.${speaker}`) : speaker}</span>
+      <div class="debug-sounds">${Object.entries(events).flatMap(([event, clips]) => clips.map((c, n) =>
+        `<button type="button" class="tiny" data-radio="${speaker}/${event}/${n}" data-sfx="none" title="${c.text.replace(/"/g, '&quot;')}">${event} ${n + 1}</button>`)).join('')}</div>
+    </div>`).join('');
+    el.innerHTML = rows || `<p class="muted small">${t('debug.radioNone')}</p>`;
   }
 
   /** Where the selection on the map is - a wormhole may open next to it. */
@@ -98,10 +120,18 @@ export class DebugDialog {
       if (a === 'fight') this.fight();
       if (a === 'destroyer') this.destroyer();
       if (a === 'aliens') this.aliens();
+      if (a === 'radioNamed') { this.app.send({ t: 'dev', action: 'radio' }); this.toggle(false); }
       const hole = e.target.closest('[data-hole]')?.dataset.hole;
       if (hole) this.hole(hole);
       const snd = e.target.closest('[data-play]');
       if (snd) sfx.play(snd.dataset.play);
+      const rad = e.target.closest('[data-radio]')?.dataset.radio;
+      if (rad) {
+        const [speaker, event, n] = rad.split('/');
+        radio.stop();
+        radio.say(speaker, event, +n).then(ok => { if (!ok) sfx.play('deny'); });
+      }
+      if (a === 'radioStop') radio.stop();
     });
     this.modal.addEventListener('input', (e) => {
       const f = e.target.dataset.f;
@@ -143,7 +173,12 @@ export class DebugDialog {
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="aliens">${t('dev.aliens')}</button>
       </div>
-      <p class="muted small">${t('dev.aliensHint')}</p>` : ''}`;
+      <p class="muted small">${t('dev.aliensHint')}</p>` : ''}
+      ${running && !this.app.map.view.spectator ? `<h3>${t('debug.radio')}</h3>
+      <div class="debug-actions debug-dev">
+        <button type="button" class="tiny" data-a="radioNamed">${t('dev.radioNamed')}</button>
+      </div>
+      <p class="muted small">${t('dev.radioNamedHint')}</p>` : ''}`;
     this.modal.innerHTML = `<div class="modal-box debug-box">
       <h2>${t('debug.title')}</h2>${holes}
       <h3>${t('debug.battle')}</h3>
@@ -164,10 +199,18 @@ export class DebugDialog {
       <h3>${t('debug.sounds')}</h3>
       <div class="debug-sounds">${SFX_NAMES.map(n =>
         `<button type="button" class="tiny" data-play="${n}" data-sfx="none">${n}</button>`).join('')}</div>
+      <h3>${t('debug.radio')}</h3>
+      <div class="debug-radio"></div>
+      <p class="small" data-out="radio"></p>
+      <p class="muted small">${t('debug.radioHint')}</p>
+      <div class="debug-actions">
+        <button type="button" class="tiny" data-a="radioStop" data-sfx="none">${t('debug.radioStop')}</button>
+      </div>
       <div class="debug-actions">
         <button type="button" class="primary" data-a="close">${t('battle.close')}</button>
       </div>
     </div>`;
+    this.fillRadio();
   }
 
   fight() {

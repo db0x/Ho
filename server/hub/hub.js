@@ -19,6 +19,8 @@ import { newsHandlers, VERSION, RELEASES } from './news.js';
 import { rankingHandlers } from './ranking.js';
 import { spectatorHandlers, paceSpectatorGames } from './spectators.js';
 import { voiceHandlers, voiceOffer, releaseFloor } from './voice.js';
+import { radioManifest } from '../radio/index.js';
+import { startTts, ttsStatus, onTtsStatus } from '../radio/tts.js';
 
 /**
  * Every message type the server knows, and who handles it. A Map, so a type
@@ -59,6 +61,8 @@ export function attach(wss) {
       admin: adminOf(c),
       inviter: inviterOf(c),
       dev: devOf(c),
+      // How the speech service of the radio chatter is doing - for admins (lobby note).
+      radio: radioWatcher(c) ? ttsStatus() : undefined,
       // The ranking needs accounts - without sign-in there is none.
       ranking: authEnabled() && !blocked,
       // Which release's change notes this account has seen - null: none yet.
@@ -102,6 +106,18 @@ function handle(connId, ws, msg) {
   // Every message from someone in a game counts as a sign of life for it.
   if (game) game.lastActivity = Date.now();
   HANDLERS.get(msg.t)?.({ c, connId, ws, game, me }, msg);
+}
+
+/** Who sees the state of the speech service: admins - without sign-in everyone. */
+const radioWatcher = c => adminOf(c) || !authEnabled();
+
+/** Radio chatter: prepare the lines, watch the speech service, tell the admins how it is doing. */
+export function startRadio() {
+  radioManifest();
+  onTtsStatus((status) => {
+    for (const c of conns.values()) if (radioWatcher(c)) send(c.ws, { t: 'radioStatus', radio: status });
+  });
+  startTts();
 }
 
 export function startTimers() {

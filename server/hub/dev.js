@@ -4,9 +4,10 @@ import { devAliens } from '../aliens.js';
 import { devDestroyer } from '../game/shipyard.js';
 import { pushLog } from '../game/log.js';
 import { devWormholes } from '../wormholes.js';
+import { devRadioLine } from '../radio/chatter.js';
 import { adminOf } from './account.js';
 import { send } from './connections.js';
-import { chat, broadcastView } from './games.js';
+import { chat, broadcastView, deliverRadio } from './games.js';
 
 // Dev mode (HO_DEV=on): admins get testing aids in the game, e.g. opening a
 // wormhole on the spot. Without sign-in there are no admins - then everyone
@@ -27,6 +28,13 @@ export const devHandlers = {
     const at = msg.at && ['x', 'y'].every(k => Number.isFinite(msg.at[k]))
       ? { x: msg.at.x, y: msg.at.y, z: Number.isFinite(msg.at.z) ? msg.at.z : 0 } : null;
     const action = String(msg.action || '');
+    if (action === 'radio') {
+      // A radio line with names, only to whoever asked - nothing changes in the game.
+      const line = me && devRadioLine(game, me);
+      if (!line) return send(ws, { t: 'notice', key: 'dev.nothing' });
+      deliverRadio(game, new Map([[me.id, [line]]]));
+      return;
+    }
     if (action === 'destroyer') {
       // A destroyer without research and shipyard - only for a player of the game.
       if (!devDestroyer(game, me, Number.isInteger(msg.planetId) ? msg.planetId : null)) {
