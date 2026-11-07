@@ -51,6 +51,35 @@ HO_AUTH=off
 On a server that line does not belong – without it the sign-in stays on. Whether it
 is on is in the startup log (`docker compose logs ho | grep Zugang`).
 
+### The speech service
+
+`docker compose up` also starts a second container, `tts`: it speaks the
+[radio chatter](playing.md#radio-chatter) with the Kokoro voices – locally, no
+account, no cost. Only the game server reaches it; it opens no port. It needs
+about 1 GB of RAM and a CPU core while it speaks (a sentence takes about a
+second); the first build downloads the voice model (~350 MB, checked against a
+checksum).
+
+At start the game server has all fixed lines spoken once in the background
+(the crew's answers first; some eight minutes, once) and keeps them in
+`data/tts-cache/` – they survive restarts and new images. The speech service keeps
+them too, in the Docker volume `tts-cache`: a fresh game container gets them back
+in seconds. Lines that name names (*"Kepler Prime is mine now, Olena."*) are
+spoken when they come up and kept there too (at most 3000, the oldest go).
+
+To do without voices altogether, put `HO_SPEECH=off` in the `.env` and run
+`docker compose up -d --build`: the speech service then ends right at the start,
+its image comes without the voice model, and the game server leaves it alone.
+
+Without the service – switched off, plain `npm start`, or the container down –
+the game runs as always, only the radio stays silent. The game
+server checks every 30 seconds whether it is back. Admins see the state in the
+lobby, under the *Radio chatter* switch: not set up, not reachable, or how far the
+preparing has got.
+
+The lines themselves are in `server/radio/lines.json`; to hear new ones before
+they go live, `tools/radio/preview.py` speaks them into a folder.
+
 ## Access and accounts
 
 A sign-in with user name and password sits in front of the lobby. Without a valid
@@ -197,6 +226,9 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | `HO_SESSION_DAYS` | `30` | how long a session is good for |
 | `HO_SECURE_COOKIES` | automatic | `1`/`0` forces or forbids the `Secure` flag |
 | `HO_IDLE_HOURS` | `4` | a game nobody has made a move in (orders, end of turn, chat …) for this long is discarded, even with a tab still open; with nobody connected after half the time |
+| `HO_SPEECH` | on | `off` switches the radio chatter's voices off entirely: no speech service, no voice model in the image, a silent radio |
+| `HO_TTS` | Docker: `http://tts:5005`, otherwise empty | address of the speech service for the radio chatter; empty = the radio stays silent |
+| `HO_TTS_CACHE` | Docker: `/data/tts-cache`, otherwise a temp folder | where the spoken lines are kept |
 | `HO_LANG` | from the environment | language of the `users.js` tool |
 | `HOST_PORT`, `HOST_BIND` | `8080`, `0.0.0.0` | Docker only: port and address on the host |
 

@@ -1,0 +1,730 @@
+{
+  "_comment": "What the AI colonies and the aliens say over the radio. One speaker per AI persona (server/ai/personas.js) plus the aliens. voice: a Kokoro voice (am_/af_ American, bm_/bf_ British, m male, f female), speed: 1 = normal. Each event has a few variants. Events of the colonies: war (first battle against you), attack (later battles at your planets), defeat (it loses a battle or a planet to you), victory (it beats you or takes your planet), ally (alliance with you), betray (it gives notice on your alliance). Short calls in any battle with you: engage, win, lose (aliens: engage, lose). The aliens speak no human language - 'text' is what the subtitle shows.  'templates': sentences with names, spoken on demand by the speech service (tts/) - {name} the speaker's colony, {player} the listener, {planet} the planet it is about, {ship} a named ship (destroyer) of the speaker there. A template is only used when all its names are known. Every line is spoken by the speech service (tts/) and cached (server/radio/tts.js); the server prepares all fixed lines in the background at start. To hear new lines before they go live: python tools/radio/preview.py (see there). 'crew': the player's own fleets answering orders - several voices ('voices'), every fleet keeps one; events: select, selectColony (a fleet with colonists), move, attack, colonize, chase (intercept a fleet), hole (into a wormhole).",
+  "speakers": {
+    "conqueror": {
+      "voice": "bm_george",
+      "speed": 1.0,
+      "lines": {
+        "war": [
+          "Your borders end where my fleet begins.",
+          "You have been weighed. And found wanting.",
+          "I gave you a chance to kneel. You wasted it."
+        ],
+        "attack": [
+          "All squadrons, weapons free!",
+          "Surrender, or become a crater.",
+          "Forward! No ship turns back!"
+        ],
+        "defeat": [
+          "Fall back. This is not over.",
+          "A setback. Nothing more.",
+          "Enjoy your little victory. It will be your last."
+        ],
+        "victory": [
+          "Your planet is mine now.",
+          "As expected. Your defenses were a formality.",
+          "Raise my flag. Another world for the colony."
+        ],
+        "ally": [
+          "An alliance, then. Do not make me regret it.",
+          "Together we crush the rest.",
+          "Very well. For now."
+        ],
+        "betray": [
+          "Our alliance is over. Consider this your notice.",
+          "I have outgrown our little pact. Prepare yourself.",
+          "Friendship is a luxury."
+        ],
+        "engage": [
+          "Engage!",
+          "Weapons free!",
+          "Open fire!",
+          "For the colony!",
+          "Attack formation!"
+        ],
+        "win": [
+          "Target destroyed.",
+          "Next.",
+          "Too easy.",
+          "The orbit is ours.",
+          "As ordered."
+        ],
+        "lose": [
+          "Fall back!",
+          "Regroup!",
+          "Damn them!",
+          "Pull out!",
+          "Heavy losses!"
+        ]
+      },
+      "templates": {
+        "war": [
+          "This is {name}. {player}, your borders end here.",
+          "{player}. {planet} will fly my flag. This means war.",
+          "{name} to {player}: prepare for invasion."
+        ],
+        "attack": [
+          "All squadrons, burn {planet} clean!",
+          "{ship}, open fire on {planet}!",
+          "{planet} is surrounded, {player}. Surrender."
+        ],
+        "defeat": [
+          "Fall back from {planet}. This is not over, {player}.",
+          "{planet}... a setback. Nothing more."
+        ],
+        "victory": [
+          "{planet} is mine now, {player}.",
+          "Raise my flag over {planet}.",
+          "{ship} reporting. {planet} has fallen."
+        ],
+        "ally": [
+          "{name} stands with you, {player}. For now.",
+          "Very well, {player}. Together we crush the rest."
+        ],
+        "betray": [
+          "{player}, our alliance is over. Consider this your notice.",
+          "{name} has outgrown you, {player}."
+        ]
+      }
+    },
+    "settler": {
+      "voice": "af_heart",
+      "speed": 1.0,
+      "lines": {
+        "war": [
+          "We came here to build, not to fight. But you leave us no choice.",
+          "We are peaceful. Until attacked.",
+          "You have made a terrible mistake, neighbor. We do not forget."
+        ],
+        "attack": [
+          "You started this. We are only finishing it.",
+          "For every planet you burned, we take one back.",
+          "Our patience is gone. All ships, advance."
+        ],
+        "defeat": [
+          "We will rebuild. We always rebuild.",
+          "You may win this orbit. You will never win our people.",
+          "Fall back. Protect the settlers first."
+        ],
+        "victory": [
+          "This world will bloom again, under our care.",
+          "We warned you. Now we plant our flag.",
+          "The colonists are landing. Your time here is over."
+        ],
+        "ally": [
+          "Welcome, friend. There is room enough for all of us.",
+          "Together we can grow. Let us build something that lasts.",
+          "An alliance it is. Our harbors are open to you."
+        ],
+        "betray": [
+          "I'm sorry. Our people come first.",
+          "We grew apart, you and I. Our alliance ends.",
+          "Forgive me. The council has decided against you."
+        ],
+        "engage": [
+          "Defend the colony!",
+          "Shields up!",
+          "Stand firm!",
+          "Protect the settlers!",
+          "Here they come!"
+        ],
+        "win": [
+          "They're turning back!",
+          "We held!",
+          "Thank the stars.",
+          "Safe, for now.",
+          "Well done, everyone!"
+        ],
+        "lose": [
+          "We're losing them!",
+          "Evacuate!",
+          "Oh no!",
+          "Get them out!",
+          "Not the colonists!"
+        ]
+      },
+      "templates": {
+        "war": [
+          "{player}, we came to build, not to fight. But so be it.",
+          "This is {name}. Leave {planet} alone, {player}."
+        ],
+        "attack": [
+          "For every planet you burned, {player}, we take one back.",
+          "All ships to {planet}!"
+        ],
+        "defeat": [
+          "We will rebuild {planet}. We always rebuild.",
+          "Protect the settlers on {planet}!"
+        ],
+        "victory": [
+          "{planet} will bloom again, under our care.",
+          "The colonists are landing on {planet}."
+        ],
+        "ally": [
+          "Welcome, {player}. There is room for all of us.",
+          "{name} and {player}. Let us build something that lasts."
+        ],
+        "betray": [
+          "I am sorry, {player}. Our people come first.",
+          "{player}, the council has decided against you."
+        ]
+      }
+    },
+    "technocrat": {
+      "voice": "bf_emma",
+      "speed": 1.0,
+      "lines": {
+        "war": [
+          "Hostilities commenced. Your survival probability is low.",
+          "I have run the numbers on you. They are not in your favour.",
+          "Your technology is primitive."
+        ],
+        "attack": [
+          "Target acquired. Executing strike protocol.",
+          "Thank you for volunteering. Test firing.",
+          "Shields at maximum. Engaging."
+        ],
+        "defeat": [
+          "Interesting. That was not in my model.",
+          "Unacceptable losses. Recalculating.",
+          "A minor setback. Our research division will compensate."
+        ],
+        "victory": [
+          "Planet secured. As predicted, to the second decimal.",
+          "Superior engineering wins again. How unsurprising.",
+          "Your colony has been optimised. You are no longer required."
+        ],
+        "ally": [
+          "An alliance is the logical choice. Accepted.",
+          "Our interests align. Let us share the data.",
+          "Cooperation increases our efficiency. Welcome aboard."
+        ],
+        "betray": [
+          "Our alliance is no longer cost effective. Terminating.",
+          "Analysis complete. You are now a liability.",
+          "Nothing personal. The numbers simply changed."
+        ],
+        "engage": [
+          "Engaging.",
+          "Targets locked.",
+          "Firing solution ready.",
+          "Commencing.",
+          "Calculating."
+        ],
+        "win": [
+          "Target eliminated.",
+          "Efficient.",
+          "As predicted.",
+          "Optimal.",
+          "Threat removed."
+        ],
+        "lose": [
+          "Error.",
+          "Recalculating.",
+          "Unexpected.",
+          "Systems failing!",
+          "Abort sequence."
+        ]
+      },
+      "templates": {
+        "war": [
+          "{player}, your survival probability is low.",
+          "{name} to {player}: hostilities commenced."
+        ],
+        "attack": [
+          "Target acquired: {planet}. Executing.",
+          "{ship}, field test on {planet}. Fire."
+        ],
+        "defeat": [
+          "{planet} lost. That was not in my model.",
+          "Unacceptable losses at {planet}. Recalculating."
+        ],
+        "victory": [
+          "{planet} secured. As predicted.",
+          "{planet} has been optimised, {player}."
+        ],
+        "ally": [
+          "Alliance with {player}: the logical choice.",
+          "{name} accepts, {player}. Let us share the data."
+        ],
+        "betray": [
+          "{player}, you are no longer cost effective.",
+          "Analysis complete, {player}. You are a liability."
+        ]
+      }
+    },
+    "raider": {
+      "voice": "am_puck",
+      "speed": 1.08,
+      "lines": {
+        "war": [
+          "Nice planets you got there, neighbor!",
+          "Nothing personal, friend. Your cargo just looks better on my ships.",
+          "Knock knock. Who's there? Your worst nightmare, that's who!"
+        ],
+        "attack": [
+          "Yee-haw! Grab the cargo, leave the wrecks!",
+          "In and out, boys, in and out! Hit them where it hurts!",
+          "Surprise! Hope you weren't using that planet."
+        ],
+        "defeat": [
+          "Okay, okay, you win this one. We were just passing through anyway.",
+          "Run! Everybody run! Every ship for itself!",
+          "Ouch. Note to self: that one bites back."
+        ],
+        "victory": [
+          "Thanks for the planet, pal! We'll take good care of it. Probably.",
+          "Ha! Too slow, too slow!",
+          "Another one for the collection. Nice doing business with you."
+        ],
+        "ally": [
+          "Partners? Sure! Just keep your cargo where I can see it.",
+          "Deal! You point, we plunder.",
+          "Alright, friend. Let's go make some enemies poorer."
+        ],
+        "betray": [
+          "Sorry, partner. Somebody made me a better offer.",
+          "Nothing lasts forever, buddy. Especially not my promises.",
+          "Heads up, ex-friend. Our little deal is off."
+        ],
+        "engage": [
+          "Get 'em!",
+          "Yee-haw!",
+          "Grab everything!",
+          "Go, go, go!",
+          "Party time!"
+        ],
+        "win": [
+          "Jackpot!",
+          "Easy pickings!",
+          "Ha! Got 'em!",
+          "Loot's ours!",
+          "Woo-hoo!"
+        ],
+        "lose": [
+          "Run for it!",
+          "Abort, abort!",
+          "Not my ship!",
+          "Oh, come on!",
+          "Scatter!"
+        ]
+      },
+      "templates": {
+        "war": [
+          "Hey, {player}! Nice planets you got there!",
+          "{player}, buddy! {planet} looks shiny. Mine now!"
+        ],
+        "attack": [
+          "Hit {planet}, boys! Grab the cargo!",
+          "Surprise, {player}! Hope you weren't using {planet}."
+        ],
+        "defeat": [
+          "Okay, okay, {player}. You can keep {planet}.",
+          "Run! Everybody off {planet}!"
+        ],
+        "victory": [
+          "Thanks for {planet}, {player}!",
+          "{planet}? Jackpot!",
+          "The {ship} says hi, {player}!"
+        ],
+        "ally": [
+          "Partners, {player}? Sure! You point, we plunder.",
+          "{name} and {player}! Let's go make some enemies poorer."
+        ],
+        "betray": [
+          "Sorry, {player}. Somebody made me a better offer.",
+          "Heads up, {player}. Our deal is off."
+        ]
+      }
+    },
+    "bulwark": {
+      "voice": "am_michael",
+      "speed": 0.95,
+      "lines": {
+        "war": [
+          "Fortified zone. Turn back.",
+          "Our walls will stand.",
+          "Every planet we hold is a fortress. Come and see."
+        ],
+        "attack": [
+          "The wall is complete. Now we march.",
+          "Defense was never our only plan. Advance.",
+          "We have waited long enough behind our shields. Forward."
+        ],
+        "defeat": [
+          "One wall falls. A hundred more remain.",
+          "Hold the line! Pull back to the inner ring!",
+          "You broke through. It will cost you dearly."
+        ],
+        "victory": [
+          "Your attack broke on our walls.",
+          "Secured. Reinforce this orbit, immediately.",
+          "Another stronghold. Set up the satellites."
+        ],
+        "ally": [
+          "Our shields protect our friends as well. You are welcome.",
+          "An alliance. Good. Stand behind our wall.",
+          "Agreed. Your borders are safe with us."
+        ],
+        "betray": [
+          "Our walls are closing. You are now on the outside.",
+          "Alliance terminated.",
+          "The gates are shut, former friend."
+        ],
+        "engage": [
+          "Hold the line.",
+          "Shields up.",
+          "Brace!",
+          "Defensive positions!",
+          "Contact."
+        ],
+        "win": [
+          "The line holds.",
+          "Repelled.",
+          "Secured.",
+          "Breach sealed.",
+          "They broke."
+        ],
+        "lose": [
+          "Breach!",
+          "The wall is down!",
+          "Fall back to the ring!",
+          "We're overrun!",
+          "Hold, damn it!"
+        ]
+      },
+      "templates": {
+        "war": [
+          "This is {name}. {player}, turn back.",
+          "{player}, {planet} is a fortress. Come and see."
+        ],
+        "attack": [
+          "The wall is complete. Advance on {planet}.",
+          "{ship}, forward to {planet}."
+        ],
+        "defeat": [
+          "{planet} falls. A hundred walls remain.",
+          "Pull back from {planet}! Hold the inner ring!"
+        ],
+        "victory": [
+          "Your attack broke on {planet}, {player}.",
+          "{planet} secured. Set up the satellites."
+        ],
+        "ally": [
+          "Stand behind our wall, {player}.",
+          "{name} protects its friends, {player}."
+        ],
+        "betray": [
+          "The gates are shut, {player}.",
+          "{player}, you are now on the outside."
+        ]
+      }
+    },
+    "vulture": {
+      "voice": "af_nicole",
+      "speed": 1.02,
+      "lines": {
+        "war": [
+          "I have been watching you. You look... tired.",
+          "Lovely colony. Poorly defended.",
+          "I'm only here for the leftovers."
+        ],
+        "attack": [
+          "Brave fight. Let me finish it.",
+          "Wounded ships make the easiest prey.",
+          "Patience pays off. It always does."
+        ],
+        "defeat": [
+          "Too early. I came in too early.",
+          "Hmm. You have more bite than I thought.",
+          "I will wait. I am very good at waiting."
+        ],
+        "victory": [
+          "Thanks for softening them up.",
+          "Leftovers taste the sweetest.",
+          "While you were busy, I was hungry."
+        ],
+        "ally": [
+          "Friends? Of course. Right behind you.",
+          "Let them tear each other apart.",
+          "An alliance. How... convenient."
+        ],
+        "betray": [
+          "You've grown weak. And I am hungry.",
+          "Loyal? Me? How sweet.",
+          "It was lovely. It's over now."
+        ],
+        "engage": [
+          "Dinner time.",
+          "Mmm. Wounded.",
+          "Circle them.",
+          "Now.",
+          "Pick them clean."
+        ],
+        "win": [
+          "Delicious.",
+          "Mine.",
+          "Nothing wasted.",
+          "Leftovers.",
+          "So easy."
+        ],
+        "lose": [
+          "Ugh.",
+          "Too soon!",
+          "Back off.",
+          "Retreat. For now.",
+          "Hmph."
+        ]
+      },
+      "templates": {
+        "war": [
+          "{player}... you look tired.",
+          "Lovely planet, {planet}. So poorly defended."
+        ],
+        "attack": [
+          "{planet} looks wounded. Let me finish it.",
+          "Patience, {player}. It always pays off."
+        ],
+        "defeat": [
+          "Too early at {planet}. Too early.",
+          "You have more bite than I thought, {player}."
+        ],
+        "victory": [
+          "Thank you for softening up {planet}, {player}.",
+          "{planet}. Mine. Delicious."
+        ],
+        "ally": [
+          "Friends, {player}? Of course. Right behind you.",
+          "{name} and {player}. How convenient."
+        ],
+        "betray": [
+          "You've grown weak, {player}. And I am hungry.",
+          "Loyal, {player}? Me? How sweet."
+        ]
+      }
+    },
+    "alien": {
+      "voice": "am_onyx",
+      "speed": 0.85,
+      "lines": {
+        "appear": [
+          {
+            "say": "Krrah vesh no tuul. Skaa ith rak.",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Ommm... ommm... seth ul ka. Seth ul ka.",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Vhee... nakta. Vhee... nakta zhor.",
+            "text": "[alien transmission]"
+          }
+        ],
+        "attack": [
+          {
+            "say": "Vohr! Vohr! Shii ka telm, vohr!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Graaak! Tuun zhal makka, graaak!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Ith rak! Ith rak! Ith rak!",
+            "text": "[alien transmission]"
+          }
+        ],
+        "defeat": [
+          {
+            "say": "Nnngh ra... seth ul... kaaa.",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Skee... skee... ommmm.",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Tuul... no... tuuul.",
+            "text": "[alien transmission]"
+          }
+        ],
+        "engage": [
+          {
+            "say": "Kraa!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Vohr! Vohr!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Skee ka!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Ith rak!",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Grraak!",
+            "text": "[alien transmission]"
+          }
+        ],
+        "lose": [
+          {
+            "say": "Skreee...",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Nnngh...",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Tuul... tuul...",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Kaaa...",
+            "text": "[alien transmission]"
+          },
+          {
+            "say": "Ommm...",
+            "text": "[alien transmission]"
+          }
+        ]
+      }
+    },
+    "crew": {
+      "voices": [
+        "am_eric",
+        "af_sarah",
+        "bm_daniel",
+        "af_nova"
+      ],
+      "speed": 1.12,
+      "lines": {
+        "select": [
+          "Yes?",
+          "Sir?",
+          "Ready.",
+          "Commander?",
+          "Orders?",
+          "Hm?",
+          "Here.",
+          "Listening.",
+          "Go on.",
+          "What now?",
+          "Yep?",
+          "At once?",
+          "Standing by.",
+          "Say it.",
+          "Aye?",
+          "Ready, sir.",
+          "Awaiting.",
+          "Bridge.",
+          "Talk to me.",
+          "You rang?",
+          "Yes, boss?",
+          "Ship's ready.",
+          "Mm-hm?",
+          "Waiting."
+        ],
+        "selectColony": [
+          "Settlers here.",
+          "Colonists ready.",
+          "Where to?",
+          "New home?",
+          "Families aboard.",
+          "Ready to settle.",
+          "Pick a world.",
+          "Land ho?",
+          "Seeds ready.",
+          "Let's build."
+        ],
+        "move": [
+          "On it.",
+          "Moving.",
+          "Aye.",
+          "Right away.",
+          "Going.",
+          "Roger.",
+          "Can do.",
+          "Course set.",
+          "Underway.",
+          "Off we go.",
+          "Will do.",
+          "Yes, sir.",
+          "Heading out.",
+          "Copy.",
+          "Sure thing.",
+          "As you say.",
+          "Rolling.",
+          "Engaging drive.",
+          "Understood.",
+          "Fine.",
+          "Okay!",
+          "Done."
+        ],
+        "attack": [
+          "Charge!",
+          "Attack!",
+          "For glory!",
+          "Fire!",
+          "Weapons hot!",
+          "Get 'em!",
+          "Hit 'em hard!",
+          "No mercy!",
+          "Battle stations!",
+          "Going in!",
+          "They're mine!",
+          "Burn 'em!",
+          "Into battle!",
+          "Fight!",
+          "Smash 'em!",
+          "Guns up!",
+          "Let's dance!",
+          "Raaah!",
+          "Kill shot!",
+          "Full assault!"
+        ],
+        "colonize": [
+          "New home!",
+          "Land 'em!",
+          "Settling.",
+          "Fresh soil!",
+          "Home sweet home.",
+          "Plant the flag!",
+          "Colonize!",
+          "Let's grow.",
+          "Building time.",
+          "New world!",
+          "Dibs!",
+          "Ours now."
+        ],
+        "chase": [
+          "After 'em!",
+          "Hunting.",
+          "Pursuit!",
+          "Got 'em.",
+          "Chase!",
+          "Run, little ship.",
+          "Closing.",
+          "Intercept!",
+          "No escape!",
+          "Tally ho!"
+        ],
+        "hole": [
+          "Wheee!",
+          "Jump!",
+          "Here we go!",
+          "Hold on!",
+          "Into the rift!",
+          "Geronimo!",
+          "Down the hole!",
+          "Weird..."
+        ]
+      }
+    }
+  }
+}

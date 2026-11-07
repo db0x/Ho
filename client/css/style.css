@@ -1482,3 +1482,11 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 .debug-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .debug-dev { flex-wrap: wrap; justify-content: flex-start; }
 .debug-sounds { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Radio chatter of the AI colonies as a subtitle on the comms */
+#chat-list .radioline { opacity: .78; font-style: italic; }
+/* Admins in the lobby: the speech service of the radio chatter is missing, down or preparing */
+.radio-note { color: var(--gold); border-left: 3px solid var(--gold-dim); padding: 4px 0 4px 8px; margin: 4px 0 0; }
+#chat-list .radioline b { font-style: normal; }
+#chat-list .radio-mark { font-style: normal; font-size: .9em; }
+.debug-radio { display: grid; gap: 10px; }
+.debug-radio-row > span { display: block; margin-bottom: 4px; color: var(--ink-dim); font-size: 13px; }

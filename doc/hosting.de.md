@@ -51,6 +51,36 @@ HO_AUTH=off
 Auf einem Server gehört diese Zeile nicht hin – ohne sie bleibt die Anmeldung an.
 Ob sie läuft, sagt das Protokoll beim Start (`docker compose logs ho | grep Zugang`).
 
+### Der Sprachdienst
+
+`docker compose up` startet einen zweiten Container, `tts`: Er spricht die
+[Funksprüche](playing.de.md#funksprüche) mit den Kokoro-Stimmen – lokal, ohne
+Konto, ohne Kosten. Nur der Spielserver erreicht ihn; er öffnet keinen Port. Er
+braucht etwa 1 GB RAM und einen CPU-Kern, solange er spricht (ein Satz dauert etwa
+eine Sekunde); der erste Build lädt das Stimmmodell (~350 MB, gegen eine Prüfsumme
+geprüft).
+
+Beim Start lässt der Spielserver alle festen Sprüche einmal im Hintergrund
+sprechen (die Antworten der Crew zuerst; etwa acht Minuten, einmalig) und legt sie
+in `data/tts-cache/` ab – sie überstehen Neustarts und neue Images. Auch der
+Sprachdienst behält sie, im Docker-Volume `tts-cache`: Ein frischer Spiel-Container
+hat sie in Sekunden zurück. Sprüche mit Namen (*„Kepler Prime is mine
+now, Olena.“*) werden gesprochen, wenn sie gebraucht werden, und landen ebenfalls
+dort (höchstens 3000, die ältesten gehen).
+
+Wer ganz ohne Stimmen auskommen will, setzt `HO_SPEECH=off` in die `.env` und
+ruft `docker compose up -d --build`: Der Sprachdienst beendet sich dann gleich beim
+Start, sein Image kommt ohne Stimmmodell, und der Spielserver lässt ihn in Ruhe.
+
+Ohne den Dienst – abgeschaltet, schlicht `npm start` oder der Container ist aus –
+läuft das Spiel wie immer, nur der Funk bleibt stumm. Der
+Spielserver schaut alle 30 Sekunden, ob er wieder da ist. Admins sehen den Zustand
+in der Lobby unter dem Schalter *Funksprüche*: nicht eingerichtet, nicht
+erreichbar oder wie weit die Vorbereitung ist.
+
+Die Sprüche selbst stehen in `server/radio/lines.json`; um neue anzuhören, bevor
+sie live gehen, spricht `tools/radio/preview.py` sie in einen Ordner.
+
 ## Zugang und Konten
 
 Vor der Lobby steht eine Anmeldung mit Benutzername und Passwort. Ohne gültige
@@ -201,6 +231,9 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | `HO_SESSION_DAYS` | `30` | wie lange eine Sitzung gilt |
 | `HO_SECURE_COOKIES` | automatisch | `1`/`0` erzwingt oder verbietet das `Secure`-Flag |
 | `HO_IDLE_HOURS` | `4` | eine Partie, in der sich so lange niemand bewegt hat (Befehle, Zug beenden, Chat …), wird verworfen – auch wenn noch ein Tab offen ist; ist niemand verbunden, schon nach der halben Zeit |
+| `HO_SPEECH` | an | `off` schaltet die Stimmen der Funksprüche ganz ab: kein Sprachdienst, kein Stimmmodell im Image, stummer Funk |
+| `HO_TTS` | Docker: `http://tts:5005`, sonst leer | Adresse des Sprachdienstes für die Funksprüche; leer = der Funk bleibt stumm |
+| `HO_TTS_CACHE` | Docker: `/data/tts-cache`, sonst ein Temp-Ordner | wo die gesprochenen Sprüche liegen |
 | `HO_LANG` | aus der Umgebung | Sprache des Werkzeugs `users.js` |
 | `HOST_PORT`, `HOST_BIND` | `8080`, `0.0.0.0` | nur Docker: Port und Adresse auf dem Host |
 

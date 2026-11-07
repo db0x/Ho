@@ -223,3 +223,7 @@ saves/
 *.sqlite
 *.sqlite3
 *.db
+
+# Python bytecode (tts/, tools/)
+__pycache__/
+*.pyc

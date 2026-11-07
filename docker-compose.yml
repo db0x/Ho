@@ -33,6 +33,15 @@ services:
       # Address the browsers should ask for STUN if it is not the page's
       # host (e.g. behind a proxy on another machine): stun:host:port
       HO_STUN_URL: ${HO_STUN_URL:-}
+      # Radio chatter with voices: HO_SPEECH=off switches it off entirely -
+      # the game server leaves the speech service alone, the service does
+      # not start and its image comes without the voice model.
+      HO_SPEECH: ${HO_SPEECH:-on}
+      # Address of the speech service (service tts below). Admins see its
+      # state in the lobby.
+      HO_TTS: ${HO_TTS-http://tts:5005}
+      # The spoken lines survive a new image next to the accounts.
+      HO_TTS_CACHE: /data/tts-cache
     # Otherwise node runs as PID 1 and ignores SIGTERM -> slow shutdown.
     init: true
     healthcheck:
@@ -42,9 +51,42 @@ services:
       start_period: 5s
       retries: 3
 
+  # Speech service: Kokoro speaks the radio chatter - the fixed lines once
+  # (cached in ./data/tts-cache), lines with names when they come up ("Kepler
+  # Prime is mine now, Olena."). Only the game server reaches it - no port to
+  # the outside. Needs about 1 GB of RAM and a CPU core while it speaks; the
+  # first build downloads the voice model (~350 MB). Without it the game runs
+  # as before, just without radio chatter.
+  tts:
+    build:
+      context: ./tts
+      # HO_SPEECH=off: the image comes without the voice model (~350 MB).
+      args:
+        SPEECH: ${HO_SPEECH:-on}
+    image: ho-tts:latest
+    container_name: ho-tts
+    # HO_SPEECH=off: the service ends right at the start and stays down
+    # (a clean exit is not restarted); a crash is.
+    restart: on-failure
+    environment:
+      TTS_ENABLED: ${HO_SPEECH:-on}
+    init: true
+    # The fixed lines, spoken once and kept for good (lines with names are not).
+    volumes:
+      - tts-cache:/cache
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5005/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
   # Only on demand: docker compose --profile test run --rm test
   test:
     build: .
     image: ho:latest
     profiles: ["test"]
     command: ["npm", "test"]
+
+volumes:
+  tts-cache:

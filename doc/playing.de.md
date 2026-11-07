@@ -377,6 +377,29 @@ Eine schwere KI-Kolonie verrät mit Plan: Ihre Flotten sammeln sich zuerst als G
 im Orbit des Verbündeten, und erst wenn genug dort stehen, kündigt sie – läuft die
 Frist ab, beginnt die Schlacht mitten in der Abwehr des Verbündeten.
 
+### Funksprüche
+
+Ab und zu meldet sich eine KI-Kolonie über Funk – jede Persönlichkeit mit eigener
+Stimme, auf Englisch: beim ersten Zusammenstoß mit dir, wenn sie deine Planeten
+angreift, einen erobert oder verliert, sich mit dir verbündet oder kündigt. Auch
+die Aliens melden sich, in einer Sprache, die niemand versteht. Was gesagt wird,
+steht zusätzlich im Funk, mit 📻 markiert. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
+Träger: *„Kepler Prime is mine now, Olena.“* Mitten in einer Schlacht mit dir
+kommen kurze Rufe dazu – *Open fire!*, *Jackpot!*, *Breach!* –, die nur zu hören sind.
+
+Auch deine eigenen Flotten antworten, kurz und knackig, jede mit eigener Stimme:
+wenn du eine auswählst (*„Yes?“*), losschickst (*„On it.“*), in den Kampf
+(*„Charge!“*), zum Besiedeln eines freien Planeten (*„New home!“*), hinter einer
+fremden Flotte her oder ins Wurmloch – sofort oder gar
+nicht, nicht jedes Mal, und bei über hundert Sprüchen selten zweimal derselbe.
+
+Es bleibt sparsam: nur was dich betrifft, höchstens ein Spruch pro Runde (der
+wichtigste, dazu ein Kurzruf von jemand anderem), danach schweigt die Kolonie ein paar Runden, und solange jemand im
+CB-Funk spricht, wartet der Spruch. Der Spielleiter schaltet es in der Lobby ab
+(*Funksprüche*); im Menü ⚙ wählt jeder *Alle* (mit den Antworten der Crew), *Nur Wichtiges* (erster
+Zusammenstoß, Verrat, ein verlorener Planet, auftauchende Aliens) oder *Aus*.
+Lautstärke und Stumm folgen dem Ton.
+
 ## Zusehen
 
 *Beim Spielen zusehen* setzt eine Partie mit 4 bis 16 KI-Kolonien auf. Es gibt

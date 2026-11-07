@@ -64,17 +64,19 @@ export const commsMethods = {
    * A line on the comms. Whatever another player writes while the comms are
    * out of sight counts as unread (badge on the tab and on the bar at the
    * bottom) and pops up as a message - a tap opens the comms to answer.
-   * @param {{fromId?: string, system?: boolean, mine?: boolean}} o
+   * Radio chatter of the AI colonies stands in as a subtitle - quietly, it
+   * neither counts as unread nor pops up.
+   * @param {{fromId?: string, system?: boolean, mine?: boolean, radio?: boolean}} o
    */
   chat(from, text, o = {}) {
     const box = $('#chat-list');
     const div = document.createElement('div');
-    div.className = 'logline' + (o.system ? ' sysline' : '');
+    div.className = 'logline' + (o.system ? ' sysline' : '') + (o.radio ? ' radioline' : '');
     const color = this.view?.players.find(p => p.id === o.fromId)?.color;
-    div.innerHTML = `<b${color ? ` style="color:${color}"` : ''}>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
+    div.innerHTML = `${o.radio ? '<span class="radio-mark" aria-hidden="true">📻</span> ' : ''}<b${color ? ` style="color:${color}"` : ''}>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
-    if (o.system || o.mine || this.chatVisible()) return;
+    if (o.system || o.mine || o.radio || this.chatVisible()) return;
     this.unread++;
     this.paintUnread();
     this.toast(`${from}: ${text}`, color || null, () => this.openChat(), '↩ ' + t('chat.reply'));
