@@ -112,12 +112,31 @@ class Radio {
     return this.buffers.get(file);
   }
 
-  /** A transmission from the server ({t: 'radio', ...}) - played if this player wants it. */
+  /**
+   * A transmission from the server ({t: 'radio', ...}) - if this player wants
+   * it. Without its sound (no speech service, or the sound off here) a long
+   * line still comes, as text on the comms.
+   */
   receive(m) {
     if (this.level === 'off' || (this.level === 'important' && !m.important)) return false;
-    if (!sfx.on || !m.file) return false;
-    this.push({ speaker: m.speaker, clip: { file: m.file, v: m.v, text: m.text }, from: m.from, name: m.name, short: !!m.short });
+    const item = { speaker: m.speaker, clip: { file: m.file ?? null, v: m.v ?? null, text: m.text }, from: m.from, name: m.name, short: !!m.short };
+    if (!m.file || !sfx.on) {
+      if (!item.short) this.emit({ ...item, textOnly: !m.file });
+      return false;
+    }
+    this.push(item);
     return true;
+  }
+
+  /** Plays a line heard before once more - asked for, so it does not wait for the CB radio. */
+  replay(item) {
+    if (!item?.clip?.file) return false;
+    this.push({ ...item, replay: true });
+    return true;
+  }
+
+  emit(item) {
+    for (const fn of this.listeners) { try { fn(item); } catch (e) { console.warn(e); } }
   }
 
   /**
@@ -155,14 +174,14 @@ class Radio {
     // Old news is dropped; while a person talks, the chatter waits.
     while (this.queue.length && Date.now() - this.queue[0].at > STALE_MS) this.queue.shift();
     if (!this.queue.length) return;
-    if (this.blocked() && !this.queue[0].debug) { setTimeout(() => this.next(), 400); return; }
+    if (this.blocked() && !this.queue[0].debug && !this.queue[0].replay) { setTimeout(() => this.next(), 400); return; }
     this.busy = true;
     const item = this.queue.shift();
     try {
       const ctx = sfx.start();
       if (ctx && sfx.on) {
         const buf = await this.buffer(ctx, item.clip);
-        for (const fn of this.listeners) { try { fn(item); } catch (e) { console.warn(e); } }
+        this.emit(item);
         const p = PROFILES[item.speaker] || PROFILES[item.speaker.replace(/\d+$/, '')] || PROFILES.default;
         await this.transmit(ctx, buf, { ...p, pitch: p.pitch * tint(item.from) });
       }

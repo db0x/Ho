@@ -2,7 +2,8 @@
 // colonize, move), every fleet keeps its voice, answers come right away or not
 // at all, picking a fleet only sometimes and not the same one again soon, no
 // line twice in a short while - and only with the radio on "All". And there
-// are plenty of lines for every kind (server/radio/lines.json).
+// are plenty of lines for every kind (server/radio/lines.json). Also the AI's
+// lines on this side: as text without sound, played again on request.
 process.env.HO_TTS = 'http://127.0.0.1:9';
 const { radioManifest } = await import('../server/radio/index.js');
 const { radio } = await import('../client/js/audio/radio.js');
@@ -96,6 +97,40 @@ assert(!(await crewSay('attack', fighters)), 'radio on "important": no crew');
 radio.level = 'off';
 assert(!(await crewSay('attack', fighters)), 'radio off: no crew');
 Math.random = random;
+
+// ----------------------------------------- the AI's lines on this side
+// Without sound (no speech service, or the sound off here) a long line still
+// comes as text; a short call does not. A spoken one can be played again.
+{
+  const shown = [], queued = [];
+  radio.onLine(item => shown.push(item));
+  const push = radio.push;
+  radio.push = item => queued.push(item);
+  radio.level = 'all';
+  sfx.on = true;
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'Lady Solderpot', text: 'Hey, Olena!', important: true, textOnly: true });
+  assert(shown.length === 1 && shown[0].textOnly && shown[0].clip.text === 'Hey, Olena!' && !queued.length,
+    'no file: shown as text right away, nothing played');
+  radio.receive({ speaker: 'raider', from: 'p2', text: 'Jackpot!', short: true });
+  assert(shown.length === 1 && !queued.length, 'a short call without sound: left out');
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'Ha!', file: 'tts/0123456789abcdef0123.mp3', v: 'x', important: false });
+  assert(queued.length === 1 && shown.length === 1, 'with a file: played (the subtitle comes when it is spoken)');
+  sfx.on = false;
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'Ha!', file: 'tts/0123456789abcdef0123.mp3', v: 'x', important: true });
+  assert(shown.length === 2 && !shown[1].textOnly && shown[1].clip.file && queued.length === 1,
+    'sound off here: as text, but it keeps its file - to be played again later');
+  sfx.on = true;
+  radio.level = 'important';
+  radio.receive({ speaker: 'raider', from: 'p2', text: 'Minor', important: false });
+  assert(shown.length === 2, 'radio on "important": an unimportant line not even as text');
+  radio.level = 'off';
+  radio.receive({ speaker: 'raider', from: 'p2', text: 'Big', important: true });
+  assert(shown.length === 2, 'radio off: nothing, not even text');
+  radio.level = 'all';
+  assert(radio.replay(shown[1]) && queued[1].replay && queued[1].clip.file === shown[1].clip.file, 'played again on request');
+  assert(!radio.replay(shown[0]), 'a line without sound cannot be played again');
+  radio.push = push;
+}
 
 const total = Object.keys(KINDS).reduce((a, k) => a + m.crew1[k].length, 0);
 if (errors) { console.error(`${errors} error(s).`); process.exit(1); }

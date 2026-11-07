@@ -65,8 +65,9 @@ export const commsMethods = {
    * out of sight counts as unread (badge on the tab and on the bar at the
    * bottom) and pops up as a message - a tap opens the comms to answer.
    * Radio chatter of the AI colonies stands in as a subtitle - quietly, it
-   * neither counts as unread nor pops up.
-   * @param {{fromId?: string, system?: boolean, mine?: boolean, radio?: boolean}} o
+   * neither counts as unread nor pops up; a spoken one has a button to hear
+   * it again (onReplay).
+   * @param {{fromId?: string, system?: boolean, mine?: boolean, radio?: boolean, onReplay?: Function}} o
    */
   chat(from, text, o = {}) {
     const box = $('#chat-list');
@@ -74,6 +75,17 @@ export const commsMethods = {
     div.className = 'logline' + (o.system ? ' sysline' : '') + (o.radio ? ' radioline' : '');
     const color = this.view?.players.find(p => p.id === o.fromId)?.color;
     div.innerHTML = `${o.radio ? '<span class="radio-mark" aria-hidden="true">📻</span> ' : ''}<b${color ? ` style="color:${color}"` : ''}>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
+    if (o.onReplay) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'radio-replay';
+      b.dataset.sfx = 'none';
+      b.textContent = '▶';
+      b.title = t('radio.replay');
+      b.setAttribute('aria-label', t('radio.replay'));
+      b.onclick = () => o.onReplay();
+      div.appendChild(b);
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
     if (o.system || o.mine || o.radio || this.chatVisible()) return;

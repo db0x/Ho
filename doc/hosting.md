@@ -72,7 +72,7 @@ To do without voices altogether, put `HO_SPEECH=off` in the `.env` and run
 its image comes without the voice model, and the game server leaves it alone.
 
 Without the service – switched off, plain `npm start`, or the container down –
-the game runs as always, only the radio stays silent. The game
+the game runs as always, only the radio comes as text on the comms. The game
 server checks every 30 seconds whether it is back. Admins see the state in the
 lobby, under the *Radio chatter* switch: not set up, not reachable, or how far the
 preparing has got.
@@ -226,8 +226,8 @@ HOST_BIND=127.0.0.1 docker compose up -d
 | `HO_SESSION_DAYS` | `30` | how long a session is good for |
 | `HO_SECURE_COOKIES` | automatic | `1`/`0` forces or forbids the `Secure` flag |
 | `HO_IDLE_HOURS` | `4` | a game nobody has made a move in (orders, end of turn, chat …) for this long is discarded, even with a tab still open; with nobody connected after half the time |
-| `HO_SPEECH` | on | `off` switches the radio chatter's voices off entirely: no speech service, no voice model in the image, a silent radio |
-| `HO_TTS` | Docker: `http://tts:5005`, otherwise empty | address of the speech service for the radio chatter; empty = the radio stays silent |
+| `HO_SPEECH` | on | `off` switches the radio chatter's voices off entirely: no speech service, no voice model in the image, the radio as text |
+| `HO_TTS` | Docker: `http://tts:5005`, otherwise empty | address of the speech service for the radio chatter; empty = the radio as text |
 | `HO_TTS_CACHE` | Docker: `/data/tts-cache`, otherwise a temp folder | where the spoken lines are kept |
 | `HO_LANG` | from the environment | language of the `users.js` tool |
 | `HOST_PORT`, `HOST_BIND` | `8080`, `0.0.0.0` | Docker only: port and address on the host |

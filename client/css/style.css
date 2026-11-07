@@ -1488,5 +1488,8 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 .radio-note { color: var(--gold); border-left: 3px solid var(--gold-dim); padding: 4px 0 4px 8px; margin: 4px 0 0; }
 #chat-list .radioline b { font-style: normal; }
 #chat-list .radio-mark { font-style: normal; font-size: .9em; }
+#chat-list .radio-replay { margin-left: 6px; padding: 0 6px; min-height: 0; line-height: 1.5; font-size: 10px;
+  font-style: normal; vertical-align: 1px; opacity: .8; }
+#chat-list .radio-replay:hover { opacity: 1; }
 .debug-radio { display: grid; gap: 10px; }
 .debug-radio-row > span { display: block; margin-bottom: 4px; color: var(--ink-dim); font-size: 13px; }

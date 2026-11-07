@@ -70,10 +70,11 @@ export function maybeResolve(game) {
 
 /**
  * After the view: the radio chatter of the turn - a line and a short call per
- * player at most. Each goes out only once it is spoken: a line with names
- * waits for the speech service and falls back to its fixed line; a fixed line
- * is usually prepared already. What cannot be spoken is left out - the game
- * never waits for the radio, and nothing here may throw.
+ * player at most. A line with names waits for the speech service and falls
+ * back to its fixed line; a fixed line is usually prepared already. What
+ * cannot be spoken goes out as text (textOnly) - with its names, if it has
+ * them; a short call without its sound is left out. The game never waits
+ * for the radio, and nothing here may throw.
  */
 export async function deliverRadio(game, out) {
   try {
@@ -82,7 +83,11 @@ export async function deliverRadio(game, out) {
         if (named) {
           try { return { ...msg, ...(await speak(named.say, named.voice, named.speed)), text: named.text }; } catch {}
         }
-        try { return { ...msg, ...(await speak(line.say, line.voice, line.speed)) }; } catch { return null; }
+        try { return { ...msg, ...(await speak(line.say, line.voice, line.speed)) }; } catch {}
+        // No voice: the line is still said - as text.
+        if (msg.short) return null;
+        const { file, v, ...rest } = msg;
+        return { ...rest, text: named?.text ?? msg.text, textOnly: true };
       }));
       const c = conns.get(game.players.find(p => p.id === id)?.connId);
       if (c && c.gameId === game.id) for (const msg of ready) if (msg) send(c.ws, msg);

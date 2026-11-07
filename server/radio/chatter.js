@@ -14,13 +14,13 @@
 // Everything is spoken by the speech service (tts/): the fixed lines are
 // prepared in advance, a good part of the long lines name names - the planet,
 // the listener, the speaker's colony or its destroyer - and are spoken when
-// needed (if that fails, the fixed line plays). Without the service the radio
-// is silent and this does nothing.
+// needed (if that fails, the fixed line plays). Without the service the long
+// lines still go out - as text on the comms (server/hub/games.js).
 // The game leader can switch it off in the lobby (settings.radio); every
 // player can tone it down in the browser (client/js/audio/radio.js).
 import { ALIEN_ID } from '../../shared/rules.js';
 import { radioManifest, radioVoices } from './index.js';
-import { ttsEnabled, speakable } from './tts.js';
+import { speakable } from './tts.js';
 
 /**
  * The events: how important (the highest of a turn is spoken), how likely
@@ -58,7 +58,7 @@ export const RADIO_NAMED_SHARE = 0.6;
  */
 export function radioTurn(game, entries, rand = Math.random) {
   const out = new Map();
-  if (game.settings.radio === false || !ttsEnabled()) return out;
+  if (game.settings.radio === false) return out;
   const clips = radioManifest();
   const st = game.radio ??= { met: {}, last: {}, lastFile: {} };
   st.lastCall ??= {};

@@ -2,7 +2,7 @@
 // English voice, sentences spoken by the speech service and cached, the
 // fixed lines prepared in the background and served by key only - and a
 // missing or failing service never gets in the way: the radio just goes
-// silent, comes back with the service, and admins learn how it is doing.
+// text, comes back with the service, and admins learn how it is doing.
 // The speech service is played here by a small fake.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -154,15 +154,30 @@ const off = execFileSync(process.execPath, ['--input-type=module', '-e', `
   const { handleRadio, radioManifest } = await import('./server/radio/index.js');
   const { createGame, startGame } = await import('./server/game/game.js');
   const { addPlayer } = await import('./server/game/players.js');
-  const g = createGame('Off'); addPlayer(g, { name: 'A' }); addPlayer(g, { isBot: true, persona: 'raider' }); startGame(g);
-  const silent = radioTurn(g, [{ type: 'alien', playerIds: [g.players[0].id], key: 'log.alienRift', params: {} }], () => 0).size === 0;
+
+  const { deliverRadio } = await import('./server/hub/games.js');
+  const { conns } = await import('./server/hub/connections.js');
+  const g = createGame('Off'); addPlayer(g, { name: 'Олена' }); addPlayer(g, { isBot: true, persona: 'raider' }); addPlayer(g, { isBot: true, persona: 'vulture' }); startGame(g);
+  const [h, bot, other] = g.players, home = g.galaxy.planets[h.homeworld];
+  const sent = [];
+  conns.set('c1', { ws: { readyState: 1, send: s => sent.push(JSON.parse(s)) }, gameId: g.id });
+  h.connId = 'c1';
+  const out = radioTurn(g, [
+    { type: 'combat', planetId: home.id, playerIds: [bot.id, other.id, h.id], key: 'log.battle', params: { planet: home.name, sides: [{ left: 3 }, { left: 0 }, { left: 2 }] } },
+    { type: 'invade', playerIds: [bot.id, h.id], planetId: home.id, key: 'log.invadeFrom', params: {} }
+  ], () => 0);
+  const picked = out.get(h.id) || [];
+  await deliverRadio(g, out);
+  const text = sent.length === 1 && sent.every(m => m.textOnly && !m.file && !m.v && !m.short && m.text);
   let refused = false; try { await speak('x', 'am_puck'); } catch { refused = true; }
   const file = radioManifest().raider.war[0].file;
   const code = await new Promise(ok => handleRadio({ method: 'GET' }, { writeHead(c) { ok(c); return this; }, end() {} }, '/api/radio/' + file));
-  console.log(JSON.stringify({ state: ttsStatus().state, silent, refused, code }));
+  console.log(JSON.stringify({ state: ttsStatus().state, picked: picked.length, text, sent, refused, code }));
 `], { env: { ...process.env, HO_TTS: '', HO_TTS_CACHE: path.join(cache, 'off') }, cwd: new URL('..', import.meta.url).pathname }).toString();
 const o = JSON.parse(off.trim().split('\n').pop());
-assert(o.state === 'off' && o.silent && o.refused && o.code === 503, `without a service: off, silent, 503 (${off.trim()})`);
+assert(o.state === 'off' && o.refused && o.code === 503, `without a service: off, nothing spoken, 503 (${off.trim()})`);
+assert(o.picked === 2 && o.text, `without a service: the line comes as text, the short call stays out (${JSON.stringify(o.sent)})`);
+assert(o.sent[0]?.text.includes('Олена') || !/\{/.test(o.sent[0]?.text || '{'), `text with names as written (${o.sent[0]?.text})`);
 
 // ------------------------------------------- switched off in the .env
 const sw = execFileSync(process.execPath, ['--input-type=module', '-e', `
@@ -171,15 +186,27 @@ const sw = execFileSync(process.execPath, ['--input-type=module', '-e', `
   const { createGame, startGame } = await import('./server/game/game.js');
   const { addPlayer } = await import('./server/game/players.js');
   startTts();
-  const g = createGame('Off'); addPlayer(g, { name: 'A' }); addPlayer(g, { isBot: true, persona: 'raider' }); startGame(g);
-  const silent = radioTurn(g, [{ type: 'alien', playerIds: [g.players[0].id], key: 'log.alienRift', params: {} }], () => 0).size === 0;
-  console.log(JSON.stringify({ state: ttsStatus().state, enabled: ttsEnabled(), silent }));
+  const { deliverRadio } = await import('./server/hub/games.js');
+  const { conns } = await import('./server/hub/connections.js');
+  const g = createGame('Off'); addPlayer(g, { name: 'Олена' }); addPlayer(g, { isBot: true, persona: 'raider' }); addPlayer(g, { isBot: true, persona: 'vulture' }); startGame(g);
+  const [h, bot, other] = g.players, home = g.galaxy.planets[h.homeworld];
+  const sent = [];
+  conns.set('c1', { ws: { readyState: 1, send: s => sent.push(JSON.parse(s)) }, gameId: g.id });
+  h.connId = 'c1';
+  const out = radioTurn(g, [
+    { type: 'combat', planetId: home.id, playerIds: [bot.id, other.id, h.id], key: 'log.battle', params: { planet: home.name, sides: [{ left: 3 }, { left: 0 }, { left: 2 }] } },
+    { type: 'invade', playerIds: [bot.id, h.id], planetId: home.id, key: 'log.invadeFrom', params: {} }
+  ], () => 0);
+  const picked = out.get(h.id) || [];
+  await deliverRadio(g, out);
+  const text = sent.length === 1 && sent.every(m => m.textOnly && !m.file && !m.v && !m.short && m.text);
+  console.log(JSON.stringify({ state: ttsStatus().state, enabled: ttsEnabled(), text }));
 `], { env: { ...process.env, HO_SPEECH: 'off', HO_TTS: `http://127.0.0.1:${port}`, HO_TTS_CACHE: path.join(cache, 'sw') },
   cwd: new URL('..', import.meta.url).pathname }).toString();
 const w = JSON.parse(sw.trim().split('\n').pop());
-assert(w.state === 'disabled' && !w.enabled && w.silent, `HO_SPEECH=off: disabled, silent, the service left alone (${sw.trim()})`);
+assert(w.state === 'disabled' && !w.enabled && w.text, `HO_SPEECH=off: disabled, the service left alone, the radio as text (${sw.trim()})`);
 
 fake.close();
 fs.rmSync(cache, { recursive: true, force: true });
 if (errors) { console.error(`${errors} error(s).`); process.exit(1); }
-console.log(`Radio speech: ${fixed.length} lines prepared, names speakable, served by key only - silent without the service, back with it.`);
+console.log(`Radio speech: ${fixed.length} lines prepared, names speakable, served by key only - text without the service, voices back with it.`);

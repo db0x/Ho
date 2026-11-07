@@ -516,16 +516,17 @@ net.on('chat', (m) => {
 net.on('voice', (m) => voice.onState(m));
 // Radio chatter of the AI colonies and the aliens - the server picks the line,
 // the player how much of it they want (radio.level). The subtitle goes on the
-// comms when the line is actually spoken - short calls ("Open fire!") only
-// sound, they would flood the comms.
+// comms when the line is actually spoken - or right away as text, when there
+// is no sound for it; a spoken line can be played again from there. Short
+// calls ("Open fire!") only sound, they would flood the comms.
 net.on('radio', (m) => radio.receive(m));
 net.on('radioStatus', (m) => lobby.setRadioStatus(m.radio));
 radio.blocked = () => !!voice.floor;
 radio.onLine((item) => {
-  if (item.debug || item.short) return;
+  if (item.debug || item.short || item.replay) return;
   const alien = item.speaker === 'alien';
   hud?.chat(alien ? t('alien.name') : item.name || '?', alien ? t('radio.alien') : item.clip.text,
-    { fromId: alien ? null : item.from, radio: true });
+    { fromId: alien ? null : item.from, radio: true, onReplay: item.clip.file ? () => radio.replay(item) : null });
 });
 net.on('rtc', (m) => voice.onSignal(m));
 

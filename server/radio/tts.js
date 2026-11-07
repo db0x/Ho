@@ -5,7 +5,7 @@
 //
 // A missing or broken service must never get in the way of a game: every
 // call has a timeout, nothing throws past this module, and while the service
-// is down the radio simply stays silent. A health check notices when it is
+// is down the radio comes as text. A health check notices when it is
 // back. Its state (disabled, off, checking, down, warming, ok) is shown to
 // admins in the lobby. HO_SPEECH=off switches all of it off on purpose.
 import crypto from 'node:crypto';
@@ -112,10 +112,10 @@ export function speak(text, voice, speed = 1) {
   return job;
 }
 
-/** The service stopped answering: silent until the health check finds it again. */
+/** The service stopped answering: text only until the health check finds it again. */
 function lost(e) {
   if (!['checking', 'warming', 'ok'].includes(status.state)) return;
-  console.warn(`Speech service lost (${e.name === 'TimeoutError' ? 'timeout' : e.message}) - radio silent until it is back.`);
+  console.warn(`Speech service lost (${e.name === 'TimeoutError' ? 'timeout' : e.message}) - radio as text until it is back.`);
   setStatus({ state: 'down' });
   schedule(CHECK_DOWN_MS);
 }
@@ -150,7 +150,7 @@ async function check() {
     ok = res.ok;
   } catch { ok = false; }
   if (!ok) {
-    if (status.state !== 'down') console.warn('Speech service not reachable - radio silent until it is back.');
+    if (status.state !== 'down') console.warn('Speech service not reachable - radio as text until it is back.');
     setStatus({ state: 'down' });
     schedule(CHECK_DOWN_MS);
     return;

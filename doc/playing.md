@@ -365,7 +365,7 @@ Now and then an AI colony gets on the radio – with a voice of its own for each
 personality, in English: when it first clashes with you, attacks your planets,
 takes one or loses one, allies with you or gives notice. The aliens speak up
 too, in a language nobody understands. What is said also shows on the comms,
-marked 📻. Many lines name names – your
+marked 📻 – the ▶ next to it plays it once more. Many lines name names – your
 planet, you, the colony or its destroyer: *"Kepler Prime is mine now, Olena."* In the thick of a battle with you there are short calls on top –
 *Open fire!*, *Jackpot!*, *Breach!* – those only sound.
 
@@ -379,7 +379,8 @@ important one, plus one short call from someone else), a colony keeps quiet for 
 somebody talks on the CB radio it waits. The host switches it off in the lobby
 (*Radio chatter*); in the menu ⚙ every player picks *All* (with the crew's answers), *Important only*
 (first clash, betrayal, a lost planet, aliens appearing) or *Off*. Volume and
-mute follow the sound.
+mute follow the sound; with the sound off – or where the server runs without
+voices – the lines still come, as text on the comms.
 
 ## Watching
 

@@ -383,7 +383,7 @@ Ab und zu meldet sich eine KI-Kolonie über Funk – jede Persönlichkeit mit ei
 Stimme, auf Englisch: beim ersten Zusammenstoß mit dir, wenn sie deine Planeten
 angreift, einen erobert oder verliert, sich mit dir verbündet oder kündigt. Auch
 die Aliens melden sich, in einer Sprache, die niemand versteht. Was gesagt wird,
-steht zusätzlich im Funk, mit 📻 markiert. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
+steht zusätzlich im Funk, mit 📻 markiert – das ▶ daneben spielt ihn noch einmal ab. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
 Träger: *„Kepler Prime is mine now, Olena.“* Mitten in einer Schlacht mit dir
 kommen kurze Rufe dazu – *Open fire!*, *Jackpot!*, *Breach!* –, die nur zu hören sind.
 
@@ -398,7 +398,8 @@ wichtigste, dazu ein Kurzruf von jemand anderem), danach schweigt die Kolonie ei
 CB-Funk spricht, wartet der Spruch. Der Spielleiter schaltet es in der Lobby ab
 (*Funksprüche*); im Menü ⚙ wählt jeder *Alle* (mit den Antworten der Crew), *Nur Wichtiges* (erster
 Zusammenstoß, Verrat, ein verlorener Planet, auftauchende Aliens) oder *Aus*.
-Lautstärke und Stumm folgen dem Ton.
+Lautstärke und Stumm folgen dem Ton; bei abgeschaltetem Ton – oder wenn der Server
+ohne Stimmen läuft – kommen die Sprüche trotzdem, als Text im Funk.
 
 ## Zusehen
 

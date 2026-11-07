@@ -5,7 +5,7 @@
     "Auch die Aliens funken – in einer Sprache, die niemand versteht. Wer sie einmal gehört hat, weiß, was dieses Heulen bedeutet.",
     "Deine eigenen Flotten antworten: „Yes?“ beim Auswählen, „On it.“ beim Losschicken, „Charge!“ vor dem Angriff, „New home!“ beim Besiedeln – über hundert Sprüche, vier Stimmen, und jede Flotte behält ihre.",
     "Es bleibt im Rahmen: höchstens ein Funkspruch pro Runde und nur zu dem, was dich betrifft; was gesagt wird, steht mit 📻 im Funk. Im Menü ⚙ wählst du „Alle“, „Nur Wichtiges“ oder „Aus“, der Spielleiter kann die Funksprüche in der Lobby ganz abschalten. Gesprochen wird immer Englisch – es ist schließlich Funk.",
-    "Für Admins: Die Stimmen kommen von einem eigenen Sprachdienst (Kokoro), der lokal mitläuft – ohne Konto, ohne Kosten. Fehlt er, bleibt der Funk einfach stumm; wie es ihm geht, steht in der Lobby."
+    "Für Admins: Die Stimmen kommen von einem eigenen Sprachdienst (Kokoro), der lokal mitläuft – ohne Konto, ohne Kosten. Fehlt er, kommen die Funksprüche als Text; wie es ihm geht, steht in der Lobby."
   ],
   "en": [
     "📻 Radio's open! The AI colonies now speak up over the radio – every personality with a voice of its own: the conqueror British and cold, the settler warm, the technocrat precise to the second decimal, the raider loud-mouthed, the bulwark stoic and the vulture … whispering. They call in on the first clash, when they attack, conquer or lose, ally with you – or give notice on your alliance.",
@@ -13,7 +13,7 @@
     "The aliens transmit too – in a language nobody understands. Hear it once and you know what that howl means.",
     "Your own fleets answer: “Yes?” when you pick one, “On it.” when you send it off, “Charge!” before an attack, “New home!” when settling – over a hundred lines, four voices, and every fleet keeps its own.",
     "It stays within bounds: one radio line per turn at most, and only about what concerns you; what is said shows on the comms, marked 📻. In the menu ⚙ you pick “All”, “Important only” or “Off”, and the host can switch the chatter off in the lobby.",
-    "For admins: the voices come from a speech service of their own (Kokoro) that runs locally alongside – no account, no cost. Without it the radio simply stays silent; how it is doing shows in the lobby."
+    "For admins: the voices come from a speech service of their own (Kokoro) that runs locally alongside – no account, no cost. Without it the radio chatter comes as text; how it is doing shows in the lobby."
   ],
   "uk": [
     "📻 Ефір відкрито! Колонії ШІ тепер виходять на зв’язок по радіо – кожна особистість своїм голосом: завойовник британський і холодний, поселенка тепла, технократка точна до другого знака після коми, рейдер горластий, бастіон незворушний, а стерв’ятниця … шепоче. Вони озиваються при першому зіткненні, коли нападають, завойовують чи програють, укладають із тобою союз – або розривають його.",
@@ -21,6 +21,6 @@
     "Прибульці теж виходять в ефір – мовою, якої не розуміє ніхто. Хто почув це раз, той знає, що означає це виття.",
     "Твої власні флоти відповідають: «Yes?», коли ти їх обираєш, «On it.», коли відправляєш, «Charge!» перед атакою, «New home!» під час заселення – понад сотня реплік, чотири голоси, і кожен флот зберігає свій.",
     "Усе в міру: щонайбільше одне радіоповідомлення за хід і лише про те, що стосується тебе; сказане з’являється в ефірі з позначкою 📻. У меню ⚙ обираєш «Усі», «Лише важливі» або «Вимк.», а господар може вимкнути перемовини в лобі. Говорять завжди англійською – це ж радіо.",
-    "Для адмінів: голоси дає окрема мовна служба (Kokoro), що працює локально поруч – без облікового запису, без витрат. Без неї радіо просто мовчить; її стан видно в лобі."
+    "Для адмінів: голоси дає окрема мовна служба (Kokoro), що працює локально поруч – без облікового запису, без витрат. Без неї радіоперемовини надходять текстом; її стан видно в лобі."
   ]
 }

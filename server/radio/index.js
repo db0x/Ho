@@ -7,7 +7,7 @@
 //
 // A fixed line that is not cached yet is spoken right then; a line with
 // names only exists once the server had it spoken for a transmission. Any
-// other key: 404. Without the speech service: 503, and the radio is silent.
+// other key: 404. Without the speech service: 503 - the lines go out as text.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
