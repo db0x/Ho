@@ -32,6 +32,10 @@ const fixed = new Map();          // key -> {text, voice, speed}: may be spoken 
 const listeners = new Set();
 let status = { state: SWITCHED_OFF ? 'disabled' : URL_ ? 'checking' : 'off', done: 0, total: 0 };
 let timer = null, warming = false, made = 0, started = false;
+// Since the start, for the admins: sentences spoken, served from the cache,
+// failed - and the milliseconds the spoken ones took, and the last health check.
+const counts = { spoken: 0, cached: 0, failed: 0, ms: 0 };
+let health = { at: null, ms: null, ok: null };
 
 export const ttsEnabled = () => !!URL_;
 export const ttsStatus = () => ({ ...status });
@@ -80,12 +84,13 @@ export const fixedLine = key => fixed.get(key) ?? null;
 export function speak(text, voice, speed = 1) {
   const key = ttsKey(text, voice, speed);
   const clip = { file: `tts/${key}.mp3`, v: key };
-  if (ttsReady(key)) return Promise.resolve(clip);
+  if (ttsReady(key)) { counts.cached++; return Promise.resolve(clip); }
   if (!URL_) return Promise.reject(new Error('no speech service'));
   if (status.state === 'down') return Promise.reject(new Error('speech service down'));
   if (pending.has(key)) return pending.get(key);
   const job = (async () => {
     let res;
+    const t0 = Date.now();
     try {
       res = await fetch(new URL('/speak', URL_), {
         method: 'POST',
@@ -95,11 +100,14 @@ export function speak(text, voice, speed = 1) {
         signal: AbortSignal.timeout(TIMEOUT_MS)
       });
     } catch (e) {
+      counts.failed++;
       lost(e);                                    // unreachable or hanging
       throw e;
     }
-    if (!res.ok) throw new Error(`speech service: ${res.status}`);   // busy or refused - it lives
+    if (!res.ok) { counts.failed++; throw new Error(`speech service: ${res.status}`); }   // busy or refused - it lives
     const audio = Buffer.from(await res.arrayBuffer());
+    counts.spoken++;
+    counts.ms += Date.now() - t0;
     const file = ttsFile(key);
     await fs.promises.mkdir(CACHE, { recursive: true });
     const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
@@ -145,10 +153,12 @@ export const checkTts = () => check();
 
 async function check() {
   let ok = false;
+  const t0 = Date.now();
   try {
     const res = await fetch(new URL('/health', URL_), { signal: AbortSignal.timeout(3000) });
     ok = res.ok;
   } catch { ok = false; }
+  health = { at: Date.now(), ms: ok ? Date.now() - t0 : null, ok };
   if (!ok) {
     if (status.state !== 'down') console.warn('Speech service not reachable - radio as text until it is back.');
     setStatus({ state: 'down' });
@@ -200,6 +210,38 @@ function prune() {
     files.sort((a, b) => a.t - b.t);
     for (const f of files.slice(0, files.length - MAX_NAMED)) fs.promises.unlink(f.p).catch(() => {});
   }).catch(() => {});
+}
+
+let cacheInfo = null;
+
+/** What the cache holds: fixed lines ready, sentences with names, bytes - looked at every 15 s at most. */
+function cacheView() {
+  if (cacheInfo && Date.now() - cacheInfo.at < 15000) return cacheInfo.view;
+  let fixedReady = 0, named = 0, bytes = 0;
+  try {
+    for (const n of fs.readdirSync(CACHE)) {
+      if (!n.endsWith('.mp3')) continue;
+      try { bytes += fs.statSync(path.join(CACHE, n)).size; } catch { continue; }
+      if (fixed.has(n.slice(0, -4))) fixedReady++; else named++;
+    }
+  } catch { /* no cache yet */ }
+  const view = { fixed: fixedReady, fixedTotal: fixed.size, named, bytes };
+  cacheInfo = { at: Date.now(), view };
+  return view;
+}
+
+/**
+ * For the admins: the state of the speech service, its last health check,
+ * the cache and what it did since the start.
+ */
+export function ttsAdmin() {
+  return {
+    ...ttsStatus(),
+    url: URL_ || null,
+    health: { ...health },
+    cache: cacheView(),
+    counts: { ...counts, avgMs: counts.spoken ? Math.round(counts.ms / counts.spoken) : null }
+  };
 }
 
 /**

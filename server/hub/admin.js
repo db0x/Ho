@@ -11,6 +11,9 @@ import { accountAvatarUrl } from '../profile.js';
 import { getUser, listUsers, setInviter, setBlocked, deleteUser } from '../userstore.js';
 import { adminOf, inviterOf, appealView } from './account.js';
 import { send, conns, connsOf } from './connections.js';
+import { radioManifest, radioVoices } from '../radio/index.js';
+import { lineStats } from '../radio/stats.js';
+import { ttsAdmin, ttsReady } from '../radio/tts.js';
 import { games, closeGame } from './games.js';
 
 /**
@@ -41,6 +44,8 @@ function adminOverview() {
   try { appeals = allAppeals(); } catch (e) { console.error(e.message); }
   return {
     now: Date.now(),
+    // The speech service of the radio chatter, and how many lines went out.
+    radio: radioOverview(),
     games: [...games.values()].map(adminGameView)
       .sort((a, b) => (a.state === 'running' ? 0 : 1) - (b.state === 'running' ? 0 : 1) || a.created - b.created),
     accounts: accounts.map(u => {
@@ -93,7 +98,42 @@ function adminMessage(game, from, text) {
   return delivered;
 }
 
+/**
+ * Every radio line for the admins' dialog: per speaker and event the fixed
+ * lines and the templates with names, how often each went out, and whether
+ * it is spoken already (with several voices: in how many of them).
+ */
+/** The speech service for the panel's card, and how many lines went out. */
+export function radioOverview() {
+  return { ...ttsAdmin(), delivered: Object.values(lineStats().lines).reduce((a, n) => a + n, 0) };
+}
+
+export function radioLines() {
+  const { since, lines: counted } = lineStats();
+  const manifest = radioManifest();
+  const speakers = Object.entries(radioVoices()).map(([name, s]) => {
+    const keys = s.voices?.length ? s.voices.map((_, i) => `${name}${i + 1}`) : [name];
+    const events = Object.keys(s.lines || {}).concat(Object.keys(s.templates || {}))
+      .filter((e, i, all) => all.indexOf(e) === i)
+      .map(event => ({
+        event,
+        lines: (manifest[keys[0]]?.[event] || []).map((c, n) => ({
+          n, text: c.text, say: c.say !== c.text ? c.say : undefined, count: counted[`${name}/${event}/${n}`] || 0,
+          ready: keys.filter(k => manifest[k]?.[event]?.[n] && ttsReady(manifest[k][event][n].key)).length
+        })),
+        templates: (s.templates?.[event] || []).map((text, n) => ({ n, text, count: counted[`${name}/${event}/t${n}`] || 0 }))
+      }));
+    return { name, play: keys[0], voices: s.voices?.length ? s.voices : [s.voice], counted: name !== 'crew', events };
+  });
+  return { since, speakers };
+}
+
 export const adminHandlers = {
+  adminRadio({ c, ws }) {
+    if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
+    send(ws, { t: 'adminRadioData', ...radioLines() });
+  },
+
   admin({ c, ws }) {
     if (!adminOf(c)) return send(ws, { t: 'error', key: 'err.notAdmin' });
     send(ws, { t: 'adminData', ...adminOverview() });

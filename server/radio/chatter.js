@@ -143,10 +143,13 @@ export function radioTurn(game, entries, rand = Math.random) {
     const clip = (fresh.length ? fresh : options)[Math.floor(rand() * (fresh.length || options.length))];
     st.lastFile[h] = clip.file;
     const speaker = speakerOf(game, pick.from);
+    const event = pick.event.split('.').pop();
     const msg = {
       t: 'radio', from: pick.from, name: pick.from === ALIEN_ID ? null : player(pick.from)?.name ?? null,
       speaker, file: clip.file, v: clip.key, text: clip.text,
       line: { say: clip.say, voice: clip.voice, speed: clip.speed },
+      // For the statistics (stats.js) - counted on delivery, not sent along.
+      stat: `${speaker}/${event}/${options.indexOf(clip)}`,
       important, ...(short ? { short: true } : {})
     };
     // Tied to a place on the map: spoken once its battle is over (if there is
@@ -158,7 +161,7 @@ export function radioTurn(game, entries, rand = Math.random) {
       const named = namedLine(radioVoices()[speaker], pick, {
         name: msg.name, player: player(h)?.name, planet: pick.ctx?.planet, ship: pick.ctx?.ship
       }, rand);
-      if (named) msg.named = named;
+      if (named) msg.named = { ...named, stat: `${speaker}/${event}/t${named.i}` };
     }
     return msg;
   };
@@ -199,6 +202,7 @@ export function namedLine(voice, { event }, names, rand = Math.random, force = f
   if (!fits.length || (!force && rand() >= RADIO_NAMED_SHARE)) return null;
   const tpl = fits[Math.floor(rand() * fits.length)];
   return {
+    i: templates.indexOf(tpl),
     say: tpl.replace(/\{(\w+)\}/g, (_, k) => say[k]),
     text: tpl.replace(/\{(\w+)\}/g, (_, k) => names[k]),
     voice: voice.voice, speed: voice.speed ?? 1
@@ -248,12 +252,14 @@ export function yardLine(game, me, planetId, rand = Math.random) {
   const speaker = `yard${i + 1}`;
   const clips = radioManifest()[speaker]?.select;
   if (!clips?.length) return null;
-  const clip = clips[Math.floor(rand() * clips.length)];
+  const n = Math.floor(rand() * clips.length);
+  const clip = clips[n];
   const named = namedLine({ ...yard, voice: yard.voices[i] }, { event: 'select' }, { planet: planet.name }, rand, true);
   return {
     t: 'radio', from: null, name: null, speaker, file: clip.file, v: clip.key, text: clip.text,
     short: true, crew: true, line: { say: clip.say, voice: clip.voice, speed: clip.speed },
-    ...(named ? { named } : {})
+    stat: `yard/select/${n}`,
+    ...(named ? { named: { ...named, stat: `yard/select/t${named.i}` } } : {})
   };
 }
 

@@ -360,6 +360,7 @@ net.on('hello', (m) => {
 
 net.on('games', (m) => { lobby.showOpenGames(m.openGames); lobby.showMySeats(m.mySeats); });
 net.on('adminData', (m) => admin.update(m));
+net.on('adminRadioData', (m) => admin.showRadio(m));
 net.on('ranking', (m) => showRanking(m));
 net.on('privacy', (m) => showPrivacy(m.privacy));
 net.on('inviteData', (m) => invites.update(m));

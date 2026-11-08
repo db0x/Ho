@@ -2,10 +2,11 @@
 // account. Only shown when the server says so in 'hello' - and the server
 // checks the flag again on every request, so a hidden panel is no security
 // boundary, just a view.
-import { t, n as num, localeTag, relative, onLocaleChange } from '../i18n.js';
+import { t, n as num, localeTag, relative, onLocaleChange, hasKey } from '../i18n.js';
 import { avatarHtml } from './avatar.js';
 import { inviteUrl, copyField } from './invites.js';
 import { appealLogHtml } from './blocked.js';
+import { radio } from '../audio/radio.js';
 
 const $ = s => document.querySelector(s);
 const POLL_MS = 5000;
@@ -82,7 +83,96 @@ export class AdminPanel {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.sendMessage(); }
       if (e.key === 'Escape') this.compose(null);
     };
-    onLocaleChange(() => this.render());
+    // The speech service: its card in the panel, and the dialog with every line.
+    $('#admin-tts').addEventListener('click', (e) => {
+      if (e.target.closest('[data-radio-open]')) this.net.send({ t: 'adminRadio' });
+    });
+    $('#admin-radio-close').onclick = () => this.closeRadio();
+    $('#admin-radio').addEventListener('click', (e) => {
+      if (e.target.id === 'admin-radio') return this.closeRadio();
+      const play = e.target.closest('[data-play]');
+      if (play) {
+        const [speaker, event, n] = play.dataset.play.split('|');
+        radio.stop();
+        radio.say(speaker, event, +n);
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('#admin-radio').classList.contains('hidden')) this.closeRadio();
+    });
+    onLocaleChange(() => { this.render(); if (this.radioData) this.renderRadio(); });
+  }
+
+  /**
+   * The speech service at a glance: is it there, how is it doing, what is
+   * in its cache, what did it do since the start - and the lines (dialog).
+   */
+  ttsCard(r) {
+    if (!r) return '';
+    const tone = { ok: 'ok', warming: 'warn', checking: 'warn', down: 'bad', off: 'off', disabled: 'off' }[r.state] || 'off';
+    const mb = num((r.cache?.bytes || 0) / 1048576, 1);
+    const lines = [
+      r.health?.at ? t(r.health.ok ? 'admin.ttsHealth' : 'admin.ttsHealthFail', { ms: r.health.ms ?? '–', ago: this.ago(r.health.at) }) : null,
+      r.cache ? t('admin.ttsCache', { fixed: r.cache.fixed, total: r.cache.fixedTotal, named: r.cache.named, mb }) : null,
+      r.counts ? t('admin.ttsCounts', { spoken: r.counts.spoken, avg: r.counts.avgMs ?? '–', cached: r.counts.cached, failed: r.counts.failed }) : null,
+      t('admin.ttsDelivered', { n: r.delivered || 0 })
+    ].filter(Boolean);
+    return `<div class="admin-tts">
+      <div class="at-head">
+        <span class="at-state ${tone}"><i></i>${esc(t(`admin.ttsState.${r.state}`, { done: r.done ?? 0, total: r.total ?? 0 }))}</span>
+        ${r.url ? `<span class="muted small">${esc(r.url)}</span>` : ''}
+        <button type="button" class="tiny" data-radio-open>${t('admin.radioOpen')}</button>
+      </div>
+      ${lines.map(l => `<div class="small muted">${esc(l)}</div>`).join('')}
+    </div>`;
+  }
+
+  /** The dialog with every radio line - from the server, on request. */
+  showRadio(m) {
+    this.radioData = m;
+    this.renderRadio();
+    $('#admin-radio').classList.remove('hidden');
+  }
+
+  closeRadio() {
+    radio.stop();
+    $('#admin-radio').classList.add('hidden');
+  }
+
+  renderRadio() {
+    const m = this.radioData;
+    if (!m) return;
+    $('#admin-radio-since').textContent = t('admin.radioSince', {
+      date: new Date(m.since).toLocaleDateString(localeTag(), { day: '2-digit', month: '2-digit', year: 'numeric' })
+    });
+    const label = s => s.name === 'alien' ? t('alien.name')
+      : hasKey(`persona.${s.name}`) ? t(`persona.${s.name}`)
+      : hasKey(`admin.radioSpeaker.${s.name}`) ? t(`admin.radioSpeaker.${s.name}`) : s.name;
+    $('#admin-radio-list').innerHTML = m.speakers.map(s => {
+      const all = s.events.flatMap(e => [...e.lines, ...e.templates]);
+      const total = all.reduce((a, l) => a + l.count, 0);
+      const most = Math.max(1, ...all.map(l => l.count));
+      const bar = l => s.counted ? `<span class="ar-count"><i style="width:${Math.round(l.count / most * 100)}%"></i><b>${num(l.count)}</b></span>` : '<span class="ar-count">–</span>';
+      return `<details class="ar-speaker">
+        <summary><b>${esc(label(s))}</b> <span class="muted small">${esc(s.voices.join(', '))}</span>
+          <span class="ar-total">${s.counted ? t('admin.radioTotal', { n: num(total) }) : t('admin.radioNotCounted')}</span></summary>
+        ${s.events.map(e => `<div class="ar-event">
+          <h4>${esc(e.event)}</h4>
+          ${e.lines.map(l => `<div class="ar-line">
+            <button type="button" class="tiny" data-sfx="none" data-play="${esc(s.play)}|${esc(e.event)}|${l.n}"
+              ${l.ready ? '' : 'disabled'} title="${esc(t('radio.replay'))}">▶</button>
+            <span class="ar-text">${esc(l.text)}${l.say ? ` <span class="muted">(${esc(l.say)})</span>` : ''}</span>
+            ${s.voices.length > 1 ? `<span class="muted small" title="${esc(t('admin.radioReady'))}">${l.ready}/${s.voices.length}</span>` : ''}
+            ${bar(l)}
+          </div>`).join('')}
+          ${e.templates.map(l => `<div class="ar-line named">
+            <span class="ar-tag" title="${esc(t('admin.radioNamedTitle'))}">${t('admin.radioNamed')}</span>
+            <span class="ar-text">${esc(l.text)}</span>
+            ${bar(l)}
+          </div>`).join('')}
+        </div>`).join('')}
+      </details>`;
+    }).join('');
   }
 
   /** Switches the panel on or off - after 'hello', i.e. on every (re)connect. */
@@ -277,6 +367,7 @@ export class AdminPanel {
       time: new Date().toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     });
     $('#admin-games-count').textContent = d.games.length;
+    $('#admin-tts').innerHTML = this.ttsCard(d.radio);
     $('#admin-accounts-count').textContent = d.accounts.length;
     $('#admin-invites-count').textContent = d.invites.length;
     $('#admin-invites').innerHTML = d.invites.map(i => this.inviteRow(i)).join('');

@@ -7,6 +7,7 @@ import { buildView } from '../game/intel.js';
 import { resolveTurn } from '../game/turn.js';
 import { radioTurn } from '../radio/chatter.js';
 import { speak } from '../radio/tts.js';
+import { countLine } from '../radio/stats.js';
 import { recordGame } from '../stats.js';
 import { conns, send } from './connections.js';
 import { spectatorView } from './spectators.js';
@@ -79,14 +80,23 @@ export function maybeResolve(game) {
 export async function deliverRadio(game, out) {
   try {
     for (const [id, msgs] of out) {
-      const ready = await Promise.all(msgs.map(async ({ named, line, ...msg }) => {
+      const ready = await Promise.all(msgs.map(async ({ named, line, stat, ...msg }) => {
         if (named) {
-          try { return { ...msg, ...(await speak(named.say, named.voice, named.speed)), text: named.text }; } catch {}
+          try {
+            const spoken = { ...msg, ...(await speak(named.say, named.voice, named.speed)), text: named.text };
+            countLine(named.stat);
+            return spoken;
+          } catch {}
         }
-        try { return { ...msg, ...(await speak(line.say, line.voice, line.speed)) }; } catch {}
+        try {
+          const spoken = { ...msg, ...(await speak(line.say, line.voice, line.speed)) };
+          countLine(stat);
+          return spoken;
+        } catch {}
         // No voice: the line is still said - as text.
         if (msg.short) return null;
         const { file, v, ...rest } = msg;
+        countLine(named ? named.stat : stat);
         return { ...rest, text: named?.text ?? msg.text, textOnly: true };
       }));
       const c = conns.get(game.players.find(p => p.id === id)?.connId);

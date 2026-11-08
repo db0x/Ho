@@ -32,6 +32,7 @@ const port = fake.address().port;
 const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'ho-tts-test-'));
 process.env.HO_TTS = `http://127.0.0.1:${port}`;
 process.env.HO_TTS_CACHE = cache;
+process.env.HO_RADIO_STATS = path.join(cache, 'radio-stats.json');
 
 const tts = await import('../server/radio/tts.js');
 const { speak, speakable, ttsFile, ttsStatus, onTtsStatus, startTts, stopTts, checkTts } = tts;
@@ -162,6 +163,47 @@ const ask = (g, me, planetId, c = {}) => new Promise((ok) => {
   assert(!again.length, 'asked again right away: no second answer');
   g.settings.radio = false;
   assert(!(await ask(g, h, home.id)).length, 'radio switched off in the lobby: no yard');
+}
+
+// ------------------------------------------ statistics for the admins
+{
+  const { lineStats, save } = await import('../server/radio/stats.js');
+  const { radioOverview, radioLines } = await import('../server/hub/admin.js');
+  const { deliverRadio } = await import('../server/hub/games.js');
+  const { conns } = await import('../server/hub/connections.js');
+  const before = lineStats().lines;
+  const g = yardGame();
+  const [h, bot] = g.players;
+  const home = g.galaxy.planets[h.homeworld];
+  const sent = [];
+  conns.set('stat1', { ws: { readyState: 1, send: s => sent.push(JSON.parse(s)) }, gameId: g.id });
+  h.connId = 'stat1';
+  const out = radioTurn(g, [{ type: 'invade', playerIds: [bot.id, h.id], planetId: home.id, key: 'log.invadeFrom', params: {} }], () => 0);
+  const m = out.get(h.id)[0];
+  assert(m.stat?.startsWith('raider/victory/') && m.named?.stat?.startsWith('raider/victory/t'), `keys for the statistics (${m.stat}, ${m.named?.stat})`);
+  await deliverRadio(g, out);
+  assert(sent.length === 1 && !('stat' in sent[0]) && !('named' in sent[0]) && !('line' in sent[0]), 'the keys stay on the server');
+  const after = lineStats().lines;
+  assert((after[m.named.stat] || 0) === (before[m.named.stat] || 0) + 1, `the line with names counted (${m.named.stat})`);
+  assert((after[m.stat] || 0) === (before[m.stat] || 0), 'the fixed line it stood in for not');
+  await ask(g, h, home.id, {});
+  assert(Object.keys(lineStats().lines).some(k => k.startsWith('yard/select/')), 'the shipyard counted');
+  save();
+  assert(JSON.parse(fs.readFileSync(process.env.HO_RADIO_STATS, 'utf8')).lines[m.named.stat] >= 1, 'saved next to the accounts');
+
+  const o = radioOverview();
+  assert(o.state === 'ok' && o.health.ok && o.cache.fixed === o.cache.fixedTotal && o.counts.spoken > 0 && o.delivered >= 2,
+    `the overview: state, health, cache, counts (${JSON.stringify(o)})`);
+  const lines = radioLines();
+  const raider = lines.speakers.find(s => s.name === 'raider');
+  const victory = raider?.events.find(e => e.event === 'victory');
+  assert(victory?.lines.length >= 3 && victory.templates.length >= 2 && victory.lines.every(l => l.ready === 1),
+    'the dialog: lines and templates per event, spoken');
+  assert(victory.templates[m.named.i].count >= 1, 'with their counts');
+  const crew = lines.speakers.find(s => s.name === 'crew');
+  assert(crew && !crew.counted && crew.voices.length === 4 && crew.play === 'crew1', 'the crew: four voices, not counted');
+  const yard = lines.speakers.find(s => s.name === 'yard');
+  assert(yard?.events[0].lines.every(l => l.ready === 2), 'the shipyard: every line in both voices');
 }
 
 // ------------------------------------------------ the service goes away

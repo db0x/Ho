@@ -204,6 +204,8 @@
       </div>
     </div>
     <div id="admin-games" class="admin-list"></div>
+    <h3 data-i18n="admin.tts"></h3>
+    <div id="admin-tts" class="admin-list"></div>
     <h3><span data-i18n="admin.invites"></span> <span id="admin-invites-count" class="muted"></span></h3>
     <div class="admin-invite-new">
       <input id="admin-invite-note" maxlength="60" autocomplete="off" data-i18n-attr="placeholder:admin.inviteNote">
@@ -503,6 +505,18 @@
 </div>
 
 <!-- =============================== Leave game ============================= -->
+<!-- ============================== Admin: every radio line ============================== -->
+<div id="admin-radio" class="modal hidden">
+  <div class="modal-box radio-box">
+    <div class="radio-box-head">
+      <h2 data-i18n="admin.radioTitle"></h2>
+      <button type="button" id="admin-radio-close" class="tiny" data-i18n="battle.close"></button>
+    </div>
+    <p class="muted small" id="admin-radio-since"></p>
+    <div id="admin-radio-list"></div>
+  </div>
+</div>
+
 <div id="quit" class="modal hidden">
   <div class="modal-box narrow">
     <h2 id="quit-title" data-i18n="quit.title"></h2>
