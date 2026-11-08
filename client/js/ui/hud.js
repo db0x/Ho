@@ -162,13 +162,25 @@ export class Hud {
     this.logDlg.refresh(glide);
     this.leftDlg.refresh(glide);
     if (!sel) {
+      this.shownSel = null;
       if (compact.matches) { box.classList.remove('split'); box.innerHTML = `<p class="muted pad">${t('sel.empty')}</p>`; }
       return;
     }
+    // On the phone the whole panel scrolls (on the desktop the planet's part
+    // does, see planetPanel). A rebuild - every order, e.g. + in the
+    // shipyard, brings a new view - must not throw it back to the top: the
+    // panel is built in steps (the shipyard rows come last), and a layout in
+    // between clamps the position to the shorter content. So it is put back
+    // once everything is there - for the same selection; a new one starts at
+    // the top.
+    const same = this.shownSel === `${sel.type}:${sel.id}`;
+    const keep = same ? box.scrollTop : 0;
+    this.shownSel = `${sel.type}:${sel.id}`;
     box.classList.remove('split');                      // only the planet panel is in two parts
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
     else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
     else this.fleetPanel(box, this.view.fleets.find(f => f.id === sel.id));
+    box.scrollTop = keep;
   }
 
   /**
