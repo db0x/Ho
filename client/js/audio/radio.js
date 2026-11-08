@@ -20,6 +20,10 @@ const LEVEL = 0.35;
 // What has not been played after this long is no longer news.
 const STALE_MS = 25000;
 const PREF_KEY = 'ho-radio';
+// After a battle has faded on the map, a breath before the line comes.
+const AFTER_BATTLE_MS = 400;
+// No line waits longer than this for its battle.
+const MAX_WAIT_MS = 15000;
 export const RADIO_LEVELS = ['all', 'important', 'off'];
 
 /**
@@ -80,6 +84,7 @@ class Radio {
     this.busy = false;
     this.listeners = new Set();   // (item) => void when a line starts - for a subtitle
     this.blocked = () => false;   // is a person talking on the CB radio?
+    this.moment = () => null;     // (where, when) => when that battle starts/ends on the map, or null
     this.level = loadLevel();
   }
 
@@ -115,9 +120,18 @@ class Radio {
   /**
    * A transmission from the server ({t: 'radio', ...}) - if this player wants
    * it. Without its sound (no speech service, or the sound off here) a long
-   * line still comes, as text on the comms.
+   * line still comes, as text on the comms. A line about a battle (where)
+   * waits until that battle has played out on the map.
    */
   receive(m) {
+    // About a battle: once it has played out on the map ("Open fire!" at its start).
+    const at = m.where ? this.moment(m.where, m.where.when) : null;
+    const wait = at == null ? 0 : Math.min(MAX_WAIT_MS, at - performance.now() + (m.where.when === 'start' ? 0 : AFTER_BATTLE_MS));
+    if (wait > 50) { setTimeout(() => this.deliver(m), wait); return true; }
+    return this.deliver(m);
+  }
+
+  deliver(m) {
     if (this.level === 'off' || (this.level === 'important' && !m.important)) return false;
     const item = { speaker: m.speaker, clip: { file: m.file ?? null, v: m.v ?? null, text: m.text }, from: m.from, name: m.name, short: !!m.short };
     if (!m.file || !sfx.on) {

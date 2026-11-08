@@ -5,6 +5,19 @@
 // are plenty of lines for every kind (server/radio/lines.json). Also the AI's
 // lines on this side: as text without sound, played again on request.
 process.env.HO_TTS = 'http://127.0.0.1:9';
+// The browser code imports ../../shared/ - the server serves that from shared/
+// at the root, so here as well (client/shared/ does not exist).
+const { register } = await import('node:module');
+register('data:text/javascript,' + encodeURIComponent(`
+  export async function resolve(spec, ctx, next) {
+    if (spec.startsWith('.') && ctx.parentURL) {
+      const url = new URL(spec, ctx.parentURL);
+      if (url.pathname.includes('/client/shared/')) {
+        return { url: url.href.replace('/client/shared/', '/shared/'), shortCircuit: true };
+      }
+    }
+    return next(spec, ctx);
+  }`));
 const { radioManifest } = await import('../server/radio/index.js');
 const { radio } = await import('../client/js/audio/radio.js');
 const { sfx } = await import('../client/js/audio/sfx.js');
@@ -130,6 +143,36 @@ Math.random = random;
   assert(radio.replay(shown[1]) && queued[1].replay && queued[1].clip.file === shown[1].clip.file, 'played again on request');
   assert(!radio.replay(shown[0]), 'a line without sound cannot be played again');
   radio.push = push;
+}
+
+// ------------------------------------- after the battle on the map
+// A line about a battle waits until that battle has played out; the battle
+// animation knows when (BattleFx.moment).
+{
+  const { BattleFx } = await import('../client/js/render/battlefx.js');
+  const battle = { sides: ['me', 'p2'], units: [[0, 'fighter', 5, 5], [1, 'fighter', 5, 5]],
+    rounds: [[[0, 1, 2], [1, 0, 2]], [[0, 1, 3]]], scuttled: [], fled: [] };
+  const fx = new BattleFx();
+  const t0 = performance.now();
+  fx.start([{ planetId: 7, at: null, battle }, { planetId: 2, at: { x: 5, y: 6, z: 0 }, battle }], 'me', t0);
+  const start = fx.moment({ planetId: 7 }, 'start'), end = fx.moment({ planetId: 7 }, 'end');
+  assert(start != null && end > start, `a battle on the map has a start and an end (${start} - ${end})`);
+  assert(fx.moment({ planetId: 2, at: { x: 5, y: 6, z: 0 } }, 'start') > start, 'the second battle starts a little later');
+  assert(fx.moment({ planetId: 2 }) === null && fx.moment({ planetId: 9 }) === null, 'another place: no battle playing there');
+
+  const shown = [];
+  const off = radio.onLine(item => shown.push(item));
+  radio.level = 'all';
+  radio.moment = (where, when) => fx.moment(where, when);
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'Your planet is mine.', important: true, textOnly: true, where: { planetId: 7, when: 'end' } });
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'We are allies.', important: true, textOnly: true });
+  assert(shown.length === 1 && shown[0].clip.text === 'We are allies.', 'no battle: right away; about a battle: not yet');
+  await new Promise(r => setTimeout(r, Math.max(0, end - performance.now()) + 700));
+  assert(shown.length === 2 && shown[1].clip.text === 'Your planet is mine.', 'after the battle has played out: there');
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'Too late.', important: true, textOnly: true, where: { planetId: 7, when: 'end' } });
+  assert(shown.length === 3, 'the battle already over: right away');
+  off();
+  radio.moment = () => null;
 }
 
 const total = Object.keys(KINDS).reduce((a, k) => a + m.crew1[k].length, 0);

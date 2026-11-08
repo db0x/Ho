@@ -199,6 +199,20 @@ export class BattleFx {
     });
   }
 
+  /**
+   * When the battle at this place starts or is over on the map (performance.now
+   * milliseconds) - null if none is playing there (any more). The radio waits
+   * for it: a line about a battle comes once it has been fought.
+   * @param {{planetId?: number|null, at?: {x:number, y:number, z?:number}}} where
+   * @param {'start'|'end'} when
+   */
+  moment(where, when = 'end') {
+    const same = (a, b) => (!a && !b) || (a && b && a.x === b.x && a.y === b.y && (a.z || 0) === (b.z || 0));
+    const it = this.items.find(i => i.planetId === (where?.planetId ?? null) && same(i.at, where?.at));
+    if (!it) return null;
+    return (it.t0 + (when === 'start' ? 0 : it.tl.end)) * 1000;
+  }
+
   /** Milliseconds until the last effect has faded. */
   remaining(now = performance.now()) {
     let end = 0;

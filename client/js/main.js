@@ -522,6 +522,7 @@ net.on('voice', (m) => voice.onState(m));
 net.on('radio', (m) => radio.receive(m));
 net.on('radioStatus', (m) => lobby.setRadioStatus(m.radio));
 radio.blocked = () => !!voice.floor;
+radio.moment = (where, when) => map?.battleMoment?.(where, when) ?? null;
 radio.onLine((item) => {
   if (item.debug || item.short || item.replay) return;
   const alien = item.speaker === 'alien';

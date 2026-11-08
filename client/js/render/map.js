@@ -120,6 +120,9 @@ export class MapView {
     this.poke(this.battleFx.remaining() + 100);
   }
 
+  /** When the battle at this place starts or ends on the map - null if none plays there. */
+  battleMoment(where, when) { return this.battleFx.moment(where, when); }
+
   w2s(x, y) {
     return [(x - this.cam.x) * this.cam.zoom + this.w / 2, (y - this.cam.y) * this.cam.zoom + this.h / 2];
   }

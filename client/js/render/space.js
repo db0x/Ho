@@ -90,6 +90,9 @@ export class SpaceView {
     this.poke(this.battleFx.remaining() + 100);
   }
 
+  /** When the battle at this place starts or ends on the map - null if none plays there. */
+  battleMoment(where, when) { return this.battleFx.moment(where, when); }
+
   /** Right-handed basis from view direction, right and up. */
   basis() {
     const cp = Math.cos(this.cam.pitch), sp = Math.sin(this.cam.pitch);

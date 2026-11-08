@@ -383,7 +383,8 @@ Ab und zu meldet sich eine KI-Kolonie über Funk – jede Persönlichkeit mit ei
 Stimme, auf Englisch: beim ersten Zusammenstoß mit dir, wenn sie deine Planeten
 angreift, einen erobert oder verliert, sich mit dir verbündet oder kündigt. Auch
 die Aliens melden sich, in einer Sprache, die niemand versteht. Was gesagt wird,
-steht zusätzlich im Funk, mit 📻 markiert – das ▶ daneben spielt ihn noch einmal ab. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
+steht zusätzlich im Funk, mit 📻 markiert – das ▶ daneben spielt ihn noch einmal ab. Ein Spruch zu einem
+Kampf kommt erst, wenn dieser Kampf auf der Karte ausgefochten ist. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
 Träger: *„Kepler Prime is mine now, Olena.“* Mitten in einer Schlacht mit dir
 kommen kurze Rufe dazu – *Open fire!*, *Jackpot!*, *Breach!* –, die nur zu hören sind.
 

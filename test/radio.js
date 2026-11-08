@@ -75,6 +75,7 @@ const battle = (planet, sides) => ({
   let m = lineOf(out, h.id);
   assert(m?.speaker === 'conqueror' && is(m, 'conqueror', 'war'), `first battle: war line (${m?.file})`);
   assert(m.important === true && m.from === con.id && m.name === 'Con', 'war line important, with sender');
+  assert(m.where?.planetId === home.id && m.where.when === 'end', `about a battle: after it on the map (${JSON.stringify(m.where)})`);
   assert(!out.has(con.id), 'the AI itself gets nothing');
   // Next turn: the conqueror keeps quiet towards this player.
   g.turn++;
@@ -116,6 +117,7 @@ const battle = (planet, sides) => ({
   // Alliance and notice, by the names in the log.
   let m = lineOf(radioTurn(g, [{ type: 'diplomacy', key: 'log.alliance', params: { a: vul.name, b: h.name } }], always), h.id);
   assert(is(m, 'vulture', 'ally'), `alliance: ally line (${m?.file})`);
+  assert(!m.where, 'an alliance is no battle: right away');
   g.turn += RADIO_QUIET_TURNS;
   m = lineOf(radioTurn(g, [{ type: 'diplomacy', key: 'log.allianceNotice', params: { player: vul.name, other: h.name, n: 3 } }], always), h.id);
   assert(is(m, 'vulture', 'betray') && m.important, `notice: betray line (${m?.file})`);
@@ -149,6 +151,7 @@ const battle = (planet, sides) => ({
   assert(!lineOf(out, h.id), 'no long line while both keep quiet');
   const c = callOf(out, h.id);
   assert(c && c.short && !c.important, `a short call (${c?.file})`);
+  assert(c?.where?.planetId === home.id && c.where.when === 'end', 'a losing shout: at the end of the battle');
   // The worse it goes, the likelier the call: the vulture lost everything.
   assert(is(c, 'vulture', 'lose'), `the beaten one shouts (${c?.file})`);
   // Calls pause a turn only.
@@ -159,6 +162,7 @@ const battle = (planet, sides) => ({
   g.turn++;
   const a = callOf(radioTurn(g, [battle(home, [[ALIEN_ID, 5], [h.id, 1]]), battle(home, [[con.id, 1], [h.id, 1]])], always), h.id);
   assert(a, 'aliens or colony shout in a battle');
+  assert(a?.where?.when === 'start', `"Open fire!": at the start of the battle (${JSON.stringify(a?.where)})`);
   assert(RADIO_CALLS['call.lose'].chance > RADIO_CALLS['call.engage'].chance, 'losing shouts more than engaging');
 }
 

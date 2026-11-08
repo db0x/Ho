@@ -76,7 +76,7 @@ export function radioTurn(game, entries, rand = Math.random) {
     map.get(listener).push({ from, event, ctx });
   };
   const want = (listener, from, event, ctx) => add(wish, listener, from, event, ctx);
-  const call = (listener, from, event) => add(calls, listener, from, event);
+  const call = (listener, from, event, ctx) => add(calls, listener, from, event, ctx);
   const planetOf = id => (id != null ? game.galaxy.planets.find(q => q.id === id) : null);
   /** A named ship (destroyer) of this owner in that orbit. */
   const shipAt = (owner, planetId) => planetId == null ? null : game.fleets
@@ -88,18 +88,20 @@ export function radioTurn(game, entries, rand = Math.random) {
       const ids = e.playerIds || [];
       const left = id => e.params.sides[ids.indexOf(id)]?.left ?? 1;
       const planet = planetOf(e.planetId);
+      // The battle this is about - the client lets it play out on the map first.
+      const where = { planetId: e.planetId ?? null, ...(e.at ? { at: e.at } : {}) };
       for (const h of ids) {
         if (!humans.has(h)) continue;
         for (const o of ids) {
           if (o === h) continue;
           if (o === ALIEN_ID) {
-            want(h, o, left(o) === 0 ? 'alien.defeat' : 'alien.attack');
-            call(h, o, left(o) === 0 ? 'call.lose' : 'call.engage');
+            want(h, o, left(o) === 0 ? 'alien.defeat' : 'alien.attack', { where });
+            call(h, o, left(o) === 0 ? 'call.lose' : 'call.engage', { where });
             continue;
           }
           if (!bot(o)) continue;
-          call(h, o, left(o) === 0 ? 'call.lose' : left(h) === 0 ? 'call.win' : 'call.engage');
-          const ctx = { planet: planet?.name ?? e.params.near ?? null, ship: e.at ? null : shipAt(o, e.planetId) };
+          call(h, o, left(o) === 0 ? 'call.lose' : left(h) === 0 ? 'call.win' : 'call.engage', { where });
+          const ctx = { planet: planet?.name ?? e.params.near ?? null, ship: e.at ? null : shipAt(o, e.planetId), where };
           if (!st.met[`${o}>${h}`]) want(h, o, 'war', ctx);
           if (left(o) === 0) want(h, o, 'defeat', ctx);
           else if (left(h) === 0) want(h, o, 'victory', ctx);
@@ -109,8 +111,10 @@ export function radioTurn(game, entries, rand = Math.random) {
     } else if (e.type === 'invade') {
       const [taker, loser] = e.playerIds || [];
       const name = planetOf(e.planetId)?.name ?? null;
-      if (bot(taker) && humans.has(loser)) want(loser, taker, 'victory', { planet: name, ship: shipAt(taker, e.planetId) });
-      if (bot(loser) && humans.has(taker)) want(taker, loser, 'defeat', { planet: name });
+      // After the battle over the planet, if there was one - the same place.
+      const where = { planetId: e.planetId ?? null };
+      if (bot(taker) && humans.has(loser)) want(loser, taker, 'victory', { planet: name, ship: shipAt(taker, e.planetId), where });
+      if (bot(loser) && humans.has(taker)) want(taker, loser, 'defeat', { planet: name, where });
     } else if (e.type === 'diplomacy') {
       if (e.key === 'log.alliance' || e.key === 'log.allianceSecret') {
         const a = byName(e.params?.a), b = byName(e.params?.b);
@@ -143,6 +147,9 @@ export function radioTurn(game, entries, rand = Math.random) {
       line: { say: clip.say, voice: clip.voice, speed: clip.speed },
       important, ...(short ? { short: true } : {})
     };
+    // Tied to a battle on the map: spoken when it is over - only "Open fire!"
+    // and the like at its start.
+    if (pick.ctx?.where) msg.where = { ...pick.ctx.where, when: pick.event === 'call.engage' ? 'start' : 'end' };
     // Sometimes with names - the fixed clip stays as the fallback.
     if (!short) {
       const named = namedLine(radioVoices()[speaker], pick, {
