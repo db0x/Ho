@@ -365,14 +365,17 @@ Now and then an AI colony gets on the radio – with a voice of its own for each
 personality, in English: when it first clashes with you, attacks your planets,
 takes one or loses one, allies with you or gives notice. The aliens speak up
 too, in a language nobody understands. What is said also shows on the comms,
-marked 📻 – the ▶ next to it plays it once more. A line about a battle comes once
+marked 📻 – the ▶ next to it plays it once more, the crosshair takes you to the planet
+it is about. A line about a battle comes once
 that battle has played out on the map. Many lines name names – your
 planet, you, the colony or its destroyer: *"Kepler Prime is mine now, Olena."* In the thick of a battle with you there are short calls on top –
 *Open fire!*, *Jackpot!*, *Breach!* – those only sound.
 
 Your own fleets answer too, short and snappy, each with a voice of its own: when
 you pick one (*"Yes?"*), send it off (*"On it."*), into battle (*"Charge!"*), to
-settle a free planet (*"New home!"*), after a foreign fleet or into a wormhole – right away or not at all, not every time, and with over a hundred
+settle a free planet (*"New home!"*), after a foreign fleet or into a wormhole.
+Pick one of your planets with a shipyard and its dock master reports in, by name
+(*"Kepler Prime shipyard ready."*) – right away or not at all, not every time, and with over a hundred
 lines rarely the same twice.
 
 It stays sparse: only what concerns you, at most one line per turn (the most

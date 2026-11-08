@@ -127,6 +127,43 @@ assert(r.code === 200 && JSON.parse(r.body).vulture?.war?.[0]?.file?.startsWith(
   assert(m.line?.say && radioManifest().conqueror.victory.some(c => c.file === m.file), 'the fixed line stays as fallback');
 }
 
+// ------------------------------------------------- the shipyard answers
+const { radioHandlers } = await import('../server/hub/radio.js');
+const { yardLine } = await import('../server/radio/chatter.js');
+const yardGame = () => {
+  const g = createGame('Yard');
+  g.settings.seed = 5;
+  addPlayer(g, { name: 'Олена' });
+  addPlayer(g, { name: 'Bot', isBot: true, persona: 'raider' });
+  startGame(g);
+  return g;
+};
+const ask = (g, me, planetId, c = {}) => new Promise((ok) => {
+  const sent = [];
+  radioHandlers.radioLine({ c, game: g, me, ws: { readyState: 1, send: s => sent.push(JSON.parse(s)) } },
+    { t: 'radioLine', kind: 'yard', planetId, ask: 7 });
+  setTimeout(() => ok(sent), 300);
+});
+{
+  const g = yardGame();
+  const [h, bot] = g.players;
+  const home = g.galaxy.planets[h.homeworld];
+  const y = yardLine(g, h, home.id, () => 0);
+  assert(y?.named?.say.includes(speakable(home.name)) && y.named.text.includes(home.name) && y.short && y.crew,
+    `the yard names its planet (${y?.named?.say})`);
+  assert(y.line?.say && radioManifest()[y.speaker]?.select.some(c => c.file === y.file), 'with a fixed line as fallback');
+  assert(yardLine(g, h, home.id, () => 0.9).speaker === y.speaker, 'the same planet, the same voice');
+  assert(!yardLine(g, h, g.galaxy.planets[bot.homeworld].id), 'a foreign planet: no yard');
+  assert(!yardLine(g, bot && null, home.id), 'nobody: no yard');
+  const sent = await ask(g, h, home.id);
+  assert(sent.length === 1 && sent[0].file?.startsWith('tts/') && sent[0].ask === 7 && sent[0].crew && sent[0].text.includes(home.name),
+    `asked: answered by name, spoken (${JSON.stringify(sent[0])})`);
+  const again = await ask(g, h, home.id, { radioLineAt: Date.now() });
+  assert(!again.length, 'asked again right away: no second answer');
+  g.settings.radio = false;
+  assert(!(await ask(g, h, home.id)).length, 'radio switched off in the lobby: no yard');
+}
+
 // ------------------------------------------------ the service goes away
 await new Promise(ok => { fake.closeAllConnections?.(); fake.close(ok); });
 failed = false;
@@ -140,6 +177,15 @@ await speak('Kepler is mine now, Olena.', 'bm_george', 1).then(() => {}, () => a
 fs.unlinkSync(ttsFile(fixed[6].key));
 r = await get(`/api/radio/${fixed[6].file}`);
 assert(r.code === 503, `an uncached line while down: 503 (${r.code})`);
+{
+  // The yard while the service is down: the fixed line (prepared), not the name.
+  const g = yardGame();
+  const [h] = g.players;
+  g.galaxy.planets[h.homeworld].name = 'Neverspoken Prime';
+  const sent = await ask(g, h, h.homeworld);
+  assert(sent.length === 1 && sent[0].file && !sent[0].text.includes('Neverspoken'),
+    `service down: the yard's fixed line instead (${sent[0]?.text})`);
+}
 // ... and comes back.
 await new Promise(ok => fake.listen(port, '127.0.0.1', ok));
 await checkTts();

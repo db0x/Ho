@@ -109,6 +109,7 @@ const battle = (planet, sides) => ({
   ], always);
   const m = lineOf(out, h.id);
   assert(out.size === 1 && m?.speaker === 'alien' && is(m, 'alien', 'appear'), `aliens first (${m?.file})`);
+  assert(m.where?.planetId === home.id, 'the aliens\' planet goes along - to jump there from the comms');
   assert(m.from === ALIEN_ID && m.name === null, 'aliens without a name');
 }
 

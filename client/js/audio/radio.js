@@ -61,6 +61,9 @@ const PROFILES = {
   // Your own crew: close by, clean, just a click at the end.
   crew:       { pitch: 1, band: [200, 4200], crunch: 1.4, crackle: 0, hiss: 0.008,
                 roger: [[2600, 0.025]], squelch: 0.12 },
+  // The shipyard down on the planet: a little further away, a wider hum.
+  yard:       { pitch: 1, band: [240, 3600], crunch: 1.8, crackle: 0.05, hiss: 0.02,
+                roger: [[1800, 0.03], [2400, 0.03]], squelch: 0.18 },
   alien:      { pitch: 0.8, band: [180, 4200], crunch: 3, crackle: 0.7, hiss: 0.06,
                 ring: 52, warble: 70, swarm: [[0.93, 0.035, 0.5], [1.09, 0.06, 0.4], [0.86, 0.09, 0.3]], crush: 5,
                 roger: 'chirp' },
@@ -133,7 +136,8 @@ class Radio {
 
   deliver(m) {
     if (this.level === 'off' || (this.level === 'important' && !m.important)) return false;
-    const item = { speaker: m.speaker, clip: { file: m.file ?? null, v: m.v ?? null, text: m.text }, from: m.from, name: m.name, short: !!m.short };
+    const item = { speaker: m.speaker, clip: { file: m.file ?? null, v: m.v ?? null, text: m.text }, from: m.from, name: m.name, short: !!m.short,
+      planetId: m.where?.planetId ?? null };
     if (!m.file || !sfx.on) {
       if (!item.short) this.emit({ ...item, textOnly: !m.file });
       return false;

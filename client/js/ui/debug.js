@@ -63,8 +63,8 @@ export class DebugDialog {
     const m = await radio.load();
     const el = this.modal?.querySelector('.debug-radio');
     if (!el) return;
-    // The crew has four voices with the same lines - the first stands for all.
-    const rows = Object.entries(m).filter(([speaker]) => !/^crew[2-9]/.test(speaker)).map(([speaker, events]) => `<div class="debug-radio-row">
+    // Crew and shipyard have several voices with the same lines - the first stands for all.
+    const rows = Object.entries(m).filter(([speaker]) => !/^(crew|yard)[2-9]/.test(speaker)).map(([speaker, events]) => `<div class="debug-radio-row">
       <span>${speaker === 'alien' ? t('alien.name') : hasKey(`persona.${speaker}`) ? t(`persona.${speaker}`) : speaker}</span>
       <div class="debug-sounds">${Object.entries(events).flatMap(([event, clips]) => clips.map((c, n) =>
         `<button type="button" class="tiny" data-radio="${speaker}/${event}/${n}" data-sfx="none" title="${c.text.replace(/"/g, '&quot;')}">${event} ${n + 1}</button>`)).join('')}</div>

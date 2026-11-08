@@ -7,6 +7,12 @@ import { fmt1, escapeHtml } from './format.js';
 
 const $ = s => document.querySelector(s);
 
+// A crosshair: to the planet a radio line is about.
+const CROSSHAIR = '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">'
+  + '<circle cx="8" cy="8" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  + '<path d="M8 0.8v4M8 11.2v4M0.8 8h4M11.2 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+  + '<circle cx="8" cy="8" r="1.1" fill="currentColor"/></svg>';
+
 export const commsMethods = {
   /**
    * A log entry in the chosen language. The server only sends keys and
@@ -66,8 +72,8 @@ export const commsMethods = {
    * bottom) and pops up as a message - a tap opens the comms to answer.
    * Radio chatter of the AI colonies stands in as a subtitle - quietly, it
    * neither counts as unread nor pops up; a spoken one has a button to hear
-   * it again (onReplay).
-   * @param {{fromId?: string, system?: boolean, mine?: boolean, radio?: boolean, onReplay?: Function}} o
+   * it again (onReplay), one about a planet a button to go there (onGoto).
+   * @param {{fromId?: string, system?: boolean, mine?: boolean, radio?: boolean, onReplay?: Function, onGoto?: Function}} o
    */
   chat(from, text, o = {}) {
     const box = $('#chat-list');
@@ -75,17 +81,19 @@ export const commsMethods = {
     div.className = 'logline' + (o.system ? ' sysline' : '') + (o.radio ? ' radioline' : '');
     const color = this.view?.players.find(p => p.id === o.fromId)?.color;
     div.innerHTML = `${o.radio ? '<span class="radio-mark" aria-hidden="true">📻</span> ' : ''}<b${color ? ` style="color:${color}"` : ''}>${escapeHtml(from)}:</b> ${escapeHtml(text)}`;
-    if (o.onReplay) {
+    const button = (glyph, label, fn, sfx, cls = '') => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'radio-replay';
-      b.dataset.sfx = 'none';
-      b.textContent = '▶';
-      b.title = t('radio.replay');
-      b.setAttribute('aria-label', t('radio.replay'));
-      b.onclick = () => o.onReplay();
+      b.className = 'radio-replay' + (cls ? ' ' + cls : '');
+      if (sfx) b.dataset.sfx = sfx;
+      b.innerHTML = glyph;
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.onclick = () => fn();
       div.appendChild(b);
-    }
+    };
+    if (o.onReplay) button('▶', t('radio.replay'), o.onReplay, 'none');
+    if (o.onGoto) button(CROSSHAIR, t('radio.goto'), o.onGoto, null, 'radio-goto');
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
     if (o.system || o.mine || o.radio || this.chatVisible()) return;

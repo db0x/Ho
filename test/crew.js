@@ -21,7 +21,7 @@ register('data:text/javascript,' + encodeURIComponent(`
 const { radioManifest } = await import('../server/radio/index.js');
 const { radio } = await import('../client/js/audio/radio.js');
 const { sfx } = await import('../client/js/audio/sfx.js');
-const { crewSay, orderKind, hasColonists } = await import('../client/js/audio/crew.js');
+const { crewSay, orderKind, hasColonists, yardSay, crewReply, setCrewRequest } = await import('../client/js/audio/crew.js');
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };
@@ -111,6 +111,35 @@ radio.level = 'off';
 assert(!(await crewSay('attack', fighters)), 'radio off: no crew');
 Math.random = random;
 
+// ------------------------------------------------- the shipyard answers
+{
+  const requests = [];
+  setCrewRequest(m => requests.push(m));
+  const real = Math.random;
+  Math.random = () => 0;
+  radio.level = 'all';
+  now += 20000;
+  assert(yardSay(4) && requests.length === 1 && requests[0].t === 'radioLine' && requests[0].kind === 'yard' && requests[0].planetId === 4,
+    'an own planet picked: the yard is asked');
+  const reply = { t: 'radio', crew: true, speaker: 'yard1', file: 'tts/0123456789abcdef0123.mp3', v: 'x', text: 'Kepler Prime shipyard ready.', ask: requests[0].ask };
+  const before = played.length;
+  assert(crewReply(reply) && played.length === before + 1 && played.at(-1).speaker === 'yard1', 'its answer in time: played');
+  assert(!crewReply(reply), 'the same answer twice: once');
+  now += 7000;
+  assert(!yardSay(4), 'the same planet again soon: not asked');
+  assert(yardSay(5) && requests.length === 2, 'another planet: asked');
+  now += 4000;
+  assert(!crewReply({ ...reply, ask: requests[1].ask }), 'its answer too late: dropped');
+  now += 10000;
+  yardSay(6);
+  assert(!crewReply({ ...reply, ask: 999 }), 'an answer to another question: dropped');
+  radio.level = 'important';
+  now += 20000;
+  assert(!yardSay(8), 'radio on "important": no yard');
+  radio.level = 'all';
+  Math.random = real;
+}
+
 // ----------------------------------------- the AI's lines on this side
 // Without sound (no speech service, or the sound off here) a long line still
 // comes as text; a short call does not. A spoken one can be played again.
@@ -121,9 +150,10 @@ Math.random = random;
   radio.push = item => queued.push(item);
   radio.level = 'all';
   sfx.on = true;
-  radio.receive({ speaker: 'raider', from: 'p2', name: 'Lady Solderpot', text: 'Hey, Olena!', important: true, textOnly: true });
+  radio.receive({ speaker: 'raider', from: 'p2', name: 'Lady Solderpot', text: 'Hey, Olena!', important: true, textOnly: true, where: { planetId: 3 } });
   assert(shown.length === 1 && shown[0].textOnly && shown[0].clip.text === 'Hey, Olena!' && !queued.length,
     'no file: shown as text right away, nothing played');
+  assert(shown[0].planetId === 3, 'its planet goes along to the comms (a jump there)');
   radio.receive({ speaker: 'raider', from: 'p2', text: 'Jackpot!', short: true });
   assert(shown.length === 1 && !queued.length, 'a short call without sound: left out');
   radio.receive({ speaker: 'raider', from: 'p2', name: 'L', text: 'Ha!', file: 'tts/0123456789abcdef0123.mp3', v: 'x', important: false });

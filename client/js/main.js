@@ -27,7 +27,7 @@ import { SpaceView } from './render/space.js';
 import { sfx, bindUi, LOG_SFX } from './audio/sfx.js';
 import { Voice } from './voice.js';
 import { radio } from './audio/radio.js';
-import { crewSay, orderKind, hasColonists } from './audio/crew.js';
+import { crewSay, orderKind, hasColonists, yardSay, crewReply, setCrewRequest } from './audio/crew.js';
 import { enhanceSelects, syncSelects } from './ui/select.js';
 import { compact } from './ui/viewport.js';
 import { bindTips } from './ui/tips.js';
@@ -193,6 +193,11 @@ const app = {
     if (sel?.type === 'fleet' && (app.selection?.type !== 'fleet' || app.selection.id !== sel.id) && !app.spectator) {
       const f = map?.view?.fleets.find(x => x.id === sel.id);
       if (f?.mine) crewSay(hasColonists(f) ? 'selectColony' : 'select', f);
+    }
+    // An own planet with a shipyard newly picked: its yard may answer, by name.
+    if (sel?.type === 'planet' && (app.selection?.type !== 'planet' || app.selection.id !== sel.id) && !app.spectator) {
+      const p = map?.view?.planets[sel.id];
+      if (p && p.owner === map.view.you && p.pop >= 1) yardSay(sel.id);
     }
     app.selection = sel;
     if (map) { map.selection = sel; map.poke(); }
@@ -519,15 +524,25 @@ net.on('voice', (m) => voice.onState(m));
 // comms when the line is actually spoken - or right away as text, when there
 // is no sound for it; a spoken line can be played again from there. Short
 // calls ("Open fire!") only sound, they would flood the comms.
-net.on('radio', (m) => radio.receive(m));
+net.on('radio', (m) => m.crew ? crewReply(m) : radio.receive(m));
+setCrewRequest(m => net.send(m));
 net.on('radioStatus', (m) => lobby.setRadioStatus(m.radio));
 radio.blocked = () => !!voice.floor;
 radio.moment = (where, when) => map?.battleMoment?.(where, when) ?? null;
 radio.onLine((item) => {
   if (item.debug || item.short || item.replay) return;
   const alien = item.speaker === 'alien';
-  hud?.chat(alien ? t('alien.name') : item.name || '?', alien ? t('radio.alien') : item.clip.text,
-    { fromId: alien ? null : item.from, radio: true, onReplay: item.clip.file ? () => radio.replay(item) : null });
+  hud?.chat(alien ? t('alien.name') : item.name || '?', alien ? t('radio.alien') : item.clip.text, {
+    fromId: alien ? null : item.from, radio: true,
+    onReplay: item.clip.file ? () => radio.replay(item) : null,
+    // About a planet: a jump there, as from the log.
+    onGoto: item.planetId != null ? () => {
+      const p = map?.view?.planets[item.planetId];
+      if (!p) return;
+      map.focus(p, app.freeArea());
+      app.setSelection({ type: 'planet', id: p.id });
+    } : null
+  });
 });
 net.on('rtc', (m) => voice.onSignal(m));
 

@@ -383,7 +383,8 @@ Ab und zu meldet sich eine KI-Kolonie über Funk – jede Persönlichkeit mit ei
 Stimme, auf Englisch: beim ersten Zusammenstoß mit dir, wenn sie deine Planeten
 angreift, einen erobert oder verliert, sich mit dir verbündet oder kündigt. Auch
 die Aliens melden sich, in einer Sprache, die niemand versteht. Was gesagt wird,
-steht zusätzlich im Funk, mit 📻 markiert – das ▶ daneben spielt ihn noch einmal ab. Ein Spruch zu einem
+steht zusätzlich im Funk, mit 📻 markiert – das ▶ daneben spielt ihn noch einmal ab, das Fadenkreuz führt zum
+Planeten, um den es geht. Ein Spruch zu einem
 Kampf kommt erst, wenn dieser Kampf auf der Karte ausgefochten ist. Viele Sprüche nennen Namen – deinen Planeten, dich, die Kolonie oder ihren
 Träger: *„Kepler Prime is mine now, Olena.“* Mitten in einer Schlacht mit dir
 kommen kurze Rufe dazu – *Open fire!*, *Jackpot!*, *Breach!* –, die nur zu hören sind.
@@ -391,7 +392,8 @@ kommen kurze Rufe dazu – *Open fire!*, *Jackpot!*, *Breach!* –, die nur zu h
 Auch deine eigenen Flotten antworten, kurz und knackig, jede mit eigener Stimme:
 wenn du eine auswählst (*„Yes?“*), losschickst (*„On it.“*), in den Kampf
 (*„Charge!“*), zum Besiedeln eines freien Planeten (*„New home!“*), hinter einer
-fremden Flotte her oder ins Wurmloch – sofort oder gar
+fremden Flotte her oder ins Wurmloch. Wählst du einen deiner Planeten mit Werft,
+meldet sich ihr Dockmeister mit Namen (*„Kepler Prime shipyard ready.“*) – sofort oder gar
 nicht, nicht jedes Mal, und bei über hundert Sprüchen selten zweimal derselbe.
 
 Es bleibt sparsam: nur was dich betrifft, höchstens ein Spruch pro Runde (der

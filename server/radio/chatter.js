@@ -126,7 +126,9 @@ export function radioTurn(game, entries, rand = Math.random) {
       }
     } else if (e.type === 'alien') {
       const event = e.key === 'log.alienRift' ? 'alien.appear' : e.key === 'log.alienBrokeOff' ? 'alien.defeat' : null;
-      if (event) for (const h of e.playerIds || []) want(h, ALIEN_ID, event);
+      // The planet they turned up at - no battle to wait for, but a place to look at.
+      const ctx = e.planetId != null ? { where: { planetId: e.planetId } } : {};
+      if (event) for (const h of e.playerIds || []) want(h, ALIEN_ID, event, ctx);
     }
   }
 
@@ -147,8 +149,9 @@ export function radioTurn(game, entries, rand = Math.random) {
       line: { say: clip.say, voice: clip.voice, speed: clip.speed },
       important, ...(short ? { short: true } : {})
     };
-    // Tied to a battle on the map: spoken when it is over - only "Open fire!"
-    // and the like at its start.
+    // Tied to a place on the map: spoken once its battle is over (if there is
+    // one there) - only "Open fire!" and the like at its start. The comms
+    // offer a jump to that planet.
     if (pick.ctx?.where) msg.where = { ...pick.ctx.where, when: pick.event === 'call.engage' ? 'start' : 'end' };
     // Sometimes with names - the fixed clip stays as the fallback.
     if (!short) {
@@ -229,6 +232,29 @@ export function devRadioLine(game, me, rand = Math.random) {
     }
   }
   return null;
+}
+
+/**
+ * The shipyard of an own planet answers when the planet is picked - "Kepler
+ * Prime shipyard ready." Every planet keeps one of the yard's voices. With
+ * the fixed line (no name) as the fallback; null if the planet has no
+ * shipyard of this player.
+ */
+export function yardLine(game, me, planetId, rand = Math.random) {
+  const planet = game.galaxy.planets.find(q => q.id === planetId);
+  const yard = radioVoices().yard;
+  if (!me || !planet || planet.owner !== me.id || !(planet.pop >= 1) || !yard?.voices?.length) return null;
+  const i = Math.abs(Number(planetId) || 0) % yard.voices.length;
+  const speaker = `yard${i + 1}`;
+  const clips = radioManifest()[speaker]?.select;
+  if (!clips?.length) return null;
+  const clip = clips[Math.floor(rand() * clips.length)];
+  const named = namedLine({ ...yard, voice: yard.voices[i] }, { event: 'select' }, { planet: planet.name }, rand, true);
+  return {
+    t: 'radio', from: null, name: null, speaker, file: clip.file, v: clip.key, text: clip.text,
+    short: true, crew: true, line: { say: clip.say, voice: clip.voice, speed: clip.speed },
+    ...(named ? { named } : {})
+  };
 }
 
 /** The voice of a sender: its persona, or the aliens. */

@@ -1491,5 +1491,7 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 #chat-list .radio-replay { margin-left: 6px; padding: 0 6px; min-height: 0; line-height: 1.5; font-size: 10px;
   font-style: normal; vertical-align: 1px; opacity: .8; }
 #chat-list .radio-replay:hover { opacity: 1; }
+#chat-list .radio-goto { color: var(--gold); padding: 0 4px; }
+#chat-list .radio-goto .ico { width: 12px; height: 12px; vertical-align: -2px; }
 .debug-radio { display: grid; gap: 10px; }
 .debug-radio-row > span { display: block; margin-bottom: 4px; color: var(--ink-dim); font-size: 13px; }

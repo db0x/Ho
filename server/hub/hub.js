@@ -19,6 +19,7 @@ import { newsHandlers, VERSION, RELEASES } from './news.js';
 import { rankingHandlers } from './ranking.js';
 import { spectatorHandlers, paceSpectatorGames } from './spectators.js';
 import { voiceHandlers, voiceOffer, releaseFloor } from './voice.js';
+import { radioHandlers } from './radio.js';
 import { radioManifest } from '../radio/index.js';
 import { startTts, ttsStatus, onTtsStatus } from '../radio/tts.js';
 
@@ -28,7 +29,7 @@ import { startTts, ttsStatus, onTtsStatus } from '../radio/tts.js';
  */
 const HANDLERS = new Map(Object.entries({
   ...lobbyHandlers, ...matchHandlers, ...spectatorHandlers, ...voiceHandlers,
-  ...friendHandlers, ...accountHandlers, ...newsHandlers, ...rankingHandlers, ...adminHandlers, ...devHandlers
+  ...friendHandlers, ...accountHandlers, ...newsHandlers, ...rankingHandlers, ...adminHandlers, ...devHandlers, ...radioHandlers
 }));
 export const MESSAGE_TYPES = [...HANDLERS.keys()];
 

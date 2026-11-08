@@ -1,5 +1,5 @@
 {
-  "_comment": "What the AI colonies and the aliens say over the radio. One speaker per AI persona (server/ai/personas.js) plus the aliens. voice: a Kokoro voice (am_/af_ American, bm_/bf_ British, m male, f female), speed: 1 = normal. Each event has a few variants. Events of the colonies: war (first battle against you), attack (later battles at your planets), defeat (it loses a battle or a planet to you), victory (it beats you or takes your planet), ally (alliance with you), betray (it gives notice on your alliance). Short calls in any battle with you: engage, win, lose (aliens: engage, lose). The aliens speak no human language - 'text' is what the subtitle shows.  'templates': sentences with names, spoken on demand by the speech service (tts/) - {name} the speaker's colony, {player} the listener, {planet} the planet it is about, {ship} a named ship (destroyer) of the speaker there. A template is only used when all its names are known. Every line is spoken by the speech service (tts/) and cached (server/radio/tts.js); the server prepares all fixed lines in the background at start. To hear new lines before they go live: python tools/radio/preview.py (see there). 'crew': the player's own fleets answering orders - several voices ('voices'), every fleet keeps one; events: select, selectColony (a fleet with colonists), move, attack, colonize, chase (intercept a fleet), hole (into a wormhole).",
+  "_comment": "What the AI colonies and the aliens say over the radio. One speaker per AI persona (server/ai/personas.js) plus the aliens. voice: a Kokoro voice (am_/af_ American, bm_/bf_ British, m male, f female), speed: 1 = normal. Each event has a few variants. Events of the colonies: war (first battle against you), attack (later battles at your planets), defeat (it loses a battle or a planet to you), victory (it beats you or takes your planet), ally (alliance with you), betray (it gives notice on your alliance). Short calls in any battle with you: engage, win, lose (aliens: engage, lose). The aliens speak no human language - 'text' is what the subtitle shows.  'templates': sentences with names, spoken on demand by the speech service (tts/) - {name} the speaker's colony, {player} the listener, {planet} the planet it is about, {ship} a named ship (destroyer) of the speaker there. A template is only used when all its names are known. Every line is spoken by the speech service (tts/) and cached (server/radio/tts.js); the server prepares all fixed lines in the background at start. To hear new lines before they go live: python tools/radio/preview.py (see there). 'crew': the player's own fleets answering orders - several voices ('voices'), every fleet keeps one; events: select, selectColony (a fleet with colonists), move, attack, colonize, chase (intercept a fleet), hole (into a wormhole). 'yard': the shipyard of an own planet answering when the planet is picked - two voices, every planet keeps one; its templates name the planet ({planet}), its lines are the fallback without names.",
   "speakers": {
     "conqueror": {
       "voice": "bm_george",
@@ -723,6 +723,43 @@
           "Geronimo!",
           "Down the hole!",
           "Weird..."
+        ]
+      }
+    },
+    "yard": {
+      "voices": [
+        "am_liam",
+        "bf_isabella"
+      ],
+      "speed": 1.08,
+      "lines": {
+        "select": [
+          "Shipyard ready.",
+          "Docks standing by.",
+          "Slipways clear.",
+          "What shall we build?",
+          "Yards ready.",
+          "Dock master here.",
+          "Ready to build.",
+          "Hammers ready.",
+          "Shipyard online.",
+          "Order something!"
+        ]
+      },
+      "templates": {
+        "select": [
+          "{planet} shipyard ready.",
+          "{planet} docks standing by.",
+          "Shipyard {planet}, ready to build.",
+          "{planet} yards, at your service.",
+          "{planet} here. What shall we build?",
+          "Docks of {planet}, awaiting orders.",
+          "{planet}, slipways clear.",
+          "{planet} yards ready.",
+          "This is {planet} shipyard.",
+          "{planet} docks. Build what?",
+          "{planet}, hammers ready.",
+          "{planet} shipyard online."
         ]
       }
     }

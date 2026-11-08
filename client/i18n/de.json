@@ -572,6 +572,7 @@
   "radio.off": "Aus",
   "radio.alien": "[Alien-Funkspruch]",
   "radio.replay": "Nochmal anhören",
+  "radio.goto": "Zum Planeten",
   "radio.note.disabled": "Hinweis für Admins: Die Stimmen der Funksprüche sind auf diesem Server abgeschaltet (HO_SPEECH=off) – sie kommen nur als Text.",
   "radio.note.off": "Hinweis für Admins: Kein Sprachdienst eingerichtet (HO_TTS) – die Funksprüche kommen nur als Text.",
   "radio.note.down": "Hinweis für Admins: Der Sprachdienst ist nicht erreichbar – die Funksprüche kommen nur als Text, bis er wieder da ist.",

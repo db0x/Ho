@@ -12,6 +12,10 @@
 //     on the CB radio
 // The lines are in server/radio/lines.json (speaker crew), spoken by the
 // speech service like all the radio chatter.
+//
+// The shipyard of an own planet answers too when the planet is picked -
+// with its name ("Kepler Prime shipyard ready."), so the server has it
+// spoken (yardSay); an answer that comes too late is dropped.
 import { radio } from './radio.js';
 
 /** How often and how far apart: chance, and the least time since the last answer of that kind. */
@@ -26,6 +30,10 @@ const RULES = {
 };
 // The same fleet picked again within this time stays quiet.
 const SAME_FLEET_MS = 12000;
+// The shipyard: as often as picking a fleet, the same planet not again soon.
+const YARD = { chance: 0.6, gap: 4000 };
+// A shipyard's answer later than this after the click is no answer any more.
+const YARD_ANSWER_MS = 3000;
 // How many of the last lines are not repeated (per kind).
 const MEMORY = 6;
 
@@ -33,6 +41,8 @@ const last = new Map();          // kind -> time of the last answer
 const recent = new Map();        // kind -> files heard lately
 const picked = new Map();        // fleet id -> when it last answered to being picked
 let lastAny = 0;
+let ask = 0, asked = null;       // the shipyard's pending question: {ask, at}
+let request = null;              // (msg) => sends to the server - set by main.js
 
 /** The voice of a fleet: the same one for as long as the fleet lives. */
 function voiceOf(fleetId, voices) {
@@ -68,6 +78,36 @@ export async function crewSay(kind, fleet) {
   lastAny = now;
   if (picking) picked.set(fleet.id, now);
   recent.set(kind, [...heard, lines.indexOf(clip)].slice(-MEMORY));
+  return true;
+}
+
+/** How a shipyard question gets to the server. */
+export function setCrewRequest(fn) { request = fn; }
+
+/**
+ * An own planet with a shipyard is picked: maybe its yard answers, by name.
+ * Asks the server, which has the line spoken; the answer comes as crewReply.
+ */
+export function yardSay(planetId) {
+  if (!request || radio.level !== 'all' || !Number.isInteger(planetId)) return false;
+  const now = Date.now();
+  const key = 'planet:' + planetId;
+  if (now - (last.get('yard') ?? 0) < YARD.gap || now - lastAny < 800) return false;
+  if (now - (picked.get(key) ?? 0) < SAME_FLEET_MS) return false;
+  if (Math.random() >= YARD.chance) return false;
+  last.set('yard', now);
+  picked.set(key, now);
+  asked = { ask: ++ask, at: now };
+  request({ t: 'radioLine', kind: 'yard', planetId, ask });
+  return true;
+}
+
+/** The server's answer to a click (a radio message with crew: true) - played if still in time. */
+export function crewReply(m) {
+  if (!asked || m.ask !== asked.ask || Date.now() - asked.at > YARD_ANSWER_MS || !m.file) return false;
+  asked = null;
+  if (!radio.instant({ speaker: m.speaker, clip: { file: m.file, v: m.v, text: m.text }, from: null, name: null, short: true, crew: true })) return false;
+  lastAny = Date.now();
   return true;
 }
 
