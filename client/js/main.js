@@ -373,12 +373,22 @@ net.on('friendLookup', (m) => friends.onLookup(m));
 net.on('friendHistory', (m) => friends.onHistory(m));
 net.on('friendMsg', async (m) => {
   const text = await friends.onMessage(m);
-  // In a game the start menu is out of sight - a toast says who wrote.
-  if (!m.msg.mine && text != null && hud && $('#screen-menu').classList.contains('hidden')) {
+  // In a game the friends are a window behind a button - unless that
+  // conversation is open, a toast says who wrote, and a click answers.
+  if (!m.msg.mine && hud && friends.inGame && !friends.reading(m.with)) {
     const who = friends.data.friends.find(p => p.handle === m.with)?.name || '#' + m.with;
-    hud.toast(t('friends.toast', { name: who, text: text.slice(0, 80) }), '#8ad6ff');
+    const line = text != null ? t('friends.toast', { name: who, text: text.slice(0, 80) }) : t('friends.toastLocked', { name: who });
+    hud.toast(line, '#8ad6ff', () => openFriends(m.with), '↩ ' + t('chat.reply'));
   }
 });
+
+/** The friends window in the game - on a phone no other sheet stays open beneath it. */
+function openFriends(handle = null) {
+  if (narrow.matches) app.showSheet?.('');
+  friends.show(true, handle);
+}
+friends.onOnline = (p) => hud?.toast(t('friends.nowOnline', { name: p.name }), '#7fd99a',
+  () => openFriends(p.handle), '✉ ' + t('friends.write'));
 net.on('adminMsgSent', (m) => admin.messageSent(m));
 net.on('adminInviteCreated', (m) => admin.inviteCreated(m));
 // An admin speaks to everyone in the game: a banner that has to be
@@ -448,6 +458,7 @@ net.on('view', (m) => {
     map.resize();
     hud = new Hud(app);
     bindGame();
+    friends.setInGame(true);
     requestAnimationFrame(loop);
     if (view.turn <= 1) sfx.play('start');
   }
@@ -625,6 +636,7 @@ function bindGame() {
     if (narrow.matches) showSheet(''); else showOpts(false);
     $('#help').classList.remove('hidden');
   };
+  $('#btn-friends').onclick = () => { if (friends.shown) friends.show(false); else openFriends(); };
   $('#btn-zoomin').onclick = () => map.zoomBy(1.25);
   $('#btn-zoomout').onclick = () => map.zoomBy(1 / 1.25);
   // Sheets on narrow devices: only one open at a time, controlled via the bar
@@ -640,6 +652,8 @@ function bindGame() {
       b.classList.toggle('active', (b.dataset.sheet || '') === (name || ''));
     }
     showOpts(name === 'opts');
+    // One sheet at a time - the friends window is one too ("Map" closes it as well).
+    if (narrow.matches || name) friends.show(false);
     if (name && name !== 'opts' && hud?.view) hud.update(hud.view);
     hud?.chatSeen();
   };

@@ -118,6 +118,11 @@
 
   <!-- Accounts only: friends found by their handle, their status and messages. -->
   <section id="friends-panel" class="menu-box friends-box hidden">
+    <!-- In a game the panel is a window (client/js/ui/friends.js, setInGame): its own bar to close it. -->
+    <div class="fr-gamebar">
+      <b data-i18n="friends.title"></b>
+      <button type="button" id="friends-close" class="icon-btn" data-i18n-attr="title:friends.close">&times;</button>
+    </div>
     <div class="friends-list-view">
       <h2 data-i18n="friends.title"></h2>
       <!-- The message key is not in this browser yet: the password opens it. -->
@@ -401,6 +406,8 @@
           <button id="btn-zoomin" data-i18n-attr="title:map.zoomIn"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
           <button id="btn-zoomout" data-i18n-attr="title:map.zoomOut"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
           <button id="btn-mine" data-sfx="none" aria-pressed="false" data-i18n-attr="title:map.mineTitle"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 14.6V1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.4 2.4h8.4l-2.1 3.1 2.1 3.1H4.4z" fill="currentColor"/></svg></button>
+          <!-- Accounts only: the friends and their messages, also during a game. -->
+          <button id="btn-friends" class="hidden" aria-expanded="false" data-i18n-attr="title:friends.button"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5.2" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.6 13.6c.5-2.6 2.2-4 4.4-4s3.9 1.4 4.4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11.4" cy="5.6" r="1.9" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11.8 9.6c1.5.2 2.4 1.3 2.8 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span class="badge friends-badge hidden"></span><span class="friends-dot hidden"></span></button>
           <button id="btn-mapopts" data-i18n-attr="title:map.options" aria-expanded="false" aria-haspopup="true"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12.60 8.00L15.20 8.00 M11.25 11.25L13.09 13.09 M8.00 12.60L8.00 15.20 M4.75 11.25L2.91 13.09 M3.40 8.00L0.80 8.00 M4.75 4.75L2.91 2.91 M8.00 3.40L8.00 0.80 M11.25 4.75L13.09 2.91" stroke="currentColor" stroke-width="2.6" stroke-linecap="butt"/></svg></button>
         </div>
         <div id="mapsettings" class="hidden">

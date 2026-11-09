@@ -262,6 +262,35 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .fc-code .fc-end a { color: var(--ink-faint); }
 .fc-code .fc-end a:hover, .fc-code .fc-end a[data-armed="1"] { color: var(--bad); }
 .fc-input { display: flex; gap: 8px; }
+/* In a game the panel is a window at the right, below the top bar - above
+   the docks (z 5-8), below the emoji palette and the confirmations. The
+   search and the account settings stay in the start menu. */
+.fr-gamebar { display: none; }
+.friends-box.in-game {
+  position: absolute; top: 72px; right: 12px; z-index: 9; width: min(360px, calc(100vw - 24px));
+  max-height: calc(100% - 90px); display: flex; flex-direction: column; padding: 0 16px 16px;
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow); animation: sel-in .11s ease-out;
+}
+.friends-box.in-game.closed { display: none; }
+.friends-box.in-game .fr-gamebar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  position: sticky; top: 0; z-index: 1; padding: 10px 0 8px; background: var(--panel-solid);
+}
+.friends-box.in-game .fr-gamebar b { color: var(--gold); }
+.friends-box.in-game h2, .friends-box.in-game .friends-list-view > .friends-search,
+.friends-box.in-game #friends-result, .friends-box.in-game #friends-outgoing,
+.friends-box.in-game #ranking-box, .friends-box.in-game #privacy-box,
+.friends-box.in-game #invite-box { display: none; }
+.friends-box.in-game #friends-list > h3:first-child { margin-top: 4px; }
+.friends-box.in-game .fc-log { height: min(340px, calc(100vh - 300px)); min-height: 140px; }
+#btn-friends { position: relative; }
+#btn-friends.open { border-color: var(--gold-dim); color: var(--gold); }
+#btn-friends .friends-badge { position: absolute; top: -6px; right: -6px; margin: 0; }
+#btn-friends .friends-dot {
+  position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--good); box-shadow: 0 0 6px var(--good);
+}
 /* Inviters only: their invite links, below the friends. */
 .invite-box { margin-top: 16px; padding-top: 2px; border-top: 1px solid var(--line); }
 .invite-box h3 { margin: 14px 0 6px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
@@ -1337,6 +1366,16 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
     max-height: 54vh; overflow-y: auto;
   }
   #mapsettings .chk { padding: 6px 0; }
+  /* The friends window is a sheet here, between the top bar and the bar below. */
+  .friends-box.in-game {
+    position: fixed; left: 0; right: 0; top: 54px; bottom: var(--bar); width: auto; max-height: none;
+    z-index: 11; border-radius: 14px 14px 0 0; border-bottom: none; overflow-y: auto;
+  }
+  .friends-box.in-game .friends-chat { flex: 1; min-height: 0; }
+  .friends-box.in-game .fc-log { flex: 1; height: auto; min-height: 120px; }
+  #btn-friends .friends-badge { top: 2px; right: 2px; }
+  /* Like for every other sheet: the map buttons make way. */
+  #screen-game:has(> .friends-box.in-game:not(.closed)) #mapcontrols { display: none; }
 
   /* Usable with the thumb: minimum sizes for everything touchable */
   button.tiny { padding: 8px 12px; font-size: 13px; }

@@ -5,6 +5,8 @@
 // The key is the account's: the sign-in page leaves it in this browser. If it
 // is not there (a session from before, a private window), the password
 // opens it here.
+// During a game the same panel is a window behind a button on the map, so
+// friends can still reach you there (setInGame).
 import { t, localeTag, onLocaleChange } from '../i18n.js';
 import { loadKey, dropKey, setupKey, encrypt, decrypt, safetyCode } from '../e2e.js';
 import { avatarHtml } from './avatar.js';
@@ -39,6 +41,13 @@ export class FriendsPanel {
     this.found = null;          // last lookup: { handle, user, relation }
     this.open = null;           // handle of the open conversation
     this.log = [];
+    // In a game the panel is a window behind a button on the map (setInGame).
+    this.inGame = false;
+    this.shown = false;         // the window is open (in a game only)
+    this.lastStatus = new Map();  // handle -> status of the last list
+    this.offlineAt = new Map();   // handle -> when they were last seen going offline
+    /** Hook for the game: a friend came online. */
+    this.onOnline = null;
 
     const input = $('#friends-handle');
     input.oninput = () => { input.value = input.value.toUpperCase().replace(/[^0-9A-Z#]/g, ''); };
@@ -78,6 +87,16 @@ export class FriendsPanel {
       this.renderCode();
     });
     onLocaleChange(() => this.render());
+    $('#friends-close').onclick = () => this.show(false);
+    // Escape in the game: from the conversation back to the list, then the
+    // window closes. Before the map, which would drop its selection - but the
+    // emoji palette closes first.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !this.inGame || !this.shown) return;
+      if (document.querySelector('.emoji-palette:not(.hidden)')) return;
+      e.stopPropagation();
+      if (this.open) this.openChat(null); else this.show(false);
+    }, true);
   }
 
   /**
@@ -90,9 +109,78 @@ export class FriendsPanel {
     this.handle = handle || null;
     $('#friends-panel').classList.toggle('hidden', !this.enabled);
     $('#screen-menu').classList.toggle('with-friends', this.enabled);
-    if (!this.enabled) return this.openChat(null);
+    this.paintButton();
+    if (!this.enabled) { this.show(false); return this.openChat(null); }
     this.key ||= await loadKey(handle);
     this.render();
+  }
+
+  // ------------------------------------------------------------ In the game
+
+  /**
+   * In a game the start menu is out of sight: the panel moves into the game
+   * screen and opens as a window from the friends button on the map. Same
+   * list, same conversation, same key - only the search and the account
+   * settings stay in the start menu.
+   */
+  setInGame(on) {
+    if (this.inGame === on) return;
+    const panel = $('#friends-panel');
+    this.inGame = on;
+    if (on) $('#screen-game').appendChild(panel);
+    else $('#screen-menu').insertBefore(panel, $('#admin-panel'));
+    panel.classList.toggle('in-game', on);
+    this.show(false);
+  }
+
+  /** Is the panel on screen? In the start menu always, in a game while the window is open. */
+  get visible() { return !document.hidden && (!this.inGame || this.shown); }
+
+  /** Opens or closes the window in the game - with a conversation, if a handle is given. */
+  show(open, handle = null) {
+    if (open && !this.enabled) return;
+    const was = this.shown;
+    this.shown = !!open;
+    $('#friends-panel').classList.toggle('closed', this.inGame && !this.shown);
+    if (handle) this.openChat(handle);
+    // Back to a conversation left open: what came meanwhile is read now.
+    else if (open && !was && this.open) this.openChat(this.open);
+    this.paintButton();
+  }
+
+  /** The button on the map: unread messages and requests, who is online. */
+  paintButton() {
+    const btn = $('#btn-friends');
+    if (!btn) return;
+    btn.classList.toggle('hidden', !this.enabled);
+    btn.classList.toggle('open', this.shown);
+    btn.setAttribute('aria-expanded', String(this.shown));
+    const d = this.data;
+    const unread = d.friends.reduce((a, p) => a + (p.unread || 0), 0) + d.incoming.length;
+    const online = d.friends.filter(p => p.status !== 'offline').length;
+    const badge = btn.querySelector('.friends-badge');
+    badge.textContent = unread > 9 ? '9+' : String(unread);
+    badge.classList.toggle('hidden', !unread);
+    btn.querySelector('.friends-dot').classList.toggle('hidden', !online || !!unread);
+    btn.title = online ? t('friends.buttonOnline', { n: online }) : t('friends.button');
+  }
+
+  /**
+   * Friends who come online while you play: a toast says so. Not for the
+   * first list (that is just how things are), and not for a reload - only
+   * after a minute away.
+   */
+  noticeOnline() {
+    const now = Date.now();
+    for (const p of this.data.friends) {
+      const before = this.lastStatus.get(p.handle);
+      this.lastStatus.set(p.handle, p.status);
+      if (before == null) { if (p.status === 'offline') this.offlineAt.set(p.handle, 0); continue; }
+      if (p.status === 'offline') { if (before !== 'offline') this.offlineAt.set(p.handle, now); continue; }
+      if (before !== 'offline') continue;
+      const away = now - (this.offlineAt.get(p.handle) ?? 0);
+      if (this.inGame && away > 60000) this.onOnline?.(p);
+    }
   }
 
   /**
@@ -160,6 +248,7 @@ export class FriendsPanel {
         : (this.found.relation === 'self' ? 'self' : 'none');
     }
     if (this.open && !this.data.friends.some(p => p.handle === this.open)) this.openChat(null);
+    this.noticeOnline();
     this.render();
   }
 
@@ -181,6 +270,7 @@ export class FriendsPanel {
 
   render() {
     if (!this.enabled) return;
+    this.paintButton();
     // WebCrypto exists only over HTTPS (and on localhost).
     const crypto = !!globalThis.crypto?.subtle;
     $('#friends-unlock').classList.toggle('hidden', !!this.key || !crypto);
@@ -270,11 +360,15 @@ export class FriendsPanel {
     if (m.with === this.open) {
       this.log.push(msg);
       this.renderChat();
-      if (!msg.mine) this.net.send({ t: 'friendRead', handle: m.with });
+      // Read only if it is on screen - a closed window in the game keeps it unread.
+      if (!msg.mine && this.visible) this.net.send({ t: 'friendRead', handle: m.with });
     }
     if (!msg.mine) sfx.play('chat');
     return msg.text;
   }
+
+  /** Is the conversation with this friend on screen right now? */
+  reading(handle) { return this.visible && this.open === handle; }
 
   renderChat() {
     const p = this.data.friends.find(x => x.handle === this.open);
