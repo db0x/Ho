@@ -48,8 +48,20 @@ function snapshotPlanet(game, planet, turn) {
     metalRichness: planet.metalRichness, metalReserve: Math.round(planet.metalReserve),
     owner: planet.owner, pop: planet.pop,
     defenses: planet.defenses ? planet.defenses.length : 0,
+    station: stationView(planet),
     sizeFactor: planet.sizeFactor
   };
+}
+
+/**
+ * The orbital station as everyone who sees the world sees it: there or not,
+ * how far the construction is, how much hull it has left. Null without one.
+ */
+function stationView(planet, own = false) {
+  const st = planet.station;
+  if (!st) return null;
+  return { building: st.building > 0 ? st.building : 0, hp: Math.round(st.hp), maxHp: Math.round(st.maxHp),
+    ...(own ? { attack: round1(st.attack), tech: st.tech } : {}) };
 }
 
 /**
@@ -117,6 +129,7 @@ export function buildView(game, player) {
         // research, and only the client's ledger knows those.
         defenseShips: p.owner === player.id && p.defenses ? p.defenses.map(d => ({ type: d.type, tech: d.tech })) : null,
         defenseStats: p.owner === player.id ? defenseStats(p) : null,
+        station: stationView(p, p.owner === player.id),
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
         terraSpent: p.owner === player.id ? Math.round(p.terraSpent || 0) : 0,
         isHomeworld: !!p.isHomeworld
@@ -244,6 +257,7 @@ export function buildSpectatorView(game) {
     metalRichness: p.metalRichness, metalReserve: Math.round(p.metalReserve),
     owner: p.owner, pop: p.pop,
     defenses: p.defenses ? p.defenses.length : 0,
+    station: stationView(p, true),
     terraBudget: p.terraBudget || 0,
     terraSpent: Math.round(p.terraSpent || 0),
     isHomeworld: !!p.isHomeworld

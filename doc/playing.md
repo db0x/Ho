@@ -56,7 +56,7 @@ saying who can change them:
 | Turn timer | 0 = the game waits until everyone is done |
 | Galaxy grows | see [A galaxy without an edge](#a-galaxy-without-an-edge); off gives a fixed map |
 | Wormholes | see [Wormholes](#wormholes) |
-| Capital ships | destroyers can be built (see [The ship classes](#the-ship-classes)); off gives classic Ho!! with the small ships only |
+| Capital ships | orbital stations and destroyers can be built (see [The ship classes](#the-ship-classes)); off gives classic Ho!! with the small ships only |
 | Alliances | colonies can ally (see [Alliances](#alliances)); off makes it everyone against everyone |
 
 **Connection.** A disconnected player does not block the turn – they are skipped
@@ -87,15 +87,17 @@ colonisation, economy.
 
 ## The ship classes
 
-Seven classes, each with a job of its own. Ships are built at the shipyard of one of
-your planets; clicking a ship there – or *Browse ship types* in *How to play* (`H`) –
-opens its data sheet with the current values.
+Seven classes, each with a job of its own, plus the orbital station that builds the
+destroyers. Ships are built at the shipyard of one of your planets; clicking a ship
+there – or *Browse ship types* in *How to play* (`H`) – opens its data sheet with
+the current values.
 
 | | |
 |---|---|
 | <img src="screenshots/ships/scout.webp" width="120" alt="Scout"> | **Scout** – the fastest class, with a long range. Only a scout reveals a planet's temperature, gravity and metal reserve. Unarmed and fragile: better steer clear of enemy fleets. |
 | <img src="screenshots/ships/fighter.webp" width="120" alt="Fighter"> | **Fighter** – the backbone of every fleet, with weapons and shields. Whoever holds the orbit and breaks the defence battery and the orbital defence takes the planet. Short range – send a tanker along for strikes deep in enemy space. |
-| <img src="screenshots/ships/destroyer.webp" width="120" alt="Destroyer"> | **Destroyer** – the capital ship, and the anchor of a fleet. It costs as much as ten fighters and fights about as well, but in its own way: eight guns fire at different targets every round, and its hull draws the fire like four fighters. In orbit of a planet of yours it repairs its whole fleet, 20% of every hull per turn without a battle there. Weak against planets – conquering stays the fighters' job. Needs Weapons 5 and Shields 5, and a shipyard on a planet with at least 20M people. Every destroyer carries a historical ship name, which you can change in the fleet panel. |
+| <img src="screenshots/ships/destroyer.webp" width="120" alt="Destroyer"> | **Destroyer** – the capital ship, and the anchor of a fleet. It costs as much as ten fighters and fights about as well, but in its own way: eight guns fire at different targets every round, and its hull draws the fire like four fighters. In orbit of a planet of yours it repairs its whole fleet, 20% of every hull per turn without a battle there. Weak against planets – conquering stays the fighters' job. Needs Weapons 5 and Shields 5, and is only built at a finished orbital station. Every destroyer carries a historical ship name, which you can change in the fleet panel. |
+| <img src="screenshots/ships/station.webp" width="120" alt="Orbital station"> | **Orbital station** – the shipyard in orbit where destroyers are built, and fighters cost 25% less there. It costs as much as a destroyer, is paid when ordered and is ready after 3 turns; until then a construction site stands in orbit. One per planet, from Weapons 5 and Shields 5 on planets with at least 20M people. Once ready it takes over the planet's shipyard: click the station on the map to build. It never flies and cannot be transported. In a battle for its planet it fights along – a hull like a destroyer that draws the fire, and four guns, about as strong as four satellites – and as long as it stands, the planet cannot be conquered. Shot down, or the planet lost, and it is gone; without a battle it repairs 20% of its hull per turn. Only in games with capital ships. |
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbital defence"> | **Orbital defence** – a satellite placed straight into orbit of the planet that builds it, where it stays. Cheap, tough and well armed; from five upwards they raise a shield. A planet with satellites does not fall without a fight. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Colony ship"> | **Colony ship** – lands 8M settlers on a free planet and is used up in the process. Over a planet of yours that is not yet full, *Drop settlers here* tops up the population. Slow and defenceless – an escort pays off. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – does not fight, but gives the whole fleet its range, more than twice that of a fighter. Every further tanker in the same fleet adds +15%. |
@@ -109,6 +111,7 @@ the current level:
 | Scout | 8 cr · 3 metal | – | 10 | 71 ly/t | 323 ly |
 | Fighter | 14 cr · 7 metal | 5 | 22 | 42 ly/t | 170 ly |
 | Destroyer | 140 cr · 80 metal | 8 × 5 | 320 | 29 ly/t | 170 ly |
+| Orbital station | 140 cr · 80 metal | 4 × 5.6 | 320 | – | – |
 | Orbital defence | 10 cr · 5 metal | 6 | 34 | – | – |
 | Colony ship | 30 cr · 12 metal | – | 16 | 34 ly/t | 221 ly |
 | Tanker | 18 cr · 6 metal | – | 20 | 38 ly/t | 442 ly |
@@ -275,6 +278,11 @@ fighters**. They appear within sight of a planet, a few turns of flight away;
 the log names the target. On the map you see the carrier with its fighters
 swarming around it like a cloud.
 
+| | |
+|---|---|
+| <img src="screenshots/ships/alienCarrier.webp" width="120" alt="Alien carrier"> | **Alien carrier** – the heart of the swarm. Three guns, it draws the fire like three fighters and sends out new fighters every turn without a battle. Shoot down every carrier and the swarm breaks off. Cannot be built. |
+| <img src="screenshots/ships/alienFighter.webp" width="120" alt="Alien fighter"> | **Alien fighter** – a little faster than a fighter, otherwise as strong. Alone in the orbit of a planet they do not conquer it – they leave it empty. Cannot be built. |
+
 - **Target:** the colony with the fewest alien attacks so far.
 - **Effect:** they do not conquer. A planet whose orbit they hold alone is
   depopulated and becomes free. A colony's last planet is never attacked.
@@ -295,7 +303,7 @@ The host sets their strength in the lobby (or switches them off):
 | Planets per raid | 2 | 3 | 5 |
 | Fighters replaced per turn | 1 | 2 | 3 |
 
-Satellites or a fleet in orbit stop them.
+Satellites, an orbital station or a fleet in orbit stop them.
 
 ## The AI colonies
 

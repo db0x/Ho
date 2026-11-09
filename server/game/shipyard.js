@@ -3,7 +3,7 @@
 // world with at least a million people. Only what can be paid for at the end
 // of the turn is accepted (economy.js).
 import {
-  SHIP_TYPES, shipTypesFor, buildLock, SHIP_DEFS, shipCost, shipStats, refitCost, recycleValue
+  BUILD_TYPES, buildTypesFor, buildLock, buildCost, SHIP_DEFS, STATION, REPAIR_SHARE, shipStats, refitCost, recycleValue
 } from '../../shared/rules.js';
 import { affordable } from './economy.js';
 import { addShip, orbitFleet, cleanupFleets } from './fleets.js';
@@ -22,14 +22,17 @@ export function orderBuild(game, player, b) {
   const { planetId, type } = b;
   const count = Math.round(Number(b.count));
   const planet = planetById(game, planetId);
-  if (!planet || planet.owner !== player.id || !SHIP_TYPES.includes(type) || !Number.isFinite(count) || !count) return;
-  if (count > 0 && !shipTypesFor(game.settings).includes(type)) return { error: 'yard.noCapitals' };
+  if (!planet || planet.owner !== player.id || !BUILD_TYPES.includes(type) || !Number.isFinite(count) || !count) return;
+  if (count > 0 && !buildTypesFor(game.settings).includes(type)) return { error: 'yard.noCapitals' };
   if (count < 0) { buildStep(player, planetId, type, count); return; }
   // Where nobody lives, the server does not build - so accept nothing either.
   if (planet.pop < 1) return { error: 'yard.needPop' };
-  const lock = buildLock(type, player.tech, planet.pop);
-  if (lock) return { error: 'yard.locked', params: { ...SHIP_DEFS[type].requires } };
-  for (let i = 0; i < Math.min(count, 99); i++) {
+  const lock = buildLock(type, player.tech, planet.pop, planet.station || null);
+  // The destroyer needs a station instead of a large world - its own sentence.
+  if (lock) return { error: SHIP_DEFS[type].requires.station ? 'yard.lockedStation' : 'yard.locked', params: { ...SHIP_DEFS[type].requires } };
+  // One station per world - already there, under construction or ordered.
+  if (type === 'station' && (planet.station || player.orders.builds[planetId]?.station)) return { error: 'yard.stationExists' };
+  for (let i = 0; i < Math.min(count, type === 'station' ? 1 : 99); i++) {
     buildStep(player, planetId, type, 1);
     if (!affordable(game, player)) {
       buildStep(player, planetId, type, -1);
@@ -64,31 +67,39 @@ export function orderRefit(game, player, r) {
   }
 }
 
-/** Ships are built at the end of the turn, then the refits are done. */
+/**
+ * Ships are built at the end of the turn, then the refits are done, then the
+ * stations under construction get on - prices and locks go by the state the
+ * player saw when ordering, as in the forecast (shared/budget.js).
+ */
 export function buildShips(game, entries) {
   for (const p of game.players) {
     if (!p.alive) continue;
     for (const [pid, queue] of Object.entries(p.orders.builds)) {
       const planet = planetById(game, Number(pid));
       if (!planet || planet.owner !== p.id || planet.pop < 1) continue;
-      for (const type of SHIP_TYPES) {
+      for (const type of BUILD_TYPES) {
         let n = queue[type] || 0;
         let built = 0;
+        if (type === 'station' && n > 0 && planet.station) continue;
         // Accepted only when unlocked - but the world may have lost people
-        // since (and research never goes back).
-        if (n > 0 && buildLock(type, p.tech, planet.pop)) {
+        // (or its station) since, and research never goes back.
+        if (n > 0 && buildLock(type, p.tech, planet.pop, planet.station || null)) {
           entries.push({ type: 'warn', playerIds: [p.id], private: p.id, planetId: planet.id,
             key: 'log.buildLocked', params: { planet: planet.name, ship: type } });
           continue;
         }
         while (n-- > 0) {
-          const cost = shipCost(type, p.tech);
+          const cost = buildCost(type, p.tech, planet);
           if (p.money < cost.money || p.metal < cost.metal) break;
           p.money -= cost.money;
           p.metal -= cost.metal;
           p.ledger.build.money += cost.money; p.ledger.build.metal += cost.metal;
           if (type === 'satellite') {
             (planet.defenses || (planet.defenses = [])).push(makeDefense(game, type, p.tech));
+          } else if (type === 'station') {
+            planet.station = { ...makeDefense(game, type, p.tech), building: STATION.buildTurns, since: game.turn };
+            n = 0;
           } else {
             addShip(game, orbitFleet(game, p.id, planet), type, p.tech);
           }
@@ -96,7 +107,9 @@ export function buildShips(game, entries) {
         }
         if (built > 0) {
           entries.push({ type: 'build', playerIds: [p.id], private: p.id, planetId: planet.id,
-            key: 'log.built', params: { planet: planet.name, count: built, ship: type } });
+            ...(type === 'station'
+              ? { key: 'log.stationStarted', params: { planet: planet.name, turns: STATION.buildTurns } }
+              : { key: 'log.built', params: { planet: planet.name, count: built, ship: type } }) });
         }
         if (n + 1 > 0 && built < (queue[type] || 0)) {
           entries.push({ type: 'warn', playerIds: [p.id], private: p.id, planetId: planet.id,
@@ -106,6 +119,34 @@ export function buildShips(game, entries) {
     }
     p.orders.builds = {};
     refitOrders(game, p, entries);
+  }
+  advanceStations(game, entries);
+}
+
+/**
+ * Stations under construction get one turn further; a finished one says so.
+ * A ready station mends its hull like a destroyer mends its fleet - but not
+ * in a turn with a battle at its world (see repairStations, after combat).
+ */
+function advanceStations(game, entries) {
+  for (const planet of game.galaxy.planets) {
+    const st = planet.station;
+    if (!st || !(st.building > 0) || st.since === game.turn) continue;
+    if (!planet.owner) { planet.station = null; continue; }
+    st.building--;
+    if (st.building > 0) continue;
+    delete st.building;
+    entries.push({ type: 'build', playerIds: [planet.owner], private: planet.owner, planetId: planet.id,
+      key: 'log.stationReady', params: { planet: planet.name } });
+  }
+}
+
+/** After the battles: stations where nobody fought get REPAIR_SHARE of their hull back. */
+export function repairStations(game, fought) {
+  for (const planet of game.galaxy.planets) {
+    const st = planet.station;
+    if (!st || fought.has(planet.id) || st.hp >= st.maxHp) continue;
+    st.hp = Math.min(st.maxHp, Math.round((st.hp + st.maxHp * REPAIR_SHARE) * 10) / 10);
   }
 }
 
@@ -252,5 +293,20 @@ export function devDestroyer(game, player, planetId) {
   if (!planet || planet.owner !== player.id) planet = game.galaxy.planets.find(p => p.owner === player.id);
   if (!planet) return false;
   addShip(game, orbitFleet(game, player.id, planet), 'destroyer', player.tech);
+  return true;
+}
+
+/**
+ * Dev mode: a ready orbital station right away and for free at an own world
+ * - the given one, otherwise the homeworld. Replaces one that is there.
+ * @returns {boolean} whether one was placed
+ */
+export function devStation(game, player, planetId) {
+  if (!player?.alive || game.settings.capitalShips === false) return false;
+  let planet = planetId != null ? planetById(game, planetId) : null;
+  if (!planet || planet.owner !== player.id) planet = planetById(game, player.homeworld);
+  if (!planet || planet.owner !== player.id) planet = game.galaxy.planets.find(p => p.owner === player.id);
+  if (!planet) return false;
+  planet.station = makeDefense(game, 'station', player.tech);
   return true;
 }

@@ -155,6 +155,7 @@ npm run test:engine    # 120 turns with 16 AI, balance and state invariants
 npm run test:hole      # spiral game: the no-go zone around the black hole holds
 npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, collapse
 npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
+npm run test:station   # orbital station: price, one per planet, 3 turns, fighter discount, battle, conquest, AI
 npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last planet spared, carrier, dev mode
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:chase     # intercepting in flight: catch, stop, speed, orders, orbit and sight, AI

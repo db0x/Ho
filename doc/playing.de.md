@@ -57,7 +57,7 @@ mit dem Hinweis, wer sie ändern kann:
 | Zugzeit | 0 = es wird gewartet, bis alle fertig sind |
 | Galaxie wächst | siehe [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand); aus ergibt eine feste Karte |
 | Wurmlöcher | siehe [Wurmlöcher](#wurmlöcher) |
-| Großkampfschiffe | Träger sind baubar (siehe [Die Schiffstypen](#die-schiffstypen)); aus ergibt ein klassisches Ho!! nur mit den kleinen Schiffen |
+| Großkampfschiffe | Raumstationen und Träger sind baubar (siehe [Die Schiffstypen](#die-schiffstypen)); aus ergibt ein klassisches Ho!! nur mit den kleinen Schiffen |
 | Bündnisse | Kolonien können sich verbünden (siehe [Bündnisse](#bündnisse)); aus ergibt ein Jeder gegen jeden |
 
 **Verbindung.** Ein getrennter Spieler blockiert die Runde nicht – er wird
@@ -89,15 +89,17 @@ Kolonisierung, Wirtschaft.
 
 ## Die Schiffstypen
 
-Sieben Klassen, jede mit eigener Aufgabe. Gebaut wird in der Werft eines eigenen
-Planeten; ein Klick auf ein Schiff dort – oder *Schiffstypen ansehen* in der Spielanleitung
-(`H`) – öffnet den Steckbrief mit den aktuellen Werten.
+Sieben Klassen, jede mit eigener Aufgabe, dazu die Raumstation, an der die Träger
+entstehen. Gebaut wird in der Werft eines eigenen Planeten; ein Klick auf ein Schiff
+dort – oder *Schiffstypen ansehen* in der Spielanleitung (`H`) – öffnet den
+Steckbrief mit den aktuellen Werten.
 
 | | |
 |---|---|
 | <img src="screenshots/ships/scout.webp" width="120" alt="Späher"> | **Späher** – der schnellste Typ mit großer Reichweite. Erst ein Späher deckt Temperatur, Schwerkraft und Metallvorrat eines Planeten auf. Waffenlos und zerbrechlich: feindlichen Flotten lieber ausweichen. |
 | <img src="screenshots/ships/fighter.webp" width="120" alt="Jäger"> | **Jäger** – das Rückgrat jeder Flotte, mit Waffen und Schilden. Wer den Orbit hält und Abwehrbatterie und Orbitalverteidigung bricht, erobert den Planeten. Kurze Reichweite – für Angriffe tief im Feindgebiet einen Tanker mitschicken. |
-| <img src="screenshots/ships/destroyer.webp" width="120" alt="Träger"> | **Träger** – das Großkampfschiff und der Anker einer Flotte. Kostet so viel wie zehn Jäger und kämpft etwa so gut wie sie, aber auf eigene Art: Acht Geschütze feuern jede Runde auf verschiedene Ziele, und der Rumpf zieht das Feuer auf sich wie vier Jäger. Im Orbit eines eigenen Planeten repariert er seine ganze Flotte, 20 % jeder Hülle pro Runde ohne Kampf dort. Gegen Planeten schwach – Erobern bleibt Sache der Jäger. Braucht Waffen 5 und Schilde 5 und eine Werft auf einem Planeten ab 20 Mio. Einwohnern. Jeder Träger führt einen historischen Schiffsnamen, den du im Flottenpanel ändern kannst. |
+| <img src="screenshots/ships/destroyer.webp" width="120" alt="Träger"> | **Träger** – das Großkampfschiff und der Anker einer Flotte. Kostet so viel wie zehn Jäger und kämpft etwa so gut wie sie, aber auf eigene Art: Acht Geschütze feuern jede Runde auf verschiedene Ziele, und der Rumpf zieht das Feuer auf sich wie vier Jäger. Im Orbit eines eigenen Planeten repariert er seine ganze Flotte, 20 % jeder Hülle pro Runde ohne Kampf dort. Gegen Planeten schwach – Erobern bleibt Sache der Jäger. Braucht Waffen 5 und Schilde 5 und wird nur an einer fertigen Raumstation gebaut. Jeder Träger führt einen historischen Schiffsnamen, den du im Flottenpanel ändern kannst. |
+| <img src="screenshots/ships/station.webp" width="120" alt="Raumstation"> | **Raumstation** – die Werft im Orbit, an der Träger gebaut werden; Jäger kosten dort 25 % weniger. Sie kostet so viel wie ein Träger, wird bei Auftrag bezahlt und ist nach 3 Runden fertig; bis dahin steht im Orbit eine Baustelle. Eine pro Planet, ab Waffen 5 und Schilde 5 auf Planeten ab 20 Mio. Einwohnern. Fertig übernimmt sie die Werft des Planeten: Zum Bauen die Station auf der Karte anklicken. Sie fliegt nicht und kann nicht transportiert werden. Im Kampf um ihren Planeten kämpft sie mit – ein Rumpf wie ein Träger, der das Feuer auf sich zieht, und vier Geschütze, etwa so stark wie vier Satelliten –, und solange sie steht, kann der Planet nicht erobert werden. Abgeschossen oder mit dem Planeten verloren ist sie weg; ohne Kampf repariert sie pro Runde 20 % ihres Rumpfs. Nur in Partien mit Großkampfschiffen. |
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbitalverteidigung"> | **Orbitalverteidigung** – ein Satellit, der direkt im Orbit des Bauplaneten entsteht und dort bleibt. Billig, zäh und kräftig bewaffnet; ab fünf Stück spannen sie einen Schild auf. Ein Planet mit Satelliten fällt nicht kampflos. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Kolonieschiff"> | **Kolonieschiff** – setzt 8 Mio. Siedler auf einem freien Planeten ab und geht dabei auf. Über einem eigenen, noch nicht vollen Planeten stockt *Siedler hier absetzen* die Bevölkerung auf. Langsam und wehrlos – Geleitschutz lohnt sich. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – kämpft nicht, gibt aber der ganzen Flotte seine Reichweite, mehr als doppelt so viel wie ein Jäger. Jeder weitere Tanker in derselben Flotte bringt +15 %. |
@@ -111,6 +113,7 @@ den jeweils aktuellen Stand:
 | Späher | 8 Cr · 3 Metall | – | 10 | 71 Lj/R | 323 Lj |
 | Jäger | 14 Cr · 7 Metall | 5 | 22 | 42 Lj/R | 170 Lj |
 | Träger | 140 Cr · 80 Metall | 8 × 5 | 320 | 29 Lj/R | 170 Lj |
+| Raumstation | 140 Cr · 80 Metall | 4 × 5,6 | 320 | – | – |
 | Orbitalverteidigung | 10 Cr · 5 Metall | 6 | 34 | – | – |
 | Kolonieschiff | 30 Cr · 12 Metall | – | 16 | 34 Lj/R | 221 Lj |
 | Tanker | 18 Cr · 6 Metall | – | 20 | 38 Lj/R | 442 Lj |
@@ -286,6 +289,11 @@ Gelegentlich erscheinen Aliens: ein **Alien-Träger** und mehrere
 entfernt; der Funk nennt das Ziel. Auf der Karte umschwirren die Jäger ihren
 Träger als Wolke.
 
+| | |
+|---|---|
+| <img src="screenshots/ships/alienCarrier.webp" width="120" alt="Alien-Träger"> | **Alien-Träger** – das Herz des Schwarms. Drei Geschütze, zieht das Feuer auf sich wie drei Jäger und schickt in jeder Runde ohne Kampf neue Jäger aus. Sind alle Träger abgeschossen, bricht der Schwarm ab. Nicht baubar. |
+| <img src="screenshots/ships/alienFighter.webp" width="120" alt="Alien-Jäger"> | **Alien-Jäger** – etwas schneller als ein Jäger, sonst gleich stark. Halten sie den Orbit eines Planeten allein, erobern sie ihn nicht – sie entvölkern ihn. Nicht baubar. |
+
 - **Ziel:** die Kolonie mit den bisher wenigsten Alien-Angriffen.
 - **Wirkung:** Sie erobern nicht. Ein Planet, dessen Orbit sie allein halten,
   wird entvölkert und frei. Den letzten Planeten einer Kolonie greifen sie nie an.
@@ -306,7 +314,7 @@ Die Stärke stellt der Gastgeber in der Lobby ein (oder schaltet sie ab):
 | Planeten pro Angriff | 2 | 3 | 5 |
 | Ersatzjäger pro Runde | 1 | 2 | 3 |
 
-Satelliten oder eine Flotte im Orbit halten sie auf.
+Satelliten, eine Raumstation oder eine Flotte im Orbit halten sie auf.
 
 ## Die KI-Kolonien
 

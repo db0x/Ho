@@ -9,7 +9,7 @@
 //   - size and brightness by distance.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, drawPlanetStation } from './ships.js';
 import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -305,7 +305,7 @@ export class SpaceView {
         s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)), alpha: depthFade(pr.depth, this.cam.dist),
         shieldR: planetRadius(p) * pr.s * 1.14 + 20 * orbitScale(pr.s), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
-    if (this.hover?.type === 'planet') {
+    if (this.hover?.type === 'planet' || this.hover?.type === 'station') {
       this.drawSupplyLine(ctx, v.planets[this.hover.id]);
       this.tooltip(ctx, v.planets[this.hover.id]);
     }
@@ -759,11 +759,21 @@ export class SpaceView {
       }
       ctx.restore();
     }
+    let st = null;
+    if (p.station && p.owner) {
+      ctx.save();
+      ctx.globalAlpha = ctxAlpha;
+      st = drawPlanetStation(ctx, p, pr.x, pr.y, r, orbitScale(scale), colorOf(p.owner), this.phase);
+      if (st && this.selection?.type === 'station' && this.selection.id === p.id) this.ringAt(ctx, st.x, st.y, st.r);
+      ctx.restore();
+    }
 
     // Names fade out with size as on the flat map - in depth that means:
     // near worlds are labeled, distant ones are not.
     if (this.showNames) labels.push(...planetLabels(p, pr.x, pr.y, scale, r));
     this.hit.push({ type: 'planet', id: p.id, x: pr.x, y: pr.y, r: Math.max(10, r + 5) });
+    // After the world: where both overlap, the station wins - it holds the shipyard.
+    if (st) this.hit.push({ type: 'station', id: p.id, x: st.x, y: st.y, r: st.r });
   }
 
   /**

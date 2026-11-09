@@ -132,6 +132,9 @@ export function assessEnemies(s) {
     const bs = holder ? batteryStats(p.pop, holder.tech) : null;
     let hp = bs ? bs.hp : 0;
     if (p.defenses) for (const s of p.defenses) hp += s.maxHp;
+    // An orbital station, built or still a site, is a hull that has to go too -
+    // and while it stands the world does not fall.
+    if (p.station) hp += p.station.hp;
     // Known allies of the owner come to the rescue too - a public alliance deters.
     const helpers = game.alliances.length ? [p.owner, ...knownAllies(game, bot, p.owner)] : [p.owner];
     for (const r of helpers.flatMap(o => o === bot.id ? [] : rescuers.get(o) || [])) {

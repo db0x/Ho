@@ -85,13 +85,14 @@ export const SHIP_DEFS = {
   // fire away from the small ships, and in the orbit of an own world it
   // repairs its whole fleet. Batteries hit it hard: the planetary defense
   // wastes nothing on a target this big. Each one carries a name.
+  // Built only at an orbital station (see station below).
   destroyer: {
     icon: 'destroyer',
     money: 14, metal: 8, hull: 320,
     techs: ['range', 'speed', 'weapons', 'shields'],
     attackMul: 8, shieldMul: 1, speedMul: 0.7, rangeMul: 1,
     size: 10, guns: 8, weight: 4, repair: true, named: true, capital: true,
-    requires: { weapons: 5, shields: 5, pop: 20 }
+    requires: { weapons: 5, shields: 5, station: true }
   },
   satellite: {
     icon: 'satellite',
@@ -123,6 +124,59 @@ export const SHIP_DEFS = {
     cargo: 5
   }
 };
+
+/**
+ * The orbital station: the shipyard for destroyers, and fighters come 25%
+ * cheaper there. Not a ship - it belongs to its world (planet.station), one
+ * per world, never flies and cannot be loaded. It costs what a destroyer
+ * costs, is paid when ordered and takes STATION.buildTurns turns to finish.
+ * In a battle at its world it fights along: a hull like a destroyer that
+ * draws the fire, and a few guns - about as strong as four satellites. Shot
+ * down, or the world lost, and it is gone. Not in SHIP_TYPES: nothing that
+ * lists ships should list it.
+ */
+Object.assign(SHIP_DEFS, {
+  station: {
+    icon: 'station',
+    money: 0, metal: 0, hull: 320,
+    techs: ['weapons', 'shields'],
+    attackMul: 4.5, shieldMul: 1, speedMul: 0, rangeMul: 0,
+    guns: 4, weight: 4, capital: true, costAs: 'destroyer',
+    requires: { weapons: 5, shields: 5, pop: 20 }
+  }
+});
+export const STATION = {
+  buildTurns: 3,          // turns from the order until it is ready
+  fighterDiscount: 0.25   // fighters at a ready station cost this much less
+};
+
+/** Is this station (planet.station, or its view) ready - not a construction site? */
+export const stationReady = (st) => !!st && !(st.building > 0);
+
+/**
+ * What can be ordered at a shipyard, in the order of the build list: the
+ * ships of the game, and the station right before the destroyer it makes
+ * possible.
+ */
+export function buildTypesFor(settings) {
+  const ships = shipTypesFor(settings);
+  if (!ships.includes('destroyer')) return ships;
+  const i = ships.indexOf('destroyer');
+  return [...ships.slice(0, i), 'station', ...ships.slice(i)];
+}
+export const BUILD_TYPES = buildTypesFor({});
+
+/**
+ * Price of an order at this world: the ship's price, fighters cheaper at a
+ * ready station.
+ * @param {{station?: object}|null} planet  the world (server) or its view
+ */
+export function buildCost(type, tech, planet) {
+  const c = shipCost(type, tech);
+  if (type !== 'fighter' || !stationReady(planet?.station)) return c;
+  const f = 1 - STATION.fighterDiscount;
+  return { money: Math.max(1, Math.round(c.money * f)), metal: Math.max(1, Math.round(c.metal * f)) };
+}
 
 /**
  * Alien ships: nobody can build them. They come out of a rift from another
@@ -226,19 +280,21 @@ export function shipTypesFor(settings) {
 }
 
 /**
- * Can this type be built at all? Some need research first and a large world
- * as their shipyard. Null if it can, otherwise what is missing - the levels
- * and the population it needs. `pop` left out: only the research counts.
- * The population counts as the game shows it, to one decimal - a world
- * showing 20.0M must not fail on 19.96.
- * @returns {null | {weapons?: number, shields?: number, pop?: number}}
+ * Can this type be built at all? Some need research first, a large world or
+ * a ready station as their shipyard. Null if it can, otherwise what is
+ * missing - the levels, the population, the station. `pop` and `station`
+ * left out: only the research counts. The population counts as the game
+ * shows it, to one decimal - a world showing 20.0M must not fail on 19.96.
+ * @param {object|null} [station]  the world's station (or its view), null for none
+ * @returns {null | {weapons?: number, shields?: number, pop?: number, station?: true}}
  */
-export function buildLock(type, tech, pop) {
+export function buildLock(type, tech, pop, station) {
   const need = SHIP_DEFS[type]?.requires;
   if (!need) return null;
   const missing = {};
   for (const f of TECH_FIELDS) if (need[f] && (tech[f] || 1) < need[f]) missing[f] = need[f];
   if (need.pop && pop != null && Math.round(pop * 10) / 10 < need.pop) missing.pop = need.pop;
+  if (need.station && station !== undefined && !stationReady(station)) missing.station = true;
   return Object.keys(missing).length ? missing : null;
 }
 
@@ -266,6 +322,8 @@ export function miniFactor(miniLevel) {
  */
 export function shipCost(type, tech) {
   const def = SHIP_DEFS[type];
+  // The station costs what the ship it builds costs.
+  if (def.costAs) return shipCost(def.costAs, tech);
   let extra = 0;
   for (const f of def.techs) extra += techSurcharge(tech[f] || 1);
   // A big ship costs as much as `size` small ones - on every level, not just

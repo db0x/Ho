@@ -20,8 +20,8 @@ ihrer Kolonie.*
   freie Plätze mit KI.
 - **KI mit Charakter:** Eroberer, Siedler, Technokrat, Pirat, Bollwerk, Aasgeier.
 - **Jäger und Großkampfschiffe:** Schwärme kleiner Schiffe und Träger mit Namen,
-  die das Feuer auf sich ziehen und ihre Flotte reparieren – oder klassisches Ho!!
-  nur mit den kleinen Schiffen.
+  die das Feuer auf sich ziehen und ihre Flotte reparieren, gebaut an Raumstationen,
+  die verteidigt werden wollen – oder klassisches Ho!! nur mit den kleinen Schiffen.
 - **Bündnisse,** offen oder geheim – mit Menschen wie mit der KI. Verbündete teilen
   Sicht und Versorgung, gewinnen gemeinsam und verraten sich manchmal.
 - **Flach oder im Raum,** als Streufeld oder Spiralgalaxie mit schwarzem Loch – und

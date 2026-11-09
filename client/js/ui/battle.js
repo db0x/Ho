@@ -5,6 +5,9 @@
 // the timeline, nothing is accumulated.
 import { ownerOf } from '../owners.js';
 import { drawShipHD } from '../render/shipshd.js';
+
+/** Units that stay with the world instead of standing in their side's formation. */
+const ON_WORLD = ['battery', 'station', 'stationSite'];
 import { planetSprite, blitPlanet } from '../render/planets.js';
 import { hexRgb, drawHexShield, drawShieldHit } from '../render/fx.js';
 import { timeline, hpAt, seeded, drawBolt, drawImpact, drawExplosion, shieldOf, shieldStrength, underShield, fleeing } from '../render/battlefx.js';
@@ -156,7 +159,7 @@ function arrange(W, H) {
     dir[0] /= dl; dir[1] /= dl;
     const perp = [-dir[1], dir[0]];
     const ids = battle.units.map((u, i) => i)
-      .filter(i => battle.units[i][0] === k && battle.units[i][1] !== 'battery' && !shield?.ids.includes(i))
+      .filter(i => battle.units[i][0] === k && !ON_WORLD.includes(battle.units[i][1]) && !shield?.ids.includes(i))
       .sort((x, y) => FRONT.indexOf(battle.units[x][1]) - FRONT.indexOf(battle.units[y][1]));
     const m = ids.length;
     if (!m) return;
@@ -187,6 +190,15 @@ function arrange(W, H) {
     pos[i] = [planet.x + Math.cos(a) * R, planet.y + Math.sin(a) * R];
     len[i] = Math.min(46, H * 0.09);
     facing[i] = -Math.PI / 2;
+  });
+  // The orbital station hangs above the world, on its owner's side, outside the shield.
+  battle.units.forEach((u, i) => {
+    if (u[1] !== 'station' && u[1] !== 'stationSite') return;
+    const side = Math.cos(Math.PI + ((u[0] - mine + n) % n) * TAU / n) < 0 ? -1 : 1;
+    const a = -Math.PI / 2 + side * 0.2;
+    pos[i] = [planet.x + Math.cos(a) * R * 1.42, planet.y + Math.sin(a) * R * 1.42];
+    len[i] = Math.min(104, H * 0.21);
+    facing[i] = 0;
   });
   if (shield) {
     shield.R = R * 1.16;
@@ -266,7 +278,7 @@ function paint(ms) {
     ctx.globalAlpha = 1 - gone * gone;
     drawShipHD(ctx, {
       type: u[1], x, y: y + bob, len: L.len[i], color: color(i), phase: ms / 1000 + i,
-      angle: u[1] === 'satellite' ? ms / 4000 + i : heading
+      angle: u[1] === 'satellite' ? ms / 4000 + i : u[1].startsWith('station') ? 0 : heading
     });
     ctx.restore();
     // Shortly before the end the hull flickers red

@@ -82,12 +82,15 @@ export class DebugDialog {
     return it ? { x: it.x, y: it.y, z: it.z || 0 } : null;
   }
 
-  /** A destroyer at the selected own world - the server takes the homeworld otherwise. */
-  destroyer() {
+  /**
+   * A destroyer or a ready station at the selected own world - the server
+   * takes the homeworld otherwise.
+   */
+  destroyer(action = 'destroyer') {
     const sel = this.app?.selection;
     const planetId = sel?.type === 'planet' ? sel.id
       : sel?.type === 'fleet' ? this.app.map?.view?.fleets.find(f => f.id === sel.id)?.at ?? null : null;
-    this.app.send({ t: 'dev', action: 'destroyer', planetId });
+    this.app.send({ t: 'dev', action, planetId });
     this.toggle(false);
   }
 
@@ -119,6 +122,7 @@ export class DebugDialog {
       if (a === 'reset') { this.cfg = structuredClone(DEFAULTS); this.render(); }
       if (a === 'fight') this.fight();
       if (a === 'destroyer') this.destroyer();
+      if (a === 'station') this.destroyer('station');
       if (a === 'aliens') this.aliens();
       if (a === 'radioNamed') { this.app.send({ t: 'dev', action: 'radio' }); this.toggle(false); }
       const hole = e.target.closest('[data-hole]')?.dataset.hole;
@@ -167,8 +171,10 @@ export class DebugDialog {
       ${running && !this.app.map.view.spectator && this.app.map.view.capitalShips !== false ? `<h3>${t('dev.ships')}</h3>
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="destroyer">${t('dev.destroyer')}</button>
+        <button type="button" class="tiny" data-a="station">${t('dev.station')}</button>
       </div>
-      <p class="muted small">${t('dev.destroyerHint')}</p>` : ''}
+      <p class="muted small">${t('dev.destroyerHint')}</p>
+      <p class="muted small">${t('dev.stationHint')}</p>` : ''}
       ${running ? `<h3>${t('alien.name')}</h3>
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="aliens">${t('dev.aliens')}</button>

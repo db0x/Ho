@@ -3,7 +3,7 @@
 import { ownerOf } from '../../owners.js';
 import {
   habitability, planetCapacity, terraformable, terraformFullCost, terraLimits, IDEAL, planetIncome,
-  planetMining, batteryStats
+  planetMining, batteryStats, stationReady
 } from '../../../shared/rules.js';
 import { isAlly } from '../../allies.js';
 import { t } from '../../i18n.js';
@@ -85,6 +85,8 @@ export const planetMethods = {
             : t('planet.satellites', { n: p.defenses || 0, count: p.defenses || 0 })}</div></div>
       </div>
 
+      ${this.stationLine(p)}
+
       ${isMine ? this.defenseSection(p, orbit) : ''}
 
       ${isMine ? `
@@ -133,14 +135,12 @@ export const planetMethods = {
           : '')) : ''}
       </div>
 
-      ${isMine ? (p.pop >= 1 ? `
+      ${isMine ? (stationReady(p.station) ? `
       <div class="sel-yard">
         <h4>${t('yard.title')}</h4>
-        <div id="buildrows"></div>
-        <div class="small muted" id="buildsum"></div>
-        ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
-        ${this.recycleBlock('p:' + p.id)}
-      </div>` : `<div class="sel-yard"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`) : ''}
+        <p class="small muted">${t('yard.atStation')}</p>
+        <div class="sel-actions"><button class="tiny primary" data-station="${p.id}">${t('planet.toStation')}</button></div>
+      </div>` : this.yardBlock(p)) : ''}
     `;
     box.querySelector('.sel-main').scrollTop = keep;
 
@@ -187,7 +187,95 @@ export const planetMethods = {
     for (const item of box.querySelectorAll('[data-fleet]')) {
       item.onclick = () => this.app.setSelection({ type: 'fleet', id: item.dataset.fleet });
     }
+    for (const el of box.querySelectorAll('[data-station]')) {
+      el.onclick = () => this.app.setSelection({ type: 'station', id: p.id });
+    }
+    const sb = box.querySelector('.station-line .bi');
+    if (sb) sb.appendChild(shipIcon(stationReady(p.station) ? 'station' : 'stationSite', 30, ownerP?.color || '#9fb0c8'));
     this.wireCourse(box, p);
+  },
+
+  /**
+   * The shipyard of a world: build list, refit and recycling of its
+   * satellites - below the world, or below its station once that is ready.
+   */
+  yardBlock(p) {
+    return p.pop >= 1 ? `
+      <div class="sel-yard">
+        <h4>${t('yard.title')}</h4>
+        <div id="buildrows"></div>
+        <div class="small muted" id="buildsum"></div>
+        ${this.refitBlock('p:' + p.id, t('refit.satellites'))}
+        ${this.recycleBlock('p:' + p.id)}
+      </div>` : `<div class="sel-yard"><h4>${t('yard.title')}</h4><p class="small muted">${t('yard.needPop')}</p></div>`;
+  },
+
+  /**
+   * The panel of a selected station: what it is and how it stands, its world
+   * one click away - and, own and ready, the world's shipyard, which it
+   * holds from then on.
+   */
+  stationPanel(box, p) {
+    const st = p?.station;
+    if (!st) { box.innerHTML = ''; return; }
+    const v = this.view;
+    const ownerP = v.players.find(q => q.id === p.owner);
+    const mine = !!v.you && p.owner === v.you;
+    const ready = stationReady(st);
+    const keep = box.querySelector('.sel-main')?.scrollTop || 0;
+    box.classList.add('split');
+    box.innerHTML = `
+      <div class="sel-main">
+      <div class="sel-head">
+        <span id="thumb"></span>
+        <div>
+          <div class="sel-title">${t(ready ? 'ship.station.name' : 'ship.stationSite.name')}</div>
+          <div class="sel-sub">${ownerP ? `<span style="color:${ownerP.color}">${escapeHtml(ownerP.name)}</span> · ` : ''}<a href="#" id="to-planet">${p.name}${p.isHomeworld ? ' ★' : ''}</a></div>
+        </div>
+      </div>
+      ${this.courseButton(p)}
+      <div class="statgrid">
+        <div class="stat"><div class="k">${t('station.state')}</div>
+          <div class="v">${ready ? t('planet.stationReady') : t('planet.stationBuilding', { n: st.building, count: st.building })}</div></div>
+        <div class="stat"><div class="k">${t('fleet.hull')}</div><div class="v">${fmt(st.hp)}/${fmt(st.maxHp)} HP</div>
+          <div class="meter"><i style="width:${st.maxHp ? st.hp / st.maxHp * 100 : 0}%;background:${ready ? 'var(--good)' : 'var(--gold)'}"></i></div></div>
+        <div class="stat"><div class="k">${t('fleet.attack')}</div><div class="v">${ready && st.attack ? fmt1(st.attack) + ' ⚔' : '–'}</div>
+          ${ready ? `<div class="small muted">${t('shipinfo.gunsValue', { n: 4, attack: st.attack ? fmt1(st.attack / 4) : '?' })}</div>` : ''}</div>
+      </div>
+      <p class="small muted">${t('ship.station.desc')}</p>
+      <div class="sel-actions"><button class="tiny" id="station-info">${t('station.more')}</button></div>
+      </div>
+      ${mine ? (ready ? this.yardBlock(p)
+        : `<div class="sel-yard"><h4>${t('yard.title')}</h4><p class="small muted">${t('station.yardSoon', { n: st.building, count: st.building })}</p></div>`) : ''}
+    `;
+    box.querySelector('.sel-main').scrollTop = keep;
+    box.querySelector('#thumb').appendChild(shipIcon(ready ? 'station' : 'stationSite', 46, ownerP?.color || '#9fb0c8'));
+    box.querySelector('#to-planet').onclick = (e) => { e.preventDefault(); this.app.setSelection({ type: 'planet', id: p.id }); };
+    box.querySelector('#station-info').onclick = () => this.showShip('station', mine ? v.me.tech : undefined, ownerP?.color);
+    const rows = box.querySelector('#buildrows');
+    if (rows) this.buildRows(rows, box.querySelector('#buildsum'), p);
+    this.wireRefit(box);
+    this.wireRecycle(box);
+    this.wireCourse(box, p);
+  },
+
+  /**
+   * The orbital station of a world - for everyone who sees it: under
+   * construction (how long still) or ready, and its hull. Own ones also say
+   * what it is good for.
+   */
+  stationLine(p) {
+    const st = p.station;
+    if (!st || p.known === 'unknown') return '';
+    const mine = !!this.view.you && p.owner === this.view.you;
+    const ready = stationReady(st);
+    const state = ready ? t('planet.stationReady') : t('planet.stationBuilding', { n: st.building, count: st.building });
+    return `<div class="station-line clickable" data-station="${p.id}" title="${t('planet.toStation')}">
+        <span class="bi"></span>
+        <span><b>${t('ship.station.name')}</b> · ${state}${st.attack ? ` · ${fmt1(st.attack)} ⚔` : ''}
+          <div class="meter"><i style="width:${st.maxHp ? st.hp / st.maxHp * 100 : 0}%;background:${ready ? 'var(--good)' : 'var(--gold)'}"></i></div>
+          <div class="small muted">${fmt(st.hp)}/${fmt(st.maxHp)} HP${mine && ready ? ' · ' + t('planet.stationUse') : ''}</div></span>
+      </div>`;
   },
 
   /**
@@ -201,7 +289,8 @@ export const planetMethods = {
     const ds = p.defenseStats;
     const n = p.defenses || 0;
     const own = orbit.filter(f => f.mine).reduce((a, f) => a + (f.stats.attack || 0), 0);
-    const total = (bat?.attack || 0) + (ds?.attack || 0) + own;
+    const st = stationReady(p.station) ? p.station : null;
+    const total = (bat?.attack || 0) + (ds?.attack || 0) + (st?.attack || 0) + own;
     const enemyOrbit = orbit.filter(f => !f.mine);
     const enemyIncoming = v.fleets.filter(f => !f.mine && f.dest === p.id && f.at !== p.id);
     const ships = (f) => t('word.ships', { n: f.ships.length, count: f.ships.length });

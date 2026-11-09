@@ -68,12 +68,6 @@ export const alienFighter = {
       ctx.beginPath(); ctx.moveTo(53, -16); ctx.bezierCurveTo(36, -30, 6, -37, -20, -33); ctx.stroke();
     });
     bevel(ctx, wing, 0.9);
-    // Guns beneath the head, barrels pointing forward
-    for (const s of [-1, 1]) {
-      const gun = () => { ctx.beginPath(); ctx.roundRect(-4, s * 5 - 0.9, 21, 1.8, 0.9); };
-      gun(); fillShadowed(ctx, shell(ctx, s * 5 - 0.9, s * 5 + 0.9, '#2a7048'), S * 0.4);
-      ctx.fillStyle = '#0a1c12'; ctx.fillRect(16, s * 5 - 0.4, 1.4, 0.8);
-    }
     // The head in the opening
     const head = () => raiderHead(ctx);
     head(); fillShadowed(ctx, shell(ctx, -12, 12, '#46b673'), S);

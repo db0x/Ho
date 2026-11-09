@@ -195,7 +195,8 @@ const app = {
       if (f?.mine) crewSay(hasColonists(f) ? 'selectColony' : 'select', f);
     }
     // An own planet with a shipyard newly picked: its yard may answer, by name.
-    if (sel?.type === 'planet' && (app.selection?.type !== 'planet' || app.selection.id !== sel.id) && !app.spectator) {
+    // Its station holds the shipyard once it is ready - it answers the same way.
+    if ((sel?.type === 'planet' || sel?.type === 'station') && (app.selection?.type !== sel.type || app.selection.id !== sel.id) && !app.spectator) {
       const p = map?.view?.planets[sel.id];
       if (p && p.owner === map.view.you && p.pop >= 1) yardSay(sel.id);
     }
@@ -215,7 +216,7 @@ const app = {
   refocus() {
     const sel = app.selection;
     if (!sel || !map) return;
-    const target = sel.type === 'planet' ? map.view?.planets[sel.id]
+    const target = sel.type === 'planet' || sel.type === 'station' ? map.view?.planets[sel.id]
       : sel.type === 'hole' ? map.view?.wormholes?.find(m => m.id === sel.id)
       : map.view?.fleets.find(f => f.id === sel.id);
     if (target) map.focus(target, app.freeArea());
@@ -475,6 +476,11 @@ net.on('view', (m) => {
     app.selection = null;
     map.selection = null;
   }
+  // A station shot down: its world stays selected.
+  if (app.selection?.type === 'station' && !view.planets[app.selection.id]?.station) {
+    app.selection = { type: 'planet', id: app.selection.id };
+    map.selection = app.selection;
+  }
 
   const newTurn = view.turn > lastTurn;
   const newBattles = collectBattles(view);
@@ -572,10 +578,11 @@ function bindGame() {
     if (!hit) { app.setSelection(null); sfx.play('deselect'); return; }
     app.setSelection({ type: hit.type, id: hit.id });
     sfx.play(hit.type === 'fleet' ? 'selectFleet' : 'select',
-      { pan: hit.type === 'planet' ? panOf(hit.id) : 0 });
+      { pan: hit.type === 'planet' || hit.type === 'station' ? panOf(hit.id) : 0 });
   };
   map.onOrder = (hit) => {
-    if (hit?.type === 'planet') app.order(hit.id);
+    // A station is a target like its world.
+    if (hit?.type === 'planet' || hit?.type === 'station') app.order(hit.id);
     if (hit?.type === 'hole') app.orderHole(hit.id);
     if (hit?.type === 'fleet') app.orderChase(hit.id);
   };

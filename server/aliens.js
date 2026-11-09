@@ -228,6 +228,7 @@ export function overrun(game, planet, entries) {
   planet.terraBudget = 0;
   planet.terraSpent = 0;
   planet.defenses = [];
+  planet.station = null;
   for (const f of here) if (f.alien) f.alien.raids++;
   const eyes = watchers(game, planet);
   if (old && !eyes.includes(old.id)) eyes.push(old.id);

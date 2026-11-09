@@ -35,7 +35,7 @@ export function runEconomy(game, entries) {
   for (const planet of game.galaxy.planets) {
     if (!planet.owner) continue;
     const p = playerById(game, planet.owner);
-    if (!p || !p.alive) { planet.owner = null; continue; }
+    if (!p || !p.alive) { planet.owner = null; planet.station = null; continue; }
     const inc = planetIncome(planet);
     p.money += inc;
     p.income += inc;
@@ -56,7 +56,7 @@ export function runEconomy(game, entries) {
     if (planet.pop <= 0.1) {
       entries.push({ type: 'lost', playerIds: [p.id], planetId: planet.id,
         key: 'log.colonyLost', params: { planet: planet.name } });
-      planet.owner = null; planet.pop = 0; planet.terraBudget = 0; planet.terraSpent = 0; planet.defenses = [];
+      planet.owner = null; planet.pop = 0; planet.terraBudget = 0; planet.terraSpent = 0; planet.defenses = []; planet.station = null;
     }
   }
   for (const p of game.players) {
