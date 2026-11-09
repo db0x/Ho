@@ -20,8 +20,11 @@ export const shipyardMethods = {
     const why = new Map();
     const st = p.station || null;
     for (const type of buildTypesFor(this.view)) {
-      // A world with a station - ready or being built - has nothing to order there.
-      if (type === 'station' && st) continue;
+      // Only what can happen here: a station on a world large enough that has
+      // none yet (ready or being built), the destroyer only at a ready station.
+      // Missing research still shows - that is something to work towards.
+      if (type === 'station' && (st || buildLock('station', {}, p.pop)?.pop)) continue;
+      if (type === 'destroyer' && !stationReady(st)) continue;
       const cost = buildCost(type, pl.tech, p);
       const n = queue[type] || 0;
       // Big ships need research, a large world or a ready station - as the
