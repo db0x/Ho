@@ -1,0 +1,17 @@
+{
+  "de": [
+    "👥 Freunde erreichen dich jetzt auch mitten in der Partie: Auf der Karte gibt es neben dem Zahnrad einen Freunde-Knopf. Ein Zähler zeigt ungelesene Nachrichten und offene Anfragen, ein grüner Punkt, dass jemand online ist.",
+    "Ein Klick öffnet deine Freundesliste und den Chat als Fenster über der Karte – auf dem Handy als Blatt wie die anderen. Es ist derselbe Chat wie im Startmenü, Ende-zu-Ende-verschlüsselt mit deinem Schlüssel. Esc führt aus dem Gespräch zurück zur Liste und schließt dann das Fenster.",
+    "Schreibt dir jemand, erscheint die Nachricht kurz über der Karte – ein Klick auf „Antworten“ öffnet das Gespräch. Kommt ein Freund online, sagt dir das ebenfalls ein Hinweis, damit ihr euch für die nächste Runde verabreden könnt."
+  ],
+  "en": [
+    "👥 Friends can now reach you in the middle of a game: on the map, next to the gear, there is a friends button. A counter shows unread messages and open requests, a green dot that someone is online.",
+    "One click opens your friends list and the chat as a window above the map – on a phone as a sheet like the others. It is the same chat as in the start menu, end-to-end encrypted with your key. Escape takes you from a conversation back to the list, then closes the window.",
+    "When someone writes to you, the message shows briefly above the map – a click on “Reply” opens the conversation. When a friend comes online, a notice tells you as well, so you can arrange the next game together."
+  ],
+  "uk": [
+    "👥 Тепер друзі можуть зв’язатися з вами просто посеред партії: на мапі поруч із шестернею з’явилася кнопка друзів. Лічильник показує непрочитані повідомлення та відкриті запити, зелена крапка – що хтось онлайн.",
+    "Один клік відкриває список друзів і чат у вікні над мапою – на телефоні як аркуш, як і інші. Це той самий чат, що й у стартовому меню, наскрізно зашифрований вашим ключем. Esc повертає з розмови до списку, а потім закриває вікно.",
+    "Коли вам пишуть, повідомлення ненадовго з’являється над мапою – клік на «Відповісти» відкриває розмову. Коли друг виходить онлайн, вас теж про це сповістить підказка, щоб ви могли домовитися про наступну гру."
+  ]
+}
