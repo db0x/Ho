@@ -2,7 +2,7 @@
 // refitting old ones and recycling them.
 import { refitShips, forecast } from '../../../shared/budget.js';
 import {
-  shipTypesFor, shipCost, buildLock, SHIP_DEFS, TECH_FIELDS, refitTotal, recycleRates, recycleValue
+  buildTypesFor, buildCost, buildLock, stationReady, STATION, SHIP_DEFS, TECH_FIELDS, refitTotal, recycleRates, recycleValue
 } from '../../../shared/rules.js';
 import { t } from '../../i18n.js';
 import { shipIcon } from '../../render/ships.js';
@@ -18,22 +18,31 @@ export const shipyardMethods = {
     const pl = this.plan();
     rows.innerHTML = '';
     const why = new Map();
-    for (const type of shipTypesFor(this.view)) {
-      const cost = shipCost(type, pl.tech);
+    const st = p.station || null;
+    for (const type of buildTypesFor(this.view)) {
+      // A world with a station - ready or being built - has nothing to order there.
+      if (type === 'station' && st) continue;
+      const cost = buildCost(type, pl.tech, p);
       const n = queue[type] || 0;
-      // Big ships need research and a large world - as the server checks it:
-      // with today's levels, not those after this turn's research.
-      const lock = buildLock(type, me.tech, p.pop);
-      const blocked = lock || !this.affordable({ build: [p.id, type] });
-      if (blocked) why.set(type, lock ? this.lockTip(type, p, pl) : this.budgetTip(type, cost, pl));
+      // Big ships need research, a large world or a ready station - as the
+      // server checks it: with today's levels, not those after this turn's research.
+      const lock = buildLock(type, me.tech, p.pop, st);
+      // One station per world: once ordered, the + is done.
+      const ordered = type === 'station' && n > 0;
+      const blocked = lock || ordered || !this.affordable({ build: [p.id, type] });
+      if (blocked) why.set(type, ordered ? t('yard.why.stationOrdered')
+        : lock ? this.lockTip(type, p, pl) : this.budgetTip(type, cost, pl));
+      const price = `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`;
+      const text = lock ? t('yard.needs', { list: needsText(lock) })
+        : type === 'fighter' && stationReady(st) ? `${price} · ${t('yard.stationDiscount', { pct: Math.round(STATION.fighterDiscount * 100) })}`
+        : price;
       const row = document.createElement('div');
       row.className = 'buildrow' + (lock ? ' locked' : '');
       row.innerHTML = `
         <span class="bi"></span>
         <span>
           <div class="bname">${t(`ship.${type}.name`)}</div>
-          <div class="bcost">${lock ? t('yard.needs', { list: needsText(lock) })
-            : `${fmt(cost.money)} ${t('unit.cr')} · ${fmt(cost.metal)} ${t('unit.metal')}`}</div>
+          <div class="bcost">${text}</div>
         </span>
         <span class="bq">
           <button class="tiny minus">−</button>
@@ -53,7 +62,7 @@ export const shipyardMethods = {
     this.wireTips(rows, el => why.get(el.dataset.tip) || '');
     let cm = 0, ce = 0;
     for (const [type, count] of Object.entries(queue)) {
-      const c = shipCost(type, pl.tech);
+      const c = buildCost(type, pl.tech, p);
       cm += c.money * count; ce += c.metal * count;
     }
     // Exactly two lines, always: the refit button and fleets sit below, and
@@ -90,6 +99,11 @@ export const shipyardMethods = {
     if (need.pop) {
       const ok = !buildLock(type, {}, p.pop)?.pop;
       lines.push(`<span class="k">${t('yard.why.pop')}</span><span class="v ${mark(ok)}">${t('yard.why.popValue', { have: fmt1(p.pop), need: need.pop })}</span>`);
+    }
+    if (need.station) {
+      const st = p.station;
+      lines.push(`<span class="k">${t('yard.why.station')}</span><span class="v ${mark(stationReady(st))}">${t(stationReady(st)
+        ? 'yard.why.stationOk' : st ? 'yard.why.stationBuilding' : 'yard.why.stationNone', { n: st?.building || 0, count: st?.building || 0 })}</span>`);
     }
     // Research done this turn only counts from the next one on - as on the server.
     const soon = !buildLock(type, pl.tech) && buildLock(type, me.tech);

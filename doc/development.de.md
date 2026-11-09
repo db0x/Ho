@@ -158,6 +158,7 @@ npm run test:engine    # 120 Runden mit 16 KI, Bilanz- und Zustandsinvarianten
 npm run test:hole      # Spiralpartie: Sperrzone um das schwarze Loch hält
 npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, Zusammenbruch
 npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
+npm run test:station   # Raumstation: Preis, eine pro Planet, 3 Runden, Jäger-Rabatt, Kampf, Eroberung, KI
 npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzter Planet verschont, Träger, Entwicklungsmodus
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:chase     # Abfangen im Flug: Einholen, Anhalten, Tempo, Befehle, Orbit und Sicht, KI

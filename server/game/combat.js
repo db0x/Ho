@@ -6,6 +6,7 @@ import {
 } from '../../shared/rules.js';
 import { hostile } from './diplomacy.js';
 import { cleanupFleets } from './fleets.js';
+import { repairStations } from './shipyard.js';
 import { planetById, playerById } from './game.js';
 import { nearestName } from './movement.js';
 
@@ -42,6 +43,7 @@ export function fightBattles(game, departures, entries, encounters = []) {
   const left = new Set(game.fleets.map(f => f.id));
   for (const f of game.fleets) if (f.chase && !left.has(f.chase)) { f.chase = null; f.aim = null; }
   repairFleets(game, fought, entries);
+  repairStations(game, fought);
   return fought;
 }
 
@@ -111,6 +113,12 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
     if (!sides.has(planet.owner)) sides.set(planet.owner, []);
     sides.get(planet.owner).push(...planet.defenses);
   }
+  // The orbital station fights along; under construction it is only a target.
+  const station = planet.owner ? planet.station : null;
+  if (station) {
+    if (!sides.has(planet.owner)) sides.set(planet.owner, []);
+    sides.get(planet.owner).push(station);
+  }
   // Only fight if there is any stranger in orbit at all - allies of the
   // owner are guests, not strangers.
   const intruder = [...sides.keys()].some(o => o !== planet.owner && (!planet.owner || hostile(game, o, planet.owner)));
@@ -128,7 +136,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
   const foes = (owner, among) => among.filter(([o]) => hostile(game, o, owner));
   const all = [...sides];
   if (!all.some(([o]) => foes(o, all).length)) return false;
-  const anyArmed = all.some(([o, ships]) => ships.some(s => s.attack > 0) && foes(o, all).length);
+  const anyArmed = all.some(([o, ships]) => ships.some(s => s.attack > 0 && !(s.building > 0)) && foes(o, all).length);
   if (!anyArmed) return false;
 
   const before = new Map([...sides].map(([k, v]) => [k, v.length]));
@@ -141,7 +149,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
   owners.forEach((owner, k) => {
     for (const s of sides.get(owner)) {
       idx.set(s, units.length);
-      units.push([k, s.isBattery ? 'battery' : s.type, s.hp, round1(s.maxHp)]);
+      units.push([k, s.isBattery ? 'battery' : s === station && s.building > 0 ? 'stationSite' : s.type, s.hp, round1(s.maxHp)]);
     }
   });
   const rounds = [];
@@ -158,7 +166,7 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
       const weights = enemies.map(targetWeight);
       const total = weights.reduce((a, w) => a + w, 0);
       for (const s of ships) {
-        if (!engaged(s) || s.attack <= 0) continue;
+        if (!engaged(s) || s.attack <= 0 || s.building > 0) continue;
         // Big ships fire several guns, each at a target of its own.
         const guns = gunsOf(s);
         for (let g = 0; g < guns; g++) {
@@ -196,11 +204,17 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
     f.ships = f.ships.filter(s => s.hp > 0);
   }
   if (planet.defenses) planet.defenses = planet.defenses.filter(s => s.hp > 0);
+  if (station && station.hp <= 0) {
+    planet.station = null;
+    entries.push({ type: 'combat', planetId: planet.id, playerIds: [...sides.keys()].filter(o => !isAlien(o)),
+      key: station.building > 0 ? 'log.stationSiteLost' : 'log.stationLost', params: { planet: planet.name } });
+  }
 
   // Whoever still has weapons controls the orbit; defenseless ships are lost.
   const armedOwners = new Set();
   for (const f of game.fleets) if (here(f) && f.ships.some(s => s.attack > 0)) armedOwners.add(f.owner);
   if (planet.defenses && planet.defenses.some(s => s.attack > 0)) armedOwners.add(planet.owner);
+  if (planet.station && !(planet.station.building > 0) && planet.station.attack > 0) armedOwners.add(planet.owner);
   if (battery && battery.hp > 0) armedOwners.add(planet.owner);
   // The orbit belongs to the armed if they are no longer at war with each
   // other - alone or as allies. Whoever is at war with them loses what is left.
@@ -225,7 +239,8 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
     const p = playerById(game, owner);
     const left = (game.fleets.filter(f => (here(f) || fleeing.includes(f)) && f.owner === owner)
       .reduce((a, f) => a + f.ships.length, 0))
-      + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0);
+      + (planet.owner === owner && planet.defenses ? planet.defenses.length : 0)
+      + (planet.owner === owner && station && planet.station === station ? 1 : 0);
     // The aliens have no name of their own - the client gives them one.
     tally.push({ name: p ? p.name : String(owner), left, before: n, ...(isAlien(owner) ? { alien: true } : {}) });
   }

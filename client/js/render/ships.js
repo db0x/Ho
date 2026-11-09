@@ -1,6 +1,7 @@
 // Ship graphics. Every class has its own silhouette; drawn pointing to the
 // right, the caller rotates.
 import { raiderWing, raiderHead, raiderHump, star, starArms } from './alienshapes.js';
+import { stationBody, STATION_LIGHTS } from './shipshd/station.js';
 
 function hullGradient(ctx, len) {
   const g = ctx.createLinearGradient(0, -len * 0.4, 0, len * 0.4);
@@ -675,10 +676,29 @@ function drawAlienCarrier(ctx, L, color, phase) {
   pulse(ctx, 0, 0, 2.2 * u, phase);
 }
 
+/* ------------------------------------------------------ Orbital station */
+// Upright and seen from the side, unlike the ships - the same drawing as the
+// ship profile (shipshd/station.js), without windows at map size.
+function stationParts(ctx, L, color, phase, site) {
+  const u = L / 100;
+  ctx.save();
+  ctx.scale(u, u);
+  stationBody(ctx, color, u, site, L < 70);
+  ctx.restore();
+  for (const l of STATION_LIGHTS[site ? 'stationSite' : 'station']) {
+    blinkLight(ctx, l.x * u, l.y * u, Math.max(0.7, l.r * u * 1.6), phase + l.off * 3);
+  }
+}
+const drawStation = (ctx, L, color, phase) => stationParts(ctx, L, color, phase, false);
+const drawStationSite = (ctx, L, color, phase) => stationParts(ctx, L, color, phase, true);
+/** Types that stand upright everywhere instead of turning with a heading. */
+export const UPRIGHT = new Set(['station', 'stationSite']);
+
 const DRAW = {
   scout: drawScout, fighter: drawFighter, satellite: drawSatellite,
   colony: drawColony, tanker: drawTanker, transport: drawTransport, destroyer: drawDestroyer,
-  alienFighter: drawAlienFighter, alienCarrier: drawAlienCarrier
+  alienFighter: drawAlienFighter, alienCarrier: drawAlienCarrier,
+  station: drawStation, stationSite: drawStationSite
 };
 
 /* ------------------------------------------------------------- Sprites */
@@ -697,7 +717,7 @@ const MAX_SHIPS = 400;
  * smaller, the fighter slightly bigger, the destroyer clearly the largest. The detailed drawing (shipshd.js)
  * uses the same factors.
  */
-export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5, alienFighter: 1, alienCarrier: 1.45 };
+export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5, alienFighter: 1, alienCarrier: 1.45, station: 1.35, stationSite: 1.35 };
 /**
  * How far the middle of a hull lies ahead of the origin, in units of the
  * length/100: the destroyer's bow reaches out to 52, its stern only to -40.
@@ -850,6 +870,30 @@ export function drawFleetShips(ctx, o, f, lead) {
   else drawShip(ctx, { ...o, type: lead });
 }
 
+/**
+ * The orbital station of a world on the map: close up and to the left of
+ * it, upright - a construction site while it is being built.
+ * @param {{station: object}} p  the world's view
+ * @param {number} r   radius of the world on screen
+ * @param {number} sc  orbitScale of the zoom
+ * @returns {{x: number, y: number, r: number} | null} where it was drawn, to click on
+ */
+export function drawPlanetStation(ctx, p, x, y, r, sc, color, phase) {
+  if (!p.station) return null;
+  // Never bigger than its world: zoomed out it shrinks with the planet,
+  // zoomed in it stops growing at the size of the orbit's ships.
+  const len = Math.min(27 * sc, r * 1.5);
+  if (len < 5) return null;
+  const a = -Math.PI * 0.75;
+  const orr = r + len * 0.66;
+  const at = { x: x + Math.cos(a) * orr, y: y + Math.sin(a) * orr, r: Math.max(8, len * 0.78) };
+  drawShip(ctx, {
+    type: p.station.building > 0 ? 'stationSite' : 'station',
+    x: at.x, y: at.y, angle: 0, len, color, phase
+  });
+  return at;
+}
+
 /** Engine trail for flying fleets. */
 export function drawTrail(ctx, x, y, angle, len, color) {
   ctx.save();
@@ -893,7 +937,7 @@ export function shipIcon(type, px = 34, color = '#9fb0c8') {
   // Ships whose hull does not sit around their origin are moved by that much,
   // so the hull - not the origin - is in the middle of the square.
   const shift = (SHIP_CENTER[type] || 0) * len * (SHIP_SCALE[type] || 1) / 100;
-  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: -Math.PI / 2, len, color, phase: 0.4, shadow: false });
+  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: UPRIGHT.has(type) ? 0 : -Math.PI / 2, len, color, phase: 0.4, shadow: false });
   iconCache.set(key, cv);
   return cv;
 }

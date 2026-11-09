@@ -43,6 +43,8 @@ export function colonize(game, entries) {
         planet.pop = Math.max(0.5, Math.round(before * 0.65 * 10) / 10);
         planet.terraBudget = 0;
         planet.terraSpent = 0;
+        // A station still there (only a construction site can be) is blown up.
+        planet.station = null;
         entries.push({ type: 'invade', playerIds: [owner, old ? old.id : null].filter(Boolean), planetId: planet.id,
           key: old ? 'log.invadeFrom' : 'log.invade',
           params: { player: p.name, planet: planet.name, from: old ? old.name : null } });
@@ -106,6 +108,8 @@ function presentOwners(game, planet) {
   const set = new Set();
   for (const f of game.fleets) if (f.at === planet.id && f.ships.length) set.add(f.owner);
   if (planet.owner && planet.defenses && planet.defenses.length) set.add(planet.owner);
+  // A ready station holds the orbit like the satellites - it has to be shot down first.
+  if (planet.owner && planet.station && !(planet.station.building > 0)) set.add(planet.owner);
   if (planet.owner && planet.pop >= 0.5 && !planet._orbitLost) set.add(planet.owner);
   return [...set];
 }

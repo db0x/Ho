@@ -19,7 +19,8 @@ gravity; settled planets tint their surroundings in their colony's colour.*
   empty seats filled with AI.
 - **AI with personality:** conqueror, settler, technocrat, raider, bulwark, vulture.
 - **Fighters and capital ships:** swarms of small ships, and named destroyers that
-  draw the fire and repair their fleet – or classic Ho!! with the small ships only.
+  draw the fire and repair their fleet, built at orbital stations that have to be
+  defended – or classic Ho!! with the small ships only.
 - **Alliances,** open or secret – with humans and AI alike. Allies share sight and
   supply, win together, and sometimes betray each other.
 - **Flat or in space,** as a scatter field or a spiral galaxy with a black hole –

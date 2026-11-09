@@ -2,16 +2,28 @@
   "de": [
     "👥 Freunde erreichen dich jetzt auch mitten in der Partie: Auf der Karte gibt es neben dem Zahnrad einen Freunde-Knopf. Ein Zähler zeigt ungelesene Nachrichten und offene Anfragen, ein grüner Punkt, dass jemand online ist.",
     "Ein Klick öffnet deine Freundesliste und den Chat als Fenster über der Karte – auf dem Handy als Blatt wie die anderen. Es ist derselbe Chat wie im Startmenü, Ende-zu-Ende-verschlüsselt mit deinem Schlüssel. Esc führt aus dem Gespräch zurück zur Liste und schließt dann das Fenster.",
-    "Schreibt dir jemand, erscheint die Nachricht kurz über der Karte – ein Klick auf „Antworten“ öffnet das Gespräch. Kommt ein Freund online, sagt dir das ebenfalls ein Hinweis, damit ihr euch für die nächste Runde verabreden könnt."
+    "Schreibt dir jemand, erscheint die Nachricht kurz über der Karte – ein Klick auf „Antworten“ öffnet das Gespräch. Kommt ein Freund online, sagt dir das ebenfalls ein Hinweis, damit ihr euch für die nächste Runde verabreden könnt.",
+    "🛰 Neu: die Raumstation. Träger entstehen jetzt nur noch an einer Raumstation im Orbit – erst die Station bauen, dann die Träger. Sie kostet so viel wie ein Träger, braucht Waffen 5, Schilde 5 und einen Planeten ab 20 Mio. Einwohnern und ist nach 3 Runden fertig; bis dahin dreht sich dort eine Baustelle. Jäger kosten an der Station 25 % weniger.",
+    "Ist die Station fertig, übernimmt sie die Werft des Planeten: Klick sie auf der Karte an, dort wird gebaut. Eine pro Planet, sie fliegt nicht und lässt sich nicht transportieren.",
+    "Die Station verteidigt ihren Planeten mit: ein Rumpf wie ein Träger, der das Feuer auf sich zieht, und vier Geschütze. Solange sie steht, fällt der Planet nicht – wird sie abgeschossen oder der Planet erobert, ist sie verloren. Die KI spielt mit: Sie baut Stationen, holt sich dort ihre Träger und günstigeren Jäger und rechnet fremde Stationen ein, bevor sie angreift. Raumstationen gibt es nur, wenn in der Lobby Großkampfschiffe erlaubt sind.",
+    "Der Alien-Jäger hat in der Großansicht seine zwei fühlerartigen Kanonen verloren. In der Anleitung stehen jetzt auch Raumstation, Alien-Träger und Alien-Jäger mit Bild."
   ],
   "en": [
     "👥 Friends can now reach you in the middle of a game: on the map, next to the gear, there is a friends button. A counter shows unread messages and open requests, a green dot that someone is online.",
     "One click opens your friends list and the chat as a window above the map – on a phone as a sheet like the others. It is the same chat as in the start menu, end-to-end encrypted with your key. Escape takes you from a conversation back to the list, then closes the window.",
-    "When someone writes to you, the message shows briefly above the map – a click on “Reply” opens the conversation. When a friend comes online, a notice tells you as well, so you can arrange the next game together."
+    "When someone writes to you, the message shows briefly above the map – a click on “Reply” opens the conversation. When a friend comes online, a notice tells you as well, so you can arrange the next game together.",
+    "🛰 New: the orbital station. Destroyers are now only built at an orbital station – build the station first, then the destroyers. It costs as much as a destroyer, needs Weapons 5, Shields 5 and a planet with at least 20M people, and is ready after 3 turns; until then a construction site stands there. Fighters cost 25% less at the station.",
+    "Once ready, the station takes over the planet's shipyard: click it on the map to build there. One per planet; it never flies and cannot be transported.",
+    "The station helps defend its planet: a hull like a destroyer that draws the fire, and four guns. As long as it stands, the planet does not fall – shot down, or the planet conquered, and it is lost. The AI plays along: it builds stations, gets its destroyers and cheaper fighters there, and reckons with enemy stations before it attacks. Orbital stations only exist when capital ships are allowed in the lobby.",
+    "The alien fighter has lost its two feeler-like guns in the large view. The manual now also shows the orbital station, the alien carrier and the alien fighter with pictures."
   ],
   "uk": [
     "👥 Тепер друзі можуть зв’язатися з вами просто посеред партії: на мапі поруч із шестернею з’явилася кнопка друзів. Лічильник показує непрочитані повідомлення та відкриті запити, зелена крапка – що хтось онлайн.",
     "Один клік відкриває список друзів і чат у вікні над мапою – на телефоні як аркуш, як і інші. Це той самий чат, що й у стартовому меню, наскрізно зашифрований вашим ключем. Esc повертає з розмови до списку, а потім закриває вікно.",
-    "Коли вам пишуть, повідомлення ненадовго з’являється над мапою – клік на «Відповісти» відкриває розмову. Коли друг виходить онлайн, вас теж про це сповістить підказка, щоб ви могли домовитися про наступну гру."
+    "Коли вам пишуть, повідомлення ненадовго з’являється над мапою – клік на «Відповісти» відкриває розмову. Коли друг виходить онлайн, вас теж про це сповістить підказка, щоб ви могли домовитися про наступну гру.",
+    "🛰 Нове: орбітальна станція. Есмінці тепер будують лише біля орбітальної станції – спершу станція, потім есмінці. Вона коштує як есмінець, потребує Зброї 5, Щитів 5 і планети від 20 млн мешканців і готова через 3 ходи; доти там стоїть будмайданчик. Винищувачі біля станції коштують на 25 % менше.",
+    "Готова станція перебирає верф планети: клацніть її на мапі, щоб будувати там. Одна на планету; вона не літає й не може бути перевезена.",
+    "Станція допомагає захищати свою планету: корпус як в есмінця, що притягує вогонь, і чотири гармати. Поки вона стоїть, планета не впаде – знищена або планету завойовано, і її втрачено. ШІ теж грає за цими правилами: будує станції, отримує там есмінці й дешевші винищувачі та враховує чужі станції, перш ніж атакувати. Орбітальні станції є лише тоді, коли в лобі дозволено великі бойові кораблі.",
+    "Інопланетний винищувач у великому вигляді втратив свої дві гармати, схожі на вусики. У посібнику тепер також є орбітальна станція, інопланетний носій та інопланетний винищувач із зображеннями."
   ]
 }

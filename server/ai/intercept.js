@@ -29,10 +29,11 @@ function power(f) {
   return attack * hp;
 }
 
-/** Does the world hold out alone against what comes for it - battery and satellites? */
+/** Does the world hold out alone against what comes for it - battery, satellites and station? */
 function holdsAlone(world, fire, tech) {
   const bs = batteryStats(world.pop, tech);
-  const hp = (bs ? bs.hp : 0) + (world.defenses || []).reduce((a, d) => a + d.hp, 0);
+  const hp = (bs ? bs.hp : 0) + (world.defenses || []).reduce((a, d) => a + d.hp, 0)
+    + (world.station ? world.station.hp : 0);
   return fire * COMBAT_ROUNDS * HIT_RATE < hp * 0.8;
 }
 

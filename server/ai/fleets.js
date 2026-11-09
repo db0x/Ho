@@ -29,7 +29,8 @@ export function logistics(s) {
     .filter(x => x.p && x.p.owner === bot.id && !held.has(x.p.id) && x.p.pop >= 0.5)
     .filter(x => {
       const bs = batteryStats(x.p.pop, bot.tech);
-      const hp = (bs ? bs.hp : 0) + (x.p.defenses || []).reduce((a, d) => a + d.maxHp, 0) + 5 * sat.maxHp;
+      const hp = (bs ? bs.hp : 0) + (x.p.defenses || []).reduce((a, d) => a + d.maxHp, 0)
+        + (x.p.station ? x.p.station.hp : 0) + 5 * sat.maxHp;
       return x.a * COMBAT_ROUNDS * HIT_RATE < hp * 1.5;
     })
     .sort((x, y) => y.a - x.a);

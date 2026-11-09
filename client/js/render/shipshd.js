@@ -12,10 +12,11 @@ import { fighter } from './shipshd/fighter.js';
 import { plume, light } from './shipshd/kit.js';
 import { satellite } from './shipshd/satellite.js';
 import { scout } from './shipshd/scout.js';
+import { station, stationSite } from './shipshd/station.js';
 import { tanker } from './shipshd/tanker.js';
 import { transport } from './shipshd/transport.js';
 
-const TYPES = { scout, fighter, satellite, colony, tanker, transport, destroyer, alienFighter, alienCarrier };
+const TYPES = { scout, fighter, satellite, colony, tanker, transport, destroyer, alienFighter, alienCarrier, station, stationSite };
 
 const cache = new Map();
 

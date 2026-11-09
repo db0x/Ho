@@ -1,7 +1,7 @@
 // What the shipyards build, what gets refitted, and what goes into the
 // scrap press.
 import {
-  shipStats, travelDistance, dist, buildLock, shipCost, recycleValue, refitTotal
+  shipStats, travelDistance, dist, buildLock, shipCost, buildCost, stationReady, recycleValue, refitTotal
 } from '../../shared/rules.js';
 import { planetById } from '../game/game.js';
 import { setOrders } from '../game/orders.js';
@@ -89,29 +89,43 @@ export function build(s) {
     const have = myFleets.reduce((a, f) => a + f.ships.filter(s => s.cargo).length, 0);
     if (have < (P.satellites >= 3 ? 2 : 1) && surplus(s).length) order.push([yard, 'transport', 1]);
   };
-  // The anchor for the fleet: one per so many fighters, built at the
-  // largest world that may - repairs then happen at home anyway. It costs
-  // more than a turn's budget, so the empire saves up for it: fighters
-  // only when threatened, until it is paid for.
-  const big = P.capital && war && game.settings.capitalShips !== false ? yards.find(p => !buildLock('destroyer', bot.tech, p.pop)) : null;
+  // The anchor for the fleet: one per so many fighters, built at an orbital
+  // station - the first one goes up at the largest world that may carry one,
+  // repairs then happen at home anyway. Station and destroyer each cost more
+  // than a turn's budget, so the empire saves up for them: fighters only
+  // when threatened, until they are paid for.
+  const capitals = P.capital && war && game.settings.capitalShips !== false;
   let saving = false;
-  if (big) {
+  if (capitals) {
     const ships = myFleets.flatMap(f => f.ships);
     const fighters = ships.filter(s => s.type === 'fighter').length;
     const have = ships.filter(s => s.type === 'destroyer').length;
     if (have < Math.floor(fighters / P.capital)) {
-      const c = shipCost('destroyer', bot.tech);
-      if (c.money <= budget && c.metal <= bot.metal) order.push([big, 'destroyer', 1]);
-      else saving = true;
+      const ready = yards.find(p => !buildLock('destroyer', bot.tech, p.pop, p.station || null));
+      const site = yards.some(p => p.station);
+      const spot = !site && yards.find(p => !buildLock('station', bot.tech, p.pop));
+      const [pl, type] = ready ? [ready, 'destroyer'] : spot ? [spot, 'station'] : [null, null];
+      if (pl) {
+        const c = shipCost(type, bot.tech);
+        if (c.money <= budget && c.metal <= bot.metal) order.push([pl, type, 1]);
+        else saving = true;
+      }
     }
   }
+  // Fighters cost a quarter less at a ready station: built there whenever it
+  // lies within a fighter's range of where they are needed - like a player
+  // would, instead of paying full price next door.
+  const reach = shipStats('fighter', bot.tech).range;
+  const atStation = yards.filter(p => stationReady(p.station) && dist(p, shipyard) <= reach)
+    .sort((a, b) => dist(a, shipyard) - dist(b, shipyard))[0];
+  const fighterYard = atStation || shipyard;
   const warships = () => {
     if (saving && !threatened.size) return;
     // If a lot of money is lying around, it goes into ships instead of being hoarded.
     const hoard = Math.floor(Math.max(0, budget - 10 * fighterCost.money) / fighterCost.money * 0.4);
     const n = Math.min(P.fighters + (camp ? 2 : 0) + hoard, Math.ceil(cap - myShips));
-    if (war && n > 0) order.push([shipyard, 'fighter', n]);
-    else if (threatened.size) order.push([shipyard, 'fighter', 2]);
+    if (war && n > 0) order.push([fighterYard, 'fighter', n]);
+    else if (threatened.size) order.push([fighterYard, 'fighter', 2]);
   };
 
   scouts();
@@ -127,7 +141,8 @@ export function build(s) {
   const oreReserve = wantColony > 0 ? shipCost('colony', bot.tech).metal * 2 : 0;
   let spentMoney = 0, spentMetal = 0;
   for (const [pl, type, n] of order) {
-    const c = shipCost(type, bot.tech);
+    // The real price at that yard - fighters at a station cost less.
+    const c = buildCost(type, bot.tech, pl);
     const ore = type === 'colony' || type === 'scout' ? bot.metal : bot.metal - oreReserve;
     let k = 0;
     while (k < n

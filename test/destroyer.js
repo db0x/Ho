@@ -1,12 +1,12 @@
 // Destroyer: the capital ship. Costs as much as ten fighters on every tech
-// level, needs Weapons 5, Shields 5 and a shipyard on a world with 20M
-// people, fires eight guns, draws the fire, repairs its fleet in the orbit
+// level, needs Weapons 5, Shields 5 and a ready orbital station at its
+// world (test/station.js), fires eight guns, draws the fire, repairs its fleet in the orbit
 // of an own world - and carries a name its owner can change.
 import { createGame, startGame } from '../server/game/game.js';
 import { buildView } from '../server/game/intel.js';
 import { setOrders } from '../server/game/orders.js';
 import { addPlayer } from '../server/game/players.js';
-import { devDestroyer } from '../server/game/shipyard.js';
+import { devDestroyer, devStation } from '../server/game/shipyard.js';
 import { resolveTurn } from '../server/game/turn.js';
 import { SHIP_NAMES } from '../server/shipnames.js';
 import { shipCost, shipStats, buildLock, REPAIR_SHARE, refitCost, shipTypesFor } from '../shared/rules.js';
@@ -47,33 +47,33 @@ const unlock = p => { p.tech.weapons = 5; p.tech.shields = 5; };
   console.log('Price: ten fighters on every level, refit included; 8 guns, weight 4.');
 }
 
-// 2) Locked: research and a large world first - when ordering and at the end of the turn
+// 2) Locked: research and a ready orbital station first - when ordering and at the end of the turn
 {
   const { g, me, home } = setup();
-  assert(buildLock('destroyer', me.tech, home.pop)?.weapons === 5, 'Locked without research?');
-  let r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
-  assert(r?.error === 'yard.locked', 'Order without research accepted');
-  unlock(me);
-  home.pop = 12;
-  r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
-  assert(r?.error === 'yard.locked', 'Order on a small world accepted');
-  // The population counts as shown, to one decimal: 19.96 reads 20.0 and is enough, 19.94 is not.
-  assert(!buildLock('destroyer', me.tech, 19.96), 'A world showing 20.0M refused');
-  assert(buildLock('destroyer', me.tech, 19.94)?.pop === 20, 'A world showing 19.9M accepted');
   home.pop = 30;
+  assert(buildLock('destroyer', me.tech, home.pop, null)?.weapons === 5, 'Locked without research?');
+  let r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
+  assert(r?.error === 'yard.lockedStation', 'Order without research accepted');
+  unlock(me);
+  r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
+  assert(r?.error === 'yard.lockedStation', 'Order without a station accepted');
+  // A large world alone is no longer enough - the station is.
+  assert(buildLock('destroyer', me.tech, 40, null)?.station, 'A large world without a station unlocks the destroyer');
+  assert(!buildLock('destroyer', me.tech, 2, { hp: 1 }), 'A ready station on a small world does not unlock it');
+  devStation(g, me, home.id);
   r = setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 1 } });
   assert(!r?.error, 'Order refused although unlocked: ' + r?.error);
-  // The world shrinks before the end of the turn: nothing is built, and it says so.
-  home.pop = 15;
+  // The station is lost before the end of the turn: nothing is built, and it says so.
+  home.station = null;
   const log = resolveTurn(g);
-  assert(!g.fleets.some(f => f.ships.some(s => s.type === 'destroyer')), 'Built on a world that has become too small');
+  assert(!g.fleets.some(f => f.ships.some(s => s.type === 'destroyer')), 'Built without a station');
   assert(log.some(e => e.key === 'log.buildLocked'), 'No word about the build that did not happen');
-  home.pop = 30;
+  devStation(g, me, home.id);
   setOrders(g, me, { build: { planetId: home.id, type: 'destroyer', count: 2 } });
   resolveTurn(g);
   const built = g.fleets.flatMap(f => f.ships).filter(s => s.type === 'destroyer');
   assert(built.length === 2, `${built.length} destroyers built instead of 2`);
-  console.log('Locked: refused without research and on small worlds, also at the end of the turn.');
+  console.log('Locked: refused without research and without a station, also at the end of the turn.');
 }
 
 // 3) Names: from the fund, never twice, numbered once it runs out - and the owner may rename

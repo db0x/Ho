@@ -9,7 +9,7 @@
 // What cannot be foreseen here: combat, conquest and new colonies between
 // building and settlement - they only change the income.
 import {
-  TECH_FIELDS, techMaxLevel, techCostToNext, SHIP_TYPES, shipCost, refitCost,
+  TECH_FIELDS, techMaxLevel, techCostToNext, BUILD_TYPES, buildCost, refitCost,
   terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining
 } from './rules.js';
 
@@ -92,8 +92,9 @@ export function forecast(view) {
   // first one that fails, the rest of that type is left over.
   for (const [pid, q] of Object.entries(me.builds || {})) {
     if (!shipyard(view, pid)) continue;
-    for (const type of SHIP_TYPES) {
-      const c = shipCost(type, tech);
+    for (const type of BUILD_TYPES) {
+      // Fighters cost less at a ready station - as the server builds them.
+      const c = buildCost(type, tech, view.planets[pid]);
       let broke = false;
       for (let i = 0; i < (q[type] || 0); i++) {
         if (broke) { build.planned.money += c.money; build.planned.metal += c.metal; build.planned.n++; continue; }

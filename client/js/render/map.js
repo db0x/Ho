@@ -1,7 +1,7 @@
 // Star map: camera, background, planets, fleets, course lines.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, drawPlanetStation } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -432,6 +432,12 @@ export class MapView {
           });
         }
       }
+      // The station is a target of its own: it holds the world's shipyard.
+      const st = p.owner ? drawPlanetStation(ctx, p, sx, sy, r, orbitScale(z), colorOf(p.owner), this.phase) : null;
+      if (st) {
+        if (this.selection?.type === 'station' && this.selection.id === p.id) this.ringAt(ctx, st.x, st.y, st.r);
+        this.hit.push({ type: 'station', id: p.id, x: st.x, y: st.y, r: st.r });
+      }
       ctx.globalAlpha = 1;
     }
 
@@ -496,7 +502,7 @@ export class MapView {
     if (this._eta) this.badge(ctx, this._eta.at[0], this._eta.at[1], this._eta.text, '#ffd877', true);
 
     // Course preview for the selected fleet
-    if (selFleet?.mine && (this.hover?.type === 'planet' || this.hover?.type === 'hole')) {
+    if (selFleet?.mine && ['planet', 'station', 'hole'].includes(this.hover?.type)) {
       const target = this.hover.type === 'hole' ? v.wormholes?.find(m => m.id === this.hover.id)
         : this.view.planets[this.hover.id];
       const src = selFleet.at != null ? this.view.planets[selFleet.at] : selFleet;
@@ -523,7 +529,7 @@ export class MapView {
       }
     }
 
-    if (this.hover?.type === 'planet') this.tooltip(ctx, this.view.planets[this.hover.id]);
+    if (this.hover?.type === 'planet' || this.hover?.type === 'station') this.tooltip(ctx, this.view.planets[this.hover.id]);
     if (this.hover?.type === 'hole') {
       const m = v.wormholes?.find(x => x.id === this.hover.id);
       if (m) this.tooltipAt(ctx, ...this.w2s(m.x, m.y), this.mouthRadius() * 0.7, t('hole.name'), mouthLines(v, m));
