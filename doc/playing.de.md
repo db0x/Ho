@@ -144,6 +144,15 @@ Damit das niemand im Kopf rechnen muss:
   stehen, bei dem die Aufträge noch aufgehen – **Aufträge gehen vor**. Ein Bau,
   der am Rundenende am Geld scheitert, kommt dadurch nicht vor.
 
+**Forschungsvorlagen:** Oben im Forschungs-Tab speicherst du mit *+ Speichern*
+den aktuellen Forschungsanteil samt aller Gewichte unter einem Namen; ein Tipp auf
+die Vorlage setzt sie wieder, die gerade aktive ist gold umrandet. Unter
+*Verwalten* lassen sich Vorlagen umbenennen, mit den aktuellen Werten
+überschreiben (*Übernehmen*) und löschen. Die mit ★ markierte wird in jeder neuen
+Partie in Runde 1 automatisch gesetzt. Bis zu acht Vorlagen; mit Konto gehören
+sie zum Konto und sind auf jedem Gerät dieselben, ohne Anmeldung merkt sie sich
+der Browser.
+
 ## Kampf und Eroberung
 
 Treffen in einem Orbit feindliche Flotten aufeinander, wird gekämpft – vorn
@@ -161,6 +170,16 @@ fliegt danach weiter. Eine schnellere Flotte holt ein, eine langsamere nur im
 Gegenkurs. Erreicht das Ziel einen Orbit, folgt deine Flotte dorthin; gerät es
 außer Sicht, endet die Verfolgung. Auch die KI-Kolonien fangen ab. Abschaltbar
 in der Lobby.
+
+**Nebel des Krieges:** Du siehst nur, was deine Sensoren erfassen – rund um deine
+Planeten und Flotten, auf der Karte als heller Bereich im dunklen Schleier.
+**Späher** und Planeten mit fertiger **Orbitalstation** sehen deutlich weiter als
+der Rest; Verbündete teilen ihre Sicht. Planeten außer Sicht zeigen den Stand, als
+du sie zuletzt gesehen hast. Eine fremde Flotte in Sichtweite verrät Ziel und
+Ankunft nur, wenn sie auf einen deiner Planeten oder den eines Verbündeten
+zuhält – sonst siehst du nur ihre Flugrichtung als kurzen, gepunkteten Pfeil. Die Zahlen anderer Reiche (Planeten, Bevölkerung, Schiffe) bleiben
+verborgen. Die KI spielt nach denselben Regeln. Abschaltbar in der Lobby; aus,
+gilt die ältere, weitere Sicht.
 
 Ein Planet fällt, wenn ein Angreifer den Orbit hält und weder
 Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht

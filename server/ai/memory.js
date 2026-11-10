@@ -53,7 +53,7 @@ export function memory(game, bot) {
  * against the new owner, approaching battle fleets a little too.
  * Returns the threatened own worlds with the firepower heading for them.
  */
-export function perceive(game, bot, ai, mine, enemyWorlds) {
+export function perceive(game, bot, ai, mine, enemyWorlds, sight) {
   const now = new Set(mine.map(p => p.id));
   for (const id of ai.owned) {
     if (now.has(id)) continue;
@@ -70,10 +70,11 @@ export function perceive(game, bot, ai, mine, enemyWorlds) {
   ai.owned = now;
 
   const threatened = new Map();
-  for (const f of game.fleets) {
+  // Only fleets in sight, and only targets known of them (perception.js).
+  for (const { f, knownDest } of sight) {
     // Allies come as guests - unless notice was given.
     if (f.owner === bot.id || friendly(game, bot, f.owner)) continue;
-    const target = f.dest != null ? f.dest : f.at;
+    const target = knownDest != null ? knownDest : f.at;
     if (target == null || !now.has(target)) continue;
     const fire = f.ships.reduce((a, s) => a + s.attack, 0);
     if (fire <= 0) continue;

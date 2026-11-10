@@ -5,7 +5,7 @@ import { canReach } from '../server/game/movement.js';
 import { setOrders } from '../server/game/orders.js';
 import { addPlayer } from '../server/game/players.js';
 import { resolveTurn } from '../server/game/turn.js';
-import { habitability, refitTotal, refitCost, dist } from '../shared/rules.js';
+import { habitability, refitTotal, refitCost, dist, SENSOR } from '../shared/rules.js';
 import { runBot } from '../server/ai/bot.js';
 import { generateGalaxy } from '../server/galaxy.js';
 
@@ -46,11 +46,13 @@ for (let t = 0; t < TURNS && game.state === 'running'; t++) {
     if (pl.owner) assert(game.players.some(p => p.id === pl.owner), 'Planet has a phantom owner');
   }
   // What the scanners around your own worlds pick up is up to date for this
-  // turn - not as of the first discovery.
+  // turn - not as of the first discovery. With fog of war the sensors reach
+  // less far (at least SENSOR.world around every world).
+  const scan = game.settings.fog ? SENSOR.world : 230;
   for (const p of game.players.filter(q => q.alive)) {
     const mine = game.galaxy.planets.filter(q => q.owner === p.id);
     for (const pl of game.galaxy.planets) {
-      if (pl.owner === p.id || !mine.some(q => dist(q, pl) < 230)) continue;
+      if (pl.owner === p.id || !mine.some(q => dist(q, pl) < scan)) continue;
       const k = p.knowledge[pl.id];
       assert(k && k.owner === pl.owner,
         `${p.name} sees ${pl.name} outdated in the scanner: owner ${k?.owner} instead of ${pl.owner} (as of turn ${k?.turn})`);

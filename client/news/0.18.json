@@ -1,0 +1,26 @@
+{
+  "de": [
+    "🌫 Neu: Nebel des Krieges. Du siehst nur noch, was deine Sensoren erfassen – rund um deine Planeten und Flotten. Alles dahinter liegt auf der Karte unter einem dunklen Schleier; Planeten dort zeigen den Stand, als du sie zuletzt gesehen hast. Neue Partien starten mit Nebel, in der Lobby lässt er sich abschalten – dann gilt die alte, weitere Sicht.",
+    "🛰 Späher und Planeten mit fertiger Orbitalstation sehen deutlich weiter als der Rest – Späher sind jetzt die Augen deines Reichs. Verbündete teilen weiterhin ihre Sicht.",
+    "Fremde Flotten verraten Ziel und Ankunft nur noch, wenn sie auf einen deiner Planeten (oder den eines Verbündeten) zuhalten. Sonst siehst du nur ihre Flugrichtung als kurzen, gepunkteten Pfeil – wohin sie wirklich wollen, musst du selbst erraten.",
+    "In der Rangliste bleiben Planeten, Bevölkerung und Schiffe anderer Reiche verborgen – du kennst nur deine eigenen Zahlen und die deiner Verbündeten.",
+    "Die KI spielt nach denselben Regeln: Sie bemerkt einen Angriff erst, wenn er in ihre Sensoren fliegt, beurteilt fremde Planeten nach dem, was sie zuletzt von ihnen gesehen hat, und schätzt, wer vorn liegt, nur aus den Planeten, die sie kennt.",
+    "🧪 Neu: Forschungsvorlagen. Oben im Forschungs-Tab speicherst du deine Einstellung – Forschungsanteil und alle Gewichte – unter einem Namen und setzt sie mit einem Tipp wieder. Unter „Verwalten“ benennst du Vorlagen um, überschreibst sie mit den aktuellen Werten oder löschst sie. Die mit ★ wird in jeder neuen Partie automatisch gesetzt – kein Einstellen mehr zu Beginn. Mit Konto sind die Vorlagen auf jedem Gerät dieselben."
+  ],
+  "en": [
+    "🌫 New: fog of war. You now only see what your sensors cover – around your planets and fleets. Everything beyond lies under a dark veil on the map; planets there show what they were like when you last saw them. New games start with fog; it can be switched off in the lobby – then the old, wider sight applies.",
+    "🛰 Scouts and planets with a finished orbital station see much farther than the rest – scouts are now the eyes of your empire. Allies still share their sight.",
+    "Foreign fleets only give away their target and arrival if they are heading for one of your planets (or an ally's). Otherwise you only see their direction as a short dotted arrow – where they are really going is yours to guess.",
+    "In the ranking, the planets, population and ships of other empires stay hidden – you only know your own numbers and your allies'.",
+    "The AI plays by the same rules: it only notices an attack once it flies into its sensors, judges foreign planets by what it last saw of them, and reckons who is ahead only from the planets it knows.",
+    "🧪 New: research presets. At the top of the research tab you save your settings – research share and all weights – under a name and set them again with one tap. Under “Manage” you rename presets, overwrite them with the current settings or delete them. The one marked ★ is set in every new game automatically – no more setting up at the start. With an account the presets are the same on every device."
+  ],
+  "uk": [
+    "🌫 Нове: туман війни. Тепер ви бачите лише те, що охоплюють ваші сенсори, – навколо ваших планет і флотів. Усе, що далі, лежить на мапі під темною завісою; планети там показують стан, у якому ви бачили їх востаннє. Нові партії починаються з туманом, у лобі його можна вимкнути – тоді діє давніший, ширший огляд.",
+    "🛰 Розвідники та планети з готовою орбітальною станцією бачать значно далі за інших – розвідники тепер очі вашої імперії. Союзники, як і раніше, діляться своїм оглядом.",
+    "Чужі флоти видають ціль і час прибуття лише тоді, коли прямують до однієї з ваших планет (або планети союзника). Інакше ви бачите лише напрямок польоту – коротку пунктирну стрілку, а куди вони насправді летять, доведеться вгадувати.",
+    "У рейтингу планети, населення й кораблі інших імперій приховані – ви знаєте лише свої числа та числа союзників.",
+    "ШІ грає за тими самими правилами: помічає атаку, лише коли вона залітає в його сенсори, оцінює чужі планети за тим, що бачив востаннє, і визначає лідера лише за відомими йому планетами.",
+    "🧪 Нове: шаблони досліджень. Угорі вкладки досліджень ви зберігаєте свої налаштування – частку досліджень і всі ваги – під назвою й задаєте їх знову одним дотиком. У «Керувати» ви перейменовуєте шаблони, перезаписуєте їх поточними значеннями або видаляєте. Шаблон із ★ задається автоматично в кожній новій партії – більше не треба налаштовувати на початку. З обліковим записом шаблони однакові на кожному пристрої."
+  ]
+}

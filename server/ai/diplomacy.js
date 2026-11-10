@@ -15,6 +15,7 @@
 //   first moves its fleets into the ally's orbit as guests, gives notice
 //   once they are in place, and the battle starts inside the defenses.
 import { dist, clamp } from '../../shared/rules.js';
+import { perceivedPlanets, popOf } from './perception.js';
 import {
   allianceOf, offerAlliance, answerOffer, endAlliance, announceAlliance, mayOffer, knowsAlliance,
   partnerIn, alliesOf, NOTICE_TURNS
@@ -56,21 +57,24 @@ export function knownAllies(game, bot, id) {
 function outlook(game, bot) {
   const ai = memory(game, bot);
   const living = game.players.filter(p => p.alive);
-  const totalPop = living.reduce((a, p) => a + p.stats.pop, 0) || 1;
-  const share = id => (playerById(game, id)?.stats.pop || 0) / totalPop;
-  const top = living.slice().sort((a, b) => b.stats.pop - a.stats.pop)[0];
-  const leader = top && top.stats.pop / totalPop > 0.25 && living.length > 2 ? top.id : null;
+  // With fog of war: sizes and owners only as far as this empire knows them.
+  const planets = perceivedPlanets(game, bot);
+  const popBy = popOf(game, bot, planets);
+  const totalPop = living.reduce((a, p) => a + popBy(p.id), 0) || 1;
+  const share = id => popBy(id) / totalPop;
+  const top = living.slice().sort((a, b) => popBy(b.id) - popBy(a.id))[0];
+  const leader = top && popBy(top.id) / totalPop > 0.25 && living.length > 2 ? top.id : null;
   // How close the nearest known world of each empire is to our biggest ones.
   const mine = game.galaxy.planets.filter(p => p.owner === bot.id && p.pop >= 0.5)
     .sort((a, b) => b.pop - a.pop).slice(0, 12);
   const near = new Map();
-  for (const p of game.galaxy.planets) {
+  for (const p of planets) {
     if (!p.owner || p.owner === bot.id || !bot.explored.has(p.id)) continue;
     let d = near.get(p.owner) ?? Infinity;
     for (const q of mine) d = Math.min(d, dist(p, q));
     near.set(p.owner, d);
   }
-  return { ai, P: ai.p, living, share, leader, near };
+  return { ai, P: ai.p, living, share, leader, near, planets };
 }
 
 /** How much this empire wants an alliance with `id` - above ACCEPT it says yes. */
@@ -144,7 +148,7 @@ function watchAllies(s, o) {
   // What allies held last turn - lost to an enemy, it stirs a grudge.
   const held = ai.allyWorlds || new Map();
   const now = new Map();
-  for (const p of game.galaxy.planets) {
+  for (const p of o.planets) {
     const was = held.get(p.id);
     if (p.owner && friendly(game, bot, p.owner)) now.set(p.id, p.owner);
     if (was && p.owner && p.owner !== was && p.owner !== bot.id && !friendly(game, bot, p.owner)) {
@@ -209,7 +213,7 @@ function reconsider(s, o) {
     if (game.turn - x.since < SETTLE_IN) continue;
     let urge = pressure * 1.5 + (ai.grudge[id] || 0) * 0.3;
     if (id === leader) urge += 1.2 + P.vsLeader;
-    if ((worldsLeft.get(id) ?? countWorlds(game, bot, id)) <= BATTERED) urge += 1.2;
+    if ((worldsLeft.get(id) ?? countWorlds(o.planets, bot, id)) <= BATTERED) urge += 1.2;
     urge *= clamp(1 - P.loyalty, 0, 1);
     // A plot under way is seen through - the mood of a turn does not stop it.
     if (urge < 1.2 && ai.plot?.id !== id) continue;
@@ -219,7 +223,7 @@ function reconsider(s, o) {
     // Only an ally within reach of the fighters is worth the plot. The
     // campaign under way is dropped: the next one is planned against the ally.
     if (!ai.plot) {
-      const near = game.galaxy.planets.some(p => p.owner === id && bot.explored.has(p.id)
+      const near = o.planets.some(p => p.owner === id && bot.explored.has(p.id)
         && s.bases.some(b => dist(b, p) <= s.fighter.range));
       if (near) { ai.plot = { id, since: game.turn }; ai.campaign = null; }
       continue;
@@ -237,6 +241,6 @@ function reconsider(s, o) {
 }
 
 /** Known worlds of an empire, when the situation report has not counted them. */
-function countWorlds(game, bot, id) {
-  return game.galaxy.planets.filter(p => p.owner === id && bot.explored.has(p.id)).length;
+function countWorlds(planets, bot, id) {
+  return planets.filter(p => p.owner === id && bot.explored.has(p.id)).length;
 }

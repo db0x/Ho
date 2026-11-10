@@ -232,6 +232,9 @@ const order = (g, p, planet, type, count = 1) => setOrders(g, p, { build: { plan
 {
   const g = createGame('Reckon');
   g.settings.seed = 9;
+  // The world is made known below by hand, without ever being seen - that
+  // only works without fog of war (test/fog.js covers that).
+  g.settings.fog = false;
   for (const persona of ['conqueror', 'bulwark']) addPlayer(g, { name: persona, isBot: true, persona });
   startGame(g);
   const [bot, foe] = g.players;

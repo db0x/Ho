@@ -515,11 +515,12 @@ export class SpaceView {
       const path = route(f, target, zone);
       const spot = this._spots.get(f.id);
       const st = courseStyle(f, focusId);
-      ctx.globalAlpha = this.dim(f.owner);
+      // Only the direction known (fog of war): fine dots, a little fainter.
+      ctx.globalAlpha = this.dim(f.owner) * (target.heading ? 0.75 : 1);
       ctx.save();
       ctx.strokeStyle = st.color;
       ctx.lineWidth = st.width;
-      ctx.setLineDash([6, 5]);
+      ctx.setLineDash(target.heading ? [2, 4] : [6, 5]);
       ctx.lineDashOffset = -this.phase * 22;
       ctx.beginPath();
       // First piece from the ship on screen, the rest in space (clipped at
@@ -544,7 +545,7 @@ export class SpaceView {
       const tp = this.project(target.x, target.y, target.z || 0);
       if (tp && pts.length > 1) {
         const [fx, fy] = pts[pts.length - 2];
-        const tr = isMouth(target) ? this.mouthRadius(tp) * 0.7 + 6 : planetRadius(target) * tp.s + 10;
+        const tr = target.heading ? 0 : isMouth(target) ? this.mouthRadius(tp) * 0.7 + 6 : planetRadius(target) * tp.s + 10;
         arrowHead(ctx, fx, fy, tp.x, tp.y, tr, st.hot ? 11 : 8, st.color);
       }
       ctx.globalAlpha = 1;

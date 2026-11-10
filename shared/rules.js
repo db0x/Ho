@@ -154,6 +154,14 @@ export const STATION = {
 export const stationReady = (st) => !!st && !(st.building > 0);
 
 /**
+ * Sensor reach with fog of war (game setting "fog"): how far a world, a
+ * world with a ready orbital station, a fleet and a fleet with a scout see.
+ * Scouts are the eyes of an empire - they look much farther than the rest.
+ * Without fog the older, wider sight rules of server/game/intel.js apply.
+ */
+export const SENSOR = { world: 170, station: 300, fleet: 120, scout: 280 };
+
+/**
  * What can be ordered at a shipyard, in the order of the build list: the
  * ships of the game, and the station right before the destroyer it makes
  * possible.

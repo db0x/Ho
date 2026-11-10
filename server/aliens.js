@@ -15,6 +15,7 @@ import { makeRng } from './galaxy.js';
 import { SCAN } from './wormholes.js';
 import { newFleet, addShip, cleanupFleets } from './game/fleets.js';
 import { teamOf } from './game/diplomacy.js';
+import { fogOn, eyesOf, covered } from './game/sensors.js';
 
 /** A stream of its own: the aliens must not shift the combat rolls. */
 function rngOf(game) {
@@ -53,6 +54,7 @@ function watchers(game, point) {
 }
 
 function seesPoint(game, playerId, point) {
+  if (fogOn(game)) return covered(eyesOf(game, playerId), point);
   const team = teamOf(game, playerId);
   return game.galaxy.planets.some(q => team.includes(q.owner) && dist(q, point) < SCAN.world)
     || game.fleets.some(f => team.includes(f.owner) && f.ships.length && dist(f, point) < SCAN.fleet);

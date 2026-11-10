@@ -12,6 +12,7 @@ import { supplyBases } from '../game/movement.js';
 import { friendly, knownAllies } from './diplomacy.js';
 import { memory, perceive, review } from './memory.js';
 import { chooseRival } from './war.js';
+import { perceivedPlanets, seenFleets, popOf, techOf } from './perception.js';
 
 // Share of the firepower that really lands over twelve combat rounds - the
 // rest is lost to own casualties and overkill on targets already destroyed.
@@ -30,7 +31,8 @@ export const BATTERED = 3;
 export function survey(game, bot) {
   const ai = memory(game, bot);
   const P = ai.p;
-  const planets = game.galaxy.planets;
+  // With fog of war: the worlds as this empire last saw them (perception.js).
+  const planets = perceivedPlanets(game, bot);
   const zone = holeZone(game.galaxy);
   // Center of the map - the edge where it grows is measured from here.
   const g = game.galaxy;
@@ -50,7 +52,9 @@ export function survey(game, bot) {
   const enemyWorlds = known.filter(p => p.owner && p.owner !== bot.id && !friendly(game, bot, p.owner));
   const early = game.turn < 30;
 
-  const threatened = perceive(game, bot, ai, mine, enemyWorlds);
+  // Foreign fleets in sight, with the targets known of them.
+  const sight = seenFleets(game, bot);
+  const threatened = perceive(game, bot, ai, mine, enemyWorlds, sight);
   // First look at how the last strikes went, then plan.
   const hard = bot.level === 'hard';
   review(game, bot, ai, hard);
@@ -92,7 +96,7 @@ export function survey(game, bot) {
   // Ore is the hard limit: when it is scarce, the last chunks go into colonies
   // on ore-rich worlds instead of warships.
   const oreScarce = bot.metal < shipCost('colony', bot.tech).metal * 4;
-  return { game, bot, ai, P, planets, zone, center, myFleets, mine, known, enemyWorlds, early, threatened, hard, hit, pressure, margin, solo, garrison, home, settleable, inRange, settleScore, oreScarce };
+  return { game, bot, ai, P, planets, sight, zone, center, myFleets, mine, known, enemyWorlds, early, threatened, hard, hit, pressure, margin, solo, garrison, home, settleable, inRange, settleScore, oreScarce };
 }
 
 /**
@@ -100,12 +104,12 @@ export function survey(game, bot) {
  * who leads, who is the rival - and how much firepower there is.
  */
 export function assessEnemies(s) {
-  const { game, planets, hard, bot, enemyWorlds, ai, mine, P, myFleets, treasury } = s;
+  const { game, planets, sight, hard, bot, enemyWorlds, ai, mine, P, myFleets, treasury } = s;
   // --- Situation report: what does each enemy world cost, and who is down?
   // The defense battery is rebuilt from the population every turn -
   // sieging is pointless, it has to be broken in one move.
   const homeFleet = new Map();
-  for (const f of game.fleets) {
+  for (const { f } of sight) {
     // Own guests in an ally's orbit are no defense against us.
     if (f.at === null || f.at === undefined || f.owner === bot.id) continue;
     const pl = planets[f.at];
@@ -119,17 +123,17 @@ export function assessEnemies(s) {
   // will not turn back.
   const rescuers = new Map();      // empire -> its armed fleets in space or orbit
   if (hard) {
-    for (const f of game.fleets) {
+    for (const { f, knownDest } of sight) {
       if (f.owner === bot.id || !f.ships.some(s => s.attack > 0)) continue;
       if (!rescuers.has(f.owner)) rescuers.set(f.owner, []);
-      rescuers.get(f.owner).push({ f, reach: 2 * fleetStats(f).speed, hp: f.ships.reduce((a, s) => a + s.maxHp, 0) });
+      rescuers.get(f.owner).push({ f, dest: knownDest, reach: 2 * fleetStats(f).speed, hp: f.ships.reduce((a, s) => a + s.maxHp, 0) });
     }
   }
   const defense = new Map();       // world -> hit points that have to go
   const worldsLeft = new Map();    // empire -> how many of its worlds the AI knows
   for (const p of enemyWorlds) {
     const holder = playerById(game, p.owner);
-    const bs = holder ? batteryStats(p.pop, holder.tech) : null;
+    const bs = holder ? batteryStats(p.pop, techOf(game, bot, holder)) : null;
     let hp = bs ? bs.hp : 0;
     if (p.defenses) for (const s of p.defenses) hp += s.maxHp;
     // An orbital station, built or still a site, is a hull that has to go too -
@@ -138,7 +142,7 @@ export function assessEnemies(s) {
     // Known allies of the owner come to the rescue too - a public alliance deters.
     const helpers = game.alliances.length ? [p.owner, ...knownAllies(game, bot, p.owner)] : [p.owner];
     for (const r of helpers.flatMap(o => o === bot.id ? [] : rescuers.get(o) || [])) {
-      if (r.f.at !== p.id && (r.f.dest == null || r.f.dest === p.id) && dist(r.f, p) <= r.reach) hp += r.hp;
+      if (r.f.at !== p.id && (r.dest == null || r.dest === p.id) && dist(r.f, p) <= r.reach) hp += r.hp;
     }
     defense.set(p.id, hp + (homeFleet.get(p.id) || 0));
     worldsLeft.set(p.owner, (worldsLeft.get(p.owner) || 0) + 1);
@@ -161,11 +165,13 @@ export function assessEnemies(s) {
     distance.set(p.id, d);
   }
 
-  // Who leads? Every empire's tally is visible to everyone in the list.
+  // Who leads? Without fog every empire's tally is in the list; with fog
+  // only what its known worlds add up to (perception.js).
   const living = game.players.filter(p => p.alive);
-  const totalPop = living.reduce((a, p) => a + p.stats.pop, 0) || 1;
-  const top = living.slice().sort((a, b) => b.stats.pop - a.stats.pop)[0];
-  const leader = top && top.id !== bot.id && top.stats.pop / totalPop > 0.25 && living.length > 2
+  const popBy = popOf(game, bot, planets);
+  const totalPop = living.reduce((a, p) => a + popBy(p.id), 0) || 1;
+  const top = living.slice().sort((a, b) => popBy(b.id) - popBy(a.id))[0];
+  const leader = top && top.id !== bot.id && popBy(top.id) / totalPop > 0.25 && living.length > 2
     ? top.id : null;
 
   ai.rival = chooseRival(ai, P, enemyWorlds, distance, leader, o => friendly(game, bot, o));

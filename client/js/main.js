@@ -14,6 +14,8 @@ import { showAnnouncement } from './ui/announce.js';
 import { openNews, hasNews, newsOnHello } from './ui/news.js';
 import { bindRanking, showRanking } from './ui/ranking.js';
 import { bindPrivacy, showPrivacy } from './ui/privacy.js';
+import { initPresets, presetsFromServer, onPresets, autoPreset } from './presets.js';
+import { presetMatches } from '../shared/presets.js';
 import { bindEmoji } from './ui/emoji.js';
 import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
@@ -353,6 +355,7 @@ net.on('hello', (m) => {
   newsOnHello(m, msg => net.send(msg));
   bindRanking(!!m.ranking, msg => net.send(msg));
   bindPrivacy(m.privacy, msg => net.send(msg));
+  initPresets(m.presets, msg => net.send(msg));
   if (!net.session) lobby.show('menu');
   // Testing aid: ?solo=N starts a game against N AI empires right away
   const solo = new URLSearchParams(location.search).get('solo');
@@ -364,6 +367,9 @@ net.on('adminData', (m) => admin.update(m));
 net.on('adminRadioData', (m) => admin.showRadio(m));
 net.on('ranking', (m) => showRanking(m));
 net.on('privacy', (m) => showPrivacy(m.privacy));
+net.on('presets', (m) => presetsFromServer(m.presets));
+// A changed list shows at once in the research tab.
+onPresets(() => { if (hud?.view?.me) hud.presetsBox(); });
 net.on('inviteData', (m) => invites.update(m));
 net.on('appealData', (m) => blockDialog.update(m.msgs));
 net.on('inviteCreated', (m) => invites.created(m));
@@ -485,6 +491,7 @@ net.on('view', (m) => {
   const newTurn = view.turn > lastTurn;
   const newBattles = collectBattles(view);
   hud.update(view);
+  applyStartPreset(view);
   if (newTurn && lastTurn > 0) {
     if (!view.spectator) showTurnBanner(view);
     playTurnSounds(view);
@@ -723,8 +730,11 @@ function bindGame() {
     const box = $(id);
     if (typeof mapOpts[prop] === 'boolean') box.checked = mapOpts[prop];
     map[prop] = box.checked;
+    // "Fewer effects" also stills the decoration of the panels (style.css: body.fx-lite).
+    if (prop === 'lite') document.body.classList.toggle('fx-lite', box.checked);
     box.onchange = (e) => {
       map[prop] = mapOpts[prop] = e.target.checked;
+      if (prop === 'lite') document.body.classList.toggle('fx-lite', e.target.checked);
       map.poke();
       try { localStorage.setItem(MAP_OPTS, JSON.stringify(mapOpts)); } catch {}
     };
@@ -898,6 +908,24 @@ function loop(now) {
   lastDraw = now;
   if (resized) map.resize();
   map.draw(dt);
+}
+
+/**
+ * The start preset (★, presets.js) goes into a new game by itself: once per
+ * game, in its first turn, and only if the settings are not already that.
+ * Remembered per game code, so a reload does not apply it over changes made since.
+ */
+function applyStartPreset(view) {
+  const code = net.session?.code;
+  if (view.spectator || !view.me || view.turn !== 1 || !code) return;
+  // Marked on the first view of the game, preset or not: one saved later in
+  // this turn must not jump in and undo what was set by hand since.
+  const KEY = 'ho-preset-applied';
+  try { if (localStorage.getItem(KEY) === code) return; localStorage.setItem(KEY, code); } catch { return; }
+  const p = autoPreset();
+  if (!p || presetMatches(p, view.me.research)) return;
+  net.send({ t: 'orders', research: { budgetPct: p.budgetPct, weights: { ...p.weights } } });
+  hud.toast(t('research.presetApplied', { name: p.name }));
 }
 
 function showTurnBanner(view) {

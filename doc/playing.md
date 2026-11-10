@@ -142,6 +142,14 @@ So that nobody has to work this out in their head:
   add up – **orders come first**. A build that fails for lack of money at the end
   of the turn therefore does not happen.
 
+**Research presets:** at the top of the research tab, *+ Save* keeps the current
+research share and all weights under a name; one tap on the preset sets them
+again, the active one is outlined in gold. Under *Manage* presets can be renamed,
+overwritten with the current settings (*Update*) and deleted. The one marked ★ is
+set automatically in turn 1 of every new game. Up to eight presets; with an
+account they belong to the account and are the same on every device, without
+sign-in the browser keeps them.
+
 ## Combat and conquest
 
 When hostile fleets meet in an orbit, they fight – those who deal damage at the
@@ -157,6 +165,16 @@ without battery or satellites; a survivor flies on afterwards. A faster fleet
 catches up, a slower one only head-on. If the target reaches an orbit, your
 fleet follows it there; if it goes out of sight, the chase ends. The AI
 colonies intercept too. Intercepting can be switched off in the lobby.
+
+**Fog of war:** you only see what your sensors cover – around your planets and
+fleets, shown on the map as a clear area in the dark veil. **Scouts** and planets
+with a finished **orbital station** see much farther than the rest; allies share
+their sight. Planets out of sight show what they were like when you last saw
+them. A foreign fleet in sight gives away its target and arrival only if it is
+heading for one of your planets or an ally's – otherwise you only see its
+direction as a short dotted arrow. The numbers of other empires
+(planets, population, ships) stay hidden. The AI plays by the same rules. Can be
+switched off in the lobby; off, the older, wider sight applies.
 
 A planet falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes

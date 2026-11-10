@@ -368,6 +368,17 @@ export function setPrivacy(name, { status, ranking } = {}) {
   return privacyOf(user);
 }
 
+/** The research presets of an account (shared/presets.js), replaced as a whole. */
+export function setResearchPresets(name, presets) {
+  const key = normalizeName(name);
+  const db = load();
+  const user = db.users[key];
+  if (!user) throw new Error('auth.cli.unknown');
+  if (presets.length) user.presets = presets; else delete user.presets;
+  save(db);
+  return presets;
+}
+
 /** The visibility settings of an account record, as the client sees them. */
 export function privacyOf(user) {
   return { status: !user?.invisible, ranking: !user?.unlisted };

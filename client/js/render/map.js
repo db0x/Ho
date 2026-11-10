@@ -372,12 +372,13 @@ export class MapView {
       const pts = [[spot.x, spot.y], ...path.map(w => this.w2s(w.x, w.y))];
       const [bx, by] = pts[pts.length - 1];
       const st = courseStyle(f, focusId);
-      const tr = isMouth(target) ? this.mouthRadius() * 0.7 + 6 : planetRadius(target) * this.cam.zoom + 15;
-      ctx.globalAlpha = this.dim(f.owner);
+      const tr = target.heading ? 0 : isMouth(target) ? this.mouthRadius() * 0.7 + 6 : planetRadius(target) * this.cam.zoom + 15;
+      // Only the direction known (fog of war): fine dots, a little fainter.
+      ctx.globalAlpha = this.dim(f.owner) * (target.heading ? 0.75 : 1);
       ctx.save();
       ctx.strokeStyle = st.color;
       ctx.lineWidth = st.width;
-      ctx.setLineDash([6, 5]);
+      ctx.setLineDash(target.heading ? [2, 4] : [6, 5]);
       ctx.lineDashOffset = -this.phase * 22;
       ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
       for (const [wx, wy] of pts.slice(1)) ctx.lineTo(wx, wy);
@@ -484,6 +485,9 @@ export class MapView {
       return { x: sx, y: sy, r: planetRadius(p) * z, s: Math.max(0.55, Math.min(1.8, 0.7 + z * 0.45)),
         shieldR: planetRadius(p) * z * 1.14 + 20 * orbitScale(z), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
+
+    // Fog of war over everything out of sensor reach - the names stay readable above it.
+    this.drawFog(ctx);
 
     // Labels last, so ships in orbit do not cover them
     for (const l of labels) {
@@ -655,6 +659,52 @@ export class MapView {
     });
     ctx.globalAlpha = 1;
     this.drawTerritory(ctx);
+  }
+
+  /**
+   * Fog of war (view.sensors, only when the game has it on): everything
+   * beyond the reach of the own and allied sensors - sky, remembered worlds,
+   * unknown ones - lies under a dark veil; the covered area stays clear,
+   * with a soft edge and no line of its own, so it cannot be mistaken for
+   * the dashed range of a fleet. Rendered again only when the camera or the
+   * sensors change.
+   */
+  drawFog(ctx) {
+    const eyes = this.view?.sensors;
+    if (!eyes) return;
+    if (!this._fog) this._fog = document.createElement('canvas');
+    const fc = this._fog;
+    const W = Math.max(1, Math.round(this.w * this.dpr)), H = Math.max(1, Math.round(this.h * this.dpr));
+    const key = `${this._skyKey}|${eyes.length}`;
+    if (fc.width !== W || fc.height !== H) { fc.width = W; fc.height = H; this._fogKey = null; }
+    if (this._fogKey !== key) { this._fogKey = key; this.renderFog(fc, eyes); }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(fc, 0, 0);
+    ctx.restore();
+  }
+
+  renderFog(fc, eyes) {
+    const f = fc.getContext('2d');
+    f.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, this.w, this.h);
+    f.fillStyle = 'rgba(2, 3, 8, 0.6)';
+    f.fillRect(0, 0, this.w, this.h);
+    // Every eye cuts its sphere out of the veil, fading out at the edge.
+    f.globalCompositeOperation = 'destination-out';
+    const z = this.cam.zoom;
+    for (const e of eyes) {
+      const [sx, sy] = this.w2s(e.x, e.y);
+      const r = e.r * z;
+      if (sx + r < 0 || sy + r < 0 || sx - r > this.w || sy - r > this.h) continue;
+      const g = f.createRadialGradient(sx, sy, r * 0.82, sx, sy, r);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      f.fillStyle = g;
+      f.beginPath(); f.arc(sx, sy, r, 0, Math.PI * 2); f.fill();
+    }
   }
 
   /**

@@ -117,6 +117,9 @@ function sortie(level) {
 // ---------------------------------------------------------------- Ambush
 function ambush(level) {
   const { g, bot, foe, home, near } = setup(level);
+  // The target of a foreign colony ship is only known without fog of war -
+  // with it a free world as target stays hidden from humans and AI alike.
+  g.settings.fog = false;
   const w = near[0];
   // A colony of the foe close by, so its colony ship has the range.
   Object.assign(near[1], { owner: foe.id, pop: 3 });

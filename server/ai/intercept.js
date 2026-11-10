@@ -51,11 +51,14 @@ export function intercepts(s) {
   const near = (pt) => homes.some(p => dist(p, pt) < SCAN.world);
   const intruder = (f, goal) => f.ships.some(x => x.colonists > 0 || x.cargo) && (near(f) || (goal && near(goal)));
   const prey = [];
+  // The target of a foreign fleet only as far as known (perception.js).
+  const destOf = new Map(s.sight.map(x => [x.f.id, x.knownDest]));
   for (const f of game.fleets) {
     if (f.at != null || !f.ships.length || taken.has(f.id) || !hostile(game, bot.id, f.owner)) continue;
     if (!seesFleet(game, bot.id, f)) continue;
     const armed = f.ships.some(x => x.attack > 0);
-    const goal = f.dest != null ? planetById(game, f.dest) : null;
+    const dest = destOf.has(f.id) ? destOf.get(f.id) : f.dest;
+    const goal = dest != null ? planetById(game, dest) : null;
     const threat = armed && goal?.owner === bot.id;
     const value = threat ? 3 : isAlien(f.owner) ? 2 : hard && !armed && intruder(f, goal) ? 1 : 0;
     if (!value) continue;
