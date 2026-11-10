@@ -176,9 +176,8 @@ Planeten und Flotten, auf der Karte als heller Bereich im dunklen Schleier.
 **Späher** und Planeten mit fertiger **Orbitalstation** sehen deutlich weiter als
 der Rest; Verbündete teilen ihre Sicht. Planeten außer Sicht zeigen den Stand, als
 du sie zuletzt gesehen hast. Eine fremde Flotte in Sichtweite verrät Ziel und
-Ankunft nur, wenn sie auf einen deiner Planeten zuhält oder ihr Ziel selbst in
-Sicht liegt – sonst siehst du nur ihre Flugrichtung als kurzen, gepunkteten
-Pfeil. Die Zahlen anderer Reiche (Planeten, Bevölkerung, Schiffe) bleiben
+Ankunft nur, wenn sie auf einen deiner Planeten oder den eines Verbündeten
+zuhält – sonst siehst du nur ihre Flugrichtung als kurzen, gepunkteten Pfeil. Die Zahlen anderer Reiche (Planeten, Bevölkerung, Schiffe) bleiben
 verborgen. Die KI spielt nach denselben Regeln. Abschaltbar in der Lobby; aus,
 gilt die ältere, weitere Sicht.
 

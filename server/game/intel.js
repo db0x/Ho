@@ -6,8 +6,8 @@
 // last, foreign fleets only near own worlds and fleets. With the game
 // setting "fog" (sensors.js) it gets strict: only what the sensors cover,
 // scouts and stations see farther, a foreign course shows only its
-// direction unless its target is in sight, and the tallies of other empires
-// stay hidden. The AI goes by the same rules.
+// direction unless it is coming for an own world, and the tallies of other
+// empires stay hidden. The AI goes by the same rules.
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
 import { riftView } from '../aliens.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
@@ -132,10 +132,10 @@ export function seesFleet(game, playerId, f, eyes = null) {
 
 /**
  * What an empire knows of the course of a foreign fleet it sees. Without
- * fog: everything, as before. With fog the target counts only if it is a
- * world of the own team or in sight of the sensors - otherwise there is
- * just the direction the fleet flies in (a point HEADING_LEN ahead), and
- * of a fleet still waiting in orbit not even that.
+ * fog: everything, as before. With fog the target is known only when the
+ * fleet comes for the own team - a world of it, or one of its fleets it
+ * chases. Anything else shows just the direction the fleet flies in (a
+ * point HEADING_LEN ahead), and a fleet still waiting in orbit not even that.
  * @returns {{dest: number|null, hole: string|null, chase?: string, aim?: object,
  *   target: object|null, heading?: object}}
  */
@@ -151,12 +151,10 @@ export function courseIntel(game, player, f, eyes = null) {
     target: mouth || destP || chasing.aim || null };
   if (!fogOn(game)) return known;
   if (!known.target) return { dest: null, hole: null, target: null };
-  eyes ||= eyesOf(game, player.id);
   const plain = known.target === destP && team.includes(destP.owner)
-    || (prey && team.includes(prey.owner))
-    || covered(eyes, known.target);
+    || (prey && team.includes(prey.owner));
   if (plain) return known;
-  // Out of sight: only where it is heading - straight on, rounded.
+  // Not coming for us: only where it is heading - straight on, rounded.
   const real = mouth || destP || f.aim;
   if (f.at != null || !real) return { dest: null, hole: null, target: null };
   const dx = real.x - f.x, dy = real.y - f.y, dz = (real.z || 0) - (f.z || 0);

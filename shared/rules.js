@@ -159,7 +159,7 @@ export const stationReady = (st) => !!st && !(st.building > 0);
  * Scouts are the eyes of an empire - they look much farther than the rest.
  * Without fog the older, wider sight rules of server/game/intel.js apply.
  */
-export const SENSOR = { world: 230, station: 360, fleet: 185, scout: 320 };
+export const SENSOR = { world: 170, station: 300, fleet: 120, scout: 280 };
 
 /**
  * What can be ordered at a shipyard, in the order of the build list: the

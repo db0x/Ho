@@ -1,7 +1,7 @@
 // Fog of war (game setting "fog", server/game/sensors.js): an empire sees
-// only what its sensors cover - worlds 230, worlds with a station 360,
-// fleets 185, fleets with a scout 320. A foreign course shows its target
-// only if that is an own world or in sight, otherwise just the direction.
+// only what its sensors cover - worlds 170, worlds with a station 300,
+// fleets 120, fleets with a scout 280. A foreign course shows its target
+// only if it comes for an own world, otherwise just the direction.
 // The tallies of other empires are hidden. Off, the older, wider sight
 // stays as it was. The AI goes by the same rules as a human.
 import { createGame, startGame, DEFAULT_SETTINGS } from '../server/game/game.js';
@@ -83,6 +83,13 @@ assert(sanitizeSettings({ fog: false }).fog === false && sanitizeSettings({ fog:
     }
   }
   assert(!seen(g, a, wide), 'A fleet beyond the sensors is seen');
+  // A target in sight that is not ours: still only the direction.
+  const free = g.galaxy.planets.find(p => !p.owner && dist(p, homeA) > SENSOR.world);
+  const eye = fleetOf(g, a.id, free, ['fighter']);
+  near.dest = free.id;
+  const u = seen(g, a, near);
+  assert(u && u.dest == null && u.heading, 'The course to a world in sight but not ours is given away');
+  g.fleets = g.fleets.filter(f => f !== eye);
   // Coming for an own world: target and arrival are known.
   near.dest = homeA.id;
   const w = seen(g, a, near);
