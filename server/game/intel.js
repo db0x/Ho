@@ -23,6 +23,8 @@ const HEADING_LEN = 110;
 
 export function updateVisibility(game) {
   const fog = fogOn(game);
+  // Which scan is the latest - a memory from it is in sight right now (buildView).
+  game.scanTurn = game.turn;
   for (const p of game.players) {
     // Collect own worlds and fleets once: the map grows, otherwise every new
     // world would be checked against every other here. Allies share what
@@ -209,7 +211,9 @@ export function buildView(game, player) {
     if (k) {
       const owner = k.owner === player.id ? p.owner : k.owner;
       const { defHp, ...seen } = k;
-      return { ...base, known: 'memory', ...seen, owner, terraBudget: 0, terraSpent: 0, isHomeworld: !!p.isHomeworld };
+      return { ...base, known: 'memory', ...seen, owner, terraBudget: 0, terraSpent: 0, isHomeworld: !!p.isHomeworld,
+        // Picked up by the scanners in the latest scan: in sight right now, not an old memory.
+        ...(k.turn === game.scanTurn ? { scanned: true } : {}) };
     }
     return { ...base, known: 'unknown' };
   });

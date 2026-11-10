@@ -730,8 +730,11 @@ function bindGame() {
     const box = $(id);
     if (typeof mapOpts[prop] === 'boolean') box.checked = mapOpts[prop];
     map[prop] = box.checked;
+    // "Fewer effects" also stills the decoration of the panels (style.css: body.fx-lite).
+    if (prop === 'lite') document.body.classList.toggle('fx-lite', box.checked);
     box.onchange = (e) => {
       map[prop] = mapOpts[prop] = e.target.checked;
+      if (prop === 'lite') document.body.classList.toggle('fx-lite', e.target.checked);
       map.poke();
       try { localStorage.setItem(MAP_OPTS, JSON.stringify(mapOpts)); } catch {}
     };

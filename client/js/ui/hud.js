@@ -145,6 +145,24 @@ export class Hud {
     if (chatTab) chatTab.classList.toggle('hidden', sp);
   }
 
+  /**
+   * Is the selected object one the own sensors are scouting right now - not
+   * ours, and in sight this turn? A foreign or allied fleet, a world or
+   * station of someone else (or of nobody) seen live or in the latest scan,
+   * a wormhole mouth. Remembered worlds and spectators: no.
+   */
+  scanned(sel) {
+    const v = this.view;
+    if (!sel || !v || v.spectator) return false;
+    if (sel.type === 'fleet') { const f = v.fleets.find(x => x.id === sel.id); return !!f && !f.mine; }
+    if (sel.type === 'hole') return true;
+    if (sel.type === 'planet' || sel.type === 'station') {
+      const p = v.planets[sel.id];
+      return !!p && p.owner !== v.you && (p.known === 'live' || !!p.scanned);
+    }
+    return false;
+  }
+
   selection() {
     const sel = this.app.selection;
     const box = $('#selection');
@@ -159,6 +177,8 @@ export class Hud {
     // panel only now has a size to measure.
     const glide = dock.classList.contains('open') !== !!sel;
     dock.classList.toggle('open', !!sel);
+    // Something not ours that the sensors pick up right now: faint radar waves behind the panel.
+    dock.classList.toggle('scan', this.scanned(sel));
     this.logDlg.refresh(glide);
     this.leftDlg.refresh(glide);
     if (!sel) {

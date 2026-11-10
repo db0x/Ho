@@ -621,7 +621,7 @@
   "map.territoryTitle": "Gebiete der Kolonien einfärben",
   "map.stars": "Sterne",
   "map.lite": "Weniger Effekte",
-  "map.liteTitle": "Weniger Last für Rechner und Akku: einfache Pixeldichte, und solange du nichts tust, steht das Bild still.",
+  "map.liteTitle": "Weniger Last für Rechner und Akku: einfache Pixeldichte, und solange du nichts tust, steht das Bild still. Auch die Radarwellen in den Panels entfallen.",
   "map.starsTitle": "Sternenhimmel im Hintergrund",
   "map.sound": "Ton",
   "map.soundTitle": "Klangeffekte",

@@ -621,7 +621,7 @@
   "map.territoryTitle": "Shade the colonies’ territory",
   "map.stars": "Stars",
   "map.lite": "Fewer effects",
-  "map.liteTitle": "Less load on computer and battery: single pixel density, and while you do nothing the picture stands still.",
+  "map.liteTitle": "Less load on computer and battery: single pixel density, and while you do nothing the picture stands still. The radar waves in the panels are left out too.",
   "map.starsTitle": "Starfield in the background",
   "map.sound": "Sound",
   "map.soundTitle": "Sound effects",

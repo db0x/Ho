@@ -613,6 +613,36 @@ body.is-blocked > :not(#blocked) { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   #rightdock, #rightdock.open { transition: none; }
 }
+/* A foreign fleet selected (hud.js, class scan): behind its panel radar
+   waves rise from the bottom edge - a train of five rings around a centre
+   on the bottom edge, growing together until they pass the top. The front
+   one is the clearest, each one behind it a little fainter. Barely there,
+   and the content stays above them. */
+#selection { position: relative; z-index: 1; }
+#rightdock.scan::before {
+  --c: 120, 200, 255;
+  content: ''; position: absolute; z-index: 0; pointer-events: none;
+  left: 50%; top: 0; height: 200%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle closest-side,
+    transparent 66.5%, rgba(var(--c), .045) 67%, transparent 67.5%,
+    transparent 74.5%, rgba(var(--c), .065) 75%, transparent 75.5%,
+    transparent 82.5%, rgba(var(--c), .09) 83%, transparent 83.5%,
+    transparent 90.5%, rgba(var(--c), .12) 91%, transparent 91.5%,
+    transparent 98.6%, rgba(var(--c), .16) 99.3%, transparent 100%);
+  transform: translateX(-50%) scale(.04); opacity: 0;
+  animation: radar-wave 8s cubic-bezier(.3, 0, .7, 1) infinite;
+}
+@keyframes radar-wave {
+  0% { transform: translateX(-50%) scale(.04); opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: .6; }
+  100% { transform: translateX(-50%) scale(1.15); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #rightdock.scan::before { display: none; }
+}
+/* "Fewer effects" in the map settings (main.js) switches the waves off too. */
+body.fx-lite #rightdock.scan::before { display: none; }
 /* Outside the split (phone sheet) the shipyard is one section among others. */
 .sel-yard { border-top: 1px solid var(--line); margin: 12px -12px 0; padding: 12px 12px 0; }
 .sel-yard h4 { margin: 0 0 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
