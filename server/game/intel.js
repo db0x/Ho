@@ -1,6 +1,13 @@
 // What each empire knows: what its worlds and fleets see now, what it
 // remembers from earlier, and the view of the game built from that for its
 // player - fog of war included. Spectators get the view without fog.
+//
+// Two levels of fog. Always: worlds out of scanner reach show what was seen
+// last, foreign fleets only near own worlds and fleets. With the game
+// setting "fog" (sensors.js) it gets strict: only what the sensors cover,
+// scouts and stations see farther, a foreign course shows only its
+// direction unless its target is in sight, and the tallies of other empires
+// stay hidden. The AI goes by the same rules.
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
 import { riftView } from '../aliens.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
@@ -9,8 +16,13 @@ import { teamOf, alliesOf, diplomacyView } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
 import { planetById, hostOf, pauseView } from './game.js';
 import { visibleEntry, logEntry } from './log.js';
+import { fogOn, eyesOf, covered } from './sensors.js';
+
+// Length of the direction arrow of a foreign fleet whose target is out of sight.
+const HEADING_LEN = 110;
 
 export function updateVisibility(game) {
+  const fog = fogOn(game);
   for (const p of game.players) {
     // Collect own worlds and fleets once: the map grows, otherwise every new
     // world would be checked against every other here. Allies share what
@@ -22,8 +34,17 @@ export function updateVisibility(game) {
       const presence = team.includes(planet.owner) || myFleets.some(f => f.at === planet.id);
       if (presence) {
         p.explored.add(planet.id);
-        p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn);
+        p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn, fog);
       }
+    }
+    if (fog) {
+      const eyes = eyesOf(game, p.id);
+      for (const planet of game.galaxy.planets) {
+        if (team.includes(planet.owner) || myFleets.some(f => f.at === planet.id) || !covered(eyes, planet)) continue;
+        p.explored.add(planet.id);
+        p.knowledge[planet.id] = snapshotPlanet(game, planet, game.turn, fog);
+      }
+      continue;
     }
     // Scanners: own worlds and fleets roughly see their neighborhood - anew
     // every turn. Recording only on first discovery would mean: a world that
@@ -41,8 +62,15 @@ export function updateVisibility(game) {
   }
 }
 
-function snapshotPlanet(game, planet, turn) {
+/**
+ * What is seen of a world. With fog the AI keeps the hit points of the
+ * satellites too, as an estimate for later (ai/perception.js) - stripped
+ * before a view goes out.
+ */
+function snapshotPlanet(game, planet, turn, fog = false) {
+  const d = planet.defenses || [];
   return {
+    ...(fog ? { defHp: Math.round(d.reduce((a, s) => a + s.maxHp, 0)) } : {}),
     turn,
     temp: planet.temp, grav: planet.grav,
     metalRichness: planet.metalRichness, metalReserve: Math.round(planet.metalReserve),
@@ -85,19 +113,57 @@ function defenseStats(planet) {
  * or those of its allies? Then it knows course, arrival and the number of
  * ships, not what they are. The AI goes by the same rule.
  */
-export function inSight(game, playerId, f) {
+export function inSight(game, playerId, f, eyes = null) {
+  if (fogOn(game)) return covered(eyes || eyesOf(game, playerId), f);
   const team = teamOf(game, playerId);
   return game.galaxy.planets.some(q => team.includes(q.owner) && dist(q, f) < 300)
     || game.fleets.some(g => team.includes(g.owner) && g.ships.length && dist(g, f) < 240);
 }
 
 /** Does this empire see the fleet - its own, in a watched orbit, or in sight? */
-export function seesFleet(game, playerId, f) {
+export function seesFleet(game, playerId, f, eyes = null) {
   if (f.owner === playerId) return true;
   const team = teamOf(game, playerId);
+  if (team.includes(f.owner)) return true;
   if (f.at != null && (team.includes(planetById(game, f.at).owner)
     || game.fleets.some(g => team.includes(g.owner) && g.at === f.at && g.ships.length))) return true;
-  return inSight(game, playerId, f);
+  return inSight(game, playerId, f, eyes);
+}
+
+/**
+ * What an empire knows of the course of a foreign fleet it sees. Without
+ * fog: everything, as before. With fog the target counts only if it is a
+ * world of the own team or in sight of the sensors - otherwise there is
+ * just the direction the fleet flies in (a point HEADING_LEN ahead), and
+ * of a fleet still waiting in orbit not even that.
+ * @returns {{dest: number|null, hole: string|null, chase?: string, aim?: object,
+ *   target: object|null, heading?: object}}
+ */
+export function courseIntel(game, player, f, eyes = null) {
+  const team = teamOf(game, player.id);
+  // A course to a wormhole only shows if its mouth is in sight.
+  const mouth = f.hole && player.seenMouths.has(f.hole) ? findMouth(game, f.hole)?.mouth : null;
+  // A chaser shows where it is heading - whom it chases only if that one is in sight too.
+  const prey = f.chase ? game.fleets.find(g => g.id === f.chase) : null;
+  const chasing = prey && seesFleet(game, player.id, prey, eyes) ? chaseView(game, f) : {};
+  const destP = f.dest != null ? planetById(game, f.dest) : null;
+  const known = { dest: f.dest != null && !mouth ? f.dest : null, hole: mouth ? mouth.id : null, ...chasing,
+    target: mouth || destP || chasing.aim || null };
+  if (!fogOn(game)) return known;
+  if (!known.target) return { dest: null, hole: null, target: null };
+  eyes ||= eyesOf(game, player.id);
+  const plain = known.target === destP && team.includes(destP.owner)
+    || (prey && team.includes(prey.owner))
+    || covered(eyes, known.target);
+  if (plain) return known;
+  // Out of sight: only where it is heading - straight on, rounded.
+  const real = mouth || destP || f.aim;
+  if (f.at != null || !real) return { dest: null, hole: null, target: null };
+  const dx = real.x - f.x, dy = real.y - f.y, dz = (real.z || 0) - (f.z || 0);
+  const len = Math.hypot(dx, dy, dz) || 1;
+  const k = Math.min(1, HEADING_LEN / len);
+  return { dest: null, hole: null, target: null,
+    heading: { x: Math.round(f.x + dx * k), y: Math.round(f.y + dy * k), z: Math.round((f.z || 0) + dz * k) } };
 }
 
 /** Whom a fleet chases and the meeting point it heads for - for course lines and panels. */
@@ -109,6 +175,8 @@ function chaseView(game, f) {
 export function buildView(game, player) {
   const vis = new Set();   // planets with current sight - own and allied eyes
   const team = teamOf(game, player.id);
+  const fog = fogOn(game);
+  const eyes = fog ? eyesOf(game, player.id) : null;
   for (const planet of game.galaxy.planets) {
     if (team.includes(planet.owner) || game.fleets.some(f => team.includes(f.owner) && f.at === planet.id)) vis.add(planet.id);
   }
@@ -142,7 +210,8 @@ export function buildView(game, player) {
     // income and shipyard would count a world that is not yours.
     if (k) {
       const owner = k.owner === player.id ? p.owner : k.owner;
-      return { ...base, known: 'memory', ...k, owner, terraBudget: 0, terraSpent: 0, isHomeworld: !!p.isHomeworld };
+      const { defHp, ...seen } = k;
+      return { ...base, known: 'memory', ...seen, owner, terraBudget: 0, terraSpent: 0, isHomeworld: !!p.isHomeworld };
     }
     return { ...base, known: 'unknown' };
   });
@@ -164,22 +233,17 @@ export function buildView(game, player) {
       });
       continue;
     }
-    if ((f.at !== null && vis.has(f.at)) || inSight(game, player.id, f)) {
+    if ((f.at !== null && vis.has(f.at)) || team.includes(f.owner) || inSight(game, player.id, f, eyes)) {
       // Whoever has a foreign fleet in their own space scouts it well enough to
-      // know its course and arrival - what it flies with stays hidden.
-      // A course to a wormhole only shows if its mouth is in sight.
-      const mouth = f.hole && player.seenMouths.has(f.hole) ? findMouth(game, f.hole)?.mouth : null;
-      // A chaser shows where it is heading - whom it chases only if that one is in sight too.
-      const prey = f.chase ? game.fleets.find(g => g.id === f.chase) : null;
-      const chasing = prey && seesFleet(game, player.id, prey) ? chaseView(game, f) : {};
-      const target = mouth || (f.dest != null ? planetById(game, f.dest) : chasing.aim || null);
+      // know its course and arrival - what it flies with stays hidden. With
+      // fog only if the target is in sight too (courseIntel).
+      const { target, heading, ...course } = courseIntel(game, player, f, eyes);
       const speed = target ? fleetStats(f).speed : 0;
       fleets.push({
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0),
-        dest: f.dest != null && !mouth ? f.dest : null,
-        hole: mouth ? mouth.id : null,
-        ...chasing,
+        ...course,
+        ...(heading ? { heading } : {}),
         eta: target && speed > 0
           ? Math.max(1, Math.ceil(travelDistance(f, target, holeZone(game.galaxy)) / speed))
           : null,
@@ -205,6 +269,8 @@ export function buildView(game, player) {
     maxTurns: game.settings.maxTurns || 0,       // 0 = no limit: whoever is left wins
     capitalShips: game.settings.capitalShips !== false,
     alliances: game.settings.alliances !== false,
+    // Fog of war: the reach of the own and allied sensors, for the map.
+    ...(fog ? { fog: true, sensors: eyes.map(e => ({ x: Math.round(e.x), y: Math.round(e.y), z: Math.round(e.z), r: e.r })) } : {}),
     galaxy: {
       minX: game.galaxy.minX, minY: game.galaxy.minY, minZ: game.galaxy.minZ || 0,
       maxX: game.galaxy.maxX, maxY: game.galaxy.maxY, maxZ: game.galaxy.maxZ || 0,
@@ -236,7 +302,8 @@ export function buildView(game, player) {
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
-      stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
+      // With fog the tallies of other empires stay hidden - allies share theirs.
+      stats: fog && !team.includes(p.id) ? null : { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     })),
     planets, fleets,
     log: game.log.slice(-25).map(l => ({

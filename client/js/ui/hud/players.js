@@ -14,11 +14,14 @@ export const playersMethods = {
     const v = this.view;
     const box = $('#tab-players');
     let place = 0;
-    box.innerHTML = `<p class="hint-line rank-hint">${v.maxTurns ? t('rank.hint', { n: v.maxTurns }) : t('rank.hintEndless')}</p>` + ranking(v.players).map(p => {
+    // Fog of war: the tallies of other empires are hidden (stats null) - then
+    // there is no ranking either, only the own numbers and the allies'.
+    const fog = v.players.some(p => !p.stats);
+    box.innerHTML = `<p class="hint-line rank-hint">${v.maxTurns ? t('rank.hint', { n: v.maxTurns }) : t('rank.hintEndless')}${fog ? ' ' + t('rank.hintFog') : ''}</p>` + ranking(v.players).map(p => {
       if (p.alive) place++;
       return `
       <div class="listrow rankrow ${p.ready ? 'rdy' : ''} ${p.id === v.you ? 'me' : ''} ${p.alive ? '' : 'dead'}">
-        <span class="rank">${p.alive ? place : '–'}</span>
+        <span class="rank">${!p.alive ? '–' : fog ? '' : place}</span>
         ${avatarHtml(p, 22)}
         <span class="who">
           <span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>
@@ -26,10 +29,11 @@ export const playersMethods = {
                     p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '')
                       + (p.level ? ' · ' + t(`ai.${p.level}`) : '') : null,
                     p.connected || p.isBot ? null : t('word.offline'),
-                    p.alive ? `${t('word.worlds', { n: p.stats.planets, count: p.stats.planets })} · ${t('word.ships', { n: p.stats.ships, count: p.stats.ships })}` : null
+                    p.alive && p.stats ? `${t('word.worlds', { n: p.stats.planets, count: p.stats.planets })} · ${t('word.ships', { n: p.stats.ships, count: p.stats.ships })}` : null,
+                    p.alive && !p.stats ? t('rank.fogged') : null
                    ].filter(Boolean).join(' · ')}</small>
         </span>
-        <span class="num"><b>${p.alive ? t('word.pop', { n: fmt1(p.stats.pop) }) : t('rank.out')}</b></span>
+        <span class="num"><b>${!p.alive ? t('rank.out') : p.stats ? t('word.pop', { n: fmt1(p.stats.pop) }) : '?'}</b></span>
       </div>${this.diplomacyRow(p)}`;
     }).join('');
     this.wireDiplomacy(box);
@@ -141,6 +145,9 @@ function levelTag(p) {
  * eliminated empires are at the bottom.
  */
 function ranking(players) {
-  return players.slice().sort((a, b) => (b.alive - a.alive)
-    || b.stats.pop - a.stats.pop || b.stats.planets - a.stats.planets || b.stats.ships - a.stats.ships);
+  // In the fog: the known tallies first, the hidden ones after, by name.
+  const known = p => p.stats ? 1 : 0;
+  return players.slice().sort((a, b) => (b.alive - a.alive) || known(b) - known(a)
+    || (!a.stats ? a.name.localeCompare(b.name)
+      : b.stats.pop - a.stats.pop || b.stats.planets - a.stats.planets || b.stats.ships - a.stats.ships));
 }

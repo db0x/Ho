@@ -162,6 +162,17 @@ Gegenkurs. Erreicht das Ziel einen Orbit, folgt deine Flotte dorthin; gerät es
 außer Sicht, endet die Verfolgung. Auch die KI-Kolonien fangen ab. Abschaltbar
 in der Lobby.
 
+**Nebel des Krieges:** Du siehst nur, was deine Sensoren erfassen – rund um deine
+Planeten und Flotten, auf der Karte als heller Bereich im dunklen Schleier.
+**Späher** und Planeten mit fertiger **Orbitalstation** sehen deutlich weiter als
+der Rest; Verbündete teilen ihre Sicht. Planeten außer Sicht zeigen den Stand, als
+du sie zuletzt gesehen hast. Eine fremde Flotte in Sichtweite verrät Ziel und
+Ankunft nur, wenn sie auf einen deiner Planeten zuhält oder ihr Ziel selbst in
+Sicht liegt – sonst siehst du nur ihre Flugrichtung als kurzen, gepunkteten
+Pfeil. Die Zahlen anderer Reiche (Planeten, Bevölkerung, Schiffe) bleiben
+verborgen. Die KI spielt nach denselben Regeln. Abschaltbar in der Lobby; aus,
+gilt die ältere, weitere Sicht.
+
 Ein Planet fällt, wenn ein Angreifer den Orbit hält und weder
 Orbitalverteidigung noch Abwehrbatterie überlebt haben. Die Bevölkerung geht
 dabei zurück, der Rest wechselt den Besitzer.

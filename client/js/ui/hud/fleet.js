@@ -34,7 +34,9 @@ export const fleetMethods = {
       const pl = ownerOf(v, f.owner);
       // Detected means: course and arrival are known, the ships themselves are not.
       const target = courseTarget(v, f);
-      const whither = target
+      // Fog of war: target out of sight, only the direction is known.
+      const whither = target?.heading ? `<div class="sel-sub">${t('fleet.headingOnly')}</div>`
+        : target
         ? `<div class="sel-sub">${t('fleet.courseTo', { planet: target.name ?? t('hole.name') }).replace('<b>', '<b style="color:var(--gold)">')}`
           + (f.eta ? ' ' + t('fleet.etaSuffix', { turns: t('word.turns', { n: f.eta, count: f.eta }) }) : '')
           + '</div>'

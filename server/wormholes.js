@@ -4,6 +4,7 @@
 // sending a fleet through it.
 import { WORMHOLE, holeZone, dist } from '../shared/rules.js';
 import { makeRng } from './galaxy.js';
+import { fogOn, worldSensor, fleetSensor, covered } from './game/sensors.js';
 
 /** Scanner reach of own worlds and fleets - for worlds and mouths alike. */
 export const SCAN = { world: 230, fleet: 185 };
@@ -148,16 +149,25 @@ export function collapse(game, hole, entries) {
   }
 }
 
+/** Sensor spheres of one empire's own worlds and fleets (fog of war). */
+const ownEyes = (worlds, fleets) => [
+  ...worlds.map(q => ({ x: q.x, y: q.y, z: q.z || 0, r: worldSensor(q) })),
+  ...fleets.map(f => ({ x: f.x, y: f.y, z: f.z || 0, r: fleetSensor(f) }))
+];
+
 /** Mouths come into sight like worlds: within scanner reach of own worlds and fleets. */
 export function spotWormholes(game, entries) {
   for (const p of game.players) {
     if (!p.alive) continue;
     const mine = game.galaxy.planets.filter(q => q.owner === p.id);
     const fleets = game.fleets.filter(f => f.owner === p.id && f.ships.length);
+    // With fog of war the sensors decide - own ones only, as before.
+    const eyes = fogOn(game) ? ownEyes(mine, fleets) : null;
     for (const hole of game.wormholes) {
       for (const m of hole.mouths) {
         if (p.seenMouths.has(m.id)) continue;
-        if (!mine.some(q => dist(q, m) < SCAN.world) && !fleets.some(f => dist(f, m) < SCAN.fleet)) continue;
+        if (eyes ? !covered(eyes, m)
+          : !mine.some(q => dist(q, m) < SCAN.world) && !fleets.some(f => dist(f, m) < SCAN.fleet)) continue;
         p.seenMouths.add(m.id);
         const at = nearest(game, m);
         entries?.push({ type: 'wormhole', playerIds: [p.id], private: p.id, planetId: at?.id ?? null,

@@ -134,7 +134,10 @@ export function courseTarget(view, f) {
   if (f.hole) return view.wormholes?.find(m => m.id === f.hole) || null;
   if (f.dest != null) return view.planets[f.dest] || null;
   // Intercepting: the point where it meets its target.
-  return f.aim ? { ...f.aim, aim: true, grav: 0.2 } : null;
+  if (f.aim) return { ...f.aim, aim: true, grav: 0.2 };
+  // Fog of war: a foreign fleet whose target is out of sight - only the
+  // direction it flies in, a short way ahead (server/game/intel.js).
+  return f.heading ? { ...f.heading, heading: true, grav: 0 } : null;
 }
 
 /**

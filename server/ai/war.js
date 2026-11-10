@@ -36,11 +36,12 @@ export function chooseRival(ai, P, enemyWorlds, distance, leader, friend) {
 export function planCampaign(s) {
   const {
     ai, game, bot, price, margin, power, reinforcements, P, pressure, hit, bases, fighter,
-    enemyWorlds, distance, value, mine, zone
+    enemyWorlds, distance, value, mine, zone, planets
   } = s;
   let plan = ai.campaign;
   if (plan) {
-    const z = planetById(game, plan.targetId);
+    // As far as known - with fog of war the world as last seen.
+    const z = planets[plan.targetId];
     const open = z && z.owner && z.owner !== bot.id && !friendly(game, bot, z.owner) && bot.explored.has(z.id);
     // Waited too long, or the target arms faster than we can rebuild:
     // drop it and avoid it for a while.
@@ -86,7 +87,7 @@ export function planCampaign(s) {
     if (!choice) { ai.campaign = null; return null; }
     plan = { targetId: choice.id, since: game.turn };
   }
-  const target = planetById(game, plan.targetId);
+  const target = planets[plan.targetId];
   plan.cost = price(target);
   plan.rally = mine.filter(p => p.pop >= 1)
     .sort((a, b) => travelDistance(a, target, zone) - travelDistance(b, target, zone))[0] || null;
@@ -148,7 +149,7 @@ export function recall(s) {
  */
 export function detach(s) {
   const {
-    myFleets, game, bot, planets, price, margin, strikePower, zone, ai, enemyWorlds, value, fighter
+    myFleets, game, bot, planets, price, margin, strikePower, zone, ai, enemyWorlds, value, fighter, sight
   } = s;
   const ambushed = new Set(myFleets.filter(f => f.dest != null).map(f => f.dest));
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.at == null && f.dest != null)) {
@@ -209,9 +210,10 @@ export function detach(s) {
 
     // Ambush: only what a human would see as well - course, arrival and
     // number of ships, not their kind.
-    for (const e of game.fleets) {
-      if (e.owner === bot.id || e.dest == null || e.ships.length > 3) continue;
-      const w = planets[e.dest];
+    // With fog of war only fleets in sight whose target is known (perception.js).
+    for (const { f: e, knownDest } of sight) {
+      if (e.owner === bot.id || knownDest == null || e.ships.length > 3) continue;
+      const w = planets[knownDest];
       if (!w || w.owner || ambushed.has(w.id) || !inSight(game, bot.id, e)) continue;
       const eSpeed = fleetStats(e).speed;
       if (eSpeed <= 0) continue;

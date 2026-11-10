@@ -100,6 +100,7 @@ export function sanitizeSettings(s) {
   if (typeof s.aliens === 'boolean') out.aliens = s.aliens;
   if (Number.isFinite(s.alienLevel)) out.alienLevel = Math.min(3, Math.max(1, Math.round(s.alienLevel)));
   if (typeof s.interception === 'boolean') out.interception = s.interception;
+  if (typeof s.fog === 'boolean') out.fog = s.fog;
   if (typeof s.radio === 'boolean') out.radio = s.radio;
   if (s.mode === 'classic' || s.mode === 'space') out.mode = s.mode;
   if (s.shape === 'scatter' || s.shape === 'spiral') out.shape = s.shape;

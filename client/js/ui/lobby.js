@@ -121,6 +121,9 @@ export class Lobby {
     $('#s-radio').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { radio: $('#s-radio').checked } });
     };
+    $('#s-fog').onchange = () => {
+      if (this.isHost) this.net.send({ t: 'settings', settings: { fog: $('#s-fog').checked } });
+    };
     $('#s-intercept').onchange = () => {
       if (this.isHost) this.net.send({ t: 'settings', settings: { interception: $('#s-intercept').checked } });
     };
@@ -474,6 +477,9 @@ export class Lobby {
     $('#v-alienlevel').textContent = t(`lobby.alienLevel.${level}`);
     $('#row-alienlevel').classList.toggle('hidden', s.aliens === false);
     $('#hint-alienlevel').classList.toggle('hidden', s.aliens === false);
+    $('#s-fog').checked = s.fog !== false;
+    $('#v-fog').textContent = t(s.fog !== false ? 'word.yes' : 'word.no');
+    $('#s-fog').disabled = !this.isHost;
     $('#s-intercept').checked = s.interception !== false;
     $('#v-intercept').textContent = t(s.interception !== false ? 'word.yes' : 'word.no');
     $('#s-intercept').disabled = !this.isHost;

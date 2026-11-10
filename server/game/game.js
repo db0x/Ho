@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   aliens: true,        // now and then aliens raid from another galaxy (server/aliens.js)
   alienLevel: 2,       // how strong they are: 1 easy, 2 medium, 3 strong (ALIEN_LEVELS in rules.js)
   interception: true,  // armed fleets may chase foreign fleets in flight (movement.js)
+  fog: true,           // fog of war: only what the own sensors reach (sensors.js); off = the older, wider sight
   radio: true,         // AI colonies and aliens speak up over the radio now and then (server/radio/)
   seed: null
 };

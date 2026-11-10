@@ -158,6 +158,16 @@ catches up, a slower one only head-on. If the target reaches an orbit, your
 fleet follows it there; if it goes out of sight, the chase ends. The AI
 colonies intercept too. Intercepting can be switched off in the lobby.
 
+**Fog of war:** you only see what your sensors cover – around your planets and
+fleets, shown on the map as a clear area in the dark veil. **Scouts** and planets
+with a finished **orbital station** see much farther than the rest; allies share
+their sight. Planets out of sight show what they were like when you last saw
+them. A foreign fleet in sight gives away its target and arrival only if it is
+heading for one of your planets or its target is in sight itself – otherwise you
+only see its direction as a short dotted arrow. The numbers of other empires
+(planets, population, ships) stay hidden. The AI plays by the same rules. Can be
+switched off in the lobby; off, the older, wider sight applies.
+
 A planet falls when an attacker holds the orbit and neither orbital defence nor
 defence battery survived. The population drops in the process, the rest changes
 hands.
