@@ -1,7 +1,7 @@
 // Fleets: the panel of a selected fleet with its ships, names and cargo,
 // the fleet rows other panels list - and whether a fleet can go somewhere.
 import {
-  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, ALIEN_TYPES, supplyNeed
+  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, ALIEN_TYPES, supplyNeed, onMouth
 } from '../../../shared/rules.js';
 import { ownerOf, ownerColor } from '../../owners.js';
 import { suppliesMe } from '../../allies.js';
@@ -20,6 +20,7 @@ const FA_ICON = {
   merge: svg('<path d="M3 3.5l5 4.5 5-4.5M8 8v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   split: svg('<path d="M8 13V8.5L3 4M8 8.5L13 4M3 4v3M3 4h3M13 4v3M13 4h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'),
   refit: svg('<path d="M8 13V4M4 7.5L8 3.5l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.2h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'),
+  jump: svg('<circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.6"/><path d="M8 4.6a3.4 3.4 0 1 1-3.1 4.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/>'),
   recycle: svg('<path d="M12.6 6.2A5 5 0 0 0 3.6 5.4M3.4 9.8a5 5 0 0 0 9 .8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3.2 2.6v3h3M12.8 13.4v-3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>')
 };
 
@@ -142,11 +143,16 @@ export const fleetMethods = {
     if (c) c.onclick = () => this.app.send({ t: 'orders', move: { fleetId: f.id, planetId: null } });
     const m = box.querySelector('#merge');
     if (m) m.onclick = () => this.app.send({ t: 'orders', merge: { planetId: f.at } });
+    const jump = box.querySelector('#jump');
+    if (jump) jump.onclick = () => { if (jump.getAttribute('aria-pressed') !== 'true') this.app.orderHole(jump.dataset.hole); };
     const sp = box.querySelector('#split');
     if (sp) sp.onclick = () => openSplit(f, {
       color: col,
       // In flight both parts keep the course - say so, with the target.
       flight: !where ? { target: destP ? destP.name : null } : null,
+      // In flight every part keeps the course: does it still get anywhere
+      // without the rest? Null if so, otherwise the reason (as the server, movement.js).
+      reach: !where ? (ships, stats) => this.partReach(f, ships, stats) : null,
       onSplit: (ships, each) => this.app.send({ t: 'orders', split: { fleetId: f.id, ships, each } })
     });
     this.wireRefit(box);
@@ -211,6 +217,14 @@ export const fleetMethods = {
     if (where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1)
       out.push(btn('merge', 'merge', t('fleet.act.merge'), t('fleet.merge')));
     if (f.ships.length > 1) out.push(btn('split', 'split', t('fleet.act.split'), `${t('fleet.split')} – ${t('fleet.splitKey')}`));
+    // Standing on a wormhole mouth (came out there): jump through it - always
+    // possible, even where nothing on this side is in range.
+    const mouth = f.at == null && (v.wormholes || []).find(m => onMouth(f, m));
+    if (mouth) {
+      const set = f.hole === mouth.id;
+      out.push(btn('jump', 'jump', t('fleet.act.jump'), t(set ? 'hole.jumpSet' : 'hole.jumpTip'),
+        ` data-hole="${mouth.id}"${set ? ' aria-pressed="true"' : ''}`));
+    }
     if (where) {
       const pl = this.plan();
       const r = pl && this.refitFor(key, pl.tech);
@@ -348,6 +362,8 @@ export const fleetMethods = {
   whyNot(f, target) {
     const v = this.view;
     if (!f.stats || f.stats.speed <= 0) return t('err.fleetImmobile');
+    // Standing on a mouth: the jump through it is always possible (shared/rules.js).
+    if (onMouth(f, target)) return null;
     const bases = v.planets.filter(q => suppliesMe(v, q.owner) && q.pop > 0.5);
     if (!bases.length) return t('err.outOfRange', { need: '∞', range: f.stats.range });
     const need = Math.round(supplyNeed(bases, f, target, holeZone(v.galaxy), portalsOf(v)));
@@ -355,6 +371,22 @@ export const fleetMethods = {
       return t('err.outOfRange', { need, range: f.stats.range });
     }
     return null;
+  },
+
+  /**
+   * Would this part of a fleet in flight still reach its course target - or,
+   * without one, any own world? Null if so, otherwise why not. The same
+   * rule as the server's splitStrands (movement.js).
+   */
+  partReach(f, ships, stats) {
+    const v = this.view;
+    const part = { ...f, ships, stats };
+    const target = courseTarget(v, f);
+    if (target) return this.whyNot(part, target);
+    const bases = v.planets.filter(q => suppliesMe(v, q.owner) && q.pop > 0.5);
+    let why = t('err.outOfRange', { need: '∞', range: stats.range });
+    for (const b of bases) { const w = this.whyNot(part, b); if (!w) return null; why = w; }
+    return why;
   },
 
   /**

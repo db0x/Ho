@@ -85,6 +85,46 @@ function setup(level) {
   console.log('Rules: split in flight keeps the course for both parts, the new part flies its own course; holding position stays holding.');
 }
 
+// ------------------------------------------------------------ Stranding
+// A part without the tanker would reach neither the target nor any own
+// world - such a split in flight is refused. With a tanker in each part it
+// goes through; in orbit nothing is held back.
+{
+  const { g, bot: me, home } = setup('normal');
+  me.isBot = false;
+  const tankers = (n) => {
+    const st = shipStats('tanker', me.tech);
+    return Array.from({ length: n }, () => ({ id: 's' + g.nextShipId++, type: 'tanker', isTanker: true, tech: { ...me.tech },
+      hp: st.maxHp, maxHp: st.maxHp, attack: 0, speed: Math.round(st.speed), range: Math.round(st.range), colonists: 0 }));
+  };
+  const probe = { owner: me.id, ships: fighters(g, me.id, 1) };
+  const withTanker = { owner: me.id, ships: [...fighters(g, me.id, 1), ...tankers(1)] };
+  const far = g.galaxy.planets.filter(p => !p.owner && !canReach(g, probe, p).ok && canReach(g, withTanker, p).ok)
+    .sort((a, b) => dist(b, home) - dist(a, home))[0];
+  if (assert(far, 'No world only a tanker reaches (scenario broken)') !== false && far) {
+    const f = fleetIn(g, me.id, [...fighters(g, me.id, 3), ...tankers(1)], toward(home, far, dist(home, far) * 0.8), far.id);
+    const fightersOnly = f.ships.filter(s => s.type === 'fighter').map(s => s.id);
+    const n = g.fleets.length;
+    const r = setOrders(g, me, { split: { fleetId: f.id, ships: fightersOnly } });
+    assert(r?.error === 'err.splitStrands' && g.fleets.length === n, `Fighters split off without the tanker far out (${r?.error})`);
+    const r2 = setOrders(g, me, { split: { fleetId: f.id, ships: [f.ships.find(s => s.type === 'tanker').id] } });
+    assert(r2?.error === 'err.splitStrands' && g.fleets.length === n, 'The tanker split off, leaving the fighters stranded');
+    const r3 = setOrders(g, me, { split: { fleetId: f.id, ships: f.ships.map(s => s.id), each: true } });
+    assert(r3?.error === 'err.splitStrands' && g.fleets.length === n, 'Broken up into single ships far out');
+    // A second tanker: one in each part, then it goes through.
+    f.ships.push(...tankers(1));
+    const half = [f.ships[0].id, f.ships.filter(s => s.type === 'tanker')[0].id];
+    const r4 = setOrders(g, me, { split: { fleetId: f.id, ships: half } });
+    assert(!r4?.error && r4?.newFleet, `With a tanker in each part the split was refused (${r4?.error})`);
+    // In orbit nothing is held back.
+    const o = fleetIn(g, me.id, [...fighters(g, me.id, 2), ...tankers(1)], home, null);
+    Object.assign(o, { at: home.id });
+    const r5 = setOrders(g, me, { split: { fleetId: o.id, ships: [o.ships[2].id] } });
+    assert(!r5?.error && r5?.newFleet, 'A split in orbit was refused');
+    console.log('Stranding: no split in flight that leaves a part without supply; one tanker per part goes through; in orbit as before.');
+  }
+}
+
 // ---------------------------------------------------------------- Sortie
 function sortie(level) {
   const { g, bot, foe, home, near } = setup(level);

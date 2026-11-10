@@ -4,7 +4,7 @@
 // message - it would only arrive when nothing can be changed anymore.
 import { orderUnload } from './colonization.js';
 import { loadOrDrop, splitFleet, mergeFleets } from './fleets.js';
-import { orderMove } from './movement.js';
+import { orderMove, splitStrands } from './movement.js';
 import { orderResearch } from './research.js';
 import { orderBuild, renameShip, orderRefit, recycle } from './shipyard.js';
 import { orderTerraform } from './terraforming.js';
@@ -24,6 +24,6 @@ export function setOrders(game, player, msg) {
   if (msg.recycle) return recycle(game, player, msg.recycle);
   if (msg.terraform) return orderTerraform(game, player, msg.terraform);
   if (msg.move) return orderMove(game, player, msg.move);
-  if (msg.split) return splitFleet(game, player, msg.split);
+  if (msg.split) return splitStrands(game, player, msg.split) || splitFleet(game, player, msg.split);
   if (msg.merge) return mergeFleets(game, player, msg.merge);
 }

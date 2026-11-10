@@ -1260,6 +1260,9 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 .sp-side[data-side="new"] { border-color: var(--gold-dim); background: linear-gradient(#17140b, #0b1020); }
 .sp-side.sp-empty { opacity: .55; }
 .sp-side[data-side="new"].sp-empty { border-color: var(--line); background: #0b1020; }
+/* In flight: this part would be stranded without supply (split.js). */
+.sp-side.sp-strand, .sp-side[data-side="new"].sp-strand { border-color: var(--bad); background: rgba(255, 95, 95, .08); }
+.sp-side.sp-strand .sp-count { color: var(--bad); }
 .sp-side .sp-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-side .sp-count { font-family: var(--mono); font-size: 26px; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }

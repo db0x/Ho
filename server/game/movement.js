@@ -7,7 +7,7 @@
 // fleets move at the same time, so the turn is played through in small
 // steps - where a chaser comes close enough to its target, both stop and
 // fight there in open space (combat.js).
-import { supplyNeed, holeZone, advance, route, dist, isAlien, travelDistance, routeLength } from '../../shared/rules.js';
+import { supplyNeed, holeZone, advance, route, dist, isAlien, travelDistance, routeLength, onMouth } from '../../shared/rules.js';
 import { portalsFor, findMouth, transit } from '../wormholes.js';
 import { teamOf, hostile } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
@@ -43,6 +43,8 @@ function supplyNeedFor(game, fleet, target) {
 export function canReach(game, fleet, target) {
   const st = fleetStats(fleet);
   if (st.speed <= 0) return { ok: false, key: 'err.fleetImmobile', params: {} };
+  // Standing on a mouth: the jump through it is always possible.
+  if (onMouth(fleet, target)) return { ok: true };
   // Range is rounded in fleetStats, so compare against the rounded distance
   // as well - otherwise 170.3 > 170 rejects a target shown as "170 < 170".
   const need = Math.round(supplyNeedFor(game, fleet, target));
@@ -109,6 +111,36 @@ function orderChase(game, player, fleet, targetId) {
   fleet.dest = null;
   fleet.hole = null;
   delete player.orders.moves[fleet.id];
+}
+
+/**
+ * Splitting in flight: would a part be left without supply? Every part
+ * keeps the course of the fleet (fleets.js splitFleet) - a part without the
+ * tanker may then reach neither the target nor any own world and drift in
+ * space for good. Such a split is refused. Only in flight; in orbit a part
+ * just stays where it is. If the whole fleet already reaches nothing,
+ * splitting makes nothing worse and is left alone.
+ * @returns {{error: string}|null}
+ */
+export function splitStrands(game, player, o) {
+  const fleet = game.fleets.find(f => f.id === o.fleetId);
+  if (!fleet || fleet.owner !== player.id || fleet.at != null) return null;
+  const take = new Set(o.ships || []);
+  let moved = fleet.ships.filter(s => take.has(s.id));
+  // The same parts splitFleet makes: with "each" the first ship stays.
+  const each = o.each === true;
+  if (each && moved.length === fleet.ships.length) moved = moved.slice(1);
+  if (!moved.length || moved.length === fleet.ships.length) return null;
+  const rest = fleet.ships.filter(s => !moved.includes(s));
+  const parts = [rest, ...(each ? moved.map(s => [s]) : [moved])];
+  const goal = goalOf(game, fleet);
+  const bases = supplyBases(game, fleet.owner);
+  const fine = (ships) => {
+    const part = { ...fleet, ships };
+    return goal ? canReach(game, part, goal).ok : bases.some(b => canReach(game, part, b).ok);
+  };
+  if (!fine(fleet.ships)) return null;
+  return parts.every(fine) ? null : { error: 'err.splitStrands' };
 }
 
 /** Where a fleet is heading this turn: a mouth, a world - or nothing. */

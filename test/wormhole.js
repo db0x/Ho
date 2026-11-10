@@ -88,6 +88,17 @@ for (const shape of ['scatter', 'spiral']) {
   }
   // The way back: into the far mouth, out at home.
   check(canReach(game, scouts, far).ok, 'the way back through the wormhole is open');
+  // Even without any range left the fleet standing on the mouth may jump
+  // back - otherwise it would be stuck where nothing is in reach.
+  const ranges = scouts.ships.map(x => x.range);
+  for (const x of scouts.ships) x.range = 1;
+  check(canReach(game, scouts, far).ok, 'a fleet on the mouth may always jump through it');
+  check(beyond == null || !canReach(game, scouts, beyond).ok, 'but without range nothing else is in reach');
+  check(!setOrders(game, me, { move: { fleetId: scouts.id, hole: far.id } }), 'the jump back is accepted');
+  me.ready = true;
+  resolveTurn(game);
+  check(dist(scouts, near) < 1 && !scouts.hole, `the fleet jumped back home in one turn (${Math.round(dist(scouts, near))} ly from the near mouth)`);
+  scouts.ships.forEach((x, i) => { x.range = ranges[i]; });
 
   // Collapse: afterwards the far side is cut off.
   devWormholes(game, me, 'close');

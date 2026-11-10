@@ -62,7 +62,7 @@ function build() {
   modal.querySelector('.sp-x').onclick = close;
   modal.querySelector('.sp-do').onclick = () => {
     const ids = movingIds();
-    if (!splittable(ids.length)) return;
+    if (!splittable(ids.length) || strands().why) return;
     const done = current.onSplit;
     close();
     done(ids, false);
@@ -80,6 +80,7 @@ function build() {
   };
   // One fleet per ship, the whole fleet - goes right away.
   modal.querySelector('.sp-all').onclick = () => {
+    if (singlesStrand()) return;
     const ids = current.fleet.ships.map(s => s.id), done = current.onSplit;
     close();
     done(ids, true);
@@ -92,11 +93,14 @@ function build() {
 
 /**
  * @param {object} fleet          own fleet from the view (ships with id, type, tech, hp ...)
- * @param {object} o              { color, flight: { target } | null, onSplit(shipIds, each) }
+ * @param {object} o              { color, flight: { target } | null, onSplit(shipIds, each),
+ *                                  reach(ships, stats) -> reason | null: in flight, does a part still get anywhere }
  */
 export function openSplit(fleet, o) {
   if (!modal) build();
-  current = { fleet, color: o.color, onSplit: o.onSplit, groups: groupShips(fleet.ships) };
+  current = { fleet, color: o.color, onSplit: o.onSplit, groups: groupShips(fleet.ships), reach: o.reach || null };
+  // Only parts that make it worse count: if the whole fleet reaches nothing anyway, nothing is held back.
+  if (current.reach && reachOf(fleet.ships)) current.reach = null;
   modal.querySelector('.sp-title').textContent = t('split.title');
   modal.querySelector('.sp-x').title = t('fleet.splitCancel');
   modal.querySelector('.sp-hint').textContent = !o.flight ? t('split.hint')
@@ -150,6 +154,29 @@ function sideStats(ships) {
   }
   if (tankers > 1) range += range * 0.15 * (tankers - 1);
   return { speed: Number.isFinite(speed) ? speed : 0, range, attack };
+}
+
+/** Why this part would be stranded in flight, or null (fleet.js partReach). */
+function reachOf(ships) {
+  if (!current.reach || !ships.length) return null;
+  const st = sideStats(ships);
+  return current.reach(ships, { ...st, range: Math.round(st.range) });
+}
+
+/** Which part of the split as set up would be stranded: { side, why } - side 'keep' or 'new'. */
+function strands() {
+  const moving = movingShips();
+  if (!current.reach || !splittable(moving.length)) return { side: null, why: null };
+  const going = new Set(moving.map(s => s.id));
+  const keepWhy = reachOf(current.fleet.ships.filter(s => !going.has(s.id)));
+  if (keepWhy) return { side: 'keep', why: keepWhy };
+  const newWhy = reachOf(moving);
+  return newWhy ? { side: 'new', why: newWhy } : { side: null, why: null };
+}
+
+/** Breaking up into single ships in flight: would one of them be stranded? */
+function singlesStrand() {
+  return !!current?.reach && current.fleet.ships.some(s => reachOf([s]));
 }
 
 /** One row per group - built once, render() only updates the numbers. */
@@ -217,10 +244,20 @@ function render() {
     r.classList.toggle('sp-moving', g.moving > 0);
   }
 
-  const ok = splittable(moving.length);
+  // In flight a part without the tanker may reach nothing anymore - such a
+  // split is held back, and the tile of that part says so.
+  const stranded = strands();
+  for (const side of ['keep', 'new']) modal.querySelector(`[data-side="${side}"]`).classList.toggle('sp-strand', stranded.side === side);
+  const ok = splittable(moving.length) && !stranded.why;
   const doBtn = modal.querySelector('.sp-do');
   doBtn.disabled = !ok;
   doBtn.textContent = !moving.length ? t('fleet.splitDo') : t('split.doN', { count: moving.length });
-  // Only worth a word once something has been moved and one side ran empty.
-  modal.querySelector('.sp-warn').textContent = moving.length && !ok ? t('split.needBoth') : '';
+  // Only worth a word once something has been moved and one side ran empty - or would be stranded.
+  modal.querySelector('.sp-warn').textContent = stranded.why
+    ? t(stranded.side === 'new' ? 'split.strandsNew' : 'split.strandsKeep', { reason: stranded.why })
+    : moving.length && !ok ? t('split.needBoth') : '';
+  const all = modal.querySelector('.sp-all');
+  const lost = singlesStrand();
+  all.disabled = lost;
+  all.title = lost ? t('split.strandsSingle') : t('fleet.splitKey');
 }

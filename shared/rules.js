@@ -744,6 +744,14 @@ export const WORMHOLE = {
  * @param {{a: object, b: object}[]} portals entering at a, coming out at b
  *   (a wormhole that works both ways is listed in both directions)
  */
+/**
+ * A fleet standing on a wormhole mouth (ids of mouths are strings, of
+ * worlds numbers) may always jump through it: it costs no way, so it needs
+ * no supply - otherwise a fleet that came out where nothing is in range
+ * would be stuck for good.
+ */
+export const onMouth = (fleet, target) => typeof target?.id === 'string' && dist(fleet, target) < 1;
+
 export function supplyNeed(bases, from, target, zone, portals = []) {
   let need = supplyDistance(bases, target, zone);
   if (!portals.length || !from) return need;
