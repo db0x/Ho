@@ -159,8 +159,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 /* Both rows fill the width like the buttons above: the field on the left
    with the same width in each row, the button takes the rest. */
 .join-row input, .join-row .sel, .join-row select { flex: 0 0 140px; width: 140px; }
-.join-row > button { flex: 1; white-space: nowrap; }
-@media (max-width: 420px) { .join-row input, .join-row .sel, .join-row select { flex-basis: 108px; width: 108px; } }
+.join-row > button { flex: 1; min-width: 0; white-space: nowrap; }
+@media (max-width: 420px) {
+  .join-row input, .join-row .sel, .join-row select { flex-basis: 108px; width: 108px; }
+  .join-row > button { white-space: normal; line-height: 1.25; }
+}
 .open-games { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 .open-games .og {
   display: flex; align-items: center; gap: 10px; font-size: 14px;
@@ -420,8 +423,8 @@ body.is-blocked > :not(#blocked) { display: none !important; }
 .lobby header h2 { margin: 0 0 4px; font-size: 26px; }
 .lobby header p { margin: 0 0 18px; color: var(--ink-dim); }
 .code { font-family: var(--mono); color: var(--gold); letter-spacing: .3em; }
-.lobby-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
-@media (max-width: 760px) { .lobby-grid { grid-template-columns: 1fr; } }
+.lobby-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 760px) { .lobby-grid { grid-template-columns: minmax(0, 1fr); } }
 .panel {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
@@ -1161,51 +1164,96 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 .clickable-ship { cursor: pointer; }
 .clickable-ship:hover .bname, .clickable-ship:hover .si-name { color: var(--gold); }
 
-/* Splitting a fleet (client/js/ui/split.js): two columns, ships move by
-   drag and drop. The stacks take no browser gestures - otherwise a finger
-   would scroll the list instead of lifting the stack. */
-.split-box { width: min(720px, 94vw); display: flex; flex-direction: column; }
-.split-box h2 { margin-bottom: 4px; }
-.sp-hint { margin: 0 0 14px; }
-.sp-cols { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; min-height: 0; }
-.sp-arrow { align-self: center; color: var(--ink-faint); font-size: 20px; }
-.sp-col {
-  display: flex; flex-direction: column; min-width: 0; padding: 10px;
-  background: #0b1020; border: 1px solid var(--line); border-radius: 10px;
-  transition: border-color .12s, background .12s;
+/* Splitting a fleet (client/js/ui/split.js): both parts side by side on
+   top, one row per kind of ship with a slider and - / + below. Head and
+   foot stay put, only the body scrolls; on a phone the box is a sheet
+   rising from the bottom edge, the buttons within reach of the thumb. */
+.split-box { width: min(560px, 94vw); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.sp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 20px 22px 0; }
+.split-box .sp-head h2 { margin: 0; }
+.sp-x {
+  flex: none; width: 36px; height: 36px; padding: 0; border-radius: 50%;
+  font-size: 22px; line-height: 1; color: var(--ink-dim); background: transparent; border-color: transparent;
 }
-.sp-col header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.sp-col header b { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-dim); }
-.sp-count { font-family: var(--mono); color: var(--gold); font-size: 18px; }
-.sp-stats { margin: 2px 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-list { display: flex; flex-direction: column; gap: 6px; min-height: 150px; max-height: 46vh; overflow-y: auto; }
-.sp-col.sp-over { border-color: var(--gold); background: #141a2c; box-shadow: inset 0 0 0 1px var(--gold-dim); }
-.sp-empty {
-  flex: 1; display: grid; place-items: center; margin: 0; padding: 18px 8px; text-align: center;
-  border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--ink-faint); font-size: 13px;
+.sp-x:hover { color: var(--ink); border-color: var(--line-strong); }
+.sp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 22px 4px; overscroll-behavior: contain; }
+.sp-hint { margin: 0 0 14px; line-height: 1.45; }
+
+.sp-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.sp-side {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px;
+  background: #0b1020; border: 1px solid var(--line); border-radius: 10px; transition: border-color .15s, opacity .15s;
 }
-.sp-stack {
-  display: flex; align-items: center; gap: 8px; padding: 8px 10px; min-height: 46px;
-  background: linear-gradient(#1b2236, #141a2a); border: 1px solid var(--line-strong); border-radius: 8px;
-  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+.sp-side[data-side="new"] { border-color: var(--gold-dim); background: linear-gradient(#17140b, #0b1020); }
+.sp-side.sp-empty { opacity: .55; }
+.sp-side[data-side="new"].sp-empty { border-color: var(--line); background: #0b1020; }
+.sp-side .sp-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-side .sp-count { font-family: var(--mono); font-size: 26px; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sp-side[data-side="new"] .sp-count { color: var(--gold); }
+.sp-side .sp-stats { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sp-quick { display: flex; gap: 6px; margin-bottom: 10px; }
+.sp-quick button { flex: 1; padding: 8px 6px; font-size: 13px; white-space: nowrap; }
+.sp-quick button[hidden] { display: none; }
+
+.sp-list { display: flex; flex-direction: column; gap: 8px; }
+.sp-row {
+  padding: 8px 10px 10px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: linear-gradient(#1a2134, #131929); transition: border-color .15s;
 }
-.sp-stack:hover { border-color: var(--gold-dim); }
-.sp-stack.sp-lifted { opacity: .35; }
-.sp-ic { flex: none; display: inline-flex; width: 26px; height: 26px; }
-.sp-label { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.sp-row.sp-moving { border-color: var(--gold-dim); }
+.sp-what { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.sp-ic { flex: none; display: inline-flex; width: 28px; height: 28px; }
+.sp-label { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .sp-type { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-n { font-family: var(--mono); color: var(--gold); font-variant-numeric: tabular-nums; }
-.sp-ghost {
-  position: fixed; z-index: 80; pointer-events: none; cursor: grabbing;
-  border-color: var(--gold); box-shadow: 0 14px 30px rgba(0, 0, 0, .6); transform: rotate(-1.5deg) scale(1.03);
+.sp-total { font-family: var(--mono); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.sp-ctl { display: grid; grid-template-columns: 2.2em 40px 1fr 40px 2.2em; align-items: center; gap: 8px; margin-top: 8px; }
+.sp-k, .sp-v { font-family: var(--mono); font-size: 17px; text-align: center; font-variant-numeric: tabular-nums; }
+.sp-k { color: var(--ink); }
+.sp-v { color: var(--gold); }
+.sp-step { width: 40px; height: 40px; padding: 0; font-size: 22px; line-height: 1; border-radius: 10px; touch-action: manipulation; }
+.sp-step:disabled { opacity: .3; }
+/* The slider fills gold up to the thumb: that much leaves, in the colour
+   of the new fleet above. */
+.sp-ctl input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 36px; margin: 0; background: transparent; cursor: pointer;
+  --p: 0%;
 }
-.sp-each { margin: 0 0 8px; padding: 0; }
-.sp-foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
-.sp-warn { flex: 1; color: #ffb347; }
+.sp-ctl input[type=range]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--gold) var(--p), #3a4664 0);
+}
+.sp-ctl input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #3a4664; }
+.sp-ctl input[type=range]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--gold); }
+.sp-ctl input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%;
+  background: var(--gold); border: 3px solid #2a1e02; box-shadow: 0 0 0 1px var(--gold-dim), 0 2px 6px rgba(0,0,0,.5);
+}
+.sp-ctl input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--gold); border: 3px solid #2a1e02; box-shadow: 0 0 0 1px var(--gold-dim);
+}
+.sp-each { margin: 14px 0 6px; padding: 0; }
+
+.sp-foot { padding: 12px 22px 18px; border-top: 1px solid var(--line); background: var(--panel-solid); }
+.sp-warn { display: block; color: #ffb347; margin-bottom: 8px; }
+.sp-warn:empty { display: none; }
+.sp-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.sp-btns .sp-do { min-width: 11em; }
 @media (max-width: 560px) {
-  .sp-cols { grid-template-columns: 1fr; }
-  .sp-arrow { justify-self: center; transform: rotate(90deg); }
-  .sp-list { min-height: 90px; max-height: 26vh; }
+  #split.modal { place-items: end stretch; }
+  .split-box {
+    width: 100%; max-height: 92vh; max-height: 92dvh;
+    border-radius: 16px 16px 0 0; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sp-head { padding: 16px 16px 0; }
+  .sp-side .sp-stats { white-space: normal; line-height: 1.35; }
+  .sp-body { padding: 4px 16px 4px; }
+  .sp-foot { padding: 10px 16px 14px; }
+  .sp-btns .sp-cancel { flex: 1; }
+  .sp-btns .sp-do { flex: 2; min-width: 0; }
+  .sp-btns button { padding: 12px 10px; }
 }
 /* Scrollbars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
