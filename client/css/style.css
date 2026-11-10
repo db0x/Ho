@@ -1259,9 +1259,8 @@ kbd { display: inline-block; min-width: 2em; padding: 4px 10px; margin: 2px 0; b
 .sp-warn { display: block; color: #ffb347; margin-bottom: 8px; }
 .sp-warn:empty { display: none; }
 .sp-btns { display: flex; gap: 8px; justify-content: flex-end; }
-/* Breaking up the whole fleet: a different action, on the left, plain. */
-.sp-all { margin-right: auto; background: transparent; border-style: dashed; color: var(--ink-dim); }
-.sp-all:hover { color: var(--ink); }
+/* Breaking up the whole fleet: a different action, set apart on the left. */
+.sp-all { margin-right: auto; }
 .sp-btns .sp-do { min-width: 11em; }
 @media (max-width: 560px) {
   #split.modal { place-items: end stretch; }
