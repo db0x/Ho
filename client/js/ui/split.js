@@ -4,9 +4,10 @@
 // of that kind change to the new fleet. That works the same with a finger as
 // with the mouse, without dragging between columns that do not even fit next
 // to each other on a phone.
-// "Each ship a fleet of its own" makes the new part one fleet per ship, and
-// "all single" breaks up the whole fleet at once - five colony ships, five
-// worlds. In flight both parts keep the course until the new one gets its own.
+// Apart from that, at the foot next to cancel: break the whole fleet up into
+// single ships right away - five colony ships, five worlds. A different
+// action, so it does not mix with the sliders. In flight both parts keep the
+// course until the new one gets its own.
 // The window lives outside the selection panel, so a new view arriving in
 // the meantime does not throw away what has been put together.
 import { shipIcon } from '../render/ships.js';
@@ -43,14 +44,13 @@ function build() {
       <div class="sp-quick">
         <button class="sp-none"></button>
         <button class="sp-half"></button>
-        <button class="sp-all"></button>
       </div>
       <div class="sp-list"></div>
-      <label class="chk sp-each"><input type="checkbox"> <span></span></label>
     </div>
     <div class="sp-foot">
       <span class="sp-warn small"></span>
       <div class="sp-btns">
+        <button class="sp-all"></button>
         <button class="sp-cancel"></button>
         <button class="primary sp-do"></button>
       </div>
@@ -63,9 +63,9 @@ function build() {
   modal.querySelector('.sp-do').onclick = () => {
     const ids = movingIds();
     if (!splittable(ids.length)) return;
-    const done = current.onSplit, each = current.each;
+    const done = current.onSplit;
     close();
-    done(ids, each);
+    done(ids, false);
   };
   modal.querySelector('.sp-none').onclick = () => { for (const g of current.groups) setCount(g, 0); render(); };
   modal.querySelector('.sp-half').onclick = () => {
@@ -78,13 +78,12 @@ function build() {
     }
     render();
   };
+  // One fleet per ship, the whole fleet - goes right away.
   modal.querySelector('.sp-all').onclick = () => {
-    for (const g of current.groups) setCount(g, g.ships.length);
-    current.each = true;
-    modal.querySelector('.sp-each input').checked = true;
-    render();
+    const ids = current.fleet.ships.map(s => s.id), done = current.onSplit;
+    close();
+    done(ids, true);
   };
-  modal.querySelector('.sp-each input').onchange = (e) => { current.each = e.target.checked; render(); };
   // In the capture phase, so Escape does not also clear the selection on the map.
   addEventListener('keydown', (e) => {
     if (current && e.key === 'Escape') { e.stopPropagation(); close(); }
@@ -97,22 +96,17 @@ function build() {
  */
 export function openSplit(fleet, o) {
   if (!modal) build();
-  current = { fleet, color: o.color, onSplit: o.onSplit, groups: groupShips(fleet.ships), each: false };
+  current = { fleet, color: o.color, onSplit: o.onSplit, groups: groupShips(fleet.ships) };
   modal.querySelector('.sp-title').textContent = t('split.title');
   modal.querySelector('.sp-x').title = t('fleet.splitCancel');
   modal.querySelector('.sp-hint').textContent = !o.flight ? t('split.hint')
     : t('split.hint') + ' ' + (o.flight.target ? t('split.hintFlight', { planet: o.flight.target }) : t('split.hintAdrift'));
   modal.querySelector('[data-side="keep"] .sp-name').textContent = t('split.keep');
-  modal.querySelector('.sp-each input').checked = false;
-  modal.querySelector('.sp-each span').textContent = t('split.each');
   modal.querySelector('.sp-none').textContent = t('split.none');
   modal.querySelector('.sp-half').textContent = t('split.half');
-  modal.querySelector('.sp-all').textContent = t('split.allSingle');
-  modal.querySelector('.sp-all').title = t('split.allSingleTitle', { n: fleet.ships.length });
+  modal.querySelector('.sp-all').textContent = t('split.allSingle', { count: fleet.ships.length });
+  modal.querySelector('.sp-all').title = t('fleet.splitKey');
   modal.querySelector('.sp-cancel').textContent = t('fleet.splitCancel');
-  // With a single kind of ship the quick buttons say nothing the slider
-  // does not; "all single" stays, it is the one thing a slider cannot do.
-  modal.querySelector('.sp-half').hidden = fleet.ships.length < 2;
   buildList();
   render();
   modal.classList.remove('hidden');
@@ -140,12 +134,9 @@ const setCount = (g, n) => { g.moving = Math.max(0, Math.min(g.ships.length, Mat
 const movingShips = () => current.groups.flatMap(g => g.moving ? g.ships.slice(-g.moving) : []);
 const movingIds = () => movingShips().map(s => s.id);
 
-/**
- * Can this many ships go? One fleet per ship may take them all - the first
- * then stays behind as the old fleet.
- */
+/** Can this many ships go? Something has to go, something has to stay. */
 function splittable(moving) {
-  return moving > 0 && (current.each || moving < current.fleet.ships.length);
+  return moving > 0 && moving < current.fleet.ships.length;
 }
 
 /** The same rule as fleetStats on the server: slowest ship, best range plus tankers. */
@@ -210,12 +201,10 @@ function render() {
     el.querySelector('.sp-count').textContent = ships.length;
     el.classList.toggle('sp-empty', !ships.length);
     const st = sideStats(ships);
-    // One fleet per ship: summed stats would describe no fleet at all.
     el.querySelector('.sp-stats').textContent = !ships.length ? '–'
-      : side === 'new' && current.each ? t('split.fleets', { count: ships.length })
       : t('split.stats', { attack: fmt(st.attack), speed: fmt(st.speed), range: fmt(st.range) });
   }
-  modal.querySelector('[data-side="new"] .sp-name').textContent = t(current.each ? 'split.newEach' : 'split.new');
+  modal.querySelector('[data-side="new"] .sp-name').textContent = t('split.new');
 
   for (const g of current.groups) {
     const n = g.ships.length, r = g.row;
@@ -231,9 +220,7 @@ function render() {
   const ok = splittable(moving.length);
   const doBtn = modal.querySelector('.sp-do');
   doBtn.disabled = !ok;
-  doBtn.textContent = !moving.length ? t('fleet.splitDo')
-    : current.each ? t('split.doEach', { count: moving.length })
-    : t('split.doN', { count: moving.length });
+  doBtn.textContent = !moving.length ? t('fleet.splitDo') : t('split.doN', { count: moving.length });
   // Only worth a word once something has been moved and one side ran empty.
   modal.querySelector('.sp-warn').textContent = moving.length && !ok ? t('split.needBoth') : '';
 }

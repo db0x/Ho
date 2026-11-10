@@ -10,6 +10,18 @@ import { courseTarget, portalsOf } from '../../render/courses.js';
 import { shipIcon } from '../../render/ships.js';
 import { openSplit } from '../../ui/split.js';
 import { escapeHtml, fmt, fmt1 } from './format.js';
+import { refitShips } from '../../../shared/budget.js';
+import { recycleRates, recycleValue } from '../../../shared/rules.js';
+
+// Icons of the fleet actions, 16x16 in currentColor like the rest of the UI.
+const svg = (d) => `<svg class="ico" viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
+const FA_ICON = {
+  stop: svg('<rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/>'),
+  merge: svg('<path d="M3 3.5l5 4.5 5-4.5M8 8v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
+  split: svg('<path d="M8 13V8.5L3 4M8 8.5L13 4M3 4v3M3 4h3M13 4v3M13 4h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'),
+  refit: svg('<path d="M8 13V4M4 7.5L8 3.5l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.2h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'),
+  recycle: svg('<path d="M12.6 6.2A5 5 0 0 0 3.6 5.4M3.4 9.8a5 5 0 0 0 9 .8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3.2 2.6v3h3M12.8 13.4v-3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>')
+};
 
 export const fleetMethods = {
   fleetPanel(box, f) {
@@ -82,6 +94,7 @@ export const fleetMethods = {
               .replace('<b>', '<b style="color:var(--bad)">') : ''}</div>
         </div>
       </div>
+      ${f.mine && !v.spectator ? this.fleetActions(f, where, !!(destP || destM || f.chase)) : ''}
       <div class="statgrid cols4">
         <div class="stat"><div class="k">${t('fleet.speed')}</div><div class="v">${Math.round(st.speed)} ${t('unit.lyPerTurn')}</div></div>
         <div class="stat"><div class="k">${t('fleet.range')}</div><div class="v">${fmt(st.range)} ${t('unit.ly')}</div></div>
@@ -108,19 +121,7 @@ export const fleetMethods = {
             </div>`).join('')}
         </div>
       </div>
-      ${!f.mine ? '' : `
-      <div class="sec">
-        <h4>${t('fleet.orders')}</h4>
-        <p class="hint-line" style="margin-top:0">${t('fleet.orderHint')}</p>
-        <div class="sel-actions">
-          ${destP || destM || f.chase ? `<button class="tiny" id="cancel">${t('fleet.cancelCourse')}</button>` : ''}
-          ${where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1
-            ? `<button class="tiny" id="merge">${t('fleet.merge')}</button>` : ''}
-          ${f.ships.length > 1 ? `<button class="tiny" id="split" title="${t('fleet.splitKey')}">${t('fleet.split')}</button>` : ''}
-        </div>
-        ${where ? this.refitBlock('f:' + f.id, t('refit.fleet')) : ''}
-        ${where ? this.recycleBlock('f:' + f.id) : ''}
-      </div>`}
+      ${f.mine && !v.spectator ? `<p class="hint-line fa-hint">${t('fleet.orderHint')}</p>` : ''}
       ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
 
     const col = (f.mine && v.me) ? v.me.color
@@ -192,6 +193,52 @@ export const fleetMethods = {
    * world - taking satellites aboard and setting them down. Each direction
    * has its own counter, capped by what fits or is there.
    */
+  /**
+   * What can be done with an own fleet, as one row of buttons right under
+   * its title - on a phone within reach without scrolling the sheet. Icon
+   * over a short word, all the same width; the prices go in one line below.
+   * Refit and recycle keep the data attributes, wireRefit / wireRecycle
+   * work on them as on a planet.
+   */
+  fleetActions(f, where, moving) {
+    const v = this.view, key = 'f:' + f.id;
+    const btn = (id, ico, label, title, extra = '') =>
+      `<button class="fa-btn"${id ? ` id="${id}"` : ''} title="${title}" aria-label="${title}"${extra}>${FA_ICON[ico]}<span>${label}</span></button>`;
+    const out = [], info = [];
+    if (moving) out.push(btn('cancel', 'stop', t('fleet.act.stop'), t('fleet.cancelCourse')));
+    if (where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1)
+      out.push(btn('merge', 'merge', t('fleet.act.merge'), t('fleet.merge')));
+    if (f.ships.length > 1) out.push(btn('split', 'split', t('fleet.act.split'), `${t('fleet.split')} – ${t('fleet.splitKey')}`));
+    if (where) {
+      const pl = this.plan();
+      const r = pl && this.refitFor(key, pl.tech);
+      if (r) {
+        const ordered = !!v.me.refit?.[key];
+        const price = t('refit.cost', { n: r.count, count: r.count, money: fmt(r.money), metal: fmt(r.metal) });
+        const ok = ordered || this.affordable({ refit: key });
+        out.push(btn(null, 'refit', t('fleet.act.refit'), ordered ? t('refit.cancel') : ok ? t('refit.fleet') : t('yard.cantAfford'),
+          ` data-refit="${key}"${ordered ? ' data-off="1" aria-pressed="true"' : ''}${ok ? '' : ' disabled'}`));
+        info.push(ordered ? `<span style="color:var(--good)">${t('refit.ordered', { cost: price })}</span>` : price);
+      }
+      if (recycleRates(v.me.tech.recycling)) {
+        const ships = refitShips(v, key);
+        if (ships.length) {
+          const val = recycleValue(ships, v.me.tech.recycling);
+          const ok = this.recycleAffordable(val);
+          const armed = this.recycleArmed === key;
+          const text = t('recycle.value', { n: val.count, count: val.count, money: fmt(val.money), metal: fmt(val.metal) });
+          out.push(btn(null, 'recycle', t(armed ? 'fleet.act.sure' : 'fleet.act.recycle'), ok ? t(armed ? 'recycle.confirm' : 'recycle.fleet') : t('recycle.cantAfford'),
+            ` data-recycle="${key}" data-sfx="${armed ? 'none' : 'click'}"${armed ? ' data-armed="1"' : ''}${ok ? '' : ' disabled'}`));
+          // The price of recycling is worth a line once it is about to happen.
+          if (armed) info.push(`<span style="color:var(--gold)">${t('recycle.confirm')} ${text}</span>`);
+        }
+      }
+    }
+    if (!out.length) return '';
+    return `<div class="fa-row">${out.join('')}</div>
+      ${info.map(x => `<p class="small oneline fa-info">${x}</p>`).join('')}`;
+  },
+
   cargoSection(f, where) {
     const c = cargoOf(f.ships);
     if (!c.capacity) return '';
