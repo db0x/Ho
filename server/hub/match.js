@@ -126,6 +126,7 @@ export function connectionLost(connId) {
     // Only the connection holding the seat may give it up.
     if (p && p.connId === connId) {
       p.connected = false;
+      p.lostAt = Date.now();          // a grace before counting as done (game.js allReady)
       voiceDrop(game, p);
       if (game.state === 'lobby') {
         removePlayer(game, p.id);

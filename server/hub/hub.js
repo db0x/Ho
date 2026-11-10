@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import { MAX_PLAYERS } from '../../shared/rules.js';
 import { authEnabled } from '../auth.js';
-import { DEFAULT_SETTINGS } from '../game/game.js';
+import { DEFAULT_SETTINGS, someoneAbsent } from '../game/game.js';
 import { accountAvatarUrl } from '../profile.js';
 import { getUser, privacyOf } from '../userstore.js';
 import { accountHandlers, blockedOf, appealView, adminOf, inviterOf, checkConnections } from './account.js';
@@ -12,7 +12,7 @@ import { adminHandlers } from './admin.js';
 import { conns, send, allowMessage, RATE } from './connections.js';
 import { devHandlers, devOf } from './dev.js';
 import { friendHandlers, sendFriends, tickFriends } from './friends.js';
-import { games, discardIfIdle } from './games.js';
+import { games, discardIfIdle, maybeResolve } from './games.js';
 import { lobbyHandlers, openGameList, seatList } from './lobby.js';
 import { matchHandlers, connectionLost, checkTurnTimer } from './match.js';
 import { newsHandlers, VERSION, RELEASES } from './news.js';
@@ -134,6 +134,8 @@ export function startTimers() {
     for (const game of games.values()) {
       releaseFloor(game, now);
       checkTurnTimer(game, now);
+      // An absent player's grace may have run out - then the others go on.
+      if (game.state === 'running' && someoneAbsent(game)) maybeResolve(game);
       discardIfIdle(game, now);
     }
   }, 1000);

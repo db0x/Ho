@@ -194,9 +194,24 @@ export function continueGame(game, extraTurns) {
   return true;
 }
 
-export function allReady(game) {
-  return game.players.filter(p => p.alive).every(p => p.ready || p.isBot || !p.connected);
+/**
+ * How long a player who lost the connection still counts as playing. A
+ * phone that goes to sleep drops the connection - the turn must not be
+ * resolved behind its back. Only once others have waited this long does
+ * the absent player count as done; on their own (against the AI) nobody
+ * waits, so the game waits for them. The turn timer applies as always.
+ */
+export const ABSENT_GRACE_MS = (Number(process.env.HO_ABSENT_SECONDS) || 180) * 1000;
+
+export function allReady(game, now = Date.now()) {
+  const alive = game.players.filter(p => p.alive);
+  const waiting = alive.some(p => !p.isBot && p.connected);
+  return alive.every(p => p.ready || p.isBot
+    || (!p.connected && waiting && now - (p.lostAt ?? 0) >= ABSENT_GRACE_MS));
 }
+
+/** Is someone of this game absent - so the end of their grace has to be watched for? */
+export const someoneAbsent = (game) => game.players.some(p => p.alive && !p.isBot && !p.connected && !p.ready);
 
 export function pauseView(game) {
   return game.paused ? { by: game.paused.by, name: game.paused.name, left: game.paused.left } : null;
