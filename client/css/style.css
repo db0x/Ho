@@ -702,6 +702,28 @@ body.is-blocked > :not(#blocked) { display: none !important; }
 .wrow input { flex: 1; }
 .wrow .pct { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); width: 38px; text-align: right; }
 .budget-box { background: #0b1020; border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+/* Research presets (hud/research.js): chips to apply, a row to name a new
+   one, a list to manage them. */
+.presets { margin-bottom: 12px; }
+.pr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;
+  font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim); }
+.pr-head .tiny { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.pr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-chip { padding: 6px 12px; border-radius: 999px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-chip.on { border-color: var(--gold); color: var(--gold); background: rgba(240, 180, 41, .1); }
+.pr-chip.pr-add { border-style: dashed; color: var(--ink-dim); background: transparent; }
+.pr-chip.pr-add:hover { color: var(--ink); }
+.pr-star { color: var(--gold); margin-right: 4px; }
+.pr-note { margin: 6px 0 0; line-height: 1.4; }
+.pr-new { display: flex; gap: 6px; align-items: center; }
+.pr-new .pr-name { flex: 1; min-width: 0; }
+.pr-manage { display: flex; flex-direction: column; gap: 6px; }
+.pr-row { display: flex; gap: 6px; align-items: center; }
+.pr-row .pr-name { flex: 1; min-width: 0; }
+.pr-name { padding: 6px 8px; font-size: 13px; }
+.pr-auto { flex: none; width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 16px; color: var(--ink-faint); }
+.pr-auto.on { color: var(--gold); border-color: var(--gold-dim); background: rgba(240, 180, 41, .1); }
+.pr-actions { display: flex; justify-content: flex-end; }
 
 /* Selection panel */
 .sel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }

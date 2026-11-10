@@ -144,6 +144,15 @@ Damit das niemand im Kopf rechnen muss:
   stehen, bei dem die Aufträge noch aufgehen – **Aufträge gehen vor**. Ein Bau,
   der am Rundenende am Geld scheitert, kommt dadurch nicht vor.
 
+**Forschungsvorlagen:** Oben im Forschungs-Tab speicherst du mit *+ Speichern*
+den aktuellen Forschungsanteil samt aller Gewichte unter einem Namen; ein Tipp auf
+die Vorlage setzt sie wieder, die gerade aktive ist gold umrandet. Unter
+*Verwalten* lassen sich Vorlagen umbenennen, mit den aktuellen Werten
+überschreiben (*Übernehmen*) und löschen. Die mit ★ markierte wird in jeder neuen
+Partie in Runde 1 automatisch gesetzt. Bis zu acht Vorlagen; mit Konto gehören
+sie zum Konto und sind auf jedem Gerät dieselben, ohne Anmeldung merkt sie sich
+der Browser.
+
 ## Kampf und Eroberung
 
 Treffen in einem Orbit feindliche Flotten aufeinander, wird gekämpft – vorn

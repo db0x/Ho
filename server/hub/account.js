@@ -7,7 +7,8 @@ import { listInvites, createInvite, revokeInvite } from '../invites.js';
 import {
   cleanName, nameAllowed, reservedName, parseAvatar, putAccountAvatar, putGuestAvatar
 } from '../profile.js';
-import { isAdmin, isInviter, isBlocked, setProfile, setPrivacy } from '../userstore.js';
+import { isAdmin, isInviter, isBlocked, setProfile, setPrivacy, setResearchPresets } from '../userstore.js';
+import { cleanPresets } from '../../shared/presets.js';
 import { send, connsOf, conns } from './connections.js';
 import { broadcastLobby, broadcastView } from './games.js';
 import { playerName } from './lobby.js';
@@ -91,6 +92,17 @@ export const accountHandlers = {
     }
     // Every device of the account shows the same switches.
     for (const other of connsOf(c.accountKey)) send(other.ws, { t: 'privacy', privacy });
+  },
+
+  /** The research presets of the account - every device gets the new list. */
+  presets({ c, ws }, msg) {
+    if (!c.accountKey) return;
+    let presets;
+    try { presets = setResearchPresets(c.accountKey, cleanPresets(msg.presets)); } catch (e) {
+      console.error('Presets not saved:', e.message);
+      return send(ws, { t: 'error', key: 'err.server', params: { detail: e.message } });
+    }
+    for (const other of connsOf(c.accountKey)) send(other.ws, { t: 'presets', presets });
   },
 
   profile({ c, ws, game, me }, msg) {

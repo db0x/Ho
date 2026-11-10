@@ -59,6 +59,8 @@ export function attach(wss) {
       voice: voiceOffer(),
       profile: { ...c.profile, account: c.accountKey ? c.account : null, handle: c.handle ?? null },
       privacy: c.accountKey ? privacyOf(account) : null,
+      // Research presets of the account - null without one: then the browser keeps them.
+      presets: c.accountKey ? (account?.presets || []) : null,
       admin: adminOf(c),
       inviter: inviterOf(c),
       dev: devOf(c),

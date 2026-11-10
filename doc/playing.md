@@ -142,6 +142,14 @@ So that nobody has to work this out in their head:
   add up – **orders come first**. A build that fails for lack of money at the end
   of the turn therefore does not happen.
 
+**Research presets:** at the top of the research tab, *+ Save* keeps the current
+research share and all weights under a name; one tap on the preset sets them
+again, the active one is outlined in gold. Under *Manage* presets can be renamed,
+overwritten with the current settings (*Update*) and deleted. The one marked ★ is
+set automatically in turn 1 of every new game. Up to eight presets; with an
+account they belong to the account and are the same on every device, without
+sign-in the browser keeps them.
+
 ## Combat and conquest
 
 When hostile fleets meet in an orbit, they fight – those who deal damage at the
