@@ -8,6 +8,7 @@ import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { courseTarget, portalsOf } from '../../render/courses.js';
 import { shipIcon } from '../../render/ships.js';
+import { genOf, bestFighter, MARK } from '../../render/fighterlook.js';
 import { openSplit } from '../../ui/split.js';
 import { escapeHtml, fmt, fmt1 } from './format.js';
 import { refitShips } from '../../../shared/budget.js';
@@ -70,8 +71,15 @@ export const fleetMethods = {
       this.wireChase(box, f);
       return;
     }
+    // Ships of a type together - fighters by generation, they look different
+    // (fighterlook.js): "3× Fighter Mk II" tells which want refitting.
     const groups = {};
-    for (const s of f.ships) (groups[s.type] || (groups[s.type] = [])).push(s);
+    for (const s of f.ships) {
+      const key = s.type === 'fighter' && s.tech ? `fighter:${genOf(s.tech)}` : s.type;
+      (groups[key] || (groups[key] = [])).push(s);
+    }
+    // The ship a group is shown by: for fighters the most advanced one.
+    const lead = (arr) => (arr[0].type === 'fighter' && bestFighter(arr)) || arr[0];
     const where = f.at != null ? v.planets[f.at] : null;
     const destP = f.dest != null ? v.planets[f.dest] : null;
     const destM = f.hole ? courseTarget(v, f) : null;
@@ -116,13 +124,13 @@ export const fleetMethods = {
               ${f.mine && !v.spectator ? `<button class="tiny rename" title="${t('fleet.rename')}" aria-label="${t('fleet.rename')}">✎</button>` : ''}
               <span class="hp">${Math.round(s.hp)}/${Math.round(s.maxHp)} HP</span>
             </div>`).join('')}
-          ${Object.entries(groups).filter(([type]) => !SHIP_DEFS[type]?.named).map(([type, arr]) => `
-            <div class="shipitem clickable-ship" data-info="${type}" title="${t('shipinfo.hint')}">
-              <span class="gi" data-t="${type}"></span>
-              <span>${arr.length}× ${t(`ship.${type}.name`)}
-                <span class="muted small">(${t('tech.weapons.short')}${arr[0].tech.weapons}/${t('tech.shields.short')}${arr[0].tech.shields}/${t('tech.speed.short')}${arr[0].tech.speed})</span></span>
+          ${Object.entries(groups).filter(([, arr]) => !SHIP_DEFS[arr[0].type]?.named).map(([key, arr]) => { const type = arr[0].type, s0 = lead(arr); return `
+            <div class="shipitem clickable-ship" data-info="${type}" data-group="${key}" title="${t('shipinfo.hint')}">
+              <span class="gi" data-t="${type}" data-group="${key}"></span>
+              <span>${arr.length}× ${t(`ship.${type}.name`)}${type === 'fighter' && s0.tech ? ' Mk ' + MARK[genOf(s0.tech)] : ''}
+                <span class="muted small">(${t('tech.weapons.short')}${s0.tech.weapons}/${t('tech.shields.short')}${s0.tech.shields}/${t('tech.speed.short')}${s0.tech.speed})</span></span>
               <span class="hp">${Math.round(arr.reduce((a, s) => a + s.hp, 0))} HP</span>
-            </div>`).join('')}
+            </div>`; }).join('')}
         </div>
       </div>
       ${f.mine && !v.spectator ? `<p class="hint-line fa-hint">${t('fleet.orderHint')}</p>` : ''}
@@ -130,10 +138,13 @@ export const fleetMethods = {
 
     const col = (f.mine && v.me) ? v.me.color
       : ownerColor(v, f.owner, '#9fb0c8');
-    for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
+    for (const g of box.querySelectorAll('.gi')) {
+      const ship = g.dataset.group ? lead(groups[g.dataset.group]) : f.ships.find(s => s.id === g.closest('[data-ship]')?.dataset.ship);
+      g.appendChild(shipIcon(g.dataset.t, 26, col, ship?.tech));
+    }
     // The built-in tech of these ships, not the current levels
     for (const el of box.querySelectorAll('[data-info]')) {
-      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : groups[el.dataset.info][0];
+      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : lead(groups[el.dataset.group]);
       el.onclick = (e) => {
         if (e.target.closest('.rename, .rename-input')) return;
         this.showShip(el.dataset.info, ship.tech, col);

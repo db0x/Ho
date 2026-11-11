@@ -1,7 +1,7 @@
 // Dev mode: testing aids in a running game, announced to everyone in it.
 import { authEnabled } from '../auth.js';
 import { devAliens } from '../aliens.js';
-import { devDestroyer, devStation } from '../game/shipyard.js';
+import { devDestroyer, devStation, devFighters } from '../game/shipyard.js';
 import { pushLog } from '../game/log.js';
 import { devWormholes } from '../wormholes.js';
 import { devRadioLine } from '../radio/chatter.js';
@@ -47,6 +47,12 @@ export const devHandlers = {
         return send(ws, { t: 'notice', key: 'dev.nothing' });
       }
       console.log(`Dev: ${c.account ?? 'guest'} - station in game ${game.id}`);
+    } else if (action === 'fighters') {
+      // Fighters with the tech given for each - to look at their generations.
+      if (!devFighters(game, me, Number.isInteger(msg.planetId) ? msg.planetId : null, msg.techs)) {
+        return send(ws, { t: 'notice', key: 'dev.nothing' });
+      }
+      console.log(`Dev: ${c.account ?? 'guest'} - fighters in game ${game.id}`);
     } else if (action === 'aliens') {
       // Aliens right away: at the selected world, otherwise at one of the
       // player's own - or wherever the next raid would have gone.

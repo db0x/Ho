@@ -143,13 +143,17 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
 
   // Record for the replay in the client: every unit once, every shot as
   // [shooter, target, damage]. Compact, because it travels with the view.
+  // A unit is [side, type, hp, maxHp] - a fighter adds [weapons, shields, speed, range].
   const owners = [...sides.keys()];
   const units = [];
   const idx = new Map();
   owners.forEach((owner, k) => {
     for (const s of sides.get(owner)) {
       idx.set(s, units.length);
-      units.push([k, s.isBattery ? 'battery' : s === station && s.building > 0 ? 'stationSite' : s.type, s.hp, round1(s.maxHp)]);
+      const unit = [k, s.isBattery ? 'battery' : s === station && s.building > 0 ? 'stationSite' : s.type, s.hp, round1(s.maxHp)];
+      // A fighter's look follows the tech it was built with (client fighterlook.js).
+      if (s.type === 'fighter' && s.tech) unit.push([s.tech.weapons, s.tech.shields, s.tech.speed, s.tech.range]);
+      units.push(unit);
     }
   });
   const rounds = [];

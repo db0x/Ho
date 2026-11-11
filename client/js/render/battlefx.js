@@ -4,6 +4,7 @@
 // unit perishes - and both use it: the brief flash on the map and the battle
 // window with the replay.
 import { drawShip } from './ships.js';
+import { unitTech } from './fighterlook.js';
 import { hexRgb, drawHexShield, drawShieldHit, SHIELD_MIN } from './fx.js';
 import { INTERCEPT_ROUNDS } from '../../shared/rules.js';
 import { sfx } from '../audio/sfx.js';
@@ -336,7 +337,7 @@ function drawMapBattle(ctx, it, T, pl, colorOf) {
     sy += Math.sin(sl.a) * orbit * 4 * gone * gone;
     ctx.save();
     ctx.globalAlpha *= 1 - gone;
-    drawShip(ctx, { type: u[1], x: sx, y: sy, angle: gone > 0 ? sl.a : sl.a + Math.PI, len: 15 * s, color: color(u[0]), phase: T + i });
+    drawShip(ctx, { type: u[1], x: sx, y: sy, angle: gone > 0 ? sl.a : sl.a + Math.PI, len: 15 * s, color: color(u[0]), phase: T + i, tech: unitTech(u) });
     ctx.restore();
   });
 

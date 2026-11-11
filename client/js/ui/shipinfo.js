@@ -93,7 +93,7 @@ function render() {
     b.title = t(`ship.${kind}.name`);
     // shipIcon keeps every image only once - a copy, so it is not pulled out
     // of a build list.
-    const ic = shipIcon(kind, 22, color);
+    const ic = shipIcon(kind, 22, color, tech);
     const copy = document.createElement('canvas');
     copy.width = ic.width; copy.height = ic.height;
     copy.style.width = copy.style.height = '22px';
@@ -161,7 +161,9 @@ function paint(ms) {
     angle: UPRIGHT.has(current.type) ? Math.sin(s * 0.5) * 0.02 : stationary ? s * 0.2 : -Math.PI / 2 + Math.sin(s * 0.6) * 0.1,
     len,
     color: current.color,
-    phase: s
+    phase: s,
+    // A fighter shows the generation and equipment of this tech.
+    tech: current.tech
   });
   frame = requestAnimationFrame(paint);
 }

@@ -5,6 +5,7 @@
 // the timeline, nothing is accumulated.
 import { ownerOf } from '../owners.js';
 import { drawShipHD } from '../render/shipshd.js';
+import { unitTech } from '../render/fighterlook.js';
 
 /** Units that stay with the world instead of standing in their side's formation. */
 const ON_WORLD = ['battery', 'station', 'stationSite'];
@@ -277,7 +278,7 @@ function paint(ms) {
     ctx.save();
     ctx.globalAlpha = 1 - gone * gone;
     drawShipHD(ctx, {
-      type: u[1], x, y: y + bob, len: L.len[i], color: color(i), phase: ms / 1000 + i,
+      type: u[1], x, y: y + bob, len: L.len[i], color: color(i), phase: ms / 1000 + i, tech: unitTech(u),
       angle: u[1] === 'satellite' ? ms / 4000 + i : u[1].startsWith('station') ? 0 : heading
     });
     ctx.restore();
