@@ -74,5 +74,27 @@ const r3 = setOrders(g, me, { swarm: { fleetId: g2Fleet.id } });
 assert(r3?.error === 'err.swarmNoTarget', `Expected no target: ${JSON.stringify(r3)}`);
 assert(g2Fleet.ships.length === 2, 'A refused swarm changed the fleet');
 
+// An unexplored world counts as free: the nearest one wins, explored or not.
+{
+  const g3 = createGame('Swarm unknown');
+  Object.assign(g3.settings, { seed: 7, turnTimer: 0, expanding: false, fog: false });
+  addPlayer(g3, { name: 'Me' });
+  addPlayer(g3, { name: 'Other' });
+  startGame(g3);
+  const [p3] = g3.players;
+  const ps = g3.galaxy.planets, h3 = ps[p3.homeworld], z3 = holeZone(g3.galaxy);
+  const near = ps.filter(p => p.owner === null).sort((a, b) => travelDistance(h3, a, z3) - travelDistance(h3, b, z3));
+  // Everything known and free - except the nearest world, never seen.
+  for (const p of ps) p3.knowledge[p.id] = { turn: g3.turn, temp: p.temp, grav: p.grav, owner: p.owner, pop: p.pop };
+  delete p3.knowledge[near[0].id];
+  g3.fleets = g3.fleets.filter(f => f.owner !== p3.id);
+  const fl = { id: 'fu', owner: p3.id, ships: [], at: h3.id, x: h3.x, y: h3.y, z: h3.z || 0, dest: null, hole: null, chase: null, aim: null };
+  g3.fleets.push(fl);
+  addShip(g3, fl, 'colony', p3.tech);
+  const r4 = setOrders(g3, p3, { swarm: { fleetId: fl.id } });
+  assert(r4?.swarmed?.sent === 1, `Unknown world: nothing sent ${JSON.stringify(r4)}`);
+  assert(fl.dest === near[0].id, `The nearer unexplored world was passed over (${fl.dest} instead of ${near[0].id})`);
+}
+
 if (errors) { console.error(`${errors} error(s)`); process.exit(1); }
 console.log('All swarm checks passed.');

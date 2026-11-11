@@ -19,8 +19,8 @@ export function orderUnload(game, player, o) {
 /**
  * Swarming out: every colony ship of a fleet in orbit flies alone to the
  * nearest free world - one ship per world. Free by what this empire knows
- * (in sight now, or the last memory); unexplored worlds only once the known
- * free ones are used up. Worlds an own colony ship already waits at or is
+ * (in sight now, or the last memory); a world never seen counts as free -
+ * the nearest wins, explored or not. Worlds an own colony ship already waits at or is
  * heading for are taken. What finds no world in range stays behind in the
  * fleet, as does every ship that is no colony ship.
  * @returns {{error: string}|{swarmed: {sent: number, left: number}}}
@@ -41,18 +41,17 @@ export function orderSwarm(game, player, o) {
     if (f.dest != null) claimed.add(f.dest);
     else if (f.at != null && !f.hole && !f.chase) claimed.add(f.at);
   }
-  const known = [], unknown = [];
+  const free = [];
   for (const p of game.galaxy.planets) {
     if (p.id === here.id || claimed.has(p.id)) continue;
     const k = live(p) ? p : player.knowledge[p.id];
-    if (!k) { unknown.push(p); continue; }
+    if (!k) { free.push(p); continue; }
     // A memory of an own world is outdated, as in buildView.
     const owner = k === p ? p.owner : (k.owner === player.id ? p.owner : k.owner);
-    if (owner == null && planetCapacity(k === p ? p : { ...p, temp: k.temp, grav: k.grav }) >= 1) known.push(p);
+    if (owner == null && planetCapacity(k === p ? p : { ...p, temp: k.temp, grav: k.grav }) >= 1) free.push(p);
   }
   const far = (p) => travelDistance(fleet, p, zone);
-  const order = (list) => list.map(p => [p, far(p)]).sort((a, b) => a[1] - b[1]).map(([p]) => p);
-  const targets = [...order(known), ...order(unknown)];
+  const targets = free.map(p => [p, far(p)]).sort((a, b) => a[1] - b[1]).map(([p]) => p);
   const plan = [];
   for (const ship of settlers) {
     const part = { ...fleet, ships: [ship] };
