@@ -450,6 +450,11 @@ net.on('error', (m) => {
   sfx.play('deny');
 });
 net.on('notice', (m) => { hud?.toast(message(m), '#ffb347'); sfx.play('warn'); });
+net.on('swarmed', (m) => {
+  hud?.toast(t('fleet.swarmDone', { n: m.sent, count: m.sent })
+    + (m.left ? ' ' + t('fleet.swarmLeft', { n: m.left, count: m.left }) : ''), '#7fd99a');
+  sfx.play('course');
+});
 net.on('recycled', (m) => {
   hud?.toast(t('recycle.done', { n: m.count, count: m.count, money: Math.round(m.money), metal: Math.round(m.metal) }), '#7fd99a');
   sfx.play('recycle', { pan: panOf(m.planetId) });

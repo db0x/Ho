@@ -20,6 +20,7 @@ export const matchHandlers = {
     const r = setOrders(game, me, msg);
     if (r?.error) send(ws, { t: 'notice', key: r.error, params: r.params });
     if (r?.recycled) send(ws, { t: 'recycled', ...r.recycled });
+    if (r?.swarmed) send(ws, { t: 'swarmed', ...r.swarmed });
     // Orders change only this player's view - the others see them at the end of the turn.
     send(ws, { t: 'view', view: buildView(game, me) });
   },
