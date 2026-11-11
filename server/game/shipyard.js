@@ -3,10 +3,11 @@
 // world with at least a million people. Only what can be paid for at the end
 // of the turn is accepted (economy.js).
 import {
-  BUILD_TYPES, buildTypesFor, buildLock, buildCost, SHIP_DEFS, STATION, REPAIR_SHARE, shipStats, refitCost, recycleValue
+  BUILD_TYPES, buildTypesFor, buildLock, buildCost, SHIP_DEFS, STATION, REPAIR_SHARE, shipStats, refitCost, recycleValue,
+  TECH_MAX_LEVEL
 } from '../../shared/rules.js';
 import { affordable } from './economy.js';
-import { addShip, orbitFleet, cleanupFleets } from './fleets.js';
+import { addShip, orbitFleet, cleanupFleets, newFleet } from './fleets.js';
 import { planetById } from './game.js';
 
 /** Change a build order; empty entries disappear. */
@@ -278,6 +279,29 @@ function cleanShipName(name) {
     .trim()
     .slice(0, SHIP_NAME_MAX)
     .trim();
+}
+
+/**
+ * Dev mode: fighters right away and for free, each built with the tech
+ * given for it - to look at the generations and their equipment
+ * (client/js/render/fighterlook.js) without researching for them. A fleet
+ * of their own in the orbit of an own world, the given one or the homeworld.
+ * @param {Array<{weapons, shields, speed, range}>} techs  one entry per fighter, at most 12
+ * @returns {boolean} whether any were placed
+ */
+export function devFighters(game, player, planetId, techs) {
+  if (!player?.alive || !Array.isArray(techs) || !techs.length) return false;
+  let planet = planetId != null ? planetById(game, planetId) : null;
+  if (!planet || planet.owner !== player.id) planet = planetById(game, player.homeworld);
+  if (!planet || planet.owner !== player.id) planet = game.galaxy.planets.find(p => p.owner === player.id);
+  if (!planet) return false;
+  const level = (v) => Math.max(1, Math.min(TECH_MAX_LEVEL, Math.round(Number(v)) || 1));
+  const fleet = newFleet(game, player.id, planet);
+  for (const t of techs.slice(0, 12)) {
+    addShip(game, fleet, 'fighter', { ...player.tech,
+      weapons: level(t?.weapons), shields: level(t?.shields), speed: level(t?.speed), range: level(t?.range) });
+  }
+  return true;
 }
 
 /**

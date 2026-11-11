@@ -4,10 +4,14 @@
 // here with the server's combat rules. In a running game it also steps in:
 // opening and closing wormholes, a destroyer and aliens right away - that
 // does go to the server. And it plays the radio chatter of the AI colonies
-// and the aliens, clip by clip.
+// and the aliens, clip by clip. And it shows the fighters as they look with
+// any tech (render/fighterlook.js): in the profile right away, or as a
+// fleet in the running game.
 // Opened with Ctrl+Shift+D, in the start menu as in a game.
 import { SHIP_TYPES, shipStats, batteryStats, COMBAT_ROUNDS, PLAYER_COLORS } from '../../shared/rules.js';
 import { openBattle } from './battle.js';
+import { openShipInfo } from './shipinfo.js';
+import { fighterLook, MARK } from '../render/fighterlook.js';
 import { sfx, SFX_NAMES } from '../audio/sfx.js';
 import { radio } from '../audio/radio.js';
 import { t, hasKey, onLocaleChange } from '../i18n.js';
@@ -17,8 +21,22 @@ const ATTACKER_TYPES = SHIP_TYPES.filter(s => s !== 'satellite');
 const DEFAULTS = {
   a: { fighter: 8, scout: 1, colony: 1 },
   b: { fighter: 4, satellite: 3 },
-  techA: 1, techB: 1, pop: 3
+  techA: 1, techB: 1, pop: 3,
+  fighter: { weapons: 3, shields: 3, speed: 2, range: 2 }
 };
+// The research fields a fighter's look depends on, and examples for it -
+// the same as in the design preview.
+const FIGHTER_FIELDS = ['weapons', 'shields', 'speed', 'range'];
+const FIGHTER_PRESETS = [
+  ['start', { weapons: 3, shields: 3, speed: 2, range: 2 }],
+  ['glass', { weapons: 26, shields: 4, speed: 18, range: 5 }],
+  ['armour', { weapons: 12, shields: 34, speed: 8, range: 6 }],
+  ['racer', { weapons: 8, shields: 10, speed: 36, range: 24 }],
+  ['long', { weapons: 14, shields: 14, speed: 16, range: 38 }],
+  ['late', { weapons: 30, shields: 28, speed: 26, range: 22 }],
+  ['max', { weapons: 40, shields: 40, speed: 40, range: 40 }]
+];
+const clampLevel = v => Math.max(1, Math.min(40, Math.round(+v) || 1));
 const round1 = v => Math.round(v * 10) / 10;
 
 export class DebugDialog {
@@ -82,15 +100,39 @@ export class DebugDialog {
     return it ? { x: it.x, y: it.y, z: it.z || 0 } : null;
   }
 
+  /** The selected world, or the one the selected fleet orbits - null otherwise. */
+  selectedPlanet() {
+    const sel = this.app?.selection;
+    return sel?.type === 'planet' ? sel.id
+      : sel?.type === 'fleet' ? this.app.map?.view?.fleets.find(f => f.id === sel.id)?.at ?? null : null;
+  }
+
   /**
    * A destroyer or a ready station at the selected own world - the server
    * takes the homeworld otherwise.
    */
   destroyer(action = 'destroyer') {
-    const sel = this.app?.selection;
-    const planetId = sel?.type === 'planet' ? sel.id
-      : sel?.type === 'fleet' ? this.app.map?.view?.fleets.find(f => f.id === sel.id)?.at ?? null : null;
-    this.app.send({ t: 'dev', action, planetId });
+    this.app.send({ t: 'dev', action, planetId: this.selectedPlanet() });
+    this.toggle(false);
+  }
+
+  /** The fighter tech set in the dialog, every field 1-40. */
+  fighterTech() {
+    return Object.fromEntries(FIGHTER_FIELDS.map(f => [f, clampLevel(this.cfg.fighter[f])]));
+  }
+
+  /** "Mk II" and the steps of the fields, next to the inputs. */
+  fighterInfo() {
+    const l = fighterLook(this.fighterTech());
+    return `Mk ${MARK[l.gen]} · ${FIGHTER_FIELDS.map((f, i) => `${t(`tech.${f}.short`)} ${[l.w, l.s, l.v, l.r][i] + 1}/4`).join(' · ')}`;
+  }
+
+  /**
+   * Fighters with these techs into the running game: a fleet at the
+   * selected own world, otherwise at the homeworld.
+   */
+  fighters(techs) {
+    this.app.send({ t: 'dev', action: 'fighters', planetId: this.selectedPlanet(), techs });
     this.toggle(false);
   }
 
@@ -124,6 +166,20 @@ export class DebugDialog {
       if (a === 'destroyer') this.destroyer();
       if (a === 'station') this.destroyer('station');
       if (a === 'aliens') this.aliens();
+      if (a === 'fighterView') {
+        openShipInfo('fighter', { tech: this.fighterTech(), color: this.app?.map?.view?.me?.color, types: ['fighter'] });
+      }
+      if (a === 'fighterGet') this.fighters([this.fighterTech()]);
+      if (a === 'fighterAll') this.fighters(FIGHTER_PRESETS.map(([, tech]) => tech));
+      const pre = e.target.closest('[data-fpreset]')?.dataset.fpreset;
+      if (pre != null) {
+        this.cfg.fighter = { ...FIGHTER_PRESETS[+pre][1] };
+        for (const f of FIGHTER_FIELDS) {
+          const el = this.modal.querySelector(`[data-f="fighter.${f}"]`);
+          if (el) el.value = this.cfg.fighter[f];
+        }
+        this.modal.querySelector('[data-out="mk"]').textContent = this.fighterInfo();
+      }
       if (a === 'radioNamed') { this.app.send({ t: 'dev', action: 'radio' }); this.toggle(false); }
       const hole = e.target.closest('[data-hole]')?.dataset.hole;
       if (hole) this.hole(hole);
@@ -144,6 +200,7 @@ export class DebugDialog {
       const [side, type] = f.split('.');
       if (type) this.cfg[side][type] = v;
       else this.cfg[side] = v;
+      if (side === 'fighter') this.modal.querySelector('[data-out="mk"]').textContent = this.fighterInfo();
     });
     this.modal.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.stopPropagation(); this.toggle(false); }
@@ -187,6 +244,7 @@ export class DebugDialog {
       <p class="muted small">${t('dev.radioNamedHint')}</p>` : ''}`;
     this.modal.innerHTML = `<div class="modal-box debug-box">
       <h2>${t('debug.title')}</h2>${holes}
+      ${this.fighterSection(running)}
       <h3>${t('debug.battle')}</h3>
       <table class="debug-grid">
         <thead><tr><th></th>
@@ -217,6 +275,26 @@ export class DebugDialog {
       </div>
     </div>`;
     this.fillRadio();
+  }
+
+  /** Fighters by tech: four levels, examples, the profile - and in a game the ships themselves. */
+  fighterSection(running) {
+    const c = this.cfg.fighter;
+    const game = running && !this.app.map.view.spectator;
+    return `<h3>${t('dev.fighters')}</h3>
+      <table class="debug-grid"><tbody>
+        ${FIGHTER_FIELDS.map(f => `<tr><th>${t(`tech.${f}.name`)}</th>
+          <td><input type="number" min="1" max="40" data-f="fighter.${f}" value="${c[f]}"></td></tr>`).join('')}
+      </tbody></table>
+      <p class="small" data-out="mk">${this.fighterInfo()}</p>
+      <div class="debug-actions debug-dev">${FIGHTER_PRESETS.map(([k], i) =>
+        `<button type="button" class="tiny" data-fpreset="${i}">${t(`dev.fighterPreset.${k}`)}</button>`).join('')}</div>
+      <div class="debug-actions debug-dev">
+        <button type="button" class="tiny" data-a="fighterView">${t('dev.fighterView')}</button>
+        ${game ? `<button type="button" class="tiny" data-a="fighterGet">${t('dev.fighterGet')}</button>
+        <button type="button" class="tiny" data-a="fighterAll">${t('dev.fighterAll')}</button>` : ''}
+      </div>
+      <p class="muted small">${t(game ? 'dev.fightersHint' : 'dev.fightersHintMenu')}</p>`;
   }
 
   fight() {
@@ -253,7 +331,12 @@ function simulate(cfg) {
   if (!sides.flat().some(s => s.attack > 0)) return null;
 
   const units = [], idx = new Map();
-  sides.forEach((ships, k) => ships.forEach(s => { idx.set(s, units.length); units.push([k, s.type, s.hp, round1(s.maxHp)]); }));
+  // Fighters carry their tech like on the server - at this level in every field.
+  sides.forEach((ships, k) => ships.forEach(s => {
+    idx.set(s, units.length);
+    const lv = k ? cfg.techB || 1 : cfg.techA || 1;
+    units.push([k, s.type, s.hp, round1(s.maxHp), ...(s.type === 'fighter' ? [[lv, lv, lv, lv]] : [])]);
+  }));
   const rounds = [];
   for (let r = 0; r < COMBAT_ROUNDS; r++) {
     const alive = sides.map((ships, k) => [k, ships.filter(s => s.hp > 0)]).filter(([, s]) => s.length);

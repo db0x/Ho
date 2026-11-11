@@ -201,7 +201,7 @@ function buildList() {
         <span class="sp-v"></span>
       </div>`;
     // shipIcon keeps every image only once - draw a copy per row.
-    const ic = shipIcon(g.type, 28, current.color);
+    const ic = shipIcon(g.type, 28, current.color, g.tech);
     const copy = document.createElement('canvas');
     copy.width = ic.width; copy.height = ic.height;
     copy.style.width = copy.style.height = '28px';

@@ -2,6 +2,8 @@
 // right, the caller rotates.
 import { raiderWing, raiderHead, raiderHump, star, starArms } from './alienshapes.js';
 import { stationBody, STATION_LIGHTS } from './shipshd/station.js';
+import { tone } from './shipshd/kit.js';
+import { GENS, FLAME, FLAME_LEN, PLAIN, fighterLook, bestFighter, halfWidth, leadX, podX, engineLayout, emitters } from './fighterlook.js';
 
 function hullGradient(ctx, len) {
   const g = ctx.createLinearGradient(0, -len * 0.4, 0, len * 0.4);
@@ -156,74 +158,122 @@ function drawScout(ctx, L, color, phase) {
 }
 
 /* -------------------------------------------------------------- Fighter */
-function drawFighter(ctx, L, color, phase) {
-  // After the Viper Mk VII in plan view (units of L/100): a straight wedge of
-  // a fuselage up to the wing roots, slimmer again at the stern, the blue
-  // canopy in front of big swept wings with straight cut tips, gun pods
-  // beneath the wings near the tips, a dorsal spine, three engines.
+function drawFighter(ctx, L, color, phase, look = PLAIN) {
+  // The same outlines as the detailed drawing (fighterlook.js, units of
+  // L/100): Mk I after the Viper Mk VII in plan view - a straight wedge of a
+  // fuselage, the blue canopy in front of big swept wings, gun pods beneath
+  // the wings near the tips, a dorsal spine, three engines. Mk II and III
+  // change the outline; nozzles and flame follow the drive. Missiles, tanks
+  // and shield emitters only once the ship is big enough to show them.
+  const G = GENS[look.gen];
   const u = L / 100;
   const P = (pts, s = 1) => tracePath(ctx, pts.map(([x, y]) => [x * u, s * y * u]));
   const mirror = pts => [...pts, ...pts.slice(1, -1).reverse().map(([x, y]) => [x, -y])];
-  // Three engines close together
-  engineGlow(ctx, -L * 0.53, 0, L * 0.24, phase);
-  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.51, s * 4.6 * u, L * 0.17, phase + 0.9 * s);
+  const detail = L >= 34;
+  const eng = engineLayout(G, look.v);
+  for (const [i, e] of eng.entries()) engineGlow(ctx, (e.x - 2) * u, e.y * u, e.r * 6 * u * FLAME_LEN[look.v] ** 0.5, phase + i * 0.9, FLAME[look.v]);
+  const [[ax, ay], [bx, by]] = G.wing;
   for (const s of [-1, 1]) {
     // Gun pod beneath the wing: only its front and the barrel show
-    const y = s * 26 * u;
-    ctx.strokeStyle = '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
-    ctx.beginPath(); ctx.moveTo(-4 * u, y); ctx.lineTo(0.5 * u, y); ctx.stroke();
+    const y = s * G.podY * u, lx = podX(G);
+    ctx.strokeStyle = look.w === 3 ? '#8fe6ff' : '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
+    ctx.beginPath(); ctx.moveTo(lx * u, y); ctx.lineTo((lx + (look.w === 3 ? 8 : 4.5)) * u, y); ctx.stroke();
     ctx.fillStyle = '#8994a8';
-    ctx.beginPath(); ctx.roundRect(-17 * u, y - 1.3 * u, 13 * u, 2.6 * u, 1.3 * u); ctx.fill();
+    ctx.beginPath(); ctx.roundRect((lx - 13) * u, y - 1.3 * u, 13 * u, 2.6 * u, 1.3 * u); ctx.fill();
     outline(ctx, fine(L) * 0.6);
     // Big swept silver wings - the empire color sits on the fuselage stripes
-    P([[3, 11.5], [-12.4, 30.4], [-21.6, 30.4], [-24.6, 15.6], [-27.4, 12.4], [-31.5, 9]], s); ctx.closePath();
+    P(G.wing, s); ctx.closePath();
     ctx.fillStyle = '#b4bfd0'; ctx.fill();
     // Light from above: the lower wing lies in shade, both darken outwards
-    const g = ctx.createLinearGradient(0, s * 9 * u, 0, s * 30 * u);
+    const g = ctx.createLinearGradient(0, s * ay * u, 0, s * by * u);
     g.addColorStop(0, `rgba(10,14,26,${s < 0 ? 0 : 0.2})`);
     g.addColorStop(1, `rgba(10,14,26,${s < 0 ? 0.25 : 0.5})`);
     ctx.fillStyle = g; ctx.fill(); outline(ctx, 0.9);
-    seam(ctx, L, [[-3 * u, s * 13 * u], [-17 * u, s * 29.6 * u]]);
+    // Armour band along the leading edge (shields 2+)
+    if (look.s >= 1) {
+      P([[ax, ay], [bx, by], [bx - 4, by], [ax - 4, ay]], s); ctx.closePath();
+      ctx.fillStyle = 'rgba(70,80,100,.55)'; ctx.fill();
+    }
+    seam(ctx, L, [[(ax - 6) * u, s * (ay + 1.5) * u], [(bx - 4.6) * u, s * (by - 0.8) * u]]);
     // Rail along the straight wing tip
     ctx.fillStyle = '#aab4c6';
-    ctx.beginPath(); ctx.roundRect(-22.6 * u, s * 31.1 * u - 0.8 * u, 14 * u, 1.6 * u, 0.8 * u); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(G.tip.x0 * u, s * (by + 0.7) * u - 0.8 * u, (G.tip.x1 - G.tip.x0) * u, 1.6 * u, 0.8 * u); ctx.fill();
     outline(ctx, fine(L) * 0.6);
+    if (G.canards) {
+      P(G.canards, s); ctx.closePath();
+      ctx.fillStyle = '#b4bfd0'; ctx.fill(); outline(ctx, fine(L) * 0.7);
+    }
+    if (detail && look.r >= 1) {
+      const ty = s * (ay + (look.r >= 2 ? 4.6 : 4)) * u, h = (look.r >= 2 ? 1.9 : 1.5) * u;
+      const x1 = (leadX(G, ay + 4) - 1) * u, x0 = x1 - (look.r >= 2 ? 19 : 15) * u;
+      ctx.fillStyle = '#c8ccd6';
+      ctx.beginPath(); ctx.roundRect(x0, ty - h, x1 - x0, h * 2, h); ctx.fill(); outline(ctx, fine(L) * 0.5);
+      if (look.r >= 2) { ctx.fillStyle = color; ctx.fillRect(x0 + 5 * u, ty - h, 2.2 * u, h * 2); }
+    }
+    if (detail && look.w >= 2) {
+      for (const dy of [-2.3, 2.3]) {
+        const my = G.podY - 6.5 + dy, x1 = leadX(G, my) + 3.5;
+        ctx.fillStyle = '#e7ebf2';
+        ctx.beginPath(); ctx.roundRect((x1 - 12) * u, s * my * u - 0.8 * u, 12 * u, 1.6 * u, 0.8 * u); ctx.fill();
+        outline(ctx, fine(L) * 0.4);
+        ctx.fillStyle = '#e04a3a'; ctx.fillRect((x1 - 2.6) * u, s * my * u - 0.8 * u, 2.6 * u, 1.6 * u);
+      }
+    }
   }
-  edgeLight(ctx, L, [[3 * u, -11.5 * u], [-12.4 * u, -30.4 * u]], 0.45);
-  nozzle(ctx, L, -47 * u, 0, 3.4 * u);
-  for (const s of [-1, 1]) nozzle(ctx, L, -46 * u, s * 4.6 * u, 2.8 * u);
-  // Fuselage: a wedge from the rounded nose to the wing roots, slimmer again
-  // at the stern (same points as in shipshd.js)
-  P(mirror([[60, 0], [60, -1.1], [58, -1.9], [56, -2.1], [2, -12.4], [-10, -11.2], [-24, -10.2], [-31, -9.4],
-    [-40, -8.4], [-43, -7.4], [-45, -5.6], [-45, 0]])); ctx.closePath();
+  edgeLight(ctx, L, [[ax * u, -ay * u], [bx * u, -by * u]], 0.45);
+  // Four and five nozzles sit in an engine block
+  const spread = Math.max(...eng.map(e => Math.abs(e.y) + e.r));
+  if (eng.length > 3) {
+    ctx.fillStyle = '#7d8799';
+    ctx.beginPath(); ctx.roundRect((G.engX + 4) * u, -(spread + 1) * u, (G.tail - G.engX + 6) * u, (spread + 1) * 2 * u, 2 * u); ctx.fill();
+    outline(ctx, fine(L) * 0.7);
+  }
+  for (const e of eng) nozzle(ctx, L, (e.x + 4) * u, e.y * u, e.r * 0.88 * u);
+  // Fuselage
+  const H = G.hull;
+  P(mirror([[G.nose, 0], ...H.map(([x, h]) => [x, -h]), [G.tail, 0]])); ctx.closePath();
   ctx.fillStyle = hullGradient(ctx, L * 0.3); ctx.fill(); outline(ctx, 1);
   // Empire stripes left and right just inside the edge: a fine point behind
-  // the nose, full width from the canopy back (same as in shipshd.js). Small
-  // on the map they get wider - the empire must still be recognizable there.
-  const half = [[34, 6.3], [2, 12.4], [-10, 11.2], [-24, 10.2], [-31, 9.4], [-40, 8.4], [-43, 7.4]];
+  // the nose, full width further back (as in shipshd). Small on the map they
+  // get wider - the empire must still be recognizable there.
+  const half = [[G.stripeFrom, halfWidth(H, G.stripeFrom)], ...H.filter(([x]) => x < G.stripeFrom && x > G.tail + 1)];
   const k = L < 30 ? 2 : L < 60 ? 1.5 : 1;
   for (const s of [-1, 1]) {
-    const w = x => Math.min(1, (34 - x) / 30) * 2.4 * k;
+    const w = x => Math.min(1, (G.stripeFrom - x) / 30) * 2.4 * k;
     P([...half.map(([x, h]) => [x, h - 1]), ...half.slice().reverse().map(([x, h]) => [x, h - 1 - w(x)])], s);
     ctx.closePath();
     ctx.fillStyle = color; ctx.fill();
     ctx.fillStyle = `rgba(10,14,26,${s < 0 ? 0 : 0.2})`; ctx.fill();
   }
-  edgeLight(ctx, L, [[56 * u, -1.7 * u], [2 * u, -11.9 * u], [-10 * u, -10.7 * u]]);
-  seam(ctx, L, [[-22 * u, -10.2 * u], [-22 * u, 10.2 * u]]);
-  // Dorsal spine with the tail fin as a light ridge
-  P(mirror([[-1, 0], [-3, -3.4], [-28, -3.8], [-37, -3], [-44, -1.8], [-45, 0]])); ctx.closePath();
-  ctx.fillStyle = '#a2aec0'; ctx.fill(); outline(ctx, fine(L) * 0.7);
-  P(mirror([[-12, 0], [-18, -1.3], [-41, -1.7], [-43, 0]])); ctx.closePath();
-  ctx.fillStyle = '#bcc5d3'; ctx.fill(); outline(ctx, fine(L) * 0.5);
-  // Blue canopy in front of the wings
-  const cg = ctx.createLinearGradient(-1 * u, 0, 16 * u, 0);
-  cg.addColorStop(0, 'rgba(60,100,230,.95)');
-  cg.addColorStop(1, 'rgba(140,175,255,.9)');
+  const wide = H.reduce((a, p) => p[1] > a[1] ? p : a);
+  edgeLight(ctx, L, [[(G.nose - 4) * u, -H[2][1] * 0.8 * u], [wide[0] * u, -(wide[1] - 0.5) * u], [(wide[0] - 12) * u, -(halfWidth(H, wide[0] - 12) - 0.5) * u]]);
+  seam(ctx, L, [[(G.tail + 23) * u, -halfWidth(H, G.tail + 23) * u], [(G.tail + 23) * u, halfWidth(H, G.tail + 23) * u]]);
+  // Dorsal spine with the tail fin(s) as light ridges
+  P(mirror(look.r === 3 ? G.spine.map(([x, y]) => [x, y * 1.45]) : G.spine)); ctx.closePath();
+  ctx.fillStyle = look.r === 3 ? '#b7bcc6' : '#a2aec0'; ctx.fill(); outline(ctx, fine(L) * 0.7);
+  if (G.fins === 'single') {
+    P(mirror([[-12, 0], [-18, -1.3], [-41, -1.7], [-43, 0]])); ctx.closePath();
+    ctx.fillStyle = '#bcc5d3'; ctx.fill(); outline(ctx, fine(L) * 0.5);
+  } else {
+    const off = G.fins === 'twin' ? 6.2 : 8, lean = G.fins === 'canted' ? 3.5 : 0;
+    for (const s of [-1, 1]) {
+      P([[-22, off], [-44, off + lean + 1], [-47, off + lean + 0.8], [-46, off + lean - 0.6], [-26, off - 1]], s); ctx.closePath();
+      ctx.fillStyle = '#bcc5d3'; ctx.fill(); outline(ctx, fine(L) * 0.5);
+    }
+  }
+  // Canopy in front of the wings: blue, turquoise on Mk II, gold on Mk III
+  const C = G.cab, cx0 = C[C.length - 1][0], cx1 = C[0][0];
+  const cg = ctx.createLinearGradient(cx0 * u, 0, cx1 * u, 0);
+  cg.addColorStop(0, tone(G.cabTint, -0.15));
+  cg.addColorStop(1, tone(G.cabTint, 0.4));
   ctx.fillStyle = cg;
-  P(mirror([[16.5, 0], [15.6, -2.6], [13, -3.8], [1.5, -3.8], [-0.4, -2.6], [-0.8, 0]])); ctx.closePath(); ctx.fill();
+  P(mirror(C)); ctx.closePath(); ctx.fill();
   outline(ctx, fine(L) * 0.8);
-  glint(ctx, 10 * u, -1.6 * u, 3.6 * u, 0.9 * u);
+  glint(ctx, (cx0 + (cx1 - cx0) * 0.62) * u, -1.6 * u, 3.6 * u, 0.9 * u);
+  if (detail && look.s >= 2) {
+    ctx.fillStyle = '#8fe6ff';
+    for (const e of emitters(G)) { ctx.beginPath(); ctx.arc(e.x * u, e.y * u, 1.3 * u, 0, Math.PI * 2); ctx.fill(); }
+  }
 }
 
 /* ------------------------------------------------------------ Satellite */
@@ -728,11 +778,11 @@ function lenStep(len) {
   return Math.max(4, Math.round(len));
 }
 
-function shipSprite(type, len, color, shadow) {
+function shipSprite(type, len, color, shadow, look) {
   // Pre-render at screen resolution - on high-resolution displays the fine
   // lines would otherwise be upscaled and washed out.
   const dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
-  const key = `${type}|${len}|${color}|${shadow ? 1 : 0}|${dpr}`;
+  const key = `${type}|${len}|${color}|${shadow ? 1 : 0}|${dpr}|${look?.key ?? ''}`;
   const hit = shipCache.get(key);
   if (hit) return hit;
 
@@ -753,7 +803,7 @@ function shipSprite(type, len, color, shadow) {
   g.translate(size / 2, size / 2);
   const outer = collect;
   collect = [];
-  fn(g, len, color, 0);
+  fn(g, len, color, 0, look || undefined);
   const anim = collect;
   collect = outer;
 
@@ -778,10 +828,12 @@ function shipSprite(type, len, color, shadow) {
 /**
  * Draws a ship.
  * @param {CanvasRenderingContext2D} ctx
- * @param {{type:string,x:number,y:number,angle?:number,len?:number,color?:string,phase?:number}} o
+ * @param {{type:string,x:number,y:number,angle?:number,len?:number,color?:string,phase?:number,tech?:object}} o
+ *   tech: what the ship was built with - the fighter looks different with it
  */
 export function drawShip(ctx, o) {
-  const sp = shipSprite(o.type, lenStep((o.len || 26) * (SHIP_SCALE[o.type] || 1)), o.color || '#9fb0c8', o.shadow !== false);
+  const look = o.type === 'fighter' && o.tech ? fighterLook(o.tech) : null;
+  const sp = shipSprite(o.type, lenStep((o.len || 26) * (SHIP_SCALE[o.type] || 1)), o.color || '#9fb0c8', o.shadow !== false, look);
   const phase = o.phase || 0;
   ctx.save();
   ctx.translate(o.x, o.y);
@@ -863,11 +915,11 @@ export function drawAlienSwarm(ctx, o, ships) {
 
 /**
  * The ships of a fleet on the map: an alien swarm as a whole swarm, any
- * other fleet by its leading ship.
+ * other fleet by its leading ship - a fighter as the most advanced one.
  */
 export function drawFleetShips(ctx, o, f, lead) {
   if (f.ships?.some(s => s.type === 'alienCarrier')) drawAlienSwarm(ctx, o, f.ships);
-  else drawShip(ctx, { ...o, type: lead });
+  else drawShip(ctx, { ...o, type: lead, tech: lead === 'fighter' ? bestFighter(f.ships)?.tech : undefined });
 }
 
 /**
@@ -909,9 +961,10 @@ export function drawTrail(ctx, x, y, angle, len, color) {
 }
 
 const iconCache = new Map();
-/** Icon for lists and build menus. */
-export function shipIcon(type, px = 34, color = '#9fb0c8') {
-  const key = type + '|' + px + '|' + color;
+/** Icon for lists and build menus - with tech, a fighter shows its generation and equipment. */
+export function shipIcon(type, px = 34, color = '#9fb0c8', tech = null) {
+  const look = type === 'fighter' && tech ? fighterLook(tech) : null;
+  const key = type + '|' + px + '|' + color + '|' + (look?.key ?? '');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const blank = () => {
     const cv = document.createElement('canvas');
@@ -937,7 +990,7 @@ export function shipIcon(type, px = 34, color = '#9fb0c8') {
   // Ships whose hull does not sit around their origin are moved by that much,
   // so the hull - not the origin - is in the middle of the square.
   const shift = (SHIP_CENTER[type] || 0) * len * (SHIP_SCALE[type] || 1) / 100;
-  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: UPRIGHT.has(type) ? 0 : -Math.PI / 2, len, color, phase: 0.4, shadow: false });
+  drawShip(ctx, { type, x: px / 2, y: px / 2 + shift, angle: UPRIGHT.has(type) ? 0 : -Math.PI / 2, len, color, phase: 0.4, shadow: false, tech: look ? tech : undefined });
   iconCache.set(key, cv);
   return cv;
 }

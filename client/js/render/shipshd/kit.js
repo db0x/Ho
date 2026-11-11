@@ -177,10 +177,10 @@ export function capsule(ctx, x0, x1, y, h, base, S) {
   return p;
 }
 
-/** Exhaust flame behind a nozzle at (x, y), radius r. */
-export function plume(ctx, x, y, r, color, t, seed) {
+/** Exhaust flame behind a nozzle at (x, y), radius r - lenMul makes it longer. */
+export function plume(ctx, x, y, r, color, t, seed, lenMul = 1) {
   const f = 0.86 + 0.1 * Math.sin(t * 9.3 + seed) + 0.05 * Math.sin(t * 23.7 + seed * 2.1);
-  const len = r * 4.2 * f;
+  const len = r * 4.2 * f * lenMul;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   // soft glow around the nozzle

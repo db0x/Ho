@@ -52,7 +52,8 @@ export const shipyardMethods = {
           <span class="n">${n}</span>
           <span class="plus-wrap"${blocked ? ` data-tip="${type}"` : ''}><button class="tiny plus"${blocked ? ' disabled' : ''}>+</button></span>
         </span>`;
-      row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color));
+      // A fighter shows what it would be built as - with the tech after this turn's research.
+      row.querySelector('.bi').appendChild(shipIcon(type, 30, me.color, pl.tech));
       row.title = t(`ship.${type}.desc`) + ' ' + t('shipinfo.hint');
       for (const el of [row.querySelector('.bi'), row.querySelector('.bname')]) {
         el.parentElement.classList.add('clickable-ship');

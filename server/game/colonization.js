@@ -1,10 +1,11 @@
 // Taking worlds: colony ships landing on free worlds, settlers unloading on
 // own ones, and invading an enemy world whose defenses have fallen.
-import { planetCapacity, ALIEN_ID } from '../../shared/rules.js';
+import { planetCapacity, ALIEN_ID, travelDistance, holeZone } from '../../shared/rules.js';
 import { overrun } from '../aliens.js';
-import { hostile } from './diplomacy.js';
-import { cleanupFleets } from './fleets.js';
+import { hostile, teamOf } from './diplomacy.js';
+import { cleanupFleets, newFleet } from './fleets.js';
 import { planetById, playerById } from './game.js';
+import { canReach, orderMove, endChase } from './movement.js';
 
 /** Unloading colonists on an own world - only on explicit orders. */
 export function orderUnload(game, player, o) {
@@ -13,6 +14,71 @@ export function orderUnload(game, player, o) {
     if (o.value === false) delete player.orders.unload[planet.id];
     else player.orders.unload[planet.id] = true;
   }
+}
+
+/**
+ * Swarming out: every colony ship of a fleet in orbit flies alone to the
+ * nearest free world - one ship per world. Free by what this empire knows
+ * (in sight now, or the last memory); a world never seen counts as free -
+ * the nearest wins, explored or not. Worlds an own colony ship already waits at or is
+ * heading for are taken. What finds no world in range stays behind in the
+ * fleet, as does every ship that is no colony ship.
+ * @returns {{error: string}|{swarmed: {sent: number, left: number}}}
+ */
+export function orderSwarm(game, player, o) {
+  const fleet = game.fleets.find(f => f.id === o.fleetId);
+  if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
+  if (fleet.at == null) return { error: 'err.swarmOrbit' };
+  const settlers = fleet.ships.filter(s => s.colonists > 0);
+  if (!settlers.length) return { error: 'err.swarmNoColony' };
+  const here = planetById(game, fleet.at);
+  const zone = holeZone(game.galaxy);
+  const team = teamOf(game, player.id);
+  const live = (p) => team.includes(p.owner) || game.fleets.some(f => team.includes(f.owner) && f.at === p.id);
+  const claimed = new Set();
+  for (const f of game.fleets) {
+    if (f.owner !== player.id || f === fleet || !f.ships.some(s => s.colonists > 0)) continue;
+    if (f.dest != null) claimed.add(f.dest);
+    else if (f.at != null && !f.hole && !f.chase) claimed.add(f.at);
+  }
+  const free = [];
+  for (const p of game.galaxy.planets) {
+    if (p.id === here.id || claimed.has(p.id)) continue;
+    const k = live(p) ? p : player.knowledge[p.id];
+    if (!k) { free.push(p); continue; }
+    // A memory of an own world is outdated, as in buildView.
+    const owner = k === p ? p.owner : (k.owner === player.id ? p.owner : k.owner);
+    if (owner == null && planetCapacity(k === p ? p : { ...p, temp: k.temp, grav: k.grav }) >= 1) free.push(p);
+  }
+  const far = (p) => travelDistance(fleet, p, zone);
+  const targets = free.map(p => [p, far(p)]).sort((a, b) => a[1] - b[1]).map(([p]) => p);
+  const plan = [];
+  for (const ship of settlers) {
+    const part = { ...fleet, ships: [ship] };
+    const i = targets.findIndex(p => canReach(game, part, p).ok);
+    if (i < 0) continue;
+    plan.push([ship, targets[i]]);
+    targets.splice(i, 1);
+  }
+  if (!plan.length) return { error: 'err.swarmNoTarget' };
+  // The fleet itself keeps the last ship if nothing else stays behind.
+  const all = plan.length === fleet.ships.length;
+  const out = all ? plan.slice(0, -1) : plan;
+  for (const [ship, target] of out) {
+    fleet.ships.splice(fleet.ships.indexOf(ship), 1);
+    const nf = newFleet(game, player.id, here);
+    nf.ships = [ship];
+    orderMove(game, player, { fleetId: nf.id, planetId: target.id });
+  }
+  if (all) {
+    const [, target] = plan[plan.length - 1];
+    endChase(fleet);
+    orderMove(game, player, { fleetId: fleet.id, planetId: target.id });
+  } else if (fleet.dest != null || fleet.hole) {
+    // What stays behind stays: no course carried over from before.
+    orderMove(game, player, { fleetId: fleet.id, planetId: null });
+  }
+  return { swarmed: { sent: plan.length, left: fleet.ships.length - (all ? 1 : 0) } };
 }
 
 /**

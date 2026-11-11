@@ -1163,6 +1163,8 @@ select option { background: var(--panel-solid); color: var(--ink); }
 
 /* Modal */
 .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(2, 3, 8, .72); }
+/* The ship profile opens from other dialogs (debug, fleet) - always on top of them. */
+#shipinfo.modal { z-index: 21; }
 .modal-box {
   width: min(820px, 94vw); max-height: 86vh; overflow: auto;
   background: var(--panel-solid); border: 1px solid var(--line-strong);

@@ -2,7 +2,7 @@
 // to the module it belongs to. Principle: only accept what can actually be
 // paid for at the end of the turn. There must never be a "build incomplete"
 // message - it would only arrive when nothing can be changed anymore.
-import { orderUnload } from './colonization.js';
+import { orderUnload, orderSwarm } from './colonization.js';
 import { loadOrDrop, splitFleet, mergeFleets } from './fleets.js';
 import { orderMove, splitStrands } from './movement.js';
 import { orderResearch } from './research.js';
@@ -10,7 +10,7 @@ import { orderBuild, renameShip, orderRefit, recycle } from './shipyard.js';
 import { orderTerraform } from './terraforming.js';
 
 /**
- * @returns {undefined | {error: string, params?: object} | {recycled: object} | {newFleet: string}}
+ * @returns {undefined | {error: string, params?: object} | {recycled: object} | {newFleet: string} | {swarmed: object}}
  *   an error to show, or what the order produced
  */
 export function setOrders(game, player, msg) {
@@ -26,4 +26,5 @@ export function setOrders(game, player, msg) {
   if (msg.move) return orderMove(game, player, msg.move);
   if (msg.split) return splitStrands(game, player, msg.split) || splitFleet(game, player, msg.split);
   if (msg.merge) return mergeFleets(game, player, msg.merge);
+  if (msg.swarm) return orderSwarm(game, player, msg.swarm);
 }

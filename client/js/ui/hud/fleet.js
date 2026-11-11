@@ -8,6 +8,7 @@ import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { courseTarget, portalsOf } from '../../render/courses.js';
 import { shipIcon } from '../../render/ships.js';
+import { genOf, bestFighter, MARK } from '../../render/fighterlook.js';
 import { openSplit } from '../../ui/split.js';
 import { escapeHtml, fmt, fmt1 } from './format.js';
 import { refitShips } from '../../../shared/budget.js';
@@ -20,6 +21,7 @@ const FA_ICON = {
   merge: svg('<path d="M3 3.5l5 4.5 5-4.5M8 8v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
   split: svg('<path d="M8 13V8.5L3 4M8 8.5L13 4M3 4v3M3 4h3M13 4v3M13 4h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'),
   refit: svg('<path d="M8 13V4M4 7.5L8 3.5l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.2h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'),
+  swarm: svg('<circle cx="8" cy="8" r="1.6" fill="currentColor"/><path d="M8 5.2V1.8M8 10.8v3.4M5.2 8H1.8M10.8 8h3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6.4 3.4L8 1.8l1.6 1.6M6.4 12.6L8 14.2l1.6-1.6M3.4 6.4L1.8 8l1.6 1.6M12.6 6.4L14.2 8l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>'),
   jump: svg('<circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.6"/><path d="M8 4.6a3.4 3.4 0 1 1-3.1 4.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/>'),
   recycle: svg('<path d="M12.6 6.2A5 5 0 0 0 3.6 5.4M3.4 9.8a5 5 0 0 0 9 .8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3.2 2.6v3h3M12.8 13.4v-3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>')
 };
@@ -69,8 +71,15 @@ export const fleetMethods = {
       this.wireChase(box, f);
       return;
     }
+    // Ships of a type together - fighters by generation, they look different
+    // (fighterlook.js): "3× Fighter Mk II" tells which want refitting.
     const groups = {};
-    for (const s of f.ships) (groups[s.type] || (groups[s.type] = [])).push(s);
+    for (const s of f.ships) {
+      const key = s.type === 'fighter' && s.tech ? `fighter:${genOf(s.tech)}` : s.type;
+      (groups[key] || (groups[key] = [])).push(s);
+    }
+    // The ship a group is shown by: for fighters the most advanced one.
+    const lead = (arr) => (arr[0].type === 'fighter' && bestFighter(arr)) || arr[0];
     const where = f.at != null ? v.planets[f.at] : null;
     const destP = f.dest != null ? v.planets[f.dest] : null;
     const destM = f.hole ? courseTarget(v, f) : null;
@@ -115,13 +124,13 @@ export const fleetMethods = {
               ${f.mine && !v.spectator ? `<button class="tiny rename" title="${t('fleet.rename')}" aria-label="${t('fleet.rename')}">✎</button>` : ''}
               <span class="hp">${Math.round(s.hp)}/${Math.round(s.maxHp)} HP</span>
             </div>`).join('')}
-          ${Object.entries(groups).filter(([type]) => !SHIP_DEFS[type]?.named).map(([type, arr]) => `
-            <div class="shipitem clickable-ship" data-info="${type}" title="${t('shipinfo.hint')}">
-              <span class="gi" data-t="${type}"></span>
-              <span>${arr.length}× ${t(`ship.${type}.name`)}
-                <span class="muted small">(${t('tech.weapons.short')}${arr[0].tech.weapons}/${t('tech.shields.short')}${arr[0].tech.shields}/${t('tech.speed.short')}${arr[0].tech.speed})</span></span>
+          ${Object.entries(groups).filter(([, arr]) => !SHIP_DEFS[arr[0].type]?.named).map(([key, arr]) => { const type = arr[0].type, s0 = lead(arr); return `
+            <div class="shipitem clickable-ship" data-info="${type}" data-group="${key}" title="${t('shipinfo.hint')}">
+              <span class="gi" data-t="${type}" data-group="${key}"></span>
+              <span>${arr.length}× ${t(`ship.${type}.name`)}${type === 'fighter' && s0.tech ? ' Mk ' + MARK[genOf(s0.tech)] : ''}
+                <span class="muted small">(${t('tech.weapons.short')}${s0.tech.weapons}/${t('tech.shields.short')}${s0.tech.shields}/${t('tech.speed.short')}${s0.tech.speed})</span></span>
               <span class="hp">${Math.round(arr.reduce((a, s) => a + s.hp, 0))} HP</span>
-            </div>`).join('')}
+            </div>`; }).join('')}
         </div>
       </div>
       ${f.mine && !v.spectator ? `<p class="hint-line fa-hint">${t('fleet.orderHint')}</p>` : ''}
@@ -129,10 +138,13 @@ export const fleetMethods = {
 
     const col = (f.mine && v.me) ? v.me.color
       : ownerColor(v, f.owner, '#9fb0c8');
-    for (const g of box.querySelectorAll('.gi')) g.appendChild(shipIcon(g.dataset.t, 26, col));
+    for (const g of box.querySelectorAll('.gi')) {
+      const ship = g.dataset.group ? lead(groups[g.dataset.group]) : f.ships.find(s => s.id === g.closest('[data-ship]')?.dataset.ship);
+      g.appendChild(shipIcon(g.dataset.t, 26, col, ship?.tech));
+    }
     // The built-in tech of these ships, not the current levels
     for (const el of box.querySelectorAll('[data-info]')) {
-      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : groups[el.dataset.info][0];
+      const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : lead(groups[el.dataset.group]);
       el.onclick = (e) => {
         if (e.target.closest('.rename, .rename-input')) return;
         this.showShip(el.dataset.info, ship.tech, col);
@@ -143,6 +155,8 @@ export const fleetMethods = {
     if (c) c.onclick = () => this.app.send({ t: 'orders', move: { fleetId: f.id, planetId: null } });
     const m = box.querySelector('#merge');
     if (m) m.onclick = () => this.app.send({ t: 'orders', merge: { planetId: f.at } });
+    const sw = box.querySelector('#swarm');
+    if (sw) sw.onclick = () => this.app.send({ t: 'orders', swarm: { fleetId: f.id } });
     const jump = box.querySelector('#jump');
     if (jump) jump.onclick = () => { if (jump.getAttribute('aria-pressed') !== 'true') this.app.orderHole(jump.dataset.hole); };
     const sp = box.querySelector('#split');
@@ -217,6 +231,8 @@ export const fleetMethods = {
     if (where && v.fleets.filter(x => x.mine && x.at === f.at).length > 1)
       out.push(btn('merge', 'merge', t('fleet.act.merge'), t('fleet.merge')));
     if (f.ships.length > 1) out.push(btn('split', 'split', t('fleet.act.split'), `${t('fleet.split')} – ${t('fleet.splitKey')}`));
+    // Colony ships in orbit: each one off to a free world of its own.
+    if (where && f.ships.some(s => s.colonists > 0)) out.push(btn('swarm', 'swarm', t('fleet.act.swarm'), t('fleet.swarm')));
     // Standing on a wormhole mouth (came out there): jump through it - always
     // possible, even where nothing on this side is in range.
     const mouth = f.at == null && (v.wormholes || []).find(m => onMouth(f, m));
