@@ -385,6 +385,13 @@ export const FOCUS_DIM = 0.2;
 
 /** From this many satellites on, a world shows the shield instead of individual satellites. */
 export const SHIELD_MIN = 5;
+/**
+ * How strongly the maps show the shield: it is there on many worlds late in
+ * a game and should not shout. Around a world with an orbital station it
+ * steps back further - there the ring is what the eye should find, and the
+ * shield only the veil it carries.
+ */
+export const shieldShow = (planet) => planet?.station ? 0.42 : 0.7;
 
 const shieldCache = new SpriteCache(6e6);
 // Larger shields are scaled up from this one - near the camera in the 3D view

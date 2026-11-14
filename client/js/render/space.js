@@ -15,7 +15,7 @@ import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
   glowSprite, drawHoleCore, swirlPoint, swirlStroke, SWIRL,
-  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM,
+  HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, shieldShow, FOCUS_DIM,
   drawWormhole, drawWormLink, WORMHOLE_MIN_PX
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
@@ -740,8 +740,9 @@ export class SpaceView {
     // to the world and not to the fleets.
     if (p.defenses >= SHIELD_MIN) {
       ctx.save();
-      ctx.globalAlpha = ctxAlpha;
+      ctx.globalAlpha = ctxAlpha * shieldShow(p);
       drawHexShield(ctx, pr.x, pr.y, r * 1.14 + 20 * orbitScale(scale), this.phase + p.id, 1, colorOf(p.owner));
+      ctx.globalAlpha = ctxAlpha;
       this.badge(ctx, pr.x + r + 16, pr.y - r - 10, '×' + p.defenses, colorOf(p.owner));
       ctx.restore();
     } else if (p.defenses > 0) {
@@ -765,7 +766,6 @@ export class SpaceView {
       ctx.save();
       ctx.globalAlpha = ctxAlpha;
       st = drawPlanetStation(ctx, p, pr.x, pr.y, r, orbitScale(scale), colorOf(p.owner), this.phase);
-      if (st && this.selection?.type === 'station' && this.selection.id === p.id) this.ringAt(ctx, st.x, st.y, st.r);
       ctx.restore();
     }
 
@@ -773,8 +773,8 @@ export class SpaceView {
     // near worlds are labeled, distant ones are not.
     if (this.showNames) labels.push(...planetLabels(p, pr.x, pr.y, scale, r));
     this.hit.push({ type: 'planet', id: p.id, x: pr.x, y: pr.y, r: Math.max(10, r + 5) });
-    // After the world: where both overlap, the station wins - it holds the shipyard.
-    if (st) this.hit.push({ type: 'station', id: p.id, x: st.x, y: st.y, r: st.r });
+    // The station is part of its world: a click on its yard picks the world.
+    if (st) this.hit.push({ type: 'planet', id: p.id, x: st.x, y: st.y, r: st.r });
   }
 
   /**
@@ -935,10 +935,10 @@ export class SpaceView {
     let x = px + 18, y = py - h / 2;
     if (x + w > this.w - 8) x = px - 18 - w;
     y = Math.max(4, Math.min(this.h - h - 4, y));
-    ctx.fillStyle = 'rgba(8,11,22,.93)';
-    ctx.strokeStyle = 'rgba(150,175,215,.28)';
+    ctx.fillStyle = 'rgba(10,13,23,.95)';
+    ctx.strokeStyle = 'rgba(148,170,215,.26)';
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     let yy = y + 14;
     ctx.font = '600 13.5px Inter, system-ui, sans-serif';

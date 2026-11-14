@@ -137,9 +137,18 @@ function advanceStations(game, entries) {
     st.building--;
     if (st.building > 0) continue;
     delete st.building;
+    escort(game, planet);
     entries.push({ type: 'build', playerIds: [planet.owner], private: planet.owner, planetId: planet.id,
-      key: 'log.stationReady', params: { planet: planet.name } });
+      key: 'log.stationReady', params: { planet: planet.name, count: STATION.satellites } });
   }
+}
+
+/** The satellites a finished station brings along (STATION.satellites), at its owner's levels. */
+function escort(game, planet) {
+  const owner = game.players.find(p => p.id === planet.owner);
+  if (!owner) return;
+  const list = planet.defenses || (planet.defenses = []);
+  for (let i = 0; i < STATION.satellites; i++) list.push(makeDefense(game, 'satellite', owner.tech));
 }
 
 /** After the battles: stations where nobody fought get REPAIR_SHARE of their hull back. */
@@ -332,5 +341,6 @@ export function devStation(game, player, planetId) {
   if (!planet || planet.owner !== player.id) planet = game.galaxy.planets.find(p => p.owner === player.id);
   if (!planet) return false;
   planet.station = makeDefense(game, 'station', player.tech);
+  escort(game, planet);
   return true;
 }

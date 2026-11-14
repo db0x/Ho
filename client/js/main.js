@@ -33,6 +33,7 @@ import { crewSay, orderKind, hasColonists, yardSay, crewReply, setCrewRequest } 
 import { enhanceSelects, syncSelects } from './ui/select.js';
 import { compact } from './ui/viewport.js';
 import { bindTips } from './ui/tips.js';
+import { fillSliders } from './ui/range.js';
 import { initLocale, useLocale, onLocaleChange, localeName, t, availableLocales, getLocale } from './i18n.js';
 
 const $ = s => document.querySelector(s);
@@ -46,6 +47,7 @@ initLocale();
 languagePicker();
 bindUi();
 bindTips();
+fillSliders();
 // Safari on iPad and iPhone ignores user-scalable: a pinch on a panel would
 // zoom the whole page. The map handles two fingers itself (pointer events).
 addEventListener('gesturestart', (e) => e.preventDefault());
@@ -191,6 +193,8 @@ const app = {
   },
   send: (m) => net.send(m),
   setSelection(sel) {
+    // A station is part of its world: whoever means it, means the world.
+    if (sel?.type === 'station') sel = { type: 'planet', id: sel.id };
     // An own fleet newly picked may answer over the radio.
     if (sel?.type === 'fleet' && (app.selection?.type !== 'fleet' || app.selection.id !== sel.id) && !app.spectator) {
       const f = map?.view?.fleets.find(x => x.id === sel.id);

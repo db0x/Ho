@@ -1,474 +1,583 @@
-// The orbital station and its construction site (see ../shipshd.js) - one
-// drawing for the map, the icons, the ship profile and the battle.
-// Seen from the side and upright, unlike the ships: a heavy open ring on top,
-// covered with blocks and lit windows and carried on spokes, a stepped tower
-// with rows of windows, a hangar bulge with lit docking bays, a sphere at the
-// foot with a glowing band and a bundle of antennas below. The owner's color
-// runs along the ring's outer wall and around the hangar. The site: tower
-// and hangar stand, part of the ring is plated, the rest is scaffold, a crane
-// swings the next block in.
-// Drawn on the grid of 100 units around the origin, y downwards.
-import { RED, GREEN, WHITE, fillShadowed, metal, bevel, TAU, tone } from './kit.js';
+// The orbital station and its construction site (see ../shipshd.js): a ring
+// built around its world, at the height of the satellite shield.
+//
+// Seen at a slant, like the rings some worlds have by nature - but made: a
+// slim dark band whose outer wall is lit from within in the owner's colour,
+// a stretch of it under glass, another of open lattice. Four anchors sit on
+// it, each holding the ring to its world with a tether of light - and
+// carrying the shield, once the satellites have raised it. What the station
+// is for hangs from the near side: the pods of the yard, where the ships are
+// built, and the command module with its masts. The far half runs behind
+// the world, the near half in front of it.
+//
+// One drawing for every view:
+//   ringStation   the ring itself, around the origin, in the caller's units
+//                 (the map draws it around the real world, ../ships.js)
+//   ringAnim      what moves on it: light along the band, pulses down the tethers, the yard
+//   ringArc       the same ring seen straight on, as an arc along the rim of
+//                 a huge world (the battle window, ../../ui/battle.js)
+//   stationBody   ring and a small nameless world on the grid of 100 units -
+//                 the icon and the ship profile
+// The site: part of the band is plated, the rest is scaffold, the pods of
+// the yard only frames, a crane above them.
+import { RED, GREEN, WHITE, fillShadowed, TAU, tone } from './kit.js';
 
 const AMBER = '#ffb347';
 const GLOW = '#8fdcff';
-const HULL = '#9aa6bb';
 
-/** Metal across a vertical body: light from the upper left, dark on the right. */
-function cylinder(ctx, x0, x1, base = HULL) {
-  const g = ctx.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, tone(base, -0.35));
-  g.addColorStop(0.22, tone(base, 0.55));
-  g.addColorStop(0.45, base);
-  g.addColorStop(0.8, tone(base, -0.45));
+/** How flat the ring looks: its short axis as a share of the long one. */
+export const RING_K = 0.3;
+/** It leans a little, so it does not look like a ruler laid across the world. */
+export const RING_TILT = -0.12;
+/** Where the yard hangs on the ring: in the middle of the near half, towards the viewer. */
+export const RING_YARD = 1.55;
+/** Inner edge of the band as a share of the outer one. */
+const INNER = 0.9;
+/** The four anchors: hubs on the band from which a tether of light reaches down to the world. */
+const NODES = [0.62, 2.55, 3.72, 5.7];
+/** A stretch of the band under glass (a habitat), and one of open lattice. */
+const GLASS = [2.8, 3.52], LATTICE = [5.02, 5.56];
+/** The command module, standing out from the band on the near right. */
+const COMMAND = 0.26;
+/** On a site the band is plated from here to there; the yard lies within. */
+const BUILT = [Math.PI * 0.3, Math.PI * 1.25];
+/** The pods of the yard: offset from RING_YARD along the ring, and size. */
+const PODS = [[-0.4, 1.5], [-0.27, 2.1], [-0.13, 1.6], [0.02, 2.4], [0.17, 1.7], [0.3, 2.2], [0.43, 1.4]];
+
+const DARK = '#3b4354', LENS = '#7fe9ff';
+
+/** A fixed "random" number in [0, 1) - the same every frame. */
+const rnd = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+
+/** A point on the ring: angle a, at radius rad, before the tilt. */
+export const ringPoint = (a, rad) => [Math.cos(a) * rad, Math.sin(a) * rad * RING_K];
+/** The same after the tilt - where something on the ring is on screen, relative to the world. */
+export function ringSpot(a, rad) {
+  const [x, y] = ringPoint(a, rad), c = Math.cos(RING_TILT), s = Math.sin(RING_TILT);
+  return [x * c - y * s, x * s + y * c];
+}
+
+/** Dark metal across the band: a little light from the upper left, deep shade on the right. */
+function across(ctx, R, base = DARK) {
+  const g = ctx.createLinearGradient(-R, 0, R, 0);
+  g.addColorStop(0, tone(base, -0.25));
+  g.addColorStop(0.2, tone(base, 0.5));
+  g.addColorStop(0.5, base);
+  g.addColorStop(0.85, tone(base, -0.5));
   g.addColorStop(1, tone(base, -0.7));
   return g;
 }
 
-/** Rows of lit windows on a vertical body between x0 and x1. */
-function windows(ctx, x0, x1, ys, step, seed, lite) {
-  if (lite) return;
-  for (const y of ys) {
-    for (let x = x0 + step / 2, i = 0; x < x1; x += step, i++) {
-      // Some dark - a pattern, not noise: the same every frame.
-      if (Math.sin(i * 7.31 + y * 3.17 + seed) > 0.55) continue;
-      const shade = Math.abs((x - (x0 + x1) / 2) / ((x1 - x0) / 2));
-      ctx.fillStyle = `rgba(255,226,170,${(0.95 - shade * 0.55).toFixed(2)})`;
-      ctx.fillRect(x - 0.45, y - 0.35, 0.9, 0.7);
+/** Where a tether ends: on the line from its anchor to the middle of the world, at the world's surface. */
+function tetherEnd(x, y, world) {
+  const d = Math.hypot(x, y) || 1, k = Math.min(0.9, world * 0.93 / d);
+  return [x * k, y * k];
+}
+
+/**
+ * The ring around the origin - the caller has moved there and turned by
+ * RING_TILT. R is its outer radius in the caller's units.
+ * @param {object} o
+ *   color  the owner's - the light bands along the ring carry it
+ *   site   under construction
+ *   part   'back' (the half behind the world), 'front' or 'both'
+ *   lite   small on the map: fewer details
+ *   world  radius of the world in the middle - the tethers end on it
+ */
+export function ringStation(ctx, R, o = {}) {
+  const { color = '#9fb0c8', site = false, part = 'both', lite = R < 44, world = R * 0.5 } = o;
+  const u = R / 56, K = RING_K, Ri = R * INNER, h = R * 0.05;
+  const fine = Math.max(0.45, 0.3 * u);
+  const P = (a, rad) => [Math.cos(a) * rad, Math.sin(a) * rad * K];
+  const within = (a, [a0, a1]) => a >= a0 && a <= a1;
+  const sector = (a0, a1, r0 = Ri, r1 = R) => {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r1, r1 * K, 0, a0, a1);
+    ctx.ellipse(0, 0, r0, r0 * K, 0, a1, a0, true);
+    ctx.closePath();
+  };
+
+  const half = (A0, A1, far) => {
+    const span = site ? [Math.max(A0, BUILT[0]), Math.min(A1, BUILT[1])] : [A0, A1];
+    const [a0, a1] = span;
+    if (site) {
+      // The part not plated yet: the band's edges as scaffold, rungs across
+      ctx.save();
+      ctx.strokeStyle = 'rgba(190,205,230,.7)'; ctx.lineWidth = Math.max(0.5, 0.45 * u);
+      ctx.setLineDash([2.4 * u, 1.8 * u]);
+      for (const [g0, g1] of [[A0, Math.min(A1, BUILT[0])], [Math.max(A0, BUILT[1]), A1]]) {
+        if (g1 <= g0) continue;
+        for (const rad of [R, Ri]) { ctx.beginPath(); ctx.ellipse(0, 0, rad, rad * K, 0, g0, g1); ctx.stroke(); }
+        if (!lite) {
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          for (let a = g0 + 0.08; a < g1 - 0.04; a += 0.2) { ctx.moveTo(...P(a, Ri)); ctx.lineTo(...P(a + 0.1, R)); }
+          ctx.stroke();
+          ctx.setLineDash([2.4 * u, 1.8 * u]);
+        }
+      }
+      ctx.restore();
     }
+    if (a1 <= a0) return;
+
+    // Tethers: light from the anchors down to the world - under the band they start from
+    if (!site) {
+      for (const a of NODES) {
+        if (!within(a, [A0, A1])) continue;
+        const [x, y] = P(a, Ri), [ex, ey] = tetherEnd(x, y, world);
+        ctx.save();
+        ctx.lineCap = 'round';
+        const g = ctx.createLinearGradient(x, y, ex, ey);
+        g.addColorStop(0, 'rgba(140,225,255,.85)'); g.addColorStop(1, 'rgba(90,170,255,.25)');
+        ctx.strokeStyle = 'rgba(90,180,255,.22)'; ctx.lineWidth = Math.max(1.6, 2.6 * u);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.7, 0.8 * u);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    if (far) {
+      // The inner wall, seen through the ring's opening
+      ctx.beginPath();
+      ctx.ellipse(0, 0, Ri, Ri * K, 0, a0, a1);
+      ctx.ellipse(0, h * 0.8, Ri, Ri * K, 0, a1, a0, true);
+      ctx.closePath();
+      ctx.fillStyle = '#1b212d'; ctx.fill();
+      if (!lite) {
+        const n = Math.round(40 * (a1 - a0) / Math.PI);
+        for (let i = 0; i < n; i++) {
+          if (rnd(i, 9) > 0.45) continue;
+          const [x, y] = P(a0 + (a1 - a0) * (i + 0.5) / n, Ri);
+          ctx.fillStyle = 'rgba(127,233,255,.8)';
+          ctx.fillRect(x - 0.35 * u, y + h * 0.3, 0.7 * u, 0.5 * u);
+        }
+      }
+    } else {
+      // The outer wall: dark plates, and the band of light in the owner's colour
+      const wall = () => {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, R, R * K, 0, a0, a1);
+        ctx.ellipse(0, h, R, R * K, 0, a1, a0, true);
+        ctx.closePath();
+      };
+      wall(); fillShadowed(ctx, across(ctx, R, '#2f3644'), u);
+      ctx.save(); wall(); ctx.clip();
+      ctx.strokeStyle = 'rgba(4,7,14,.55)'; ctx.lineWidth = fine;
+      const ribs = Math.round((lite ? 14 : 36) * (a1 - a0) / Math.PI);
+      ctx.beginPath();
+      for (let i = 1; i < ribs; i++) { const [x, y] = P(a0 + (a1 - a0) * i / ribs, R); ctx.moveTo(x, y); ctx.lineTo(x, y + h); }
+      ctx.stroke();
+      ctx.restore();
+      // Lit from within: short strokes of light, a glow around them
+      ctx.save();
+      ctx.lineCap = 'butt';
+      ctx.setLineDash(lite ? [3.2 * u, 2.6 * u] : [2.2 * u, 1.5 * u, 0.7 * u, 1.5 * u]);
+      ctx.strokeStyle = hexA(color, 0.3); ctx.lineWidth = Math.max(1.6, 2.4 * u);
+      ctx.beginPath(); ctx.ellipse(0, h * 0.55, R, R * K, 0, a0, a1); ctx.stroke();
+      ctx.strokeStyle = tone(color, 0.45); ctx.lineWidth = Math.max(0.8, (lite ? 1.3 : 0.95) * u);
+      ctx.beginPath(); ctx.ellipse(0, h * 0.55, R, R * K, 0, a0, a1); ctx.stroke();
+      ctx.restore();
+    }
+
+    // The band's back: dark plates with a bright edge
+    sector(a0, a1);
+    if (far) {
+      const tg = ctx.createLinearGradient(0, -R * K, 0, 0);
+      tg.addColorStop(0, '#5b6679'); tg.addColorStop(1, '#343c4b');
+      ctx.fillStyle = tg;
+    } else {
+      const tg = ctx.createLinearGradient(-R, 0, R, 0);
+      tg.addColorStop(0, '#4d5769'); tg.addColorStop(0.3, '#6b768b'); tg.addColorStop(1, '#2c3340');
+      ctx.fillStyle = tg;
+    }
+    ctx.fill();
+    // Stretches of another kind: a habitat under glass, an open lattice
+    for (const [kind, range] of [['glass', GLASS], ['lattice', LATTICE]]) {
+      const g0 = Math.max(a0, range[0]), g1 = Math.min(a1, range[1]);
+      if (g1 <= g0) continue;
+      sector(g0, g1);
+      if (kind === 'glass') {
+        const gg = ctx.createLinearGradient(0, -R * K, 0, R * K);
+        gg.addColorStop(0, 'rgba(120,220,235,.75)'); gg.addColorStop(1, 'rgba(50,130,160,.75)');
+        ctx.fillStyle = gg; ctx.fill();
+        ctx.strokeStyle = 'rgba(210,250,255,.55)'; ctx.lineWidth = fine;
+        ctx.beginPath();
+        for (let a = g0 + 0.07; a < g1; a += lite ? 0.14 : 0.07) { ctx.moveTo(...P(a, Ri)); ctx.lineTo(...P(a, R)); }
+        ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, 0, (R + Ri) / 2, (R + Ri) / 2 * K, 0, g0, g1); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#20242c'; ctx.fill();
+        ctx.save(); sector(g0, g1); ctx.clip();
+        ctx.strokeStyle = 'rgba(214,190,110,.75)'; ctx.lineWidth = fine;
+        ctx.beginPath();
+        for (let a = g0 - 0.1; a < g1 + 0.1; a += lite ? 0.09 : 0.045) {
+          ctx.moveTo(...P(a, Ri)); ctx.lineTo(...P(a + 0.07, R));
+          ctx.moveTo(...P(a + 0.07, Ri)); ctx.lineTo(...P(a, R));
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // Seams across it; the outer edge catches the light
+    ctx.strokeStyle = 'rgba(4,7,14,.5)'; ctx.lineWidth = fine * 0.8;
+    const seams = Math.round((lite ? 8 : 20) * (a1 - a0) / Math.PI);
+    ctx.beginPath();
+    for (let i = 1; i < seams; i++) { const a = a0 + (a1 - a0) * i / seams; ctx.moveTo(...P(a, Ri)); ctx.lineTo(...P(a, R)); }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(4,7,14,.7)'; ctx.lineWidth = fine;
+    ctx.beginPath(); ctx.ellipse(0, 0, Ri, Ri * K, 0, a0, a1); ctx.stroke();
+    ctx.strokeStyle = far ? 'rgba(170,190,220,.45)' : 'rgba(200,215,240,.7)'; ctx.lineWidth = fine;
+    ctx.beginPath(); ctx.ellipse(0, 0, R, R * K, 0, a0, a1); ctx.stroke();
+
+    // What sits on it and hangs from it: the anchors, the command module, the yard
+    const things = [];
+    for (const a of NODES) {
+      if (!within(a, span)) continue;
+      const [x, y] = P(a, (R + Ri) / 2);
+      things.push({ y, draw: () => hub(ctx, x, y, u, lite) });
+    }
+    if (!far && within(COMMAND, span)) {
+      const [x, y] = P(COMMAND, R);
+      things.push({ y: y + 0.01, draw: () => command(ctx, x, y, u, color, lite) });
+    }
+    if (!far && within(RING_YARD, span)) {
+      for (const [da, size] of PODS) {
+        const [x, y] = P(RING_YARD + da, R);
+        things.push({ y: y + 0.02 + size * 0.001, draw: () => pod(ctx, x, y + h, size * u, site, lite) });
+      }
+      if (site) {
+        const [x, y] = P(RING_YARD, R);
+        things.push({ y: y + 1, draw: () => crane(ctx, x, y, u) });
+      }
+    }
+    things.sort((p, q) => p.y - q.y).forEach(t => t.draw());
+  };
+
+  if (part !== 'front') half(Math.PI, TAU, true);
+  if (part !== 'back') half(0, Math.PI, false);
+}
+
+/** An anchor: a round hub set into the band, a lens in its middle (ringAnim lights it). */
+function hub(ctx, x, y, u, lite) {
+  const rx = 3.3 * u, ry = rx * 0.5;
+  ctx.beginPath(); ctx.ellipse(x, y + 0.9 * u, rx, ry, 0, 0, TAU);
+  ctx.fillStyle = '#1b212d'; ctx.fill();
+  const g = ctx.createLinearGradient(x - rx, 0, x + rx, 0);
+  g.addColorStop(0, '#7a869b'); g.addColorStop(0.4, '#566074'); g.addColorStop(1, '#2a303c');
+  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = 'rgba(4,7,14,.7)'; ctx.lineWidth = Math.max(0.4, 0.3 * u); ctx.stroke();
+  ctx.fillStyle = LENS;
+  ctx.beginPath(); ctx.ellipse(x, y, rx * 0.38, ry * 0.38, 0, 0, TAU); ctx.fill();
+  if (!lite) {
+    ctx.strokeStyle = 'rgba(127,233,255,.6)'; ctx.lineWidth = 0.3 * u;
+    ctx.beginPath(); ctx.ellipse(x, y, rx * 0.7, ry * 0.7, 0, 0, TAU); ctx.stroke();
   }
 }
 
 /**
- * The whole station.
- * @param {number} S     device pixels per grid unit (for shadows)
- * @param {boolean} site under construction
- * @param {boolean} lite small on the map: no windows, fewer seams
+ * A pod of the yard: a drum hanging under the band, a ring of light around
+ * its bay. On a site only its frame.
  */
-export function stationBody(ctx, color, S, site = false, lite = false) {
-  // Everything below the ring is a body of revolution, seen at the same
-  // slant as the ring: a lit cap on top of every step, edges and seams that
-  // curve with it, windows narrowing towards the sides. Painted bottom-up -
-  // every step covers the cap of the one beneath it.
+function pod(ctx, x, y, r, site, lite) {
+  const cy = y + r * 0.75;
+  if (site) {
+    ctx.strokeStyle = 'rgba(190,205,230,.8)'; ctx.lineWidth = Math.max(0.5, r * 0.14);
+    ctx.setLineDash([r * 0.5, r * 0.35]);
+    ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+  // The neck up to the band
+  ctx.fillStyle = '#262c38'; ctx.fillRect(x - r * 0.35, y - r * 0.2, r * 0.7, r);
+  const g = ctx.createRadialGradient(x - r * 0.35, cy - r * 0.4, r * 0.1, x, cy, r);
+  g.addColorStop(0, '#7d889d'); g.addColorStop(0.5, '#454e60'); g.addColorStop(1, '#1b212c');
+  ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = 'rgba(4,7,14,.75)'; ctx.lineWidth = Math.max(0.4, r * 0.12); ctx.stroke();
+  ctx.strokeStyle = LENS; ctx.lineWidth = Math.max(0.5, r * 0.16);
+  ctx.beginPath(); ctx.arc(x, cy, r * 0.58, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#0c1522';
+  ctx.beginPath(); ctx.arc(x, cy, r * 0.42, 0, TAU); ctx.fill();
+  if (!lite) {
+    ctx.fillStyle = 'rgba(190,245,255,.95)';
+    ctx.beginPath(); ctx.arc(x, cy, r * 0.16, 0, TAU); ctx.fill();
+  }
+}
 
-  // ----- Antennas at the foot, a dish on one of them
-  ctx.strokeStyle = '#7d889c'; ctx.lineWidth = 0.9;
+/** The crane of a site, over where the yard is going up. */
+function crane(ctx, x, y, u) {
+  ctx.strokeStyle = '#c9a24a'; ctx.lineWidth = Math.max(0.7, 0.8 * u);
+  ctx.beginPath(); ctx.moveTo(x + 4 * u, y); ctx.lineTo(x + 5.4 * u, y - 9 * u); ctx.lineTo(x - 6 * u, y - 7 * u); ctx.stroke();
+  ctx.lineWidth = Math.max(0.4, 0.35 * u);
+  ctx.beginPath(); ctx.moveTo(x - 4 * u, y - 7.3 * u); ctx.lineTo(x - 4 * u, y - 3.4 * u); ctx.stroke();
+  ctx.fillStyle = '#8f9bb0'; ctx.fillRect(x - 5.6 * u, y - 3.4 * u, 3.2 * u, 1.5 * u);
+}
+
+/**
+ * The command module: a hull standing out from the band, a bundle of masts
+ * and vanes beyond it, lights along its flank.
+ */
+function command(ctx, x, y, u, color, lite) {
+  ctx.save();
+  ctx.translate(x, y);
+  // Vanes fanning outwards
+  ctx.strokeStyle = '#7d889c'; ctx.lineWidth = Math.max(0.4, 0.45 * u); ctx.lineCap = 'round';
   ctx.beginPath();
-  for (const [x, y] of [[-3.4, 60], [0, 63], [3.4, 59]]) { ctx.moveTo(x * 0.45, 50); ctx.lineTo(x, y); }
+  for (const [dx, dy] of [[11, -1.5], [11.5, 1.2], [10.4, 3.6], [8.6, 5.4]]) { ctx.moveTo(5 * u, 1.2 * u); ctx.lineTo(dx * u, dy * u); }
   ctx.stroke();
-  if (!lite) {
-    ctx.fillStyle = '#c9d3e4';
-    ctx.beginPath(); ctx.ellipse(-3.6, 58.6, 1.8, 0.7, -0.4, 0, TAU); ctx.fill();
-  }
-
-  // ----- Sphere at the foot: latitudes, lights, a glowing equator
-  const sy = 40, sr = 12.5;
-  const sph = () => { ctx.beginPath(); ctx.arc(0, sy, sr, 0, TAU); };
-  sph();
-  const sg = ctx.createRadialGradient(-4.5, sy - 6, 1, 0, sy, sr * 1.05);
-  sg.addColorStop(0, '#f2f6fc'); sg.addColorStop(0.4, '#a9b4c8'); sg.addColorStop(0.85, '#4a5468'); sg.addColorStop(1, '#262d3b');
-  fillShadowed(ctx, sg, S);
-  ctx.save(); sph(); ctx.clip();
-  for (const f of [-0.62, -0.3, 0.32, 0.64]) {
-    const yy = sy + f * sr, rr = Math.sqrt(1 - f * f) * sr;
-    arcFront(ctx, yy, rr, 'rgba(8,12,22,.35)', 0.3);
-    if (!lite) curvedWindows(ctx, yy - 1.2, rr, 14, 0.5, f * 9);
-  }
-  if (!lite) for (const t of [0.35, 0.7, 1.05, 1.4, 1.75, 2.1, 2.45, 2.8]) meridian(ctx, sy, sr, t);
-  ctx.restore();
-  bevel(ctx, sph, 0.6);
-  glowArc(ctx, sy + 1, sr * 0.99, GLOW, 1.1);
-
-  // ----- Lower tower: two drums with a collar, pipes and hatches
-  drum(ctx, 22, 30, 7, S, lite, { windows: [25.5], seed: 1 });
-  drum(ctx, 19.5, 22.4, 8.6, S, lite, { base: '#7f8a9f' });          // collar
-  drum(ctx, 9, 20, 10.5, S, lite, { windows: [12.2, 15.2, 18], seed: 2, seams: [13.8, 16.8], ribs: 9 });
-  if (!lite) {
-    // Pipes down the tower's left, a hatch and a small dish on the right
-    for (const x of [-8.4, -6.9]) {
-      ctx.strokeStyle = '#59637a'; ctx.lineWidth = 0.7;
-      ctx.beginPath(); ctx.moveTo(x, 10.5); ctx.lineTo(x, 20 + 2.2 * Math.sqrt(1 - (x / 10.5) ** 2)); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 0.2;
-      ctx.beginPath(); ctx.moveTo(x - 0.2, 10.5); ctx.lineTo(x - 0.2, 20); ctx.stroke();
-    }
-    ctx.fillStyle = '#2a3142'; ctx.fillRect(4.2, 14, 2.6, 3.2);
-    ctx.strokeStyle = '#c9d3e4'; ctx.lineWidth = 0.35; ctx.strokeRect(4.2, 14, 2.6, 3.2);
-    ctx.strokeStyle = '#8a95aa'; ctx.lineWidth = 0.6;
-    ctx.beginPath(); ctx.moveTo(10.4, 12); ctx.lineTo(14.5, 9.5); ctx.stroke();
-    ctx.fillStyle = '#d8e0ec';
-    ctx.beginPath(); ctx.ellipse(15.4, 8.9, 2.4, 1.1, -0.5, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(8,12,22,.5)'; ctx.lineWidth = 0.25; ctx.stroke();
-  }
-
-  // ----- Hangar: a body of revolution, widest just above its foot
-  const prof = [[-9, 13], [-6.5, 19], [-3, 23.5], [1, 26], [5, 26.4], [8.5, 25], [10.5, 23]];
-  const rAt = (y) => {
-    for (let i = 1; i < prof.length; i++) {
-      if (y <= prof[i][0]) {
-        const [y0, r0] = prof[i - 1], [y1, r1] = prof[i];
-        return r0 + (r1 - r0) * (y - y0) / (y1 - y0);
-      }
-    }
-    return prof[prof.length - 1][1];
-  };
-  // Docking arms with a ferry each, behind the hangar's sides
-  if (!lite) {
-    for (const sx of [-1, 1]) {
-      ctx.strokeStyle = '#7d889c'; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.moveTo(sx * 22, 3); ctx.lineTo(sx * 34, 1.5); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 0.3;
-      ctx.beginPath(); ctx.moveTo(sx * 22, 2.4); ctx.lineTo(sx * 34, 0.9); ctx.stroke();
-      ferry(ctx, sx * 37, 1, sx, color);
-    }
-  }
+  // The hull: a blunt wedge, lit from the upper left
   const hull = () => {
     ctx.beginPath();
-    ctx.moveTo(-prof[0][1], prof[0][0]);
-    for (const [y, r] of prof) ctx.lineTo(-r, y);
-    ctx.ellipse(0, prof[prof.length - 1][0], prof[prof.length - 1][1], prof[prof.length - 1][1] * K, 0, Math.PI, 0, true);
-    for (let i = prof.length - 1; i >= 0; i--) ctx.lineTo(prof[i][1], prof[i][0]);
-    ctx.ellipse(0, prof[0][0], prof[0][1], prof[0][1] * K, 0, 0, Math.PI, true);
+    ctx.moveTo(-3.4 * u, -1.6 * u); ctx.lineTo(3.2 * u, -2.6 * u); ctx.lineTo(6.4 * u, -0.6 * u);
+    ctx.lineTo(6 * u, 2.6 * u); ctx.lineTo(1.6 * u, 4 * u); ctx.lineTo(-3 * u, 2.6 * u);
     ctx.closePath();
   };
-  hull(); fillShadowed(ctx, cylinder(ctx, -26.4, 26.4), S);
-  ctx.save(); hull(); ctx.clip();
-  // Its upper slope faces the light
-  const up = ctx.createLinearGradient(0, -9, 0, 4);
-  up.addColorStop(0, 'rgba(255,255,255,.35)'); up.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = up; ctx.fillRect(-27, -10, 54, 14);
-  // Latitudes and meridians
-  for (const y of lite ? [1] : [-6.5, -3, 1, 5, 8.5]) arcFront(ctx, y, rAt(y), 'rgba(8,12,22,.35)', 0.3);
+  const g = ctx.createLinearGradient(-3.4 * u, -2.6 * u, 6 * u, 4 * u);
+  g.addColorStop(0, '#8a96ab'); g.addColorStop(0.45, '#4c5567'); g.addColorStop(1, '#1f2530');
+  hull(); fillShadowed(ctx, g, u * 0.6);
+  ctx.strokeStyle = 'rgba(4,7,14,.75)'; ctx.lineWidth = Math.max(0.4, 0.3 * u); hull(); ctx.stroke();
+  ctx.fillStyle = tone(color, 0.4);
+  ctx.fillRect(-2.2 * u, 1.3 * u, 6.6 * u, Math.max(0.6, 0.55 * u));
   if (!lite) {
-    for (let t = 0.3; t < Math.PI; t += Math.PI / 12) {
-      ctx.strokeStyle = 'rgba(8,12,22,.22)'; ctx.lineWidth = 0.25;
-      ctx.beginPath();
-      prof.forEach(([y, r], i) => { const p = [Math.cos(t) * r, y + Math.sin(t) * r * K]; i ? ctx.lineTo(...p) : ctx.moveTo(...p); });
-      ctx.stroke();
-    }
-    curvedWindows(ctx, -5.2, rAt(-5.2), 34, 0.55, 3);
-    curvedWindows(ctx, 7, rAt(7), 44, 0.6, 5);
+    ctx.fillStyle = LENS;
+    for (let i = 0; i < 4; i++) ctx.fillRect((-1.6 + i * 1.5) * u, -0.5 * u, 0.8 * u, 0.5 * u);
   }
-  // Docking bays: lit openings that follow the curve and narrow to the sides
-  for (const t of [0.62, 1.12, 1.57, 2.02, 2.52]) {
-    const w = 0.17, y0 = -0.2, y1 = 4.2;
-    const pt = (tt, y) => [Math.cos(tt) * rAt(y), y + Math.sin(tt) * rAt(y) * K];
-    const quad = () => { ctx.beginPath(); ctx.moveTo(...pt(t - w, y0)); ctx.lineTo(...pt(t + w, y0)); ctx.lineTo(...pt(t + w, y1)); ctx.lineTo(...pt(t - w, y1)); ctx.closePath(); };
-    quad(); ctx.fillStyle = '#121826'; ctx.fill();
-    ctx.save(); quad(); ctx.clip();
-    // The opening sits lower towards the middle (the curve) - light it all, the clip keeps the frame.
-    const top = pt(t, y0)[1];
-    const bg = ctx.createLinearGradient(0, top, 0, top + (y1 - y0));
-    bg.addColorStop(0, '#fff4d6'); bg.addColorStop(1, '#ff9f45');
-    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(t);
-    ctx.fillStyle = bg; ctx.fillRect(-30, top + 0.5, 60, y1 - y0 + 4);
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(8,12,22,.8)'; ctx.lineWidth = 0.35; quad(); ctx.stroke();
-  }
+  // The mast
+  ctx.strokeStyle = '#aab6cc'; ctx.lineWidth = Math.max(0.4, 0.45 * u);
+  ctx.beginPath(); ctx.moveTo(MAST[0] * u, -2.4 * u); ctx.lineTo(MAST[0] * u, MAST[1] * u); ctx.stroke();
   ctx.restore();
-  bevel(ctx, hull, 0.6);
-  // The owner's color along its foot, a glowing seam above
-  arcFront(ctx, 10.5, 23, color, 1.6);
-  glowArc(ctx, 9.2 - 0.5, 24.6, GLOW, 0.6);
-  // Top cap where the neck stands
-  const cap = () => { ctx.beginPath(); ctx.ellipse(0, -9, 13, 13 * K, 0, 0, TAU); };
-  cap();
-  const cg = ctx.createLinearGradient(-13, -12, 13, -6);
-  cg.addColorStop(0, '#eef3fa'); cg.addColorStop(1, '#8792a7');
-  ctx.fillStyle = cg; ctx.fill();
-  ctx.strokeStyle = 'rgba(8,12,22,.55)'; ctx.lineWidth = 0.35; ctx.stroke();
-
-  // ----- The ring on top, seen at a slant: open in the middle, a heavy
-  // band covered with blocks, towers and lit windows; a smooth track with
-  // lights along its inner edge, a ribbed outer wall with the owner's color.
-  // Painted back to front: the far half, the tower and the spokes through
-  // the hole, then the near half.
-  ring(ctx, color, S, site, lite);
 }
+/** Top of the command module's mast, relative to where it meets the ring, in ring units (R = 56). */
+const MAST = [1.4, -8.5];
 
-
-/** Slant of the whole station: how flat a circle of the body looks. */
-const K = 0.24;
-
-/** The near half of a circle at height y - a seam or an edge. */
-function arcFront(ctx, y, r, style, w) {
-  ctx.strokeStyle = style; ctx.lineWidth = w;
-  ctx.beginPath(); ctx.ellipse(0, y, r, r * K, 0, 0, Math.PI); ctx.stroke();
-}
-
-/** A glowing band around the body at height y. */
-function glowArc(ctx, y, r, color, w) {
+/**
+ * What moves on the ring, drawn over the still image: light wandering along
+ * the band, pulses running down the tethers, the anchors glowing while the
+ * shield is up, work in the yard. Same frame as ringStation.
+ * @param {object} o
+ *   site, lite
+ *   shield   0..1: how strong the shield is the anchors carry (0: dark)
+ *   color    the owner's
+ *   hide     radius of the world in the middle: tethers end on it, and what runs behind it is not drawn
+ */
+export function ringAnim(ctx, R, t, o = {}) {
+  const { site = false, lite = R < 44, shield = 0, color = GLOW, hide = R * 0.5 } = o;
+  const u = R / 56, K = RING_K, Ri = R * INNER, h = R * 0.05;
+  const P = (a, rad) => [Math.cos(a) * rad, Math.sin(a) * rad * K];
+  const built = (a) => !site || (a >= BUILT[0] && a <= BUILT[1]);
+  const hidden = (a, x, y) => Math.sin(a) < 0 && Math.hypot(x, y) < hide;
+  const spot = (x, y, r, core, halo) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, core); g.addColorStop(0.35, halo); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  };
   ctx.save();
-  ctx.shadowColor = color; ctx.shadowBlur = w * 3;
-  arcFront(ctx, y, r, color, w);
+  ctx.globalCompositeOperation = 'lighter';
+  // Light wandering along the band of the near wall
+  for (let k = 0; k < (site ? 1 : 3); k++) {
+    const a = ((t * 0.35 + k * TAU / 3) % TAU + TAU) % TAU;
+    if (Math.sin(a) < 0 || !built(a)) continue;
+    const [x, y] = P(a, R);
+    spot(x, y + h * 0.55, (lite ? 5 : 4) * u, 'rgba(255,255,255,.9)', hexA(color, 0.5));
+  }
+  if (!site) {
+    NODES.forEach((a, k) => {
+      const [x, y] = P(a, Ri), [ex, ey] = tetherEnd(x, y, hide);
+      // A pulse running down each tether
+      const f = (t * 0.6 + k * 0.27) % 1, px = x + (ex - x) * f, py = y + (ey - y) * f;
+      if (!hidden(a, px, py)) spot(px, py, (lite ? 3.4 : 2.6) * u, `rgba(255,255,255,${(0.9 * (1 - f * 0.5)).toFixed(3)})`, 'rgba(120,210,255,.5)');
+      // Where it touches the world
+      if (!hidden(a, ex, ey)) spot(ex, ey, 3.2 * u, `rgba(200,240,255,${(0.35 + 0.25 * Math.sin(t * 3 + k)).toFixed(3)})`, 'rgba(90,170,255,.25)');
+      // The anchor: always a glimmer, bright in the owner's colour while it carries the shield
+      const [hx, hy] = P(a, (R + Ri) / 2);
+      if (hidden(a, hx, hy)) return;
+      const b = 0.35 + 0.2 * Math.sin(t * 2.1 + k);
+      spot(hx, hy, 3.4 * u, `rgba(200,245,255,${b.toFixed(3)})`, 'rgba(127,233,255,.3)');
+      if (shield > 0.01) {
+        const s = (0.5 + 0.3 * Math.sin(t * 2.1) + 0.2 * Math.pow(Math.max(0, Math.sin(t * 1.6 - k * TAU / 4)), 6)) * shield;
+        spot(hx, hy, (lite ? 6 : 5) * u, `rgba(255,255,255,${(0.55 * s).toFixed(3)})`, hexA(color, 0.6 * s));
+      }
+    });
+  }
+  // The yard: the bays breathe, one after the other; on a site, welding
+  if (built(RING_YARD)) {
+    PODS.forEach(([da, size], k) => {
+      const [x, y] = P(RING_YARD + da, R), cy = y + h + size * u * 0.75;
+      const f = site ? Math.pow(Math.max(0, Math.sin(t * 7.3 + k * 2) * Math.sin(t * 2.9 + k)), 3)
+        : 0.3 + 0.3 * Math.pow(Math.max(0, Math.sin(t * 1.4 - k * 0.8)), 4);
+      spot(x, cy, size * u * 1.5, site ? `rgba(255,220,160,${(0.9 * f).toFixed(3)})` : `rgba(200,245,255,${f.toFixed(3)})`,
+        site ? 'rgba(255,170,80,.25)' : 'rgba(127,233,255,.28)');
+    });
+  }
   ctx.restore();
 }
 
-/** A meridian of the sphere: from pole to pole across its near side. */
-function meridian(ctx, cy, r, t) {
-  ctx.strokeStyle = 'rgba(8,12,22,.2)'; ctx.lineWidth = 0.22;
-  ctx.beginPath();
-  for (let i = 0; i <= 12; i++) {
-    const f = -1 + i / 6, rr = Math.sqrt(Math.max(0, 1 - f * f)) * r;
-    const p = [Math.cos(t) * rr, cy + f * r + Math.sin(t) * rr * K];
-    i ? ctx.lineTo(...p) : ctx.moveTo(...p);
-  }
-  ctx.stroke();
-}
-
-/** A row of windows around the body at height y, narrowing towards the sides, dimmer on the right. */
-function curvedWindows(ctx, y, r, n, h, seed) {
-  for (let i = 0; i < n; i++) {
-    const t = Math.PI * (i + 0.5) / n;
-    if (Math.sin(i * 7.31 + seed * 3.17) > 0.5) continue;
-    const x = Math.cos(t) * r, yy = y + Math.sin(t) * r * K;
-    const w = Math.max(0.15, Math.sin(t) * Math.PI * r / n * 0.45);
-    const light = 0.35 + 0.6 * (1 - (Math.cos(t) + 1) / 2 * 0.8) * Math.sin(t);
-    ctx.fillStyle = `rgba(255,226,170,${light.toFixed(2)})`;
-    ctx.fillRect(x - w / 2, yy - h / 2, w, h);
-  }
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.max(0, a).toFixed(3)})`;
 }
 
 /**
- * A vertical drum from y0 down to y1 with radius r: the side lit from the
- * left, its cap on top, the lower edge curving towards the viewer.
+ * The ring seen straight on, as an arc along the rim of a huge world - the
+ * battle window stands so close that a slanted ring would not fit into the
+ * picture. A band at radius R from a0 to a1 (clockwise), the yard at `yardAt`.
  */
-function drum(ctx, y0, y1, r, S, lite, o = {}) {
-  const body = () => {
-    ctx.beginPath();
-    ctx.moveTo(-r, y0); ctx.lineTo(-r, y1);
-    ctx.ellipse(0, y1, r, r * K, 0, Math.PI, 0, true);
-    ctx.lineTo(r, y0);
-    ctx.ellipse(0, y0, r, r * K, 0, 0, Math.PI, true);
-    ctx.closePath();
-  };
-  body(); fillShadowed(ctx, cylinder(ctx, -r, r, o.base || HULL), S * 0.5);
-  if (!lite) {
-    ctx.save(); body(); ctx.clip();
-    for (const y of o.seams || []) arcFront(ctx, y, r, 'rgba(8,12,22,.4)', 0.3);
-    for (let i = 1; i < (o.ribs || 0); i++) {
-      const x = Math.cos(Math.PI * i / o.ribs) * r;
-      const dy = Math.sin(Math.PI * i / o.ribs) * r * K;
-      ctx.strokeStyle = 'rgba(8,12,22,.25)'; ctx.lineWidth = 0.25;
-      ctx.beginPath(); ctx.moveTo(x, y0 + dy); ctx.lineTo(x, y1 + dy); ctx.stroke();
-    }
-    for (const y of o.windows || []) curvedWindows(ctx, y, r, Math.round(r * 2.4), 0.6, (o.seed || 0) + y);
+export function ringArc(ctx, cx, cy, R, a0, a1, o = {}) {
+  const { color = '#9fb0c8', site = false, t = 0, yardAt = (a0 + a1) / 2, shield = 0 } = o;
+  const w = Math.max(6, R * 0.036), u = w / 9;
+  // A site is plated on the yard's side only.
+  const b0 = site ? Math.max(a0, yardAt - 0.42) : a0, b1 = site ? Math.min(a1, yardAt + 0.3) : a1;
+  const at = (a, rad) => [cx + Math.cos(a) * rad, cy + Math.sin(a) * rad];
+  ctx.save();
+  if (site) {
+    ctx.strokeStyle = 'rgba(205,214,232,.7)'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
+    for (const rad of [R - w / 2, R + w / 2]) { ctx.beginPath(); ctx.arc(cx, cy, rad, a0, a1); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  const band = () => { ctx.beginPath(); ctx.arc(cx, cy, R + w / 2, b0, b1); ctx.arc(cx, cy, R - w / 2, b1, b0, true); ctx.closePath(); };
+  const g = ctx.createRadialGradient(cx, cy, R - w / 2, cx, cy, R + w / 2);
+  g.addColorStop(0, '#1b212d'); g.addColorStop(0.35, '#3d4657'); g.addColorStop(0.75, '#6b768b'); g.addColorStop(1, '#2f3644');
+  band(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8; ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = 'transparent';
+  ctx.save(); band(); ctx.clip();
+  // Seams, windows towards the world, the owner's colour along the outside
+  ctx.strokeStyle = 'rgba(8,12,22,.4)'; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  const n = Math.round((b1 - b0) * R / (w * 1.5));
+  for (let i = 1; i < n; i++) { const a = b0 + (b1 - b0) * i / n; ctx.moveTo(...at(a, R - w)); ctx.lineTo(...at(a, R + w)); }
+  ctx.stroke();
+  for (let i = 0; i < n * 3; i++) {
+    if (rnd(i, 13) > 0.55) continue;
+    const [x, y] = at(b0 + (b1 - b0) * (i + 0.5) / (n * 3), R - w * 0.22);
+    ctx.fillStyle = 'rgba(127,233,255,.9)'; ctx.fillRect(x - u * 0.6, y - u * 0.45, u * 1.2, u * 0.9);
+  }
+  ctx.strokeStyle = hexA(color, 0.35); ctx.lineWidth = w * 0.4;
+  ctx.beginPath(); ctx.arc(cx, cy, R + w * 0.28, b0, b1); ctx.stroke();
+  ctx.setLineDash([w * 0.9, w * 0.5]);
+  ctx.strokeStyle = tone(color, 0.45); ctx.lineWidth = w * 0.16;
+  ctx.beginPath(); ctx.arc(cx, cy, R + w * 0.28, b0, b1); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(8,12,22,.7)'; ctx.lineWidth = 1; band(); ctx.stroke();
+  // Blocks standing out from the band, and the emitters
+  for (let i = 0; i < n; i++) {
+    const a = b0 + (b1 - b0) * (i + 0.5 + (rnd(i, 2) - 0.5) * 0.6) / n;
+    if (Math.abs(a - yardAt) < 0.12 || rnd(i, 3) > 0.7) continue;
+    const hgt = w * (0.14 + rnd(i, 4) * 0.3), bw = w * (0.3 + rnd(i, 5) * 0.45);
+    ctx.save(); ctx.translate(...at(a, R + w / 2)); ctx.rotate(a + Math.PI / 2);
+    ctx.fillStyle = rnd(i, 6) > 0.5 ? '#566074' : '#3d4657'; ctx.fillRect(-bw / 2, -hgt, bw, hgt);
+    ctx.strokeStyle = 'rgba(8,12,22,.6)'; ctx.lineWidth = 0.7; ctx.strokeRect(-bw / 2, -hgt, bw, hgt);
     ctx.restore();
   }
-  bevel(ctx, body, 0.45);
-  const cap = () => { ctx.beginPath(); ctx.ellipse(0, y0, r, r * K, 0, 0, TAU); };
-  cap();
-  const cg = ctx.createLinearGradient(-r, y0 - r * K, r, y0 + r * K);
-  cg.addColorStop(0, '#f1f5fb'); cg.addColorStop(1, '#7d889c');
-  ctx.fillStyle = cg; ctx.fill();
-  ctx.strokeStyle = 'rgba(8,12,22,.55)'; ctx.lineWidth = 0.3; ctx.stroke();
-}
-
-/** A small ferry at a docking arm, nose outwards. */
-function ferry(ctx, x, y, dir, color) {
-  ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
-  const f = () => { ctx.beginPath(); ctx.moveTo(-3, -1.3); ctx.lineTo(2.5, -1); ctx.lineTo(4.2, 0); ctx.lineTo(2.5, 1.1); ctx.lineTo(-3, 1.3); ctx.closePath(); };
-  f(); ctx.fillStyle = metal(ctx, -1.3, 1.3, '#b4bfd1'); ctx.fill(); bevel(ctx, f, 0.25);
-  ctx.fillStyle = color; ctx.fillRect(-2.2, -0.35, 2.6, 0.7);
-  ctx.fillStyle = '#7fd4ff'; ctx.fillRect(2.4, -0.45, 0.9, 0.5);
+  // The yard
+  ctx.save(); ctx.translate(...at(yardAt, R + w / 2)); ctx.rotate(yardAt + Math.PI / 2);
+  const yw = w * 2.4, yh = w * 1;
+  if (site) {
+    ctx.strokeStyle = 'rgba(205,214,232,.9)'; ctx.lineWidth = 1.2; ctx.strokeRect(-yw / 2, -yh, yw, yh);
+    ctx.strokeStyle = '#c9a24a'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(yw * 0.3, 0); ctx.lineTo(yw * 0.4, -yh * 2.1); ctx.lineTo(-yw * 0.5, -yh * 1.7); ctx.stroke();
+  } else {
+    const yg = ctx.createLinearGradient(-yw / 2, 0, yw / 2, 0);
+    yg.addColorStop(0, '#7d889d'); yg.addColorStop(1, '#2a303c');
+    ctx.fillStyle = yg; ctx.fillRect(-yw / 2, -yh, yw, yh);
+    ctx.fillStyle = '#121826'; ctx.fillRect(-yw * 0.36, -yh * 0.8, yw * 0.5, yh * 0.56);
+    const bg = ctx.createLinearGradient(0, -yh * 0.8, 0, -yh * 0.24);
+    bg.addColorStop(0, '#d6fbff'); bg.addColorStop(1, '#3fb6d8');
+    ctx.fillStyle = bg; ctx.fillRect(-yw * 0.34, -yh * 0.76, yw * 0.46, yh * 0.48);
+    ctx.fillStyle = color; ctx.fillRect(-yw / 2, -yh * 0.16, yw, yh * 0.12);
+    ctx.strokeStyle = 'rgba(8,12,22,.7)'; ctx.lineWidth = 1; ctx.strokeRect(-yw / 2, -yh, yw, yh);
+    ctx.strokeStyle = '#aab6cc'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(yw * 0.3, -yh); ctx.lineTo(yw * 0.3, -yh * 2); ctx.stroke();
+    const blink = 0.5 + 0.5 * Math.sin(t * 3);
+    ctx.fillStyle = `rgba(255,90,80,${0.3 + blink * 0.7})`;
+    ctx.beginPath(); ctx.arc(yw * 0.3, -yh * 2, 2.4, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  // Lights running along, emitters glowing into the shield
+  ctx.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const a = b0 + ((t * 0.12 + k / 3) % 1) * (b1 - b0), [x, y] = at(a, R - w * 0.1);
+    const gl = ctx.createRadialGradient(x, y, 0, x, y, w * 0.7);
+    gl.addColorStop(0, 'rgba(255,255,255,.9)'); gl.addColorStop(0.4, 'rgba(143,220,255,.5)'); gl.addColorStop(1, 'rgba(143,220,255,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, w * 0.7, 0, TAU); ctx.fill();
+  }
+  if (shield > 0.01 && !site) {
+    const m = Math.max(3, Math.round((a1 - a0) * 3));
+    for (let k = 0; k < m; k++) {
+      const a = a0 + (a1 - a0) * (k + 0.5) / m, [x, y] = at(a, R + w * 0.2);
+      const b = (0.5 + 0.3 * Math.sin(t * 2.1) + 0.2 * Math.pow(Math.max(0, Math.sin(t * 1.6 - k)), 6)) * shield;
+      const gl = ctx.createRadialGradient(x, y, 0, x, y, w * 1.5);
+      gl.addColorStop(0, `rgba(255,255,255,${(0.85 * b).toFixed(3)})`); gl.addColorStop(0.3, hexA(color, 0.5 * b)); gl.addColorStop(1, hexA(color, 0));
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, w * 1.5, 0, TAU); ctx.fill();
+    }
+  }
   ctx.restore();
 }
 
-const CY = -30;                         // the ring's plane
-const RO = [54, 13], RI = [36, 7.6];    // outer and inner ellipse (rx, ry)
-const RH = 6;                           // height of the band
-/** A fixed "random" number in [0, 1) - the same every frame. */
-const rnd = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
-const at = (a, k, dy = 0) => [Math.cos(a) * (RI[0] + (RO[0] - RI[0]) * k), CY + dy + Math.sin(a) * (RI[1] + (RO[1] - RI[1]) * k)];
+// ---------------------------------------------------- on the grid of 100 units
+// The icon and the ship profile show the station as what it is: a ring
+// around a world. The world here is nobody's - small, dark, only there to
+// be ringed - with a hint of the shield the ring carries.
+const GRID_R = 54, GRID_WORLD = 30;
 
-/** The top of the band between two angles (a0 < a1). */
-function topPath(ctx, a0, a1) {
-  ctx.beginPath();
-  ctx.ellipse(0, CY, RO[0], RO[1], 0, a0, a1);
-  ctx.ellipse(0, CY, RI[0], RI[1], 0, a1, a0, true);
-  ctx.closePath();
+/**
+ * Ring and world on the grid.
+ * @param {number} S     device pixels per grid unit (for shadows)
+ * @param {boolean} site under construction
+ * @param {boolean} lite small on the map: no windows, fewer blocks
+ */
+export function stationBody(ctx, color, S, site = false, lite = false) {
+  const ring = (part) => { ctx.save(); ctx.rotate(RING_TILT); ringStation(ctx, GRID_R, { color, site, part, lite, world: GRID_WORLD }); ctx.restore(); };
+  ring('back');
+  // The world in the middle
+  const w = ctx.createRadialGradient(-GRID_WORLD * 0.38, -GRID_WORLD * 0.42, GRID_WORLD * 0.1, 0, 0, GRID_WORLD);
+  w.addColorStop(0, '#7fa3cf'); w.addColorStop(0.45, '#3b577f'); w.addColorStop(0.85, '#16233a'); w.addColorStop(1, '#0a111f');
+  ctx.beginPath(); ctx.arc(0, 0, GRID_WORLD, 0, TAU);
+  fillShadowed(ctx, w, S);
+  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, GRID_WORLD, 0, TAU); ctx.clip();
+  ctx.fillStyle = 'rgba(190,220,255,.1)';
+  for (const [x, y, rx, ry, a] of [[-8, -10, 15, 5, 0.3], [9, 5, 13, 4, -0.2], [-12, 13, 10, 3.4, 0.1]]) {
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, a, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(160,200,255,.35)'; ctx.lineWidth = 0.7;
+  ctx.beginPath(); ctx.arc(0, 0, GRID_WORLD - 0.3, Math.PI * 0.75, Math.PI * 1.85); ctx.stroke();
+  // The shield: a faint shell in the owner's colour, not on a site
+  if (!site && !lite) {
+    const sh = ctx.createRadialGradient(0, 0, GRID_R * 0.72, 0, 0, GRID_R * 1.02);
+    sh.addColorStop(0, hexA(color, 0)); sh.addColorStop(0.9, hexA(color, 0.09)); sh.addColorStop(1, hexA(color, 0));
+    ctx.fillStyle = sh;
+    ctx.beginPath(); ctx.arc(0, 0, GRID_R * 1.02, 0, TAU); ctx.fill();
+  }
+  ring('front');
 }
 
-/** Blocks on the band: a lit top, a front face, sometimes a window or a tower. */
-function blocks(ctx, a0, a1, color, lite) {
-  const list = [];
-  const n = lite ? 22 : 70;
-  for (let i = 0; i < n; i++) {
-    const a = rnd(i, 1) * TAU;
-    if (!(a >= a0 && a <= a1) && !(a + TAU >= a0 && a + TAU <= a1)) continue;
-    const k = 0.18 + rnd(i, 2) * 0.64;
-    const [x, y] = at(a, k);
-    list.push({ i, x, y, w: (lite ? 3.2 : 2) + rnd(i, 3) * (lite ? 3 : 3.6), h: 0.8 + rnd(i, 4) * (rnd(i, 5) > 0.88 ? 7 : 2.6), d: 1 + rnd(i, 6) * 1.6 });
-  }
-  list.sort((p, q) => p.y - q.y);
-  for (const b of list) {
-    const x = b.x - b.w / 2, y = b.y;
-    // Front face
-    const g = ctx.createLinearGradient(x, 0, x + b.w, 0);
-    g.addColorStop(0, '#c7d0de'); g.addColorStop(1, '#6d778b');
-    ctx.fillStyle = g; ctx.fillRect(x, y - b.h, b.w, b.h);
-    // Top
-    ctx.fillStyle = '#eef3fa';
-    ctx.beginPath(); ctx.moveTo(x, y - b.h); ctx.lineTo(x + b.d * 0.6, y - b.h - b.d * 0.5);
-    ctx.lineTo(x + b.w + b.d * 0.6, y - b.h - b.d * 0.5); ctx.lineTo(x + b.w, y - b.h); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(10,14,24,.55)'; ctx.lineWidth = 0.22;
-    ctx.strokeRect(x, y - b.h, b.w, b.h);
-    if (!lite && b.h > 1.6) {
-      ctx.fillStyle = rnd(b.i, 7) > 0.8 ? color : 'rgba(255,226,170,.9)';
-      ctx.fillRect(x + b.w * 0.3, y - b.h * 0.6, Math.max(0.5, b.w * 0.18), 0.5);
-    }
-  }
+/** What moves, on the grid (see ringAnim). */
+export function stationAnim(ctx, t, site = false, lite = false) {
+  ctx.save();
+  ctx.rotate(RING_TILT);
+  ringAnim(ctx, GRID_R, t, { site, lite, shield: site ? 0 : 1, hide: GRID_WORLD, color: '#8fdcff' });
+  ctx.restore();
 }
 
-function ring(ctx, color, S, site, lite) {
-  const back = [Math.PI, TAU], front = [0, Math.PI];
-  // On a site only part of the band is plated, the rest is scaffold.
-  const built = site ? [Math.PI * 0.55, Math.PI * 1.45] : null;
-  const span = ([a0, a1]) => built ? [Math.max(a0, built[0]), Math.min(a1, built[1])] : [a0, a1];
-  const plated = ([a0, a1]) => a1 > a0;
-
-  // 1) Far half: the inner wall seen through the hole, then the top.
-  const fb = span(back);
-  if (plated(fb)) {
-    ctx.beginPath();
-    ctx.ellipse(0, CY, RI[0], RI[1], 0, fb[0], fb[1]);
-    ctx.ellipse(0, CY + RH * 0.8, RI[0], RI[1], 0, fb[1], fb[0], true);
-    ctx.closePath();
-    ctx.fillStyle = '#3b4456'; ctx.fill();
-    // Windows along the inner wall
-    if (!lite) {
-      for (let i = 0; i < 26; i++) {
-        const a = fb[0] + (fb[1] - fb[0]) * (i + 0.5) / 26;
-        if (rnd(i, 9) > 0.6) continue;
-        ctx.fillStyle = 'rgba(255,226,170,.85)';
-        ctx.fillRect(Math.cos(a) * RI[0] - 0.4, CY + 2 + Math.sin(a) * RI[1], 0.8, 0.6);
-      }
-    }
-    topPath(ctx, fb[0], fb[1]);
-    const tg = ctx.createLinearGradient(0, CY - RO[1], 0, CY);
-    tg.addColorStop(0, '#dfe6f1'); tg.addColorStop(1, '#9aa6bb');
-    fillShadowed(ctx, tg, S * 0.5);
-    ctx.strokeStyle = 'rgba(8,12,22,.6)'; ctx.lineWidth = 0.35; ctx.stroke();
-    track(ctx, fb[0], fb[1], lite);
-    blocks(ctx, fb[0], fb[1], color, lite);
-  }
-
-  // 2) Through the hole: the tower top, the hub and the spokes.
-  drum(ctx, CY + 2, -9, 8.4, S, lite, { windows: [CY + 8, CY + 12.5, -14.5], seed: 3, seams: [CY + 10.2, -12.2], ribs: 7 });
-  glowArc(ctx, -10.6, 8.4, GLOW, 0.8);
-  for (const a of [Math.PI * 0.18, Math.PI * 0.82, Math.PI * 1.25, Math.PI * 1.75]) {
-    const far = a > Math.PI;
-    const [x1, y1] = at(a, 0.02, 2.4);
-    ctx.strokeStyle = far ? '#5d677a' : '#8a95aa'; ctx.lineWidth = lite ? 2.6 : 2.2;
-    ctx.beginPath(); ctx.moveTo(Math.sign(x1) * 7, CY + 1); ctx.lineTo(x1, y1); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 0.4;
-    ctx.beginPath(); ctx.moveTo(Math.sign(x1) * 7, CY + 0.2); ctx.lineTo(x1, y1 - 0.8); ctx.stroke();
-  }
-  // Hub with the command dome and its mast
-  const hub = () => { ctx.beginPath(); ctx.ellipse(0, CY + 1, 11, 3, 0, 0, TAU); };
-  hub(); fillShadowed(ctx, cylinder(ctx, -11, 11, '#a9b4c8'), S * 0.4); bevel(ctx, hub, 0.4);
-  if (!site) {
-    const dm = () => {
-      ctx.beginPath();
-      ctx.ellipse(0, CY, 8, 2, 0, 0, Math.PI);
-      ctx.bezierCurveTo(-7.5, CY - 5, -4, CY - 7.5, 0, CY - 7.5);
-      ctx.bezierCurveTo(4, CY - 7.5, 7.5, CY - 5, 8, CY);
-      ctx.closePath();
-    };
-    dm(); fillShadowed(ctx, cylinder(ctx, -8, 8, '#b7c1d3'), S * 0.4); bevel(ctx, dm, 0.35);
-    ctx.fillStyle = color; ctx.fillRect(-8, CY - 0.6, 16, 0.8);
-    windows(ctx, -7, 7, [CY - 3.2], 1.7, 4, lite);
-    ctx.strokeStyle = '#aab6cc'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(0, CY - 7.5); ctx.lineTo(0, -58); ctx.stroke();
-  }
-
-  // 3) Near half: the ribbed outer wall with the owner's color, then the top.
-  const fr = span(front);
-  if (plated(fr)) {
-    const wall = () => {
-      ctx.beginPath();
-      ctx.ellipse(0, CY, RO[0], RO[1], 0, fr[0], fr[1]);
-      ctx.ellipse(0, CY + RH, RO[0], RO[1], 0, fr[1], fr[0], true);
-      ctx.closePath();
-    };
-    wall(); fillShadowed(ctx, cylinder(ctx, -RO[0], RO[0], '#8d98ad'), S);
-    ctx.save(); wall(); ctx.clip();
-    ctx.strokeStyle = 'rgba(8,12,22,.4)'; ctx.lineWidth = 0.35;
-    const ribs = lite ? 12 : 36;
-    for (let i = 1; i < ribs; i++) {
-      const a = fr[0] + (fr[1] - fr[0]) * i / ribs;
-      const x = Math.cos(a) * RO[0], y = CY + Math.sin(a) * RO[1];
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + RH); ctx.stroke();
-    }
-    ctx.strokeStyle = color; ctx.lineWidth = lite ? 1.6 : 1.2;
-    ctx.beginPath(); ctx.ellipse(0, CY + RH * 0.55, RO[0], RO[1], 0, fr[0], fr[1]); ctx.stroke();
-    if (!lite) {
-      for (let i = 0; i < 40; i++) {
-        const a = fr[0] + (fr[1] - fr[0]) * (i + 0.5) / 40;
-        if (rnd(i, 11) > 0.55) continue;
-        ctx.fillStyle = 'rgba(255,226,170,.9)';
-        ctx.fillRect(Math.cos(a) * RO[0] - 0.4, CY + RH * 0.25 + Math.sin(a) * RO[1], 0.8, 0.6);
-      }
-    }
-    ctx.restore();
-    bevel(ctx, wall, 0.5);
-    topPath(ctx, fr[0], fr[1]);
-    const tg = ctx.createLinearGradient(-RO[0], 0, RO[0], 0);
-    tg.addColorStop(0, '#cdd6e4'); tg.addColorStop(0.35, '#f2f6fc'); tg.addColorStop(1, '#8792a7');
-    ctx.fillStyle = tg; ctx.fill();
-    ctx.strokeStyle = 'rgba(8,12,22,.6)'; ctx.lineWidth = 0.35; ctx.stroke();
-    track(ctx, fr[0], fr[1], lite);
-    blocks(ctx, fr[0], fr[1], color, lite);
-  }
-
-  if (site) {
-    // The rest of the band as scaffold; the crane swings the next block in.
-    ctx.save();
-    ctx.strokeStyle = 'rgba(205,214,232,.85)'; ctx.lineWidth = lite ? 0.9 : 0.55;
-    ctx.setLineDash(lite ? [3, 2.5] : [2.2, 1.6]);
-    for (const [r, dy] of [[RO, 0], [RI, 0], [RO, RH]]) {
-      ctx.beginPath(); ctx.ellipse(0, CY + dy, r[0], r[1], 0, built[1], built[0] + TAU); ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    for (let a = built[1] + 0.12; a < built[0] + TAU - 0.05; a += 0.22) {
-      const [x0, y0] = at(a, 0), [x1, y1] = at(a + 0.11, 1);
-      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
-    }
-    ctx.stroke();
-    ctx.strokeStyle = '#c9a24a'; ctx.lineWidth = lite ? 1.2 : 0.9;
-    ctx.beginPath(); ctx.moveTo(10, CY + 2); ctx.lineTo(16, -52); ctx.lineTo(44, -46); ctx.stroke();
-    ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(40, -46.5); ctx.lineTo(40, -38); ctx.stroke();
-    const seg = () => { ctx.beginPath(); ctx.roundRect(35, -38, 10, 4, 0.8); };
-    seg(); fillShadowed(ctx, metal(ctx, -38, -34, '#a6b1c5'), S * 0.4); bevel(ctx, seg, 0.3);
-    ctx.restore();
-  }
-}
-
-/** The smooth track along the inner edge, with its row of lights. */
-function track(ctx, a0, a1, lite) {
-  ctx.strokeStyle = 'rgba(240,246,255,.9)'; ctx.lineWidth = lite ? 1.6 : 1.2;
-  ctx.beginPath(); ctx.ellipse(0, CY, RI[0] + 2.2, RI[1] + 0.5, 0, a0, a1); ctx.stroke();
-  const n = lite ? 8 : 22;
-  for (let i = 0; i < n; i++) {
-    const a = a0 + (a1 - a0) * (i + 0.5) / n;
-    ctx.fillStyle = GLOW;
-    ctx.beginPath(); ctx.arc(Math.cos(a) * (RI[0] + 2.2), CY + Math.sin(a) * (RI[1] + 0.5), lite ? 0.8 : 0.5, 0, TAU); ctx.fill();
-  }
-}
-
+const onGrid = (a, rad, dx = 0, dy = 0) => {
+  const [x, y] = ringPoint(a, rad), c = Math.cos(RING_TILT), s = Math.sin(RING_TILT);
+  return { x: (x + dx) * c - (y + dy) * s, y: (x + dx) * s + (y + dy) * c };
+};
+const G = GRID_R / 56;
 /** Where the blinking lights sit - shared with the map sprite. */
 export const STATION_LIGHTS = {
   station: [
-    { x: 0, y: -58, r: 1.3, color: RED, off: 0 },
-    { x: -54, y: -27, r: 1.1, color: RED, off: 0.4 },
-    { x: 54, y: -27, r: 1.1, color: GREEN, off: 0.4 },
-    { x: 0, y: 63, r: 1.0, color: WHITE, off: 0.2, strobe: true }
+    { ...onGrid(COMMAND, GRID_R, MAST[0] * G, MAST[1] * G), r: 1.2, color: RED, off: 0 },
+    { ...onGrid(Math.PI, GRID_R), r: 1, color: RED, off: 0.4 },
+    { ...onGrid(0, GRID_R, 11.5 * G, 1.2 * G), r: 0.9, color: GREEN, off: 0.4 },
+    { ...onGrid(RING_YARD, GRID_R, 0, 9 * G), r: 0.9, color: WHITE, off: 0.2, strobe: true }
   ],
   stationSite: [
-    { x: 16, y: -52, r: 1.3, color: AMBER, off: 0, strobe: true },
-    { x: -30, y: -21, r: 0.8, color: AMBER, off: 0.5, strobe: true },
-    { x: -54, y: -27, r: 1.1, color: RED, off: 0.4 },
-    { x: 0, y: 63, r: 1.0, color: WHITE, off: 0.2, strobe: true }
+    { ...onGrid(RING_YARD, GRID_R, 5.4 * G, -9 * G), r: 1.2, color: AMBER, off: 0, strobe: true },
+    { ...onGrid(BUILT[1] - 0.05, GRID_R), r: 0.9, color: AMBER, off: 0.5, strobe: true }
   ]
 };
 
@@ -476,12 +585,14 @@ export const station = {
   r: 68,
   engines: [],
   lights: STATION_LIGHTS.station,
-  body: (ctx, color, S) => stationBody(ctx, color, S, false)
+  body: (ctx, color, S) => stationBody(ctx, color, S, false),
+  anim: (ctx, t) => stationAnim(ctx, t, false)
 };
 
 export const stationSite = {
   r: 68,
   engines: [],
   lights: STATION_LIGHTS.stationSite,
-  body: (ctx, color, S) => stationBody(ctx, color, S, true)
+  body: (ctx, color, S) => stationBody(ctx, color, S, true),
+  anim: (ctx, t) => stationAnim(ctx, t, true)
 };

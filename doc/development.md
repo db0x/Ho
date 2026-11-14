@@ -48,7 +48,9 @@ client/
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
                      dialog.js (windows), avatar.js, battle.js, shipinfo.js, split.js (splitting a fleet), viewport.js,
                      admin.js (admin panel on the start screen), friends.js (friends next to the start menu), announce.js (admin banners), password.js (change password), delete.js (delete your own account),
-                     scene.js (starry sky and fade between sign-in and start menu)
+                     scene.js (starry sky and fade between sign-in and start menu),
+                     range.js (sliders: fills the track up to the thumb)
+  css/style.css      the whole look: colours, radii and shadows as tokens at the top of the file
   js/audio/sfx.js    Sound effects, synthesised at runtime
 test/                see Tests
 ```

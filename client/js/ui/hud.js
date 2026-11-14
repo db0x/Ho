@@ -60,7 +60,7 @@ export class Hud {
     // The dock at the top left likewise.
     this.leftDlg = makeDialog($('#leftdock'), {
       handle: $('#left-bar'), grip: $('#left-grip'), collapse: $('#left-collapse'), icon: $('#tray-left'), key: 'ho-leftdock',
-      x: 12, y: 72, w: 300, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 220, minH: 130,
+      x: 12, y: 72, w: 320, h: Math.max(260, Math.min(520, innerHeight - 332)), minW: 220, minH: 130,
       avoid: $('#rightdock')
     });
 
@@ -198,7 +198,6 @@ export class Hud {
     this.shownSel = `${sel.type}:${sel.id}`;
     box.classList.remove('split');                      // only the planet panel is in two parts
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
-    else if (sel.type === 'station') this.stationPanel(box, this.view.planets[sel.id]);
     else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
     else this.fleetPanel(box, this.view.fleets.find(f => f.id === sel.id));
     box.scrollTop = keep;

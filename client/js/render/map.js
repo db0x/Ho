@@ -6,7 +6,7 @@ import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, suppl
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
-  glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, FOCUS_DIM,
+  glowSprite, drawBlackHole, drawHoleZone, HOLE_SCALE, HOLE_MIN_PX, STAR_ALPHA, drawHexShield, SHIELD_MIN, shieldShow, FOCUS_DIM,
   drawWormhole, drawWormLink, WORMHOLE_MIN_PX
 } from './fx.js';
 import { BattleFx } from './battlefx.js';
@@ -57,8 +57,8 @@ function nebulaSprite(hue) {
   cv.width = cv.height = S;
   const g = cv.getContext('2d');
   const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  grad.addColorStop(0, `hsla(${hue},70%,55%,0.075)`);
-  grad.addColorStop(0.5, `hsla(${hue},70%,45%,0.035)`);
+  grad.addColorStop(0, `hsla(${hue},72%,58%,0.105)`);
+  grad.addColorStop(0.5, `hsla(${hue},70%,46%,0.045)`);
   grad.addColorStop(1, 'hsla(0,0%,0%,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, S, S);
@@ -418,7 +418,9 @@ export class MapView {
       // Orbital defense: a few satellites circle individually, from
       // SHIELD_MIN on they close ranks into a shield around the world.
       if (p.defenses >= SHIELD_MIN) {
+        ctx.globalAlpha = alpha * shieldShow(p);
         drawHexShield(ctx, sx, sy, r * 1.14 + 20 * orbitScale(z), this.phase + p.id, 1, colorOf(p.owner));
+        ctx.globalAlpha = alpha;
         this.badge(ctx, sx + r + 16, sy - r - 10, '×' + p.defenses, colorOf(p.owner));
       } else if (p.defenses > 0) {
         const n = p.defenses;
@@ -433,12 +435,10 @@ export class MapView {
           });
         }
       }
-      // The station is a target of its own: it holds the world's shipyard.
+      // The station is a ring around its world and part of it: a click on
+      // its yard, which stands out beyond the world's own disc, picks the world.
       const st = p.owner ? drawPlanetStation(ctx, p, sx, sy, r, orbitScale(z), colorOf(p.owner), this.phase) : null;
-      if (st) {
-        if (this.selection?.type === 'station' && this.selection.id === p.id) this.ringAt(ctx, st.x, st.y, st.r);
-        this.hit.push({ type: 'station', id: p.id, x: st.x, y: st.y, r: st.r });
-      }
+      if (st) this.hit.push({ type: 'planet', id: p.id, x: st.x, y: st.y, r: st.r });
       ctx.globalAlpha = 1;
     }
 
@@ -906,10 +906,10 @@ export class MapView {
     let x = sx + r + 14, y = sy - h / 2;
     if (x + w > this.w - 8) x = sx - r - 14 - w;
     y = Math.max(4, Math.min(this.h - h - 4, y));
-    ctx.fillStyle = 'rgba(8,11,22,.93)';
-    ctx.strokeStyle = 'rgba(150,175,215,.28)';
+    ctx.fillStyle = 'rgba(10,13,23,.95)';
+    ctx.strokeStyle = 'rgba(148,170,215,.26)';
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     let yy = y + 14;
     ctx.font = '600 13.5px Inter, system-ui, sans-serif';
