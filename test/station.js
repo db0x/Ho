@@ -87,19 +87,26 @@ const order = (g, p, planet, type, count = 1) => setOrders(g, p, { build: { plan
   order(g, me, home, 'station');
   resolveTurn(g);
   let readyAt = null;
+  const satsBefore = (home.defenses || []).length;
   for (let i = 1; i <= 5 && readyAt == null; i++) {
     assert(order(g, me, home, 'destroyer')?.error === 'yard.lockedStation', `Destroyer ordered at a construction site (turn ${i})`);
+    assert((home.defenses || []).length === satsBefore, `The construction site already brought satellites (turn ${i})`);
     const log = resolveTurn(g);
     if (log.some(e => e.key === 'log.stationReady')) readyAt = i;
   }
   assert(readyAt === STATION.buildTurns, `Ready after ${readyAt} more turns instead of ${STATION.buildTurns}`);
   assert(stationReady(home.station), 'Station not ready');
+  // The finished station brings its satellites along - at the owner's levels, at no cost.
+  const sats = home.defenses || [];
+  assert(sats.length === satsBefore + STATION.satellites, `The station brought ${sats.length - satsBefore} satellites instead of ${STATION.satellites}`);
+  assert(sats.slice(satsBefore).every(s => s.type === 'satellite' && s.tech.weapons === me.tech.weapons && s.hp === s.maxHp),
+    'The station\'s satellites are not whole satellites at the owner\'s levels');
   const v = buildView(g, me).planets[home.id];
   assert(v.station && v.station.building === 0 && v.station.attack > 0, 'The view does not show the ready station');
   assert(!order(g, me, home, 'destroyer')?.error, 'Destroyer refused at a ready station');
   resolveTurn(g);
   assert(g.fleets.some(f => f.owner === me.id && f.ships.some(s => s.type === 'destroyer')), 'No destroyer built at the station');
-  console.log(`Construction: ready ${STATION.buildTurns} turns after the order, then destroyers can be built.`);
+  console.log(`Construction: ready ${STATION.buildTurns} turns after the order with ${STATION.satellites} satellites, then destroyers can be built.`);
 }
 
 // 4) Fighters: a quarter cheaper at the station - and the forecast knows it
@@ -249,7 +256,10 @@ const order = (g, p, planet, type, count = 1) => setOrders(g, p, { build: { plan
     return s.enemyWorlds.some(p => p.id === target.id) ? s.price(target) : null;
   };
   const before = priceOf();
+  // Only the station is weighed here: the satellites it brings along are set aside.
+  const sats = target.defenses;
   devStation(g, foe, target.id);
+  target.defenses = sats;
   const after = priceOf();
   if (assert(before != null, 'The enemy homeworld is not among the AI\'s targets')) {
     assert(Math.abs(after - before - target.station.hp) < 1e-6, `Station not counted: ${before} -> ${after} (hull ${target.station.hp})`);

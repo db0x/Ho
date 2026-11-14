@@ -11,6 +11,7 @@ import { unitTech } from '../render/fighterlook.js';
 const ON_WORLD = ['battery', 'station', 'stationSite'];
 import { planetSprite, blitPlanet } from '../render/planets.js';
 import { hexRgb, drawHexShield, drawShieldHit } from '../render/fx.js';
+import { ringArc } from '../render/shipshd/station.js';
 import { timeline, hpAt, seeded, drawBolt, drawImpact, drawExplosion, shieldOf, shieldStrength, underShield, fleeing } from '../render/battlefx.js';
 import { sfx } from '../audio/sfx.js';
 import { t, onLocaleChange } from '../i18n.js';
@@ -192,20 +193,28 @@ function arrange(W, H) {
     len[i] = Math.min(46, H * 0.09);
     facing[i] = -Math.PI / 2;
   });
-  // The orbital station hangs above the world, on its owner's side, outside the shield.
+  // The orbital station is a ring around the world at the height of the
+  // shield - this close, an arc along the world's rim. What is shot at is
+  // its yard, on the owner's side (ring: where, for painting it).
+  let anchor = null, ring = null;
   battle.units.forEach((u, i) => {
     if (u[1] !== 'station' && u[1] !== 'stationSite') return;
     const side = Math.cos(Math.PI + ((u[0] - mine + n) % n) * TAU / n) < 0 ? -1 : 1;
     const a = -Math.PI / 2 + side * 0.2;
-    pos[i] = [planet.x + Math.cos(a) * R * 1.42, planet.y + Math.sin(a) * R * 1.42];
     len[i] = Math.min(104, H * 0.21);
+    const d = R * 1.16;
+    pos[i] = [planet.x + Math.cos(a) * d, planet.y + Math.sin(a) * d - len[i] * 0.12];
     facing[i] = 0;
+    anchor = { i, a };
+    ring = { i, a, R: d, k: u[0], site: u[1] === 'stationSite' };
   });
   if (shield) {
     shield.R = R * 1.16;
     const m = shield.ids.length;
     shield.ids.forEach((i, j) => {
-      const a = -Math.PI + 0.5 + (m > 1 ? j / (m - 1) : 0.5) * (Math.PI - 1);
+      let a = -Math.PI + 0.5 + (m > 1 ? j / (m - 1) : 0.5) * (Math.PI - 1);
+      // Make room where the station stands.
+      if (anchor && Math.abs(a - anchor.a) < 0.17) a = anchor.a + (a < anchor.a ? -0.17 : 0.17);
       pos[i] = [planet.x + Math.cos(a) * shield.R, planet.y + Math.sin(a) * shield.R];
       len[i] = Math.min(40, H * 0.08);
       facing[i] = a;
@@ -214,7 +223,7 @@ function arrange(W, H) {
   const rnd = seeded(battle.units.length + 17);
   const stars = Array.from({ length: Math.round(W * H / 2600) }, () =>
     [rnd() * W, rnd() * H, rnd() * 1.3 + 0.2, rnd()]);
-  return { pos, len, facing, planet, stars, shield };
+  return { pos, len, facing, planet, stars, shield, ring };
 }
 
 // ----------------------------------------------------------------- Drawing
@@ -258,8 +267,10 @@ function paint(ms) {
     // Large in the picture, the full shield would otherwise cover the world.
     ctx.save();
     ctx.globalAlpha = 0.55;
-    drawHexShield(ctx, L.planet.x, L.planet.y, L.shield.R, ms / 1000, shieldStrength(L.shield, tl, T), player(battle.sides[L.shield.k]).color);
+    const strength = shieldStrength(L.shield, tl, T);
+    drawHexShield(ctx, L.planet.x, L.planet.y, L.shield.R, ms / 1000, strength, player(battle.sides[L.shield.k]).color);
     ctx.restore();
+
   }
 
   // Ships. The planetary defense has no image of its own - it fires from
@@ -277,7 +288,12 @@ function paint(ms) {
     const bob = Math.sin(ms / 700 + i * 1.3) * L.len[i] * 0.04;
     ctx.save();
     ctx.globalAlpha = 1 - gone * gone;
-    drawShipHD(ctx, {
+    if (L.ring?.i === i) {
+      // The ring along the world's rim; its emitters glow while its side's shield is up.
+      const up = L.shield && L.shield.k === L.ring.k ? shieldStrength(L.shield, tl, T) : 0;
+      ringArc(ctx, L.planet.x, L.planet.y, L.ring.R, -Math.PI + 0.32, -0.32,
+        { color: color(i), site: L.ring.site, t: ms / 1000, yardAt: L.ring.a, shield: up });
+    } else drawShipHD(ctx, {
       type: u[1], x, y: y + bob, len: L.len[i], color: color(i), phase: ms / 1000 + i, tech: unitTech(u),
       angle: u[1] === 'satellite' ? ms / 4000 + i : u[1].startsWith('station') ? 0 : heading
     });

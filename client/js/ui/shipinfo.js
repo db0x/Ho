@@ -10,7 +10,7 @@ const fmt = n => Math.round(n).toLocaleString(localeTag());
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(localeTag(), { maximumFractionDigits: 1 });
 const STAGE = 250;           // edge length of the stage in CSS pixels
 // Size on the stage relative to the others.
-const STAGE_SIZE = { destroyer: 0.88, station: 0.92, stationSite: 0.92, alienFighter: 1.35, alienCarrier: 1.35 };
+const STAGE_SIZE = { colony: 0.9, destroyer: 0.88, station: 0.92, stationSite: 0.92, alienFighter: 1.35, alienCarrier: 1.35 };
 
 let modal = null, frame = 0, current = null;
 

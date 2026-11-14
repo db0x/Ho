@@ -8,7 +8,7 @@ import { compact } from './viewport.js';
 
 const TOP = 72;          // below the top bar, level with the panel at the right edge
 const MARGIN = 8;        // minimum distance to the screen edge
-const GAP = 12;          // distance to the panel at the right edge
+const GAP = 24;          // from the screen edge past the panel at the right: its own 12 px margin plus 12 px clear of it
 const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // Order of the windows from back to front. The z values stay within a fixed

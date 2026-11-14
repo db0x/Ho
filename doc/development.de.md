@@ -48,7 +48,9 @@ client/
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),
                      dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, split.js (Flotte teilen), viewport.js,
                      admin.js (Admin-Panel im Startbildschirm), friends.js (Freunde neben dem Startmenü), announce.js (Admin-Banner), password.js (Passwort ändern), delete.js (eigenes Konto löschen),
-                     scene.js (Sternenhimmel und Überblendung zwischen Anmeldung und Startmenü)
+                     scene.js (Sternenhimmel und Überblendung zwischen Anmeldung und Startmenü),
+                     range.js (Schieberegler: füllt die Spur bis zum Griff)
+  css/style.css      das ganze Aussehen: Farben, Radien und Schatten als Tokens am Dateianfang
   js/audio/sfx.js    Klangeffekte, zur Laufzeit synthetisiert
 test/                siehe Tests
 ```

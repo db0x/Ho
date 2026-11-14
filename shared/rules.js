@@ -147,7 +147,12 @@ Object.assign(SHIP_DEFS, {
 });
 export const STATION = {
   buildTurns: 3,          // turns from the order until it is ready
-  fighterDiscount: 0.25   // fighters at a ready station cost this much less
+  fighterDiscount: 0.25,  // fighters at a ready station cost this much less
+  // A finished station brings this many satellites along, at the owner's
+  // levels of that turn and at no extra cost - enough for the shield around
+  // the world, which the station carries from then on (see SHIELD_MIN in
+  // client/js/render/fx.js).
+  satellites: 5
 };
 
 /** Is this station (planet.station, or its view) ready - not a construction site? */

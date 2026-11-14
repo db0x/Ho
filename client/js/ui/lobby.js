@@ -406,9 +406,11 @@ export class Lobby {
           ${p.account ? `<span class="muted small" title="${t('lobby.accountTitle')}">@${p.account}</span>` : ''}
           ${p.id === host?.id ? `<span class="tag-host">${t('lobby.host')}</span>` : ''}
         </span>
+        <span class="ptags">
         ${p.isBot ? `<span class="tagbot"${p.persona ? ` title="${t(`persona.${p.persona}.desc`)}"` : ''}>${t('word.ai')}${p.persona ? ' · ' + t(`persona.${p.persona}`) : ''}</span>`
           : (p.connected ? '' : `<span class="tagbot">${t('word.offline')}</span>`)}
         ${p.isBot ? this.levelTag(p) : ''}
+        </span>
         ${this.isHost && !self ? `<button class="tiny" data-kick="${p.id}" title="${t('lobby.kick')}">×</button>` : ''}
       </li>`;
     }).join('');

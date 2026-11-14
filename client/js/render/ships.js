@@ -1,8 +1,9 @@
 // Ship graphics. Every class has its own silhouette; drawn pointing to the
 // right, the caller rotates.
 import { raiderWing, raiderHead, raiderHump, star, starArms } from './alienshapes.js';
-import { stationBody, STATION_LIGHTS } from './shipshd/station.js';
+import { stationBody, stationAnim, STATION_LIGHTS, ringStation, ringAnim, ringSpot, RING_TILT, RING_YARD } from './shipshd/station.js';
 import { tone } from './shipshd/kit.js';
+import { SHIELD_MIN } from './fx.js';
 import { GENS, FLAME, FLAME_LEN, PLAIN, fighterLook, bestFighter, halfWidth, leadX, podX, engineLayout, emitters } from './fighterlook.js';
 
 function hullGradient(ctx, len) {
@@ -347,52 +348,74 @@ function drawSatellite(ctx, L, color, phase) {
 }
 
 /* ---------------------------------------------------------- Colony ship */
+// A long hauler, as in the detailed drawing (shipshd/colony.js): a dark spine
+// from an armoured bow to the engine block, and on it three biospheres -
+// wide glass domes over green parks, the hallmark of the settler ship and
+// what tells it apart at map size.
 function drawColony(ctx, L, color, phase) {
-  const W = L * 0.4;
-  engineGlow(ctx, -L * 0.54, 0, L * 0.3, phase, '#aaffd0');
-  // Struts between girder and cargo pods - light, so they still read at map size
-  ctx.strokeStyle = '#9aa5ba'; ctx.lineWidth = Math.max(1, L * 0.04);
-  for (const s of [-1, 1]) for (const x of [-L * 0.22, L * 0.04]) {
-    ctx.beginPath(); ctx.moveTo(x, s * L * 0.1); ctx.lineTo(x, s * L * 0.25); ctx.stroke();
-  }
-  // Cargo pods with color mark at the stern and lit windows
-  for (const s of [-1, 1]) {
-    const y = s * L * 0.33;
-    const h = L * 0.09;
-    const pg = ctx.createLinearGradient(0, y - h, 0, y + h);
-    pg.addColorStop(0, '#c9d1de'); pg.addColorStop(0.45, '#8f9aae'); pg.addColorStop(1, '#4f586b');
-    ctx.fillStyle = pg;
-    ctx.beginPath();
-    ctx.roundRect(-L * 0.36, y - h, L * 0.52, h * 2, h);
-    ctx.fill(); outline(ctx, 0.8);
-    for (const xx of [-L * 0.2, -L * 0.04]) seam(ctx, L, [[xx, y - h * 0.9], [xx, y + h * 0.9]]);
-    edgeLight(ctx, L, [[-L * 0.32, y - h * 0.7], [L * 0.12, y - h * 0.7]], 0.4);
-    ctx.save();
-    ctx.beginPath(); ctx.roundRect(-L * 0.36, y - h, L * 0.52, h * 2, h); ctx.clip();
-    ctx.fillStyle = color; ctx.fillRect(-L * 0.36, y - h, L * 0.07, h * 2);
-    ctx.restore();
-    ctx.fillStyle = '#ffe9a8';
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.arc(L * 0.03 + i * L * 0.035, y, Math.max(0.45, L * 0.013), 0, Math.PI * 2); ctx.fill();
-    }
-  }
-  nozzle(ctx, L, -L * 0.46, 0, W * 0.22);
-  // Hull: a narrow girder with a blunt bow - the domes stick out left and right
-  ctx.fillStyle = hullGradient(ctx, L);
-  tracePath(ctx, [[L * 0.44, 0], [L * 0.436, -L * 0.06], [L * 0.41, -L * 0.095], [L * 0.34, -L * 0.105],
-    [-L * 0.44, -L * 0.104], [-L * 0.48, 0], [-L * 0.44, L * 0.104], [L * 0.34, L * 0.105],
-    [L * 0.41, L * 0.095], [L * 0.436, L * 0.06]]);
+  const u = L / 100;
+  engineGlow(ctx, -L * 0.56, 0, L * 0.24, phase, '#a6e6ff');
+  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.54, s * 8.6 * u, L * 0.15, phase + s, '#a6e6ff');
+  nozzle(ctx, L, -50 * u, 0, 5.4 * u);
+  // The spine
+  ctx.fillStyle = metalGradient(ctx, -4.6 * u, 4.6 * u);
+  ctx.fillRect(-36 * u, -4.6 * u, 68 * u, 9.2 * u);
+  ctx.strokeStyle = 'rgba(6,10,20,.85)'; ctx.lineWidth = Math.max(0.6, fine(L));
+  ctx.strokeRect(-36 * u, -4.6 * u, 68 * u, 9.2 * u);
+  edgeLight(ctx, L, [[-35 * u, -3.8 * u], [31 * u, -3.8 * u]], 0.45);
+  // The bow: an armoured wedge with the empire color across it
+  const hg = ctx.createLinearGradient(0, -9.2 * u, 0, 9.2 * u);
+  hg.addColorStop(0, '#b9c3d3'); hg.addColorStop(0.42, '#6f7a8e'); hg.addColorStop(1, '#333b4a');
+  const sym = (half) => tracePath(ctx, [...half, ...half.slice().reverse().map(([x, y]) => [x, -y])].map(([x, y]) => [x * u, y * u]));
+  ctx.fillStyle = hg;
+  sym([[50, 0], [49.2, -3], [45, -6.6], [36.5, -9.2], [31, -9.2]]);
   ctx.closePath(); ctx.fill(); outline(ctx, 1);
-  edgeLight(ctx, L, [[L * 0.43, -L * 0.06], [L * 0.34, -L * 0.095], [-L * 0.42, -L * 0.09]]);
-  // Flat bridge: a wide window band across the bow
-  ctx.fillStyle = 'rgba(140,225,255,.9)';
-  tracePath(ctx, [[L * 0.43, 0], [L * 0.427, -L * 0.045], [L * 0.405, -L * 0.075], [L * 0.38, -L * 0.075],
-    [L * 0.38, L * 0.075], [L * 0.405, L * 0.075], [L * 0.427, L * 0.045]]);
+  ctx.fillStyle = color; ctx.fillRect(32.4 * u, -8.6 * u, 2.6 * u, 17.2 * u);
+  ctx.fillStyle = 'rgba(140,235,255,.95)';
+  sym([[49.2, 0], [48.6, -1.9], [46.4, -3], [45, -3]]);
+  ctx.closePath(); ctx.fill();
+  // The stern block and the bridge on it
+  ctx.fillStyle = hg;
+  sym([[-32, 0], [-32, -7], [-35, -12.4], [-47, -12.4], [-50, -9]]);
+  ctx.closePath(); ctx.fill(); outline(ctx, 1);
+  ctx.fillStyle = metalGradient(ctx, -5.2 * u, 5.2 * u);
+  ctx.beginPath(); ctx.roundRect(-45 * u, -5.2 * u, 10.6 * u, 10.4 * u, 1.4 * u); ctx.fill(); outline(ctx, 0.7);
+  ctx.fillStyle = '#6fe0d6';
+  sym([[-34.9, 0], [-35.2, -3.2], [-36.6, -4.2], [-39.4, -4.2]]);
   ctx.closePath(); ctx.fill(); outline(ctx, fine(L) * 0.7);
-  // Three habitat domes protruding over the hull - the hallmark of the settler
-  // ship. As in the detailed drawing: a large one in the middle, a smaller one
-  // fore and aft, none overlapping; the rear one reaches over the engines.
-  for (const [x, r] of [[-L * 0.491, L * 0.15], [-L * 0.1355, L * 0.197], [L * 0.22, L * 0.15]]) habitatDome(ctx, L, x, r);
+  // The biospheres, from stern to bow, over the spine
+  for (const [x, r] of [[-26.5, 10], [-3.5, 13.3], [21, 11]]) biosphere(ctx, L, x * u, r * u, color);
+}
+
+/**
+ * A biosphere as in the detailed drawing, reduced to what reads at map
+ * size: a dark collar with the empire color, bright green with a blue lake
+ * under glass, a bright rim and a gloss.
+ */
+function biosphere(ctx, L, x, r, color) {
+  ctx.beginPath(); ctx.arc(x, 0, r + 1.9 * L / 100, 0, Math.PI * 2);
+  ctx.fillStyle = '#39414f'; ctx.fill(); outline(ctx, Math.max(0.6, L * 0.016));
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(0.8, L * 0.013); ctx.lineCap = 'butt';
+  for (let k = 0; k < 4; k++) {
+    const a = Math.PI / 4 + k * Math.PI / 2;
+    ctx.beginPath(); ctx.arc(x, 0, r + 1 * L / 100, a - 0.32, a + 0.32); ctx.stroke();
+  }
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, 0, r, 0, Math.PI * 2); ctx.clip();
+  const lawn = ctx.createRadialGradient(x - r * 0.25, -r * 0.3, 0, x, 0, r);
+  lawn.addColorStop(0, '#a6f596'); lawn.addColorStop(0.65, '#4fc463'); lawn.addColorStop(1, '#2a8f48');
+  ctx.fillStyle = lawn; ctx.fillRect(x - r, -r, r * 2, r * 2);
+  ctx.fillStyle = '#4aa8ee';
+  ctx.beginPath(); ctx.ellipse(x + r * 0.3, r * 0.26, r * 0.36, r * 0.23, 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1f7a3c';
+  for (const [dx, dy] of [[-0.45, 0.45], [-0.55, -0.2], [0.5, -0.5], [0.05, -0.6]]) { ctx.beginPath(); ctx.arc(x + dx * r, dy * r, r * 0.13, 0, Math.PI * 2); ctx.fill(); }
+  const rim = ctx.createRadialGradient(x, 0, r * 0.62, x, 0, r);
+  rim.addColorStop(0, 'rgba(0,25,35,0)'); rim.addColorStop(1, 'rgba(0,25,35,.4)');
+  ctx.fillStyle = rim; ctx.fillRect(x - r, -r, r * 2, r * 2);
+  ctx.restore();
+  glint(ctx, x - r * 0.25, -r * 0.5, r * 0.48, r * 0.18);
+  ctx.strokeStyle = 'rgba(205,250,255,.95)'; ctx.lineWidth = Math.max(0.7, L * 0.012);
+  ctx.beginPath(); ctx.arc(x, 0, r, 0, Math.PI * 2); ctx.stroke();
 }
 
 /* ---------------------------------------------------------- Transporter */
@@ -570,37 +593,6 @@ function drawDestroyer(ctx, L, color, phase) {
   }
 }
 
-/**
- * Habitat dome as in the detailed drawing: a park under glass - lawn, a lake
- * and a path - inside a light metal ring, so it catches the eye on the map.
- */
-function habitatDome(ctx, L, x, r) {
-  const ring = Math.max(0.9, r * 0.16);
-  // Light metal ring with a dark outer edge
-  ctx.beginPath(); ctx.arc(x, 0, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#dfe6f0'; ctx.fill();
-  outline(ctx, Math.max(0.6, L * 0.02));
-  const ri = r - ring;
-  ctx.save();
-  ctx.beginPath(); ctx.arc(x, 0, ri, 0, Math.PI * 2); ctx.clip();
-  // Lawn, lake and a path
-  const lawn = ctx.createRadialGradient(x - ri * 0.2, -ri * 0.2, 0, x, 0, ri);
-  lawn.addColorStop(0, '#9af0a0'); lawn.addColorStop(1, '#3a9a52');
-  ctx.fillStyle = lawn; ctx.fillRect(x - ri, -ri, ri * 2, ri * 2);
-  ctx.fillStyle = '#3a9ad6';
-  ctx.beginPath(); ctx.ellipse(x + ri * 0.3, ri * 0.28, ri * 0.28, ri * 0.18, 0.4, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(240,230,190,.7)'; ctx.lineWidth = Math.max(0.4, ri * 0.08);
-  ctx.beginPath(); ctx.moveTo(x - ri, -ri * 0.2); ctx.quadraticCurveTo(x, -ri * 0.05, x + ri, -ri * 0.4); ctx.stroke();
-  // Glass: ribs, a dark rim and the gloss
-  ctx.strokeStyle = 'rgba(220,245,255,.4)'; ctx.lineWidth = fine(L) * 0.6;
-  ctx.beginPath(); ctx.ellipse(x, 0, ri * 0.5, ri, 0, 0, Math.PI * 2); ctx.stroke();
-  const rim = ctx.createRadialGradient(x, 0, ri * 0.6, x, 0, ri);
-  rim.addColorStop(0, 'rgba(0,20,30,0)'); rim.addColorStop(1, 'rgba(0,20,30,.25)');
-  ctx.fillStyle = rim; ctx.fillRect(x - ri, -ri, ri * 2, ri * 2);
-  ctx.restore();
-  glint(ctx, x - ri * 0.3, -ri * 0.45, ri * 0.45, ri * 0.2);
-}
-
 /** Gray metal gradient for attachments, across the longitudinal axis. */
 function metalGradient(ctx, y0, y1) {
   const g = ctx.createLinearGradient(0, y0, 0, y1);
@@ -727,14 +719,19 @@ function drawAlienCarrier(ctx, L, color, phase) {
 }
 
 /* ------------------------------------------------------ Orbital station */
-// Upright and seen from the side, unlike the ships - the same drawing as the
-// ship profile (shipshd/station.js), without windows at map size.
+// A ring around a world, never turned with a heading - the same drawing as
+// the ship profile (shipshd/station.js), without windows at icon size. On
+// the map the ring goes around the real world instead (drawPlanetStation).
 function stationParts(ctx, L, color, phase, site) {
   const u = L / 100;
   ctx.save();
   ctx.scale(u, u);
   stationBody(ctx, color, u, site, L < 70);
   ctx.restore();
+  // The lights on the ring move: above the still image, like the blinking lights.
+  const moving = (c, ph) => { c.save(); c.scale(u, u); stationAnim(c, ph, site, L < 70); c.restore(); };
+  if (collect) collect.push({ over: true, run: (c, ph) => moving(c, ph + phase) });
+  else moving(ctx, phase);
   for (const l of STATION_LIGHTS[site ? 'stationSite' : 'station']) {
     blinkLight(ctx, l.x * u, l.y * u, Math.max(0.7, l.r * u * 1.6), phase + l.off * 3);
   }
@@ -764,10 +761,11 @@ const MAX_SHIPS = 400;
 // zoom level anyway, and the ships would visibly be the wrong size.
 /**
  * Size of a class relative to the others, for every view: the scout a bit
- * smaller, the fighter slightly bigger, the destroyer clearly the largest. The detailed drawing (shipshd.js)
+ * smaller, the fighter slightly bigger, the colony ship a big hauler, the
+ * destroyer clearly the largest. The detailed drawing (shipshd.js)
  * uses the same factors.
  */
-export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, destroyer: 1.5, alienFighter: 1, alienCarrier: 1.45, station: 1.35, stationSite: 1.35 };
+export const SHIP_SCALE = { scout: 0.85, fighter: 1.08, colony: 1.3, destroyer: 1.5, alienFighter: 1, alienCarrier: 1.45, station: 1.35, stationSite: 1.35 };
 /**
  * How far the middle of a hull lies ahead of the origin, in units of the
  * length/100: the destroyer's bow reaches out to 52, its stern only to -40.
@@ -922,28 +920,63 @@ export function drawFleetShips(ctx, o, f, lead) {
   else drawShip(ctx, { ...o, type: lead, tech: lead === 'fighter' ? bestFighter(f.ships)?.tech : undefined });
 }
 
+// The ring is drawn once per size and colour and copied from then on: a
+// few dozen gradients per station and frame would be felt late in a game.
+const ringCache = new Map();
+function ringImage(R, r, color, site) {
+  const dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
+  const key = `${R}|${r}|${color}|${site ? 1 : 0}|${dpr}`;
+  let img = ringCache.get(key);
+  if (img) return img;
+  const half = Math.ceil(R * 1.2 + 10);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = Math.ceil(half * 2 * dpr);
+  const g = cv.getContext('2d');
+  g.scale(dpr, dpr);
+  g.translate(half, half);
+  g.rotate(RING_TILT);
+  // The far half runs behind the world: cut the world's disc out of it.
+  g.save();
+  g.beginPath(); g.rect(-half * 2, -half * 2, half * 4, half * 4); g.arc(0, 0, r, 0, Math.PI * 2);
+  g.clip('evenodd');
+  ringStation(g, R, { color, site, part: 'back', world: r });
+  g.restore();
+  ringStation(g, R, { color, site, part: 'front', world: r });
+  img = { canvas: cv, half };
+  if (ringCache.size > 120) ringCache.clear();
+  ringCache.set(key, img);
+  return img;
+}
+
 /**
- * The orbital station of a world on the map: close up and to the left of
- * it, upright - a construction site while it is being built.
- * @param {{station: object}} p  the world's view
+ * The orbital station of a world on the map: a ring around it at the
+ * height of the satellite shield - the far half behind the world, the near
+ * half in front of it, tethers of light holding it to the world. Once ready
+ * and with the shield up, its anchors glow in the owner's colour; a site
+ * shows the plated part and the scaffold of the rest. The yard hangs from
+ * the near side, a little beyond the world's own disc: a click there picks
+ * the world, like one on the world itself.
+ * @param {{station: object, defenses?: number}} p  the world's view
  * @param {number} r   radius of the world on screen
  * @param {number} sc  orbitScale of the zoom
- * @returns {{x: number, y: number, r: number} | null} where it was drawn, to click on
+ * @returns {{x: number, y: number, r: number} | null} where the yard is, to click on
  */
 export function drawPlanetStation(ctx, p, x, y, r, sc, color, phase) {
   if (!p.station) return null;
-  // Never bigger than its world: zoomed out it shrinks with the planet,
-  // zoomed in it stops growing at the size of the orbit's ships.
-  const len = Math.min(27 * sc, r * 1.5);
-  if (len < 5) return null;
-  const a = -Math.PI * 0.75;
-  const orr = r + len * 0.66;
-  const at = { x: x + Math.cos(a) * orr, y: y + Math.sin(a) * orr, r: Math.max(8, len * 0.78) };
-  drawShip(ctx, {
-    type: p.station.building > 0 ? 'stationSite' : 'station',
-    x: at.x, y: at.y, angle: 0, len, color, phase
-  });
-  return at;
+  // The shield's radius - the same formula as where the map draws the shield.
+  const R = Math.round(r * 1.14 + 20 * sc);
+  if (R < 9) return null;
+  const site = p.station.building > 0;
+  const img = ringImage(R, Math.max(1, Math.round(r)), color, site);
+  ctx.drawImage(img.canvas, x - img.half, y - img.half, img.half * 2, img.half * 2);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(RING_TILT);
+  ringAnim(ctx, R, phase + (p.id || 0), { site, hide: r, color, shield: !site && (p.defenses || 0) >= SHIELD_MIN ? 1 : 0 });
+  ctx.restore();
+  // The pods hang under the band's near edge.
+  const [yx, yy] = ringSpot(RING_YARD, R);
+  return { x: x + yx, y: y + yy + R * 0.06, r: Math.max(9, R * 0.22) };
 }
 
 /** Engine trail for flying fleets. */
