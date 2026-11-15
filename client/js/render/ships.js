@@ -1,6 +1,6 @@
 // Ship graphics. Every class has its own silhouette; drawn pointing to the
 // right, the caller rotates.
-import { raiderWing, raiderHead, raiderHump, star, starArms } from './alienshapes.js';
+import { raiderWing, raiderHead, raiderHump, raiderPod, star, starArms } from './alienshapes.js';
 import { stationBody, stationAnim, STATION_LIGHTS, ringStation, ringAnim, ringSpot, RING_TILT, RING_YARD } from './shipshd/station.js';
 import { tone } from './shipshd/kit.js';
 import { SHIELD_MIN } from './fx.js';
@@ -686,33 +686,37 @@ function pulse(ctx, x, y, r, phase) {
 }
 
 function drawAlienFighter(ctx, L, color, phase) {
-  // A crescent with long thin claws reaching forward past the head.
+  // A broad crescent whose blades reach forward past the slim head.
   const u = L / 100;
-  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.46, s * 4 * u, L * 0.1, phase + s, ALIEN_GLOW);
+  for (const s of [-1, 1]) engineGlow(ctx, -L * 0.48, s * 12.5 * u, L * 0.1, phase + s, ALIEN_GLOW);
   raiderWing(ctx, u);
   ctx.fillStyle = alienMetal(ctx, -38 * u, 38 * u); ctx.fill(); outline(ctx, 1);
-  for (const s of [-1, 1]) seam(ctx, L, [[-36 * u, s * 18 * u], [-20 * u, s * 29 * u], [10 * u, s * 31 * u], [40 * u, s * 22 * u]]);
-  edgeLight(ctx, L, [[52 * u, -16 * u], [30 * u, -30 * u], [0, -36 * u], [-24 * u, -33 * u]], 0.4);
+  for (const s of [-1, 1]) seam(ctx, L, [[-34 * u, s * 20 * u], [-18 * u, s * 27 * u], [10 * u, s * 26 * u], [40 * u, s * 14 * u]]);
+  edgeLight(ctx, L, [[52 * u, -9.5 * u], [30 * u, -25 * u], [2 * u, -36 * u], [-22 * u, -35 * u]], 0.4);
   ctx.fillStyle = '#123b26';
-  for (const s of [-1, 1]) ctx.fillRect(0, s * 5 * u - 0.7 * u, 16 * u, 1.4 * u);
+  for (const s of [-1, 1]) ctx.fillRect(-12 * u, s * 9 * u - 0.7 * u, 20 * u, 1.4 * u);
+  for (const s of [-1, 1]) {
+    raiderPod(ctx, s, u);
+    ctx.fillStyle = alienMetal(ctx, (s * 12.5 - 3.6) * u, (s * 12.5 + 3.6) * u); ctx.fill(); outline(ctx, 0.6);
+  }
   raiderHead(ctx, u);
-  ctx.fillStyle = alienMetal(ctx, -12 * u, 12 * u); ctx.fill(); outline(ctx, 0.8);
+  ctx.fillStyle = alienMetal(ctx, -7 * u, 7 * u); ctx.fill(); outline(ctx, 0.8);
   raiderHump(ctx, u);
-  ctx.fillStyle = alienMetal(ctx, -7 * u, 7 * u); ctx.fill(); outline(ctx, 0.6);
+  ctx.fillStyle = alienMetal(ctx, -4 * u, 4 * u); ctx.fill(); outline(ctx, 0.6);
   ctx.fillStyle = '#05140c';
-  ctx.beginPath(); ctx.ellipse(7.5 * u, 0, 1.6 * u, 5.5 * u, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(8 * u, 0, 1.3 * u, 3.2 * u, 0, 0, Math.PI * 2); ctx.fill();
 }
 
 function drawAlienCarrier(ctx, L, color, phase) {
   // Two needle-armed three-pointed stars stacked a sixth of a turn apart:
   // the lower one smooth and in shadow, the upper one lit.
   const u = L / 100;
-  star(ctx, Math.PI / 3, 47, 3.2, u);
+  star(ctx, Math.PI / 3, 47, 5.4, u);
   const shade = ctx.createRadialGradient(0, 0, 0, 0, 0, 47 * u);
   shade.addColorStop(0, '#2a7148');
   shade.addColorStop(1, '#0f3320');
   ctx.fillStyle = shade; ctx.fill(); outline(ctx, 0.9);
-  star(ctx, 0, 50, 3.8, u);
+  star(ctx, 0, 50, 6, u);
   ctx.fillStyle = alienMetal(ctx, -50 * u, 50 * u); ctx.fill(); outline(ctx, 1);
   for (const a of starArms(0)) edgeLight(ctx, L, [[Math.cos(a) * 6 * u, Math.sin(a) * 6 * u], [Math.cos(a) * 46 * u, Math.sin(a) * 46 * u]], 0.4);
   pulse(ctx, 0, 0, 2.2 * u, phase);

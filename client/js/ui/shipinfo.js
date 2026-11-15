@@ -1,9 +1,12 @@
 // Profile of a ship type: a large, animated image and the stats the ship
 // would be built with. One window for all types - you can switch between
-// them at the top.
+// them at the top. The image is a solid turning in space (ships3d.js) and
+// can be turned by hand; without WebGL, and for the station - which is
+// drawn at a slant around its world already - it is the flat drawing.
 import { SHIP_DEFS, BUILD_TYPES, ALIEN_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
 import { shipIcon, UPRIGHT } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
+import { shipStage3D } from '../render/ships3d.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';
 
 const fmt = n => Math.round(n).toLocaleString(localeTag());
@@ -12,7 +15,16 @@ const STAGE = 250;           // edge length of the stage in CSS pixels
 // Size on the stage relative to the others.
 const STAGE_SIZE = { colony: 0.9, destroyer: 0.88, station: 0.92, stationSite: 0.92, alienFighter: 1.35, alienCarrier: 1.35 };
 
+// In space: size on the stage, how far the view comes down from straight
+// above, and how fast the ship turns by itself (radians per second).
+const SOLID_FILL = { colony: 0.9, destroyer: 1.1 };
+const TILT = 0.95, TILT_MAX = 2.7, TURN = 0.45;
+
 let modal = null, frame = 0, current = null;
+/** The stage in space: null without WebGL. */
+let solid = null;
+/** How the ship stands, and the pointer turning it. */
+const pose = { yaw: 0.6, tilt: TILT, last: 0, drag: null };
 
 function build() {
   modal = document.createElement('div');
@@ -21,7 +33,7 @@ function build() {
   modal.innerHTML = `<div class="modal-box shipinfo-box">
     <div class="si-tabs"></div>
     <div class="si-body">
-      <div class="si-stage"><canvas></canvas></div>
+      <div class="si-stage"><canvas class="si-flat"></canvas><canvas class="si-solid hidden"></canvas></div>
       <div class="si-text"></div>
     </div>
     <button class="primary si-close"></button>
@@ -29,6 +41,29 @@ function build() {
   document.body.appendChild(modal);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   modal.querySelector('.si-close').onclick = close;
+  const cv = modal.querySelector('.si-solid');
+  solid = shipStage3D(cv);
+  // Turning by hand: sideways around the vertical axis, up and down the view
+  // from above. A finger moving up or down scrolls the window instead.
+  cv.addEventListener('pointerdown', (e) => {
+    pose.drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add('turning');
+  });
+  cv.addEventListener('pointermove', (e) => {
+    const d = pose.drag;
+    if (!d || d.id !== e.pointerId) return;
+    pose.yaw += (e.clientX - d.x) * 0.012;
+    if (e.pointerType !== 'touch') pose.tilt = Math.max(0, Math.min(TILT_MAX, pose.tilt - (e.clientY - d.y) * 0.01));
+    d.x = e.clientX; d.y = e.clientY;
+  });
+  const release = (e) => {
+    if (pose.drag?.id !== e.pointerId) return;
+    pose.drag = null;
+    cv.classList.remove('turning');
+  };
+  cv.addEventListener('pointerup', release);
+  cv.addEventListener('pointercancel', release);
   // In the capture phase, so Escape does not also clear the selection on
   // the map.
   addEventListener('keydown', (e) => {
@@ -135,8 +170,39 @@ function render() {
 
 function paint(ms) {
   if (!current) return;
-  const cv = modal.querySelector('.si-stage canvas');
+  const flat = modal.querySelector('.si-flat'), deep = modal.querySelector('.si-solid');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const s = ms / 1000;
+  const dt = Math.min(0.1, Math.max(0, s - pose.last));
+  pose.last = s;
+  let inSpace = !!solid && !UPRIGHT.has(current.type);
+  if (inSpace) {
+    // Twice the screen's resolution, scaled down by the browser: smooth edges.
+    const px = Math.round(STAGE * dpr * 2);
+    if (deep.width !== px) {
+      deep.width = deep.height = px;
+      deep.style.width = deep.style.height = STAGE + 'px';
+    }
+    if (!pose.drag) pose.yaw += dt * TURN;
+    inSpace = solid.draw({
+      type: current.type,
+      color: current.color,
+      tech: current.tech,
+      phase: s,
+      yaw: pose.yaw,
+      tilt: pose.tilt + (pose.drag ? 0 : Math.sin(s * 0.5) * 0.06),
+      fill: SOLID_FILL[current.type] || 1
+    });
+    // The context is gone for good: the flat drawing from here on.
+    if (!inSpace) solid = null;
+  }
+  flat.classList.toggle('hidden', inSpace);
+  deep.classList.toggle('hidden', !inSpace);
+  if (!inSpace) paintFlat(flat, dpr, s);
+  frame = requestAnimationFrame(paint);
+}
+
+function paintFlat(cv, dpr, s) {
   const px = Math.round(STAGE * dpr);
   if (cv.width !== px) {
     cv.width = cv.height = px;
@@ -144,7 +210,6 @@ function paint(ms) {
   }
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, px, px);
-  const s = ms / 1000;
   // Without propulsion a satellite only drifts and rotates; everything else
   // flies upwards, swaying slightly.
   const stationary = !SHIP_DEFS[current.type].speedMul;
@@ -165,5 +230,4 @@ function paint(ms) {
     // A fighter shows the generation and equipment of this tech.
     tech: current.tech
   });
-  frame = requestAnimationFrame(paint);
 }

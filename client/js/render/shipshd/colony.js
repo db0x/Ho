@@ -15,8 +15,12 @@ import {
 export const DOMES = [[-26.5, 10, 2.1], [-3.5, 13.3, -0.9], [21, 11, 0.5]];
 const DARK = '#4d5668', LENS = '#7fe9ff';
 
-/** One biosphere: collar, park, glass. */
-function dome(ctx, x, R, turn, color, S) {
+/**
+ * One biosphere: collar, park, glass. As the skin of a solid (ships3d.js)
+ * the glass is left out - there a real vault of glass stands over the park;
+ * and from below there is no park at all, only the pan it lies in.
+ */
+function dome(ctx, x, R, turn, color, S, opts) {
   // The collar it sits in, with four marks in the empire colour
   const collar = () => { ctx.beginPath(); ctx.arc(x, 0, R + 1.9, 0, TAU); };
   collar(); fillShadowed(ctx, metal(ctx, -R - 1.9, R + 1.9, '#465064'), S);
@@ -27,6 +31,20 @@ function dome(ctx, x, R, turn, color, S) {
     ctx.beginPath(); ctx.arc(x, 0, R + 1.05, a - 0.3, a + 0.3); ctx.stroke();
   }
   const glassPath = () => { ctx.beginPath(); ctx.arc(x, 0, R, 0, TAU); };
+  if (opts?.under) {
+    glassPath(); ctx.fillStyle = metal(ctx, -R, R, '#566073'); ctx.fill();
+    inside(ctx, glassPath, () => {
+      seam(ctx, x - R, 0, x + R, 0, 0.3); seam(ctx, x, -R, x, R, 0.3);
+      ctx.strokeStyle = 'rgba(10,14,24,.55)'; ctx.lineWidth = 0.35;
+      ctx.beginPath(); ctx.arc(x, 0, R * 0.55, 0, TAU); ctx.stroke();
+      for (let k = 0; k < 12; k++) {
+        const a = k / 12 * TAU;
+        rivets(ctx, x + Math.cos(a) * R * 0.82, x + Math.cos(a) * R * 0.82, Math.sin(a) * R * 0.82, 1, 0.3);
+      }
+    });
+    bevel(ctx, glassPath, 0.6);
+    return;
+  }
   inside(ctx, glassPath, () => {
     // The park: only it is turned - glass and gloss keep their light from above
     ctx.save(); ctx.translate(x, 0); ctx.rotate(turn); ctx.scale(R / 15, R / 15);
@@ -52,6 +70,7 @@ function dome(ctx, x, R, turn, color, S) {
       ctx.fillStyle = '#ffd77a'; ctx.fillRect(hx + 0.55, hy + 0.55, 0.7, 0.7);
     }
     ctx.restore();
+    if (opts?.solid) return;
     // The vault: a few ribs, shade towards the rim, a strong gloss
     ctx.strokeStyle = 'rgba(230,250,255,.34)'; ctx.lineWidth = 0.35;
     for (const k of [0.34, 0.72]) {
@@ -84,7 +103,17 @@ export const colony = {
     { x: 49, y: 0, r: 0.9, color: WHITE, off: 1.4, strobe: true },
     { x: -31, y: 0, r: 0.8, color: WHITE, off: 0.4, strobe: true }
   ],
-  body(ctx, color, S) {
+  // In space: every biosphere is a flat park in its collar, under a vault
+  // of real glass - and a closed pan from below.
+  solid: {
+    under: true,
+    parts: DOMES.map(([x, R]) => ({
+      r: 2, h: 1.5, belly: 1.8, z: 2.2,
+      path(ctx) { ctx.beginPath(); ctx.arc(x, 0, R + 1.9, 0, TAU); }
+    })),
+    domes: DOMES.map(([x, R]) => ({ x, y: 0, r: R, h: R * 0.72, z: 3.4 }))
+  },
+  body(ctx, color, S, look, opts) {
     nozzle(ctx, -52, 0, 5.2, 6);
     for (const s of [-1, 1]) nozzle(ctx, -50.5, s * 8.6, 3.6, 4.6);
 
@@ -149,6 +178,6 @@ export const colony = {
     ctx.strokeStyle = 'rgba(8,12,22,.5)'; ctx.lineWidth = 0.25; ctx.stroke();
 
     // ----- The biospheres, from stern to bow - each lies over the spine
-    for (const [x, R, turn] of DOMES) dome(ctx, x, R, turn, color, S);
+    for (const [x, R, turn] of DOMES) dome(ctx, x, R, turn, color, S, opts);
   }
 };

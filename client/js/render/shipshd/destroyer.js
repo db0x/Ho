@@ -62,6 +62,41 @@ export const destroyer = {
     { x: 16.6, y: 18.1, r: 0.7, color: GREEN, off: 0 },
     { x: -32.5, y: 0, r: 0.6, color: WHITE, off: 1.4, strobe: true }
   ],
+  // In space: blocks with steep flanks and flat decks, not a cushion. The
+  // head is a wedge that gets lower towards the bow; the midsection stands
+  // taller, with a raised spine; the engine nacelles are tubes. The landing
+  // decks are flat boxes hanging low on both sides, and the cross struts
+  // come down to them from the top of the hull as slanted arms.
+  solid: {
+    hull: { r: 2.5, h: 1.8, belly: 1 },
+    parts: [
+      ...[-1, 1].map(s => ({
+        over: true, r: 1.6, h: 2.3, belly: 1, z: -2.6,
+        path: (ctx) => poly(ctx, ddPod(s * DD.pod, s))
+      })),
+      ...[-1, 1].map(s => ({
+        over: true, r: 4.4, h: 4.4, belly: 1,
+        path(ctx) { ctx.beginPath(); ctx.roundRect(-38, s * DD.nacelle - 4.4, 16, 8.8, 4); }
+      })),
+      {
+        over: true, r: 5, h: 6.6, belly: 0.85,
+        scale: (x) => 1 - 0.6 * Math.min(1, Math.max(0, (x - 20) / 32)),
+        path: (ctx) => sym(ctx, ddHead())
+      },
+      { over: true, r: 4.6, h: 7.4, belly: 0.85, path: (ctx) => sym(ctx, ddMid()) },
+      { over: true, r: 1.3, h: 1.5, belly: 0, z: 7.2, path(ctx) { ctx.beginPath(); ctx.rect(-26, -1.8, 44, 3.6); } },
+      {
+        over: true, r: 0.9, h: 1, belly: 1,
+        // Level across the hull, then down to the landing decks
+        z: (x, y) => 7.6 - 7.4 * Math.min(1, Math.max(0, (Math.abs(y) - 9) / 5.5)),
+        path(ctx) {
+          const reach = DD.pod + 3.4;
+          ctx.beginPath();
+          for (const [x0, x1] of DD.struts) ctx.rect(Math.min(x0, x1), -reach, Math.abs(x1 - x0), reach * 2);
+        }
+      }
+    ]
+  },
   body(ctx, color, S) {
     // Fixed random numbers: every destroyer is patched the same way.
     let seed = 1979;

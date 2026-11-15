@@ -7,11 +7,16 @@ import {
 // (ships.js): a round canopy in front, right behind it the broad body with
 // big five-sided wing panels, two ribbed engine pods close together at the
 // stern and long pointed stabilizers reaching back and out.
+/** In space the engine pods sit this far above the plane of the wings. */
+const POD_Z = 5.5;
+const BODY = [[50, 0], [49, -6], [45, -9.5], [36, -12], [26, -15], [0, -16], [-17, -14], [-17, 0]];
+const wingPath = (s) => [[24.5, s * 13], [13.6, s * 39], [-8.2, s * 39], [-17.3, s * 20], [-17.3, s * 13]];
+
 export const scout = {
   r: 58,
   engines: [
-    { x: -40, y: -8.4, r: 5, color: '#7fd8ff' },
-    { x: -40, y: 8.4, r: 5, color: '#7fd8ff' }
+    { x: -40, y: -8.4, r: 5, color: '#7fd8ff', z: POD_Z },
+    { x: -40, y: 8.4, r: 5, color: '#7fd8ff', z: POD_Z }
   ],
   lights: [
     { x: 13.6, y: -39, r: 1, color: RED, off: 0 },
@@ -19,7 +24,36 @@ export const scout = {
     { x: -47, y: -26.6, r: 0.8, color: WHITE, off: 1, strobe: true },
     { x: -47, y: 26.6, r: 0.8, color: WHITE, off: 1, strobe: true }
   ],
-  body(ctx, color, S) {
+  // In space: a tall, boxy body with steep flanks and a flat back, a dome on
+  // it; towards the bow it slopes down, so the canopy is a windscreen
+  // leaning back, not a cushion. The wings are plates - thick where they
+  // leave the body, thin at the tip - angled down. The engine pods are tubes
+  // riding high at the stern; the stabilizers stand up as two fins, leaning
+  // outwards.
+  solid: {
+    under: true,
+    parts: [
+      ...[-1, 1].map(s => ({
+        r: 2.2, h: 2.6, belly: 0.8,
+        z: (x, y) => 1 - 0.24 * Math.max(0, Math.abs(y) - 14),
+        scale: (x, y) => 1 - 0.72 * Math.min(1, Math.max(0, (Math.abs(y) - 14) / 25)),
+        path: (ctx) => poly(ctx, wingPath(s))
+      })),
+      {
+        over: true, r: 3.6, h: 10.5, belly: 0.8,
+        // From the back of the canopy the roof comes down to the nose
+        scale: (x) => 1 - 0.68 * Math.min(1, Math.max(0, (x - 27) / 22)),
+        path: (ctx) => sym(ctx, BODY)
+      },
+      ...[-1, 1].map(s => ({
+        over: true, r: 6.5, h: 6, belly: 1, z: POD_Z,
+        path(ctx) { ctx.beginPath(); ctx.roundRect(-41, s * 8.4 - 6.5, 29, 13, 3); }
+      })),
+      { over: true, r: 5.5, h: 3.2, belly: 0, z: 10, path(ctx) { ctx.beginPath(); ctx.arc(8, 0, 5.5, 0, Math.PI * 2); } }
+    ],
+    blades: [-1, 1].map(s => ({ x0: -13, x1: -47, y: s * 13.5, y1: s * 25, z: 0, h: 17, lean: s * 4 }))
+  },
+  body(ctx, color, S, look, opts) {
     // Long pointed stabilizers
     for (const s of [-1, 1]) {
       const st = () => poly(ctx, [[-10, s * 15], [-50, s * 28.4], [-46, s * 24], [-15, s * 11]]);
@@ -46,7 +80,7 @@ export const scout = {
     }
     // Five-sided wing panels in the empire color
     for (const s of [-1, 1]) {
-      const w = () => poly(ctx, [[24.5, s * 13], [13.6, s * 39], [-8.2, s * 39], [-17.3, s * 20], [-17.3, s * 13]]);
+      const w = () => poly(ctx, wingPath(s));
       w();
       const g = ctx.createLinearGradient(0, s * 13, 0, s * 39);
       g.addColorStop(0, tone(color, s < 0 ? 0.2 : -0.15));
@@ -67,7 +101,7 @@ export const scout = {
       bevel(ctx, w, 0.8);
     }
     // Broad body with the C emblem in the empire color
-    const body = () => sym(ctx, [[50, 0], [49, -6], [45, -9.5], [36, -12], [26, -15], [0, -16], [-17, -14], [-17, 0]]);
+    const body = () => sym(ctx, BODY);
     body(); fillShadowed(ctx, metal(ctx, -16, 16, '#a3adbd'), S);
     inside(ctx, body, () => {
       seam(ctx, 24, -16, 24, 16); seam(ctx, -1, -16, -1, 16);
@@ -81,13 +115,18 @@ export const scout = {
       rivets(ctx, 20, 2, -13.5, 6, 0.3); rivets(ctx, 20, 2, 13.5, 6, 0.3);
     });
     bevel(ctx, body, 0.9);
-    // Round canopy with a heavy dark frame
-    const cab = () => sym(ctx, [[47.5, 0], [46.5, -5], [43, -8.2], [34, -9.4], [27, -8.4], [27, 0]]);
-    glass(ctx, cab, 27, 47.5, -9.4, 9.4, '#3fb7c9', S);
-    ctx.strokeStyle = 'rgba(14,18,28,.95)'; ctx.lineWidth = 1.3; cab(); ctx.stroke();
-    ctx.lineWidth = 0.6;
-    ctx.beginPath(); ctx.moveTo(37, -9.2); ctx.lineTo(37, 9.2);
-    ctx.moveTo(27, -4.2); ctx.lineTo(46, -3); ctx.moveTo(27, 4.2); ctx.lineTo(46, 3); ctx.stroke();
+    // Round canopy with a heavy dark frame - from below there is none, only
+    // the plating of the nose
+    if (opts?.under) {
+      inside(ctx, body, () => { seam(ctx, 36, -12, 36, 12); seam(ctx, 27, 0, 49, 0, 0.3); rivets(ctx, 29, 44, -5, 5, 0.3); rivets(ctx, 29, 44, 5, 5, 0.3); });
+    } else {
+      const cab = () => sym(ctx, [[47.5, 0], [46.5, -5], [43, -8.2], [34, -9.4], [27, -8.4], [27, 0]]);
+      glass(ctx, cab, 27, 47.5, -9.4, 9.4, '#3fb7c9', S);
+      ctx.strokeStyle = 'rgba(14,18,28,.95)'; ctx.lineWidth = 1.3; cab(); ctx.stroke();
+      ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(37, -9.2); ctx.lineTo(37, 9.2);
+      ctx.moveTo(27, -4.2); ctx.lineTo(46, -3); ctx.moveTo(27, 4.2); ctx.lineTo(46, 3); ctx.stroke();
+    }
     // Sensor prongs at the nose
     ctx.strokeStyle = '#c8d2e4'; ctx.lineWidth = 0.4;
     for (const y of [-2.5, 2.5]) { ctx.beginPath(); ctx.moveTo(49, y); ctx.lineTo(53, y * 1.5); ctx.stroke(); }

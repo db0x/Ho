@@ -3,33 +3,34 @@
 // Units of ship length / 100, pointing to the right (+x).
 
 /**
- * The fighter: a crescent whose two long, thin claws reach far forward past
- * the head and end in sharp points; the broad back of it is the stern.
+ * The fighter: a broad crescent. Its back is a heavy mass, the two blades
+ * stay wide for most of their length, curve inwards and end in sharp points
+ * far ahead of the head; the opening between them is narrow.
  */
 export function raiderWing(ctx, u = 1) {
   const P = (x, y) => [x * u, y * u];
   ctx.beginPath();
-  ctx.moveTo(...P(54, -15));                                          // upper claw tip
-  ctx.bezierCurveTo(...P(36, -30), ...P(6, -38), ...P(-20, -34));
-  ctx.bezierCurveTo(...P(-38, -30), ...P(-46, -16), ...P(-46, 0));
-  ctx.bezierCurveTo(...P(-46, 16), ...P(-38, 30), ...P(-20, 34));
-  ctx.bezierCurveTo(...P(6, 38), ...P(36, 30), ...P(54, 15));         // lower claw tip
-  ctx.bezierCurveTo(...P(34, 23), ...P(8, 27), ...P(-12, 23));
-  ctx.bezierCurveTo(...P(-26, 19), ...P(-32, 10), ...P(-32, 0));
-  ctx.bezierCurveTo(...P(-32, -10), ...P(-26, -19), ...P(-12, -23));
-  ctx.bezierCurveTo(...P(8, -27), ...P(34, -23), ...P(54, -15));
+  ctx.moveTo(...P(54, -8));                                           // upper claw tip
+  ctx.bezierCurveTo(...P(32, -24), ...P(8, -39), ...P(-18, -36.5));
+  ctx.bezierCurveTo(...P(-38, -34), ...P(-46, -18), ...P(-46, 0));
+  ctx.bezierCurveTo(...P(-46, 18), ...P(-38, 34), ...P(-18, 36.5));
+  ctx.bezierCurveTo(...P(8, 39), ...P(32, 24), ...P(54, 8));          // lower claw tip
+  ctx.bezierCurveTo(...P(32, 13.5), ...P(10, 15), ...P(-4, 12.5));
+  ctx.bezierCurveTo(...P(-11, 11), ...P(-14, 6), ...P(-14, 0));
+  ctx.bezierCurveTo(...P(-14, -6), ...P(-11, -11), ...P(-4, -12.5));
+  ctx.bezierCurveTo(...P(10, -15), ...P(32, -13.5), ...P(54, -8));
   ctx.closePath();
 }
 
-/** The head on the back of the crescent, its front with the eye towards the opening. */
+/** The head: a slim pod on the back of the crescent, reaching out into the opening, the eye in front. */
 export function raiderHead(ctx, u = 1) {
   const P = (x, y) => [x * u, y * u];
   ctx.beginPath();
-  ctx.moveTo(...P(-44, -6));
-  ctx.bezierCurveTo(...P(-32, -12), ...P(-6, -12), ...P(4, -8));
-  ctx.bezierCurveTo(...P(9, -6), ...P(10, -3), ...P(10, 0));
-  ctx.bezierCurveTo(...P(10, 3), ...P(9, 6), ...P(4, 8));
-  ctx.bezierCurveTo(...P(-6, 12), ...P(-32, 12), ...P(-44, 6));
+  ctx.moveTo(...P(-48, -3.5));
+  ctx.bezierCurveTo(...P(-36, -7), ...P(-6, -7), ...P(4, -5));
+  ctx.bezierCurveTo(...P(8.5, -3.8), ...P(10, -2), ...P(10, 0));
+  ctx.bezierCurveTo(...P(10, 2), ...P(8.5, 3.8), ...P(4, 5));
+  ctx.bezierCurveTo(...P(-6, 7), ...P(-36, 7), ...P(-48, 3.5));
   ctx.closePath();
 }
 
@@ -37,30 +38,39 @@ export function raiderHead(ctx, u = 1) {
 export function raiderHump(ctx, u = 1) {
   const P = (x, y) => [x * u, y * u];
   ctx.beginPath();
-  ctx.moveTo(...P(-46, 0));
-  ctx.bezierCurveTo(...P(-42, -6.5), ...P(-14, -6.5), ...P(-2, -3));
-  ctx.bezierCurveTo(...P(1, -1.5), ...P(1, 1.5), ...P(-2, 3));
-  ctx.bezierCurveTo(...P(-14, 6.5), ...P(-42, 6.5), ...P(-46, 0));
+  ctx.moveTo(...P(-47, 0));
+  ctx.bezierCurveTo(...P(-43, -4), ...P(-16, -4), ...P(-4, -2));
+  ctx.bezierCurveTo(...P(-1, -1), ...P(-1, 1), ...P(-4, 2));
+  ctx.bezierCurveTo(...P(-16, 4), ...P(-43, 4), ...P(-47, 0));
   ctx.closePath();
 }
 
+/** One of the two engine pods at the stern, either side of the head (s = -1 or 1). */
+export function raiderPod(ctx, s, u = 1) {
+  ctx.beginPath();
+  ctx.roundRect(-48 * u, (s * 12.5 - 3.6) * u, 26 * u, 7.2 * u, 3.6 * u);
+}
+
 /** Where the arms of a star point: three, a third of a turn apart. */
+/** The two stars of the base ship: turn, reach of an arm, half width. */
+export const STAR_UPPER = [0, 50, 6], STAR_LOWER = [Math.PI / 3, 47, 5.4];
+
 export const starArms = (offset) => [0, 1, 2].map(i => offset + i * Math.PI * 2 / 3);
 
 /**
- * Half width of an arm at radius r: flared at the root, where it grows out
- * of the core, then a tube almost to the end and a needle point.
+ * Half width of an arm at radius r: broadest at the root, where it grows
+ * out of the core, then a blade narrowing steadily to its point.
  */
 export function armHalf(r, len, thick) {
   const f = Math.min(1, Math.max(0, (r - ROOT) / (len - ROOT)));
-  return thick * (1 - Math.pow(f, 2.4)) * (1 + FLARE * Math.pow(1 - f, 4));
+  return thick * (1 - Math.pow(f, 1.5)) * (1 + FLARE * Math.pow(1 - f, 4));
 }
 const ROOT = 7;
-const FLARE = 0.8;      // the root is this much wider than the tube
+const FLARE = 0.25;     // the root is this much wider than the blade
 
 /**
- * One star of the base ship: three long tubular arms ending in needle
- * points, joined near the middle by small rounded hollows. `len` is the
+ * One star of the base ship: three long, broad blades tapering to points,
+ * joined near the middle by small rounded hollows. `len` is the
  * reach of an arm, `thick` its half width.
  */
 export function star(ctx, offset, len, thick, u = 1) {

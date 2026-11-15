@@ -46,6 +46,27 @@ function wingParts(ctx, G, look, color, S, s) {
   inside(ctx, w, () => {
     // Panel lines parallel to the leading edge
     for (const d of [4, 8.5, 13]) seam(ctx, ax - d, s * ay, bx - d, s * by, 0.3);
+    // Ribs along the chord at three stations, a finer line between them
+    for (const [k, w] of [[0.24, 0.26], [0.4, 0.16], [0.56, 0.26], [0.7, 0.16], [0.84, 0.26]]) {
+      const y = s * (ay + (by - ay) * k);
+      seam(ctx, G.tail - 6, y, ax + 2, y, w);
+    }
+    // The control surface: a hinge line ahead of the trailing edge, cut in two
+    const [tx0, ty0] = G.wing[2], [tx1, ty1] = G.wing[3];
+    seam(ctx, tx0 + 3.4, s * ty0, tx1 + 3.4, s * ty1, 0.3);
+    const hm = [(tx0 + tx1) / 2, (ty0 + ty1) / 2];
+    seam(ctx, hm[0] + 3.4, s * hm[1], hm[0] - 1, s * hm[1], 0.22);
+    // Rivets behind the leading edge, an access panel and a filler cap
+    ctx.fillStyle = 'rgba(20,26,38,.5)';
+    for (let i = 1; i < 12; i++) {
+      const k = i / 12;
+      ctx.beginPath(); ctx.arc(ax + (bx - ax) * k - 2.4, s * (ay + (by - ay) * k), 0.22, 0, TAU); ctx.fill();
+    }
+    const py = s * (ay + (by - ay) * 0.32), px = leadX(G, ay + (by - ay) * 0.32) - 13;
+    ctx.strokeStyle = 'rgba(20,26,38,.6)'; ctx.lineWidth = 0.22;
+    ctx.beginPath(); ctx.roundRect(px - 4, py - 1.3, 4, 2.6, 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px - 7.4, py, 0.8, 0, TAU); ctx.stroke();
+    ctx.fillStyle = 'rgba(214,74,58,.75)'; ctx.fillRect(px - 3.4, py - 0.25, 1.2, 0.5);
     // Shields 2+: an armour band along the leading edge
     if (ts >= 1) {
       const band = () => poly(ctx, [[ax + 0.5, s * ay], [bx + 0.5, s * by], [bx - 4.2, s * by], [ax - 4.2, s * ay]]);
@@ -119,7 +140,7 @@ export const fighter = {
       { x: G.tail + 7, y: 0, r: 0.9, color: WHITE, off: 0.6, strobe: true }
     ];
   },
-  body(ctx, color, S, look) {
+  body(ctx, color, S, look, opts) {
     const G = GENS[look.gen];
     const { w: tw, s: ts, r: tr } = look;
     const eng = engineLayout(G, look.v);
@@ -167,6 +188,36 @@ export const fighter = {
         ctx.fillStyle = g; ctx.fill();
       }
       for (const x of G.seams) seam(ctx, x, -maxW, x, maxW);
+      // Plating: two long lines either side that run together towards the
+      // nose, finer joints between the frames, hatches, a hint of lettering
+      for (const s of [-1, 1]) for (const [k, w] of [[0.34, 0.24], [0.62, 0.18]]) {
+        ctx.beginPath();
+        for (let x = G.nose - 3; x >= G.tail + 3; x -= 3) ctx.lineTo(x, s * halfWidth(H, x) * k);
+        ctx.strokeStyle = 'rgba(10,14,24,.5)'; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.save(); ctx.translate(0.2, 0.2); ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.stroke(); ctx.restore();
+      }
+      for (let i = 1; i < G.seams.length; i++) {
+        const x = (G.seams[i] + G.seams[i - 1]) / 2, hw = halfWidth(H, x);
+        for (const s of [-1, 1]) seam(ctx, x, s * hw * 0.34, x, s * hw, 0.16);
+      }
+      ctx.strokeStyle = 'rgba(20,26,38,.6)'; ctx.lineWidth = 0.22;
+      for (const s of [-1, 1]) {
+        const hx = G.nose - 30, hy = s * halfWidth(H, hx) * 0.48;
+        ctx.beginPath(); ctx.roundRect(hx - 5, hy - 0.8, 5, 1.6, 0.4); ctx.stroke();
+        const rx = G.tail + 27, ry = s * halfWidth(H, rx) * 0.8;
+        ctx.beginPath(); ctx.roundRect(rx - 4, ry - 0.9, 6, 1.8, 0.4); ctx.stroke();
+        ctx.beginPath(); ctx.arc(rx + 5, ry, 0.7, 0, TAU); ctx.stroke();
+        // Slits beside the canopy
+        const vx = G.cab[0][0] - 6, vy = s * (halfWidth(H, vx) * 0.5 + 0.6);
+        ctx.fillStyle = 'rgba(14,18,28,.6)';
+        for (let i = 0; i < 4; i++) ctx.fillRect(vx - i * 1.5, vy - 0.55, 0.6, 1.1);
+      }
+      // Lettering on the nose: small dark blocks, mirrored
+      ctx.fillStyle = 'rgba(30,36,50,.6)';
+      for (const s of [-1, 1]) {
+        const lx = G.nose - 12, ly = s * halfWidth(H, lx - 3) * 0.55;
+        for (let i = 0; i < 6; i++) ctx.fillRect(lx - i * 1.1, ly - 0.35, 0.7, 0.7);
+      }
       // Shields 2+: an armoured nose cap
       if (ts >= 1) {
         const nx = G.nose - 14;
@@ -190,6 +241,29 @@ export const fighter = {
         const gy = s * (halfWidth(H, gx) - 0.8);
         ctx.fillStyle = tw === 3 ? '#3b4660' : '#2a303d'; ctx.fillRect(gx, gy - 0.4, tw === 3 ? 13 : 10, 0.8);
       }
+    }
+    // From below there is no canopy, spine or tail: a keel line, the doors
+    // of the landing gear, an intake under the nose and ports at the stern
+    if (opts?.under) {
+      inside(ctx, hull, () => {
+        seam(ctx, G.tail, 0, G.nose - 6, 0, 0.26);
+        const scoop = () => { ctx.beginPath(); ctx.roundRect(G.nose - 27, -1.7, 12, 3.4, 1.6); };
+        scoop(); ctx.fillStyle = '#1b212d'; ctx.fill(); bevel(ctx, scoop, 0.35);
+        ctx.strokeStyle = 'rgba(20,26,38,.7)'; ctx.lineWidth = 0.28;
+        for (const s of [-1, 1]) {
+          ctx.beginPath(); ctx.roundRect(G.tail + 26, s * 4.6 - 2, 14, 4, 0.6); ctx.stroke();
+          seam(ctx, G.tail + 33, s * 4.6 - 2, G.tail + 33, s * 4.6 + 2, 0.2);
+          for (const x of [G.tail + 12, G.tail + 18]) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) ctx.lineTo(x + Math.cos(i * TAU / 6) * 1.5, s * 3.4 + Math.sin(i * TAU / 6) * 1.5);
+            ctx.closePath(); ctx.fillStyle = '#232a37'; ctx.fill(); ctx.stroke();
+          }
+        }
+        const fx = G.nose - 44;
+        ctx.beginPath(); ctx.roundRect(fx - 10, -3, 16, 6, 1); ctx.stroke();
+        rivets(ctx, fx - 8, fx + 4, -2.2, 5, 0.26); rivets(ctx, fx - 8, fx + 4, 2.2, 5, 0.26);
+      });
+      return;
     }
     // Dorsal spine from the canopy to the stern - range 4 adds a tank on top
     const big = tr === 3;
@@ -236,6 +310,32 @@ export const fighter = {
     }
   },
   /** Moving parts: glowing energy guns, shield emitters, the shield bubble. */
+  // In space: the wings are thin plates angled down from the fuselage to
+  // their tips, and what hangs on them follows; the fuselage is low at the
+  // nose and tall at the stern, the canopy a bubble of glass on top of it,
+  // the dorsal spine a ridge behind it. The tail stands up: one fin on the
+  // spine (Mk I), two (Mk II), two canted outwards (Mk III).
+  solid(look) {
+    const G = GENS[look.gen];
+    const root = G.wing[0][1];
+    const droop = (x, y) => -0.42 * Math.max(0, Math.abs(y) - root);
+    const parts = [
+      ...[-1, 1].map(s => ({
+        r: 2.5, h: 1.2, belly: 1, z: (x, y) => 0.6 + droop(x, y),
+        path: (ctx) => poly(ctx, G.wing.map(([x, y]) => [x, s * y]))
+      })),
+      { over: true, r: 4, h: 3.4, belly: 0, z: 6.4, path: (ctx) => sym(ctx, G.spine) },
+      { over: true, r: 3.8, h: 4.6, belly: 0, z: 6.2, path: (ctx) => sym(ctx, G.cab) }
+    ];
+    const hull = { r: 11, h: 7.6, belly: 0.75, z: droop };
+    const under = true;
+    if (G.fins === 'single') return { under, hull, parts, blades: [{ x0: -14, x1: -43, y: 0, z: 8, h: 14 }] };
+    const off = G.fins === 'twin' ? 6.2 : 8, lean = G.fins === 'canted' ? 6 : 0;
+    return {
+      under, hull, parts,
+      blades: [-1, 1].map(s => ({ x0: -24, x1: -47, y: s * off, y1: s * (off + (lean ? 1 : 0.6)), z: 2.5, h: 13, lean: s * lean }))
+    };
+  },
   anim(ctx, t, look) {
     const G = GENS[look.gen];
     if (look.w === 3) {

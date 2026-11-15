@@ -43,7 +43,7 @@ client/
   js/main.js         Verdrahtung, Spielschleife, Rundenwechsel
   js/net.js          WebSocket mit automatischem Wiederverbinden
   js/e2e.js          Ende-zu-Ende-Verschlüsselung der Freundesnachrichten: ein Schlüssel pro Konto, mit dem Passwort verpackt
-  js/render/         planets.js, ships.js (Karte), shipshd.js (Steckbrief, Schlacht),
+  js/render/         planets.js, ships.js (Karte), shipshd.js (Steckbrief, Schlacht), ships3d.js (Steckbrief im Raum),
                      map.js (flach), space.js (räumlich), courses.js (Kurslinien, Orbitplätze), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (alle Panels samt Haushalt), select.js (Auswahllisten),
                      dialog.js (Fenster), avatar.js, battle.js, shipinfo.js, split.js (Flotte teilen), viewport.js,
@@ -147,7 +147,11 @@ und begrenzt. Nach 20 Sekunden Stille hält sich der Audiokontext an.
 Es gibt keine Assets im üblichen Sinn. Planeten, Schiffe und Effekte sind
 Canvas-Zeichenbefehle; die Schiffe gibt es zweimal – kompakt für die Karte
 (`ships.js`) und ausführlich für Steckbrief und Schlacht (`shipshd.js`), mit
-denselben Silhouetten. Das **Logo** ist handgezeichnetes SVG ohne Schriftart (alles
+denselben Silhouetten. Im Steckbrief wird aus der ausführlichen Zeichnung ein
+Körper, der sich im Raum dreht (`ships3d.js`, WebGL): Der Abstand zum Umriss ergibt
+ein Relief, die Zeichnung ist seine Haut; ein Typ kann seine Teile selbst
+beschreiben (`solid`: Platten, Kuppeln, ein gewölbter Flügel). Ohne WebGL bleibt
+die flache Zeichnung. Das **Logo** ist handgezeichnetes SVG ohne Schriftart (alles
 Pfade) und skaliert vom Startbildschirm bis zum 16-Punkte-Tabsymbol.
 
 ## Tests

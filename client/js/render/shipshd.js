@@ -29,6 +29,27 @@ function lookOf(def, tech) {
 }
 const part = (v, look) => typeof v === 'function' ? v(look) : v;
 
+/**
+ * What a type's profile is made of, for a stage that does not draw it flat
+ * (ships3d.js): the still drawing, and what moves on it.
+ * @returns {{key:string,r:number,engines:object[],lights:object[],body:Function,anim?:Function,solid?:object}}
+ */
+export function shipProfile(type, tech) {
+  const def = TYPES[type] || fighter;
+  const look = lookOf(def, tech);
+  return {
+    key: look?.key ?? '',
+    r: part(def.r, look),
+    engines: part(def.engines, look),
+    lights: part(def.lights, look),
+    // opts: {solid} drawn as the skin of a solid, {under} as its underside
+    body: (g, color, S, opts) => def.body(g, color, S, look, opts),
+    anim: def.anim && ((g, t) => def.anim(g, t, look)),
+    // What the type says about its shape in space (relief in ships3d.js)
+    solid: part(def.solid, look)
+  };
+}
+
 /** Still image of a type in device pixels, drawn once. */
 function sprite(type, len, color, look) {
   const key = `${type}|${len}|${color}|${look?.key ?? ''}`;

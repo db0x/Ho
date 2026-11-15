@@ -1,7 +1,7 @@
 // Ship profiles: the aliens (see ../shipshd.js) - the same outlines as the
 // map icons (../alienshapes.js). Green armour in long curved panels, no
 // windows, no empire colors.
-import { raiderWing, raiderHead, raiderHump, star, starArms, armHalf as half } from '../alienshapes.js';
+import { raiderWing, raiderHead, raiderHump, raiderPod, star, starArms, armHalf as half } from '../alienshapes.js';
 import { TAU, tone, fillShadowed, bevel, inside, seam } from './kit.js';
 
 const HULL = '#3fae6c';
@@ -45,49 +45,83 @@ function glowAt(ctx, x, y, r, a) {
 export const alienFighter = {
   r: 56,
   engines: [
-    { x: -47, y: -4, r: 2, color: GLOW },
-    { x: -47, y: 4, r: 2, color: GLOW }
+    { x: -48, y: -12.5, r: 2.6, color: GLOW },
+    { x: -48, y: 12.5, r: 2.6, color: GLOW }
   ],
   lights: [],
+  // In space: the crescent is a blade - thick at its back, thin along the
+  // rim - that rises a little from the middle and then arches down to its
+  // rim and its claw tips. The head rides on its back, the hump on the
+  // head, an engine pod either side.
+  solid: {
+    hull: {
+      r: 12, h: 4.6,
+      z(x, y) {
+        const a = Math.abs(y) / 38, f = Math.max(0, (x - 4) / 50);
+        return 5 * a - 14 * a * a - 5 * f * f;
+      }
+    },
+    parts: [
+      ...[-1, 1].map(s => ({ over: true, r: 3.6, h: 3.4, z: 1.6, belly: 1, path: (ctx) => raiderPod(ctx, s) })),
+      { over: true, r: 7, h: 6, z: 3.4, path: (ctx) => raiderHead(ctx) },
+      { over: true, r: 4, h: 2.8, z: 8.2, belly: 0, path: (ctx) => raiderHump(ctx) }
+    ]
+  },
   body(ctx, color, S) {
-    // The crescent: claws reaching forward to sharp points
+    // The crescent: broad blades reaching forward to sharp points
     const wing = () => raiderWing(ctx);
     wing(); fillShadowed(ctx, shell(ctx, -38, 38), S);
     inside(ctx, wing, () => {
       for (const s of [-1, 1]) {
-        // A panel line following the curve of the claw, joints across it
-        line(ctx, [[-39, s * 14], [-28, s * 26], [-6, s * 32], [20, s * 30], [44, s * 21]]);
-        for (const [x0, y0, x1, y1] of [[-42, 6, -32, 4], [-30, 30, -24, 22], [-2, 37, 0, 27], [26, 33, 24, 25], [42, 25, 40, 21]]) {
+        // Panel lines following the curve of the blade, joints across it
+        line(ctx, [[-40, s * 12], [-30, s * 25], [-8, s * 30], [18, s * 26.5], [42, s * 14.5]]);
+        line(ctx, [[-24, s * 12], [-14, s * 19], [4, s * 20.5], [24, s * 18], [44, s * 11.5]], 0.3, 0.45);
+        for (const [x0, y0, x1, y1] of [[-45, 9, -15, 7], [-34, 31, -19, 16], [-4, 37.5, -1, 13.5], [20, 32.5, 18, 15], [38, 22, 37, 13.5]]) {
           line(ctx, [[x0, s * y0], [x1, s * y1]], 0.3);
         }
-        // Ribbed band on the claw
-        for (let k = 0; k < 5; k++) line(ctx, [[8 + k * 1.8, s * 36.5], [8 + k * 1.8, s * 27]], 0.25, 0.45);
+        // Ribbed band on the blade
+        for (let k = 0; k < 6; k++) line(ctx, [[6 + k * 1.8, s * 34], [6.6 + k * 1.8, s * 28]], 0.25, 0.45);
+        // The guns, lying in the opening beside the head
+        ctx.fillStyle = '#0d2a1b'; ctx.fillRect(-13, s * 9 - 0.6, 21, 1.2);
+        ctx.fillStyle = 'rgba(220,255,230,.25)'; ctx.fillRect(-13, s * 9 - 0.6, 21, 0.3);
       }
       // The outer rim catches the light
       ctx.strokeStyle = 'rgba(220,255,230,.35)'; ctx.lineWidth = 1.1;
-      ctx.beginPath(); ctx.moveTo(53, -16); ctx.bezierCurveTo(36, -30, 6, -37, -20, -33); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(53, -9); ctx.bezierCurveTo(32, -24.5, 8, -38, -18, -35.5); ctx.stroke();
     });
     bevel(ctx, wing, 0.9);
+    // The guns reach out of the back of the opening
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = '#123b26'; ctx.fillRect(-13, s * 9 - 0.6, 21, 1.2);
+      ctx.fillStyle = 'rgba(220,255,230,.3)'; ctx.fillRect(-13, s * 9 - 0.6, 21, 0.3);
+    }
+    // Engine pods either side of the head
+    for (const s of [-1, 1]) {
+      const pod = () => raiderPod(ctx, s);
+      pod(); fillShadowed(ctx, shell(ctx, s * 12.5 - 3.6, s * 12.5 + 3.6, '#3a9f63'), S * 0.7);
+      inside(ctx, pod, () => { for (const x of [-42, -36, -30]) seam(ctx, x, s * 12.5 - 4, x, s * 12.5 + 4, 0.25); });
+      bevel(ctx, pod, 0.5);
+    }
     // The head in the opening
     const head = () => raiderHead(ctx);
-    head(); fillShadowed(ctx, shell(ctx, -12, 12, '#46b673'), S);
+    head(); fillShadowed(ctx, shell(ctx, -7, 7, '#46b673'), S);
     inside(ctx, head, () => {
-      for (const x of [-30, -16, -4]) seam(ctx, x, -12, x + 2, 12, 0.3);
-      line(ctx, [[-42, -4], [-16, -9], [4, -6]], 0.3, 0.4);
-      line(ctx, [[-42, 4], [-16, 9], [4, 6]], 0.3, 0.4);
+      for (const x of [-32, -18, -5]) seam(ctx, x, -7, x + 1.5, 7, 0.3);
+      line(ctx, [[-44, -3], [-16, -5.4], [4, -3.6]], 0.3, 0.4);
+      line(ctx, [[-44, 3], [-16, 5.4], [4, 3.6]], 0.3, 0.4);
     });
     bevel(ctx, head, 0.7);
     // The hump along its back
     const hump = () => raiderHump(ctx);
-    hump(); fillShadowed(ctx, shell(ctx, -7, 7, '#55c784'), S * 0.8);
+    hump(); fillShadowed(ctx, shell(ctx, -4, 4, '#55c784'), S * 0.8);
     inside(ctx, hump, () => {
       ctx.fillStyle = 'rgba(255,255,255,.2)';
-      ctx.beginPath(); ctx.ellipse(-22, -3, 18, 1.5, 0, 0, TAU); ctx.fill();
-      for (const x of [-36, -24, -12]) seam(ctx, x, -7, x + 1, 7, 0.25);
+      ctx.beginPath(); ctx.ellipse(-24, -1.8, 18, 0.9, 0, 0, TAU); ctx.fill();
+      for (const x of [-36, -24, -12]) seam(ctx, x, -4, x + 1, 4, 0.25);
     });
     bevel(ctx, hump, 0.5);
     // The slit of the eye across the front of the head
-    const slit = () => { ctx.beginPath(); ctx.ellipse(7.5, 0, 1.6, 5.5, 0, 0, TAU); };
+    const slit = () => { ctx.beginPath(); ctx.ellipse(8, 0, 1.3, 3.2, 0, 0, TAU); };
     slit(); ctx.fillStyle = '#040e08'; ctx.fill();
     bevel(ctx, slit, 0.3);
   }
@@ -95,47 +129,94 @@ export const alienFighter = {
 
 const along = (a, r, across = 0) => [Math.cos(a) * r - Math.sin(a) * across, Math.sin(a) * r + Math.cos(a) * across];
 /** Half width of a star's arm at radius r - roughly, for the details on it. */
-const armHalf = (r, len) => Math.max(0.2, half(r, len, len < 49 ? 3.2 : 3.8) - 0.3);
+const armHalf = (r, len) => Math.max(0.2, half(r, len, len < 49 ? 5.4 : 6) - 0.3);
 
 export const alienCarrier = {
   r: 54,
   engines: [],
   lights: [],
-  body(ctx, color, S) {
-    // The lower star, a sixth of a turn offset: smooth, in shade, darker
-    // towards the tips
-    const lower = () => star(ctx, Math.PI / 3, 47, 3.2);
-    lower(); fillShadowed(ctx, shell(ctx, -46, 46, '#21603b'), S);
+  // In space: two stars of flat blades, one above the other, joined only by
+  // the core between them; every blade is a full, rounded body right out
+  // to its point, only a little slimmer there than at its root.
+  solid: {
+    hull: { r: 1, h: 0.3, belly: 1 },
+    parts: [
+      ...[[-4.6, () => (ctx) => star(ctx, Math.PI / 3, 47, 5.4)], [4.6, () => (ctx) => star(ctx, 0, 50, 6)]].map(([z, path]) => ({
+        // Full height close behind the edge, so the points keep their body too
+        z, round: true, r: 2.4, h: 2.7, belly: 1, path: path(),
+        scale: (x, y) => 1 - 0.35 * Math.min(1, Math.hypot(x, y) / 48)
+      })),
+      { over: true, r: 9, h: 6.8, belly: 1, path(ctx) { ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); } }
+    ]
+  },
+  body(ctx, color, S, look, opts) {
+    /** Grown, not built: a bright vein along a blade, ribs across it, short offshoots. */
+    const veins = (offset, len, a0) => {
+      for (const a of starArms(offset)) {
+        ctx.save();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = `rgba(225,255,235,${a0})`;
+        ctx.lineWidth = 0.34;
+        ctx.beginPath(); ctx.moveTo(...along(a, 10, 0)); ctx.lineTo(...along(a, len - 5, 0)); ctx.stroke();
+        ctx.lineWidth = 0.28;
+        for (let r = 12, i = 0; r < len - 8; r += 3.6, i++) {
+          const w = armHalf(r, len) * 0.82;
+          ctx.beginPath();
+          ctx.moveTo(...along(a, r, -w)); ctx.lineTo(...along(a, r + 1.7, -w * 0.38));
+          ctx.lineTo(...along(a, r + 1.7, w * 0.38)); ctx.lineTo(...along(a, r, w));
+          ctx.stroke();
+          if (i % 2 && w > 1.6) for (const s of [-1, 1]) {
+            ctx.beginPath(); ctx.moveTo(...along(a, r - 1.2, s * w * 0.6)); ctx.lineTo(...along(a, r - 3, s * w * 0.6)); ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+    };
+    // The lower star, a sixth of a turn offset. Drawn flat it lies in the
+    // shade of the upper one, darker towards the tips; as the skin of a
+    // solid it has its own light.
+    const lower = () => star(ctx, Math.PI / 3, 47, 5.4);
+    lower(); fillShadowed(ctx, shell(ctx, -46, 46, opts?.solid ? '#35995e' : '#21603b'), S);
     inside(ctx, lower, () => {
-      const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 47);
-      g.addColorStop(0, 'rgba(4,20,10,0)');
-      g.addColorStop(1, 'rgba(4,20,10,.55)');
-      ctx.fillStyle = g;
-      ctx.fillRect(-48, -48, 96, 96);
+      if (!opts?.solid) {
+        const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 47);
+        g.addColorStop(0, 'rgba(4,20,10,0)');
+        g.addColorStop(1, 'rgba(4,20,10,.55)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-48, -48, 96, 96);
+      }
+      veins(Math.PI / 3, 47, opts?.solid ? 0.5 : 0.22);
     });
     bevel(ctx, lower, 0.7);
-    // The upper star: smooth, a bright ridge along every arm
-    const upper = () => star(ctx, 0, 50, 3.8);
+    // The upper star: a bright ridge along every blade
+    const upper = () => star(ctx, 0, 50, 6);
     upper(); fillShadowed(ctx, shell(ctx, -50, 50), S * 1.4);
     inside(ctx, upper, () => {
       for (const a of starArms(0)) {
         ctx.save();
         ctx.lineCap = 'round';
-        // Light along the upper flank of the tube, shade along the lower
-        ctx.strokeStyle = 'rgba(230,255,238,.4)'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(...along(a, 5, -1.4)); ctx.lineTo(...along(a, 40, -1.2)); ctx.lineTo(...along(a, 48, -0.2)); ctx.stroke();
-        ctx.strokeStyle = 'rgba(4,20,10,.45)'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(...along(a, 5, 2.2)); ctx.lineTo(...along(a, 40, 1.9)); ctx.lineTo(...along(a, 48, 0.3)); ctx.stroke();
+        // Light along the upper flank of the blade, shade along the lower
+        ctx.strokeStyle = 'rgba(230,255,238,.3)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(...along(a, 8, -3.6)); ctx.lineTo(...along(a, 34, -1.9)); ctx.lineTo(...along(a, 48, -0.2)); ctx.stroke();
+        ctx.strokeStyle = 'rgba(4,20,10,.4)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(...along(a, 8, 4.2)); ctx.lineTo(...along(a, 34, 2.4)); ctx.lineTo(...along(a, 48, 0.3)); ctx.stroke();
         ctx.restore();
-        // A few faint panel joints across the arm
+        // A few faint panel joints across the blade
         for (const r of [20, 31]) {
           const w = armHalf(r, 50) + 0.6;
           line(ctx, [along(a, r, -w), along(a, r, w)], 0.25, 0.35);
         }
       }
+      veins(0, 50, 0.55);
     });
     bevel(ctx, upper, 0.8);
-    // The middle: a dark dome where the two stars meet
+    // The core where the two stars meet: a ring with spokes around a dark dome
+    ctx.strokeStyle = 'rgba(225,255,235,.5)'; ctx.lineWidth = 0.4;
+    ctx.beginPath(); ctx.ellipse(0, 0, 7, 6, 0, 0, TAU); ctx.stroke();
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * TAU + Math.PI / 6;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 2.8, Math.sin(a) * 2.8); ctx.lineTo(Math.cos(a) * 7, Math.sin(a) * 6); ctx.stroke();
+    }
     ctx.fillStyle = '#0a2416';
     ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, TAU); ctx.fill();
     ctx.strokeStyle = 'rgba(220,255,230,.3)'; ctx.lineWidth = 0.4;

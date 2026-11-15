@@ -43,7 +43,7 @@ client/
   js/main.js         Wiring, game loop, turn changes
   js/net.js          WebSocket with automatic reconnect
   js/e2e.js          End-to-end encryption of friend messages: one key per account, wrapped with the password
-  js/render/         planets.js, ships.js (map), shipshd.js (data sheet, battle),
+  js/render/         planets.js, ships.js (map), shipshd.js (data sheet, battle), ships3d.js (data sheet in space),
                      map.js (flat), space.js (spatial), courses.js (course lines, orbit slots), fx.js, battlefx.js
   js/ui/             lobby.js, hud.js (all panels incl. the budget), select.js (select lists),
                      dialog.js (windows), avatar.js, battle.js, shipinfo.js, split.js (splitting a fleet), viewport.js,
@@ -144,6 +144,10 @@ context suspends itself.
 There are no assets in the usual sense. Planets, ships and effects are canvas
 drawing commands; the ships exist twice – compact for the map (`ships.js`) and
 detailed for the data sheet and battles (`shipshd.js`), with the same silhouettes.
+In the data sheet the detailed drawing becomes a solid turning in space
+(`ships3d.js`, WebGL): the distance to its outline gives a relief, the drawing is
+its skin; a type can describe its parts itself (`solid`: plates, domes, an arched
+wing). Without WebGL the flat drawing stays.
 The **logo** is hand-drawn SVG with no font (everything is paths) and scales from the
 start screen down to a 16-point tab icon.
 

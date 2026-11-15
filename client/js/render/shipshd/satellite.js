@@ -11,6 +11,19 @@ export const satellite = {
     { x: 53, y: 27, r: 0.9, color: GREEN, off: 0 },
     { x: 0, y: -27, r: 0.9, color: WHITE, off: 0.3, strobe: true }
   ],
+  // In space: the solar wings and the radiator fins are thin plates, the
+  // turret a dome on top of the core.
+  solid: {
+    hull: { r: 12, h: 6.5 },
+    parts: [
+      { r: 0.7, h: 0.5, belly: 1, path(ctx) { ctx.beginPath(); for (const x0 of [-54, 24]) ctx.rect(x0 - 0.4, -26.4, 30.8, 52.8); } },
+      { r: 0.7, h: 0.5, belly: 1, path(ctx) {
+        ctx.beginPath();
+        for (const y of [-30, 18]) for (let i = -2; i <= 2; i++) ctx.rect(i * 4 - 1.3, y - 0.1, 2.6, 12.2);
+      } },
+      { over: true, r: 8.6, h: 5, z: 5.5, belly: 0, path(ctx) { ctx.beginPath(); ctx.arc(0, 0, 8.6, 0, TAU); } }
+    ]
+  },
   body(ctx, color, S) {
     // Lattice girder
     for (const s of [-1, 1]) {
