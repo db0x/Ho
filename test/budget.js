@@ -24,7 +24,7 @@ const pick = (arr) => arr[Math.floor(random() * arr.length)];
 // Events after which the income can no longer be predicted
 const DISTURBS = new Set(['combat', 'invade', 'colonize', 'settle', 'lost', 'eliminated']);
 
-let turns = 0, comparisons = 0, incomeChecked = 0, terraBooked = 0, refitBooked = 0;
+let turns = 0, comparisons = 0, incomeChecked = 0, terraBooked = 0, refitBooked = 0, salvageBooked = 0;
 const rejected = { build: 0, refit: 0, research: 0 };
 // Order via setOrders, and count what the server rejects
 const order = (game, p, msg) => {
@@ -115,10 +115,15 @@ for (let gameNo = 0; gameNo < 6; gameNo++) {
         if (!near(L.income, f.income, 1e-6)) fail(`${where}: income ${L.income} instead of ${f.income}`);
         if (!near(L.mined, f.mining, 1e-6)) fail(`${where}: mining ${L.mined} instead of ${f.mining}`);
       }
+      // Salvage from the wrecks of alien carriers - unless someone else salvages there too.
+      if (!disturbed && !f.salvageShared && !entries.some(e => e.type === 'alien' && (e.playerIds || []).includes(p.id) && e.key !== 'log.salvaged' && e.key !== 'log.salvagedAll')) {
+        if (!near(L.salvage, f.salvage)) fail(`${where}: salvage ${L.salvage} instead of ${f.salvage}`);
+        if (L.salvage > 0) salvageBooked++;
+      }
 
       // 3) Cross-check: the balance is fully explained by the items
       const money = v.money - L.research - L.build.money - L.refit.money - L.terra + L.income;
-      const metal = v.metal - L.build.metal - L.refit.metal + L.mined;
+      const metal = v.metal - L.build.metal - L.refit.metal + L.mined + L.salvage;
       // The server rounds to one decimal at the end - there is no more slack than that.
       if (!near(p.money, money, 0.05 + 1e-6)) fail(`${where}: money ${p.money}, from the items ${money}`);
       if (!near(p.metal, metal, 0.05 + 1e-6)) fail(`${where}: metal ${p.metal}, from the items ${metal}`);
@@ -128,7 +133,7 @@ for (let gameNo = 0; gameNo < 6; gameNo++) {
 }
 
 console.log(`${turns} turns, ${comparisons} budgets compared, income checked ${incomeChecked}× undisturbed.`);
-console.log(`With terraforming: ${terraBooked}, with refits: ${refitBooked}. Rejected: ${rejected.build} builds, ${rejected.refit} refits, research capped ${rejected.research}×.`);
+console.log(`With terraforming: ${terraBooked}, with refits: ${refitBooked}, with salvage: ${salvageBooked}. Rejected: ${rejected.build} builds, ${rejected.refit} refits, research capped ${rejected.research}×.`);
 if (!terraBooked || !refitBooked || !rejected.build || !rejected.research) fail('Test run does not cover all cases');
 if (errors) { console.error(`${errors} deviations.`); process.exit(1); }
 console.log('Budget: forecast and settlement match item by item, no order is dropped.');

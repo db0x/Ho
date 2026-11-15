@@ -9,7 +9,7 @@
 //   - size and brightness by distance.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips, drawPlanetStation } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
 import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -768,6 +768,13 @@ export class SpaceView {
       st = drawPlanetStation(ctx, p, pr.x, pr.y, r, orbitScale(scale), colorOf(p.owner), this.phase);
       ctx.restore();
     }
+    let wr = null;
+    if (p.wreck) {
+      ctx.save();
+      ctx.globalAlpha = ctxAlpha;
+      wr = drawPlanetWreck(ctx, p, pr.x, pr.y, r, orbitScale(scale), this.phase);
+      ctx.restore();
+    }
 
     // Names fade out with size as on the flat map - in depth that means:
     // near worlds are labeled, distant ones are not.
@@ -775,6 +782,7 @@ export class SpaceView {
     this.hit.push({ type: 'planet', id: p.id, x: pr.x, y: pr.y, r: Math.max(10, r + 5) });
     // The station is part of its world: a click on its yard picks the world.
     if (st) this.hit.push({ type: 'planet', id: p.id, x: st.x, y: st.y, r: st.r });
+    if (wr) this.hit.push({ type: 'planet', id: p.id, x: wr.x, y: wr.y, r: wr.r });
   }
 
   /**
@@ -921,6 +929,7 @@ export class SpaceView {
       lines.push([t('map.tooltipTemp', { temp: Math.round(p.temp), grav: (+p.grav).toFixed(2) }), '#d6deef']);
       lines.push([t('map.tooltipPop', { pop: (+p.pop).toFixed(1), ore: Math.round(p.metalReserve) }), '#9aa8c4']);
       if (owner) lines.push([owner.name, owner.color || '#fff']);
+      if (p.wreck) lines.push([t('map.tooltipWreck', { metal: Math.round(p.wreck.metal) }), WRECK_COLOR]);
     }
     lines.push([t('map.tooltipHeight', { z: ((p.z || 0) > 0 ? '+' : '') + Math.round(p.z || 0) }), '#67738c']);
     this.tooltipAt(ctx, pr.x, pr.y, p.name, lines);

@@ -1,7 +1,7 @@
 // Star map: camera, background, planets, fleets, course lines.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips, drawPlanetStation } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -439,6 +439,9 @@ export class MapView {
       // its yard, which stands out beyond the world's own disc, picks the world.
       const st = p.owner ? drawPlanetStation(ctx, p, sx, sy, r, orbitScale(z), colorOf(p.owner), this.phase) : null;
       if (st) this.hit.push({ type: 'planet', id: p.id, x: st.x, y: st.y, r: st.r });
+      // The wreck of an alien carrier tumbles in the orbit; a click on it picks the world.
+      const wr = drawPlanetWreck(ctx, p, sx, sy, r, orbitScale(z), this.phase);
+      if (wr) this.hit.push({ type: 'planet', id: p.id, x: wr.x, y: wr.y, r: wr.r });
       ctx.globalAlpha = 1;
     }
 
@@ -892,6 +895,7 @@ export class MapView {
       lines.push([t('map.tooltipTemp', { temp: Math.round(p.temp), grav: (+p.grav).toFixed(2) }), '#d6deef']);
       lines.push([t('map.tooltipPop', { pop: (+p.pop).toFixed(1), ore: Math.round(p.metalReserve) }), '#9aa8c4']);
       if (owner) lines.push([owner.name, owner.color || '#fff']);
+      if (p.wreck) lines.push([t('map.tooltipWreck', { metal: Math.round(p.wreck.metal) }), WRECK_COLOR]);
       if (p.known === 'memory') lines.push([t('map.tooltipSeen', { turn: p.turn }), '#67738c']);
     }
     this.tooltipAt(ctx, sx, sy, planetRadius(p) * this.cam.zoom, p.name, lines);

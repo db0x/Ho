@@ -6,6 +6,7 @@ import { allianceOf, alliesOf } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { avatarHtml } from '../../ui/avatar.js';
 import { fmt1, statsText, fmt, escapeHtml } from './format.js';
+import { trophyHtml, fillTrophies } from './trophy.js';
 
 const $ = s => document.querySelector(s);
 
@@ -24,7 +25,7 @@ export const playersMethods = {
         <span class="rank">${!p.alive ? '–' : fog ? '' : place}</span>
         ${avatarHtml(p, 22)}
         <span class="who">
-          <span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>
+          <span class="nm-line"><span class="nm" title="${p.name}${p.persona ? ' – ' + t(`persona.${p.persona}`) + ': ' + t(`persona.${p.persona}.desc`) : ''}">${p.name}</span>${trophyHtml(p.carriers, 'rank.trophies')}</span>
           <small>${[p.id === v.host ? t('rank.host') : null,
                     p.isBot ? t('word.ai') + (p.persona ? ' · ' + t(`persona.${p.persona}`) : '')
                       + (p.level ? ' · ' + t(`ai.${p.level}`) : '') : null,
@@ -36,6 +37,7 @@ export const playersMethods = {
         <span class="num"><b>${!p.alive ? t('rank.out') : p.stats ? t('word.pop', { n: fmt1(p.stats.pop) }) : '?'}</b></span>
       </div>${this.diplomacyRow(p)}`;
     }).join('');
+    fillTrophies(box);
     this.wireDiplomacy(box);
   },
 
@@ -119,7 +121,7 @@ export const playersMethods = {
       <div class="row ${p.alive ? '' : 'dead'}">
         <div class="head">
           <span class="dot" style="width:9px;height:9px;border-radius:50%;background:${p.color};box-shadow:0 0 8px ${p.color}"></span>
-          <span class="nm" title="${p.name}">${p.name}</span>
+          <span class="nm" title="${p.name}">${p.name}</span>${trophyHtml(p.carriers, 'rank.trophies')}
           ${p.persona ? `<span class="muted small" title="${t(`persona.${p.persona}.desc`)}">${t(`persona.${p.persona}`)}</span>` : ''}
           ${levelTag(p)}
         </div>
@@ -130,6 +132,7 @@ export const playersMethods = {
         ${alliesOf(v, p.id).length ? `<div class="dip-known">${t('dip.alliedWith', {
           names: escapeHtml(alliesOf(v, p.id).map(x => (x.alliance.secret ? '🔒 ' : '') + name(x.id)).join(', ')) })}</div>` : ''}
       </div>`).join('')}</div>`;
+    fillTrophies($('#tab-research'));
   }
 };
 

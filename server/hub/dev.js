@@ -1,6 +1,7 @@
 // Dev mode: testing aids in a running game, announced to everyone in it.
 import { authEnabled } from '../auth.js';
 import { devAliens } from '../aliens.js';
+import { devWreck } from '../spoils.js';
 import { devDestroyer, devStation, devFighters } from '../game/shipyard.js';
 import { pushLog } from '../game/log.js';
 import { devWormholes } from '../wormholes.js';
@@ -65,6 +66,12 @@ export const devHandlers = {
       if (last && last.turn === game.turn) last.entries.push(...entries);
       else pushLog(game, entries);
       console.log(`Dev: ${c.account ?? 'guest'} - aliens in game ${game.id}`);
+    } else if (action === 'wreck') {
+      // The wreck of an alien carrier at the selected world, otherwise at the homeworld.
+      if (!devWreck(game, me || null, Number.isInteger(msg.planetId) ? msg.planetId : null)) {
+        return send(ws, { t: 'notice', key: 'dev.nothing' });
+      }
+      console.log(`Dev: ${c.account ?? 'guest'} - wreck in game ${game.id}`);
     } else {
       if (!devWormholes(game, me || null, action, at)) return send(ws, { t: 'notice', key: 'dev.nothing' });
       console.log(`Dev: ${c.account ?? 'guest'} - wormholes ${action} in game ${game.id}`);

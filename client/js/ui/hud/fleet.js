@@ -11,6 +11,7 @@ import { shipIcon } from '../../render/ships.js';
 import { genOf, bestFighter, MARK } from '../../render/fighterlook.js';
 import { openSplit } from '../../ui/split.js';
 import { escapeHtml, fmt, fmt1 } from './format.js';
+import { trophyHtml, fillTrophies } from './trophy.js';
 import { refitShips } from '../../../shared/budget.js';
 import { recycleRates, recycleValue } from '../../../shared/rules.js';
 
@@ -45,7 +46,7 @@ export const fleetMethods = {
           + '</div>'
         : `<div class="sel-sub">${t('fleet.noCourse')}</div>`;
       // Big ships are known by name, like at sea - what else flies along is not.
-      const names = f.ships.filter(s => s.name).map(s => escapeHtml(s.name));
+      const names = f.ships.filter(s => s.name).map(s => escapeHtml(s.name) + trophyHtml(s.trophies));
       if (pl?.alien) {
         // The aliens make no secret of themselves: a carrier and its swarm,
         // there for everyone to see - and where to hit them.
@@ -68,6 +69,7 @@ export const fleetMethods = {
         <p class="hint-line">${t('fleet.detected', { ships: t('word.ships', { n: f.ships.length, count: f.ships.length }) })}</p>
         ${names.length ? `<p class="hint-line">${t('fleet.namedSeen', { names: names.join(', ') })}</p>` : ''}
         ${this.chaseButton(f)}`;
+      fillTrophies(box);
       this.wireChase(box, f);
       return;
     }
@@ -119,7 +121,7 @@ export const fleetMethods = {
           ${f.ships.filter(s => s.name).map(s => `
             <div class="shipitem named clickable-ship" data-info="${s.type}" data-ship="${s.id}" title="${t('shipinfo.hint')}">
               <span class="gi" data-t="${s.type}"></span>
-              <span class="si-named"><b class="ship-name">${escapeHtml(s.name)}</b>
+              <span class="si-named"><b class="ship-name">${escapeHtml(s.name)}</b>${trophyHtml(s.trophies)}
                 <span class="muted small">${t(`ship.${s.type}.name`)}</span></span>
               ${f.mine && !v.spectator ? `<button class="tiny rename" title="${t('fleet.rename')}" aria-label="${t('fleet.rename')}">✎</button>` : ''}
               <span class="hp">${Math.round(s.hp)}/${Math.round(s.maxHp)} HP</span>
@@ -142,6 +144,7 @@ export const fleetMethods = {
       const ship = g.dataset.group ? lead(groups[g.dataset.group]) : f.ships.find(s => s.id === g.closest('[data-ship]')?.dataset.ship);
       g.appendChild(shipIcon(g.dataset.t, 26, col, ship?.tech));
     }
+    fillTrophies(box);
     // The built-in tech of these ships, not the current levels
     for (const el of box.querySelectorAll('[data-info]')) {
       const ship = el.dataset.ship ? f.ships.find(s => s.id === el.dataset.ship) : lead(groups[el.dataset.group]);

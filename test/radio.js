@@ -114,6 +114,25 @@ const battle = (planet, sides) => ({
 }
 
 {
+  const { g, h, con, home } = setup();
+  // A destroyer of the player shot down an alien carrier: its crew reports,
+  // in a crew voice, by the ship's name - and beats the aliens' own lament.
+  const trophy = { type: 'alien', playerIds: [h.id], private: h.id, planetId: home.id,
+    key: 'log.alienTrophy', params: { vessel: 'Endeavour', near: home.name, count: 1 } };
+  const out = radioTurn(g, [battle(home, [[ALIEN_ID, 0], [h.id, 4]]), trophy], always);
+  const m = lineOf(out, h.id);
+  assert(/^crew\d$/.test(m?.speaker) && is(m, m.speaker, 'trophy'), `trophy: the crew reports (${m?.speaker} ${m?.file})`);
+  assert(m?.name === 'Endeavour' && m.important && m.where?.planetId === home.id, 'trophy: by the ship\'s name, about the planet');
+  assert(m?.named?.text?.includes('Endeavour'), `trophy: a line with the ship's name (${m?.named?.text})`);
+  // The same ship keeps its voice.
+  g.turn += RADIO_QUIET_TURNS;
+  assert(lineOf(radioTurn(g, [trophy], always), h.id)?.speaker === m?.speaker, 'trophy: the same ship, the same voice');
+  // Only the victor hears it.
+  g.turn += RADIO_QUIET_TURNS;
+  assert(!radioTurn(g, [{ ...trophy, private: con.id, playerIds: [con.id] }], always).size, 'trophy: not for others');
+}
+
+{
   const { g, h, con, vul, home } = setup();
   // Alliance and notice, by the names in the log.
   let m = lineOf(radioTurn(g, [{ type: 'diplomacy', key: 'log.alliance', params: { a: vul.name, b: h.name } }], always), h.id);

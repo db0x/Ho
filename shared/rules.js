@@ -284,6 +284,45 @@ export function alienRules(levelOrGame) {
 export const isAlien = (ownerOrType) => ownerOrType === ALIEN_ID || !!SHIP_DEFS[ownerOrType]?.alien;
 
 /**
+ * The spoils of an alien carrier shot down (server/spoils.js). Whoever did
+ * the most damage to it gets the credit:
+ * - the wreck: it stays in the orbit for `life` turns, full of metal - this
+ *   share of what a destroyer costs at the aliens' levels. Any fleet in that
+ *   orbit salvages it, a share per turn (all of it in `haul` turns), a
+ *   transporter along twice as fast. Not in the orbit of a hostile
+ *   inhabited world, and not while an armed enemy is there. Shot down in
+ *   open space, the victor's fleet takes it all on the spot.
+ * - insight: research points in weapons and shields - a share of the next
+ *   level, the more the further the aliens were ahead (alienInsight).
+ * - a trophy: the victor's destroyer that did the most damage to it.
+ */
+export const ALIEN_SPOILS = {
+  wreck: 0.6,
+  haul: 3,
+  transport: 2,
+  life: 8,
+  insight: 0.2,          // share of the next level at equal levels ...
+  insightStep: 0.3,      // ... this much more per level the aliens were ahead, less per level behind
+  insightMax: 0.8
+};
+
+/** Metal in the wreck of a carrier built with these levels. */
+export function wreckMetal(tech) {
+  return Math.max(1, Math.round(shipCost('destroyer', tech || {}).metal * ALIEN_SPOILS.wreck));
+}
+
+/** Metal a fleet salvages from a wreck per turn - twice as much with a transporter along. */
+export function salvageRate(total, transport) {
+  return Math.max(1, Math.ceil(total / ALIEN_SPOILS.haul)) * (transport ? ALIEN_SPOILS.transport : 1);
+}
+
+/** Share of the next level a victor learns in a field from a carrier of that level. */
+export function alienInsight(alienLevel, ownLevel) {
+  const S = ALIEN_SPOILS;
+  return clamp(S.insight + S.insightStep * ((alienLevel || 1) - (ownLevel || 1)), 0, S.insightMax);
+}
+
+/**
  * The ship types of a game: without the lobby option "capital ships" it is
  * classic Ho!! - no destroyers.
  * @param {{capitalShips?: boolean}} settings

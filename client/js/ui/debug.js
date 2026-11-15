@@ -166,6 +166,7 @@ export class DebugDialog {
       if (a === 'destroyer') this.destroyer();
       if (a === 'station') this.destroyer('station');
       if (a === 'aliens') this.aliens();
+      if (a === 'wreck') { this.app.send({ t: 'dev', action: 'wreck', planetId: this.selectedPlanet() }); this.toggle(false); }
       if (a === 'fighterView') {
         openShipInfo('fighter', { tech: this.fighterTech(), color: this.app?.map?.view?.me?.color, types: ['fighter'] });
       }
@@ -235,8 +236,10 @@ export class DebugDialog {
       ${running ? `<h3>${t('alien.name')}</h3>
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="aliens">${t('dev.aliens')}</button>
+        <button type="button" class="tiny" data-a="wreck">${t('dev.wreck')}</button>
       </div>
-      <p class="muted small">${t('dev.aliensHint')}</p>` : ''}
+      <p class="muted small">${t('dev.aliensHint')}</p>
+      <p class="muted small">${t('dev.wreckHint')}</p>` : ''}
       ${running && !this.app.map.view.spectator ? `<h3>${t('debug.radio')}</h3>
       <div class="debug-actions debug-dev">
         <button type="button" class="tiny" data-a="radioNamed">${t('dev.radioNamed')}</button>

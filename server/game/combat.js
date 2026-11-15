@@ -147,9 +147,11 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
   const owners = [...sides.keys()];
   const units = [];
   const idx = new Map();
+  const ownerOf = new Map();         // unit -> its side, for the credit of a carrier shot down
   owners.forEach((owner, k) => {
     for (const s of sides.get(owner)) {
       idx.set(s, units.length);
+      ownerOf.set(s, owner);
       const unit = [k, s.isBattery ? 'battery' : s === station && s.building > 0 ? 'stationSite' : s.type, s.hp, round1(s.maxHp)];
       // A fighter's look follows the tech it was built with (client fighterlook.js).
       if (s.type === 'fighter' && s.tech) unit.push([s.tech.weapons, s.tech.shields, s.tech.speed, s.tech.range]);
@@ -157,6 +159,8 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
     }
   });
   const rounds = [];
+  // Damage done to alien carriers - per side and per ship - for the spoils.
+  const onCarrier = new Map();
 
   for (let round = 0; round < COMBAT_ROUNDS; round++) {
     const engaged = s => s.hp > 0 && (round < INTERCEPT_ROUNDS || !escaping.has(s));
@@ -183,8 +187,21 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
     rounds.push(damage.map(([t, dmg, s]) => [idx.get(s), idx.get(t), dmg]));
     // To tenths, like the damage: otherwise a remainder like 2e-15 would be
     // left after subtracting, and a ship without a hull would fly on.
-    for (const [t, dmg] of damage) t.hp = round1(t.hp - dmg);
+    for (const [t, dmg, s] of damage) {
+      if (t.type === 'alienCarrier') hitCarrier(onCarrier, t, ownerOf.get(s), s, dmg);
+      t.hp = round1(t.hp - dmg);
+    }
     for (const [, ships] of sides) for (const s of ships) if (s.hp < 0) s.hp = 0;
+  }
+
+  // Carriers shot down: who gets the credit is settled after the battles (spoils.js).
+  for (const [carrier, hits] of onCarrier) {
+    if (carrier.hp > 0) continue;
+    (game._carrierKills ||= []).push({
+      carrier, planetId: group ? null : planet.id, near: planet.name,
+      at: group ? { x: planet.at.x, y: planet.at.y, z: planet.at.z || 0 } : null,
+      fleets: group ? group.map(f => f.id) : null, ...hits
+    });
   }
 
   // Record losses
@@ -258,6 +275,15 @@ function resolveCombatAt(game, planet, entries, rng, fleeing = [], group = null)
   });
   cleanupFleets(game);
   return true;
+}
+
+/** Adds one hit on an alien carrier to the tally by side and by ship. */
+function hitCarrier(onCarrier, carrier, owner, ship, dmg) {
+  if (owner == null || isAlien(owner)) return;
+  let hits = onCarrier.get(carrier);
+  if (!hits) onCarrier.set(carrier, hits = { bySide: new Map(), byShip: new Map() });
+  hits.bySide.set(owner, (hits.bySide.get(owner) || 0) + dmg);
+  hits.byShip.set(ship, (hits.byShip.get(ship) || 0) + dmg);
 }
 
 /** Satellites that went down with lost transporters - told to the owner only. */

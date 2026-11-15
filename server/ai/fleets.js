@@ -1,16 +1,55 @@
 // Fleet command: bundling and sorting out fleets, a course for every idle
 // one, and the transporters' errands.
-import { cargoOf, travelDistance, dist, shipStats, batteryStats, COMBAT_ROUNDS } from '../../shared/rules.js';
+import { cargoOf, travelDistance, dist, shipStats, batteryStats, COMBAT_ROUNDS, SHIP_DEFS } from '../../shared/rules.js';
 import { hostile } from '../game/diplomacy.js';
 import { fleetStats } from '../game/fleets.js';
 import { planetById } from '../game/game.js';
 import { seesFleet } from '../game/intel.js';
+import { wrecksSeen } from '../spoils.js';
 import { canReach } from '../game/movement.js';
 import { setOrders } from '../game/orders.js';
 import { friendly } from './diplomacy.js';
 import { HIT_RATE } from './situation.js';
 import { surplus } from './shipyard.js';
 import { formPacks, combatTarget } from './war.js';
+
+// How far a fleet goes for a wreck, in turns of flight.
+const SALVAGE_TURNS = 4;
+
+/**
+ * Wrecks of alien carriers: a fleet that stands in the orbit of one stays
+ * until it is empty; to a wreck without anyone the nearest idle fleet goes -
+ * an empty transporter first, it salvages twice as fast. Not into the orbit
+ * of a hostile world or past an armed enemy there. The fleets kept or sent
+ * go into s.salvaging - nothing else gives them a course this move.
+ */
+export function salvage(s) {
+  const { game, bot, zone } = s;
+  s.salvaging = new Set();
+  const wrecks = wrecksSeen(game, bot.id);
+  if (!wrecks.length) return;
+  const mine = game.fleets.filter(f => f.owner === bot.id && f.ships.length);
+  const loaded = f => cargoOf(f.ships).used > 0;
+  for (const w of wrecks) {
+    const p = planetById(game, w.planetId);
+    if (p.owner && p.pop >= 0.5 && hostile(game, bot.id, p.owner)) continue;
+    if (game.fleets.some(f => f.at === p.id && f.ships.some(x => x.attack > 0) && hostile(game, bot.id, f.owner))) continue;
+    const here = mine.find(f => f.at === p.id && f.dest == null && !f.hole && !f.chase);
+    if (here) { s.salvaging.add(here.id); continue; }
+    if (mine.some(f => f.dest === p.id)) continue;
+    const idle = mine.filter(f => f.dest == null && !f.hole && !f.chase && !s.salvaging.has(f.id)
+      && fleetStats(f).speed > 0 && !loaded(f) && !f.ships.some(x => x.colonists > 0)
+      && !(f.at != null && s.threatened?.has(f.at)));
+    const turns = f => travelDistance(f.at != null ? planetById(game, f.at) : f, p, zone) / fleetStats(f).speed;
+    const pick = idle.map(f => ({ f, t: turns(f), hauler: f.ships.some(x => SHIP_DEFS[x.type]?.cargo) }))
+      .filter(x => x.t <= SALVAGE_TURNS)
+      .sort((a, b) => (a.hauler === b.hauler ? 0 : a.hauler ? -1 : 1) || a.t - b.t)
+      .find(x => canReach(game, x.f, p).ok);
+    if (!pick) continue;
+    setOrders(game, bot, { move: { fleetId: pick.f.id, planetId: p.id } });
+    if (pick.f.dest === p.id) s.salvaging.add(pick.f.id);
+  }
+}
 
 /**
  * Transporters: fetch spare satellites and bring them to the most heavily
@@ -36,6 +75,7 @@ export function logistics(s) {
     .sort((x, y) => y.a - x.a);
   const donors = surplus(s);
   for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.some(s => s.cargo))) {
+    if (s.salvaging?.has(f.id)) continue;
     const cargo = cargoOf(f.ships);
     const here = f.at != null ? planetById(game, f.at) : null;
     const far = p => travelDistance(here || f, p, zone);
@@ -128,6 +168,7 @@ export function orderFleets(s) {
   // Free worlds held by a foreign ship - nobody settles there until it is gone.
   const { blocked, escorted } = clearOrbits(s, claimed);
   for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && !f.chase && f.ships.length)) {
+    if (s.salvaging?.has(fleet.id)) continue;
     const st = fleetStats(fleet);
     if (st.speed <= 0 || fleet.ships.some(s => s.cargo)) continue;
     const here = fleet.at !== null ? planetById(game, fleet.at) : fleet;

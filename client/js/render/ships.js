@@ -5,6 +5,7 @@ import { stationBody, stationAnim, STATION_LIGHTS, ringStation, ringAnim, ringSp
 import { tone } from './shipshd/kit.js';
 import { SHIELD_MIN } from './fx.js';
 import { GENS, FLAME, FLAME_LEN, PLAIN, fighterLook, bestFighter, halfWidth, leadX, podX, engineLayout, emitters } from './fighterlook.js';
+import { ALIEN_COLOR } from '../../shared/rules.js';
 
 function hullGradient(ctx, len) {
   const g = ctx.createLinearGradient(0, -len * 0.4, 0, len * 0.4);
@@ -981,6 +982,80 @@ export function drawPlanetStation(ctx, p, x, y, r, sc, color, phase) {
   // The pods hang under the band's near edge.
   const [yx, yy] = ringSpot(RING_YARD, R);
   return { x: x + yx, y: y + yy + R * 0.06, r: Math.max(9, R * 0.22) };
+}
+
+/** The wreck of an alien carrier: their green, gone dull. */
+export const WRECK_COLOR = '#7fa58a';
+
+// The carrier's own shapes keep their green whatever colour is asked for -
+// the hulk is drawn once per size and darkened on top (source-atop: only
+// where the hull is), then copied.
+const wreckCache = new Map();
+function wreckSprite(len) {
+  const L = Math.max(8, Math.round(len));
+  let img = wreckCache.get(L);
+  if (img) return img;
+  const dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
+  const half = Math.ceil(L * 1.1);
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = Math.ceil(half * 2 * dpr);
+  const g = cv.getContext('2d');
+  g.scale(dpr, dpr);
+  drawShip(g, { type: 'alienCarrier', x: half, y: half, len: L, color: '#4e5a52', shadow: false });
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(46,54,50,.78)';
+  g.fillRect(0, 0, half * 2, half * 2);
+  img = { canvas: cv, half };
+  if (wreckCache.size > 40) wreckCache.clear();
+  wreckCache.set(L, img);
+  return img;
+}
+
+/**
+ * The wreck of an alien carrier in the orbit of a world (server/spoils.js):
+ * the carrier, dark and tumbling slowly, a little outside the shield on the
+ * upper left, with debris drifting around it and now and then a spark of
+ * its green - fainter the less metal is left in it.
+ * @param {{wreck?: {metal: number, total: number}}} p  the world's view
+ * @returns {{x: number, y: number, r: number} | null} where it is, to click on
+ */
+export function drawPlanetWreck(ctx, p, x, y, r, sc, phase) {
+  const w = p.wreck;
+  if (!w) return null;
+  const len = Math.max(10, 26 * sc);
+  const R = r * 1.14 + 20 * sc + len * 0.75;
+  const a = -2.3 + Math.sin(phase * 0.05 + (p.id || 0)) * 0.08;
+  const wx = x + Math.cos(a) * R, wy = y + Math.sin(a) * R;
+  const full = w.total ? Math.max(0.25, w.metal / w.total) : 1;
+  ctx.save();
+  const alpha = ctx.globalAlpha;
+  // Debris: a few specks on slow, flat orbits around the hulk.
+  ctx.fillStyle = '#9aa69c';
+  const specks = Math.round(3 + 5 * full);
+  for (let i = 0; i < specks; i++) {
+    const t = phase * (0.12 + hash(i, 11) * 0.2) + hash(i, 12) * Math.PI * 2;
+    const d = len * (0.55 + hash(i, 13) * 0.6);
+    const sx = wx + Math.cos(t) * d, sy = wy + Math.sin(t) * d * 0.45;
+    const sz = Math.max(1, len * (0.03 + hash(i, 14) * 0.04));
+    ctx.globalAlpha = alpha * (0.45 + 0.4 * hash(i, 15));
+    ctx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+  }
+  ctx.globalAlpha = alpha * (0.6 + 0.4 * full);
+  const hulk = wreckSprite(len);
+  ctx.save();
+  ctx.translate(wx, wy);
+  ctx.rotate(phase * 0.06 + (p.id || 0));
+  ctx.drawImage(hulk.canvas, -hulk.half, -hulk.half, hulk.half * 2, hulk.half * 2);
+  ctx.restore();
+  // A spark of what is left alive in it.
+  const flick = Math.max(0, Math.sin(phase * 1.7 + (p.id || 0) * 3)) ** 8;
+  if (flick > 0.05) {
+    ctx.globalAlpha = alpha * flick * full;
+    ctx.fillStyle = ALIEN_COLOR;
+    ctx.beginPath(); ctx.arc(wx + len * 0.12, wy - len * 0.08, Math.max(1.2, len * 0.07), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  return { x: wx, y: wy, r: Math.max(9, len * 0.6) };
 }
 
 /** Engine trail for flying fleets. */

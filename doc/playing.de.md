@@ -335,6 +335,29 @@ Die Stärke stellt der Gastgeber in der Lobby ein (oder schaltet sie ab):
 
 Satelliten, eine Raumstation oder eine Flotte im Orbit halten sie auf.
 
+**Beute.** Wer einen Alien-Träger abschießt, wird belohnt – die Kolonie, die
+besucht wurde, oder wer ihr zu Hilfe kam. Den Abschuss bekommt, wer am meisten
+Schaden am Träger angerichtet hat:
+
+- **Erkenntnisse:** Forschungspunkte in Waffen und Schilden. Bei gleichem
+  Stand sind es 20 % der nächsten Stufe, für jede Stufe, die die Aliens voraus
+  waren, 30 % mehr (höchstens 80 %) – auf *Stark* lohnt es sich also am
+  meisten. Ist man ihnen selbst voraus, gibt es nichts zu lernen.
+- **Trophäe:** Der eigene Träger, der den meisten Schaden am Alien-Träger
+  gemacht und den Kampf überstanden hat, bekommt eine Abschussmarke neben
+  seinen Namen – im Flottenpanel, auch für andere sichtbar. Seine Crew meldet
+  sich über Funk. Und die Kolonie selbst trägt ihre Abschüsse in der
+  Rangliste neben dem Namen, für alle sichtbar – auch im Nebel des Krieges.
+- **Wrack:** Der Träger bleibt 8 Runden als Wrack im Orbit liegen, voll Metall
+  (60 % des Metallpreises eines Trägers mit der Technik der Aliens). Jede
+  Flotte im Orbit birgt pro Runde ein Drittel davon, mit einem **Transporter**
+  zwei Drittel – auch eine fremde Flotte, die sich die Beute holt. Bergen
+  mehrere, teilen sie. Unter den Geschützen eines feindlichen bewohnten
+  Planeten oder neben bewaffneten Feinden im Orbit wird nicht geborgen. Das
+  Wrack steht auf der Karte und im Planetenpanel, der Haushalt rechnet das
+  Geborgene mit ein. Im freien Raum abgeschossen, nimmt die siegreiche Flotte
+  das ganze Metall sofort mit.
+
 ## Die KI-Kolonien
 
 KI-Kolonien treten unter eigenem Namen an – von *Admiral Wobblebeard* bis *Czarina

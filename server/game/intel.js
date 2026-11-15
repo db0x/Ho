@@ -10,6 +10,7 @@
 // empires stay hidden. The AI goes by the same rules.
 import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
 import { riftView } from '../aliens.js';
+import { wreckView } from '../spoils.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
 import { round1 } from './combat.js';
 import { teamOf, alliesOf, diplomacyView } from './diplomacy.js';
@@ -79,6 +80,7 @@ function snapshotPlanet(game, planet, turn, fog = false) {
     owner: planet.owner, pop: planet.pop,
     defenses: planet.defenses ? planet.defenses.length : 0,
     station: stationView(planet),
+    wreck: wreckView(game, planet.id),
     sizeFactor: planet.sizeFactor
   };
 }
@@ -198,6 +200,7 @@ export function buildView(game, player) {
         defenseShips: p.owner === player.id && p.defenses ? p.defenses.map(d => ({ type: d.type, tech: d.tech })) : null,
         defenseStats: p.owner === player.id ? defenseStats(p) : null,
         station: stationView(p, p.owner === player.id),
+        wreck: wreckView(game, p.id),
         terraBudget: p.owner === player.id ? p.terraBudget : 0,
         terraSpent: p.owner === player.id ? Math.round(p.terraSpent || 0) : 0,
         isHomeworld: !!p.isHomeworld
@@ -230,7 +233,8 @@ export function buildView(game, player) {
         ...chaseView(game, f),
         mine: true,
         ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-          ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}) })),
+          ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}),
+          ...(s.trophies ? { trophies: s.trophies } : {}) })),
         stats: fleetStats(f)
       });
       continue;
@@ -252,7 +256,8 @@ export function buildView(game, player) {
         mine: false, count: f.ships.length,
         ...(team.includes(f.owner) ? { allied: true } : {}),
         // A big ship is known by its name, like at sea.
-        ships: f.ships.map(s => ({ id: s.id, type: s.type, ...(s.name ? { name: s.name } : {}) })),
+        ships: f.ships.map(s => ({ id: s.id, type: s.type, ...(s.name ? { name: s.name } : {}),
+          ...(s.trophies ? { trophies: s.trophies } : {}) })),
         stats: { count: f.ships.length }
       });
     }
@@ -304,6 +309,8 @@ export function buildView(game, player) {
     players: game.players.map(p => ({
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       connected: p.connected, alive: p.alive, ready: p.ready,
+      // Alien carriers shot down - a trophy for everyone to see, fog or not.
+      ...(p.stats.carriers ? { carriers: p.stats.carriers } : {}),
       // With fog the tallies of other empires stay hidden - allies share theirs.
       stats: fog && !team.includes(p.id) ? null : { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }
     })),
@@ -327,6 +334,7 @@ export function buildSpectatorView(game) {
     owner: p.owner, pop: p.pop,
     defenses: p.defenses ? p.defenses.length : 0,
     station: stationView(p, true),
+    wreck: wreckView(game, p.id),
     terraBudget: p.terraBudget || 0,
     terraSpent: Math.round(p.terraSpent || 0),
     isHomeworld: !!p.isHomeworld
@@ -339,7 +347,8 @@ export function buildSpectatorView(game) {
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
       attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-      ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {})
+      ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}),
+      ...(s.trophies ? { trophies: s.trophies } : {})
     })),
     stats: fleetStats(f)
   }));
@@ -376,6 +385,7 @@ export function buildSpectatorView(game) {
       id: p.id, name: p.name, color: p.color, emblem: p.emblem, avatar: p.avatar, isBot: p.isBot, persona: p.persona,
       level: p.level,                      // spectators see how well each AI plays
       connected: p.connected, alive: p.alive, ready: p.ready,
+      ...(p.stats.carriers ? { carriers: p.stats.carriers } : {}),
       tech: { ...p.tech },
       money: Math.round(p.money), metal: Math.round(p.metal), income: Math.round(p.income || 0),
       stats: { planets: p.stats.planets, pop: p.stats.pop, ships: p.stats.ships }

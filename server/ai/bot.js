@@ -6,11 +6,11 @@
 // twins.
 //
 // A move: first the situation (situation.js), then research, diplomacy,
-// terraforming, building, intercepting, the fleets, war and wormholes - each in its own
+// terraforming, building, intercepting, wrecks, the fleets, war and wormholes - each in its own
 // module, all working on the same situation `s`.
 import { diplomacy } from './diplomacy.js';
 import { planResearch, terraform } from './economy.js';
-import { organizeFleets, orderFleets, logistics } from './fleets.js';
+import { organizeFleets, orderFleets, logistics, salvage } from './fleets.js';
 import { intercepts } from './intercept.js';
 import { scrap, build, refit } from './shipyard.js';
 import { survey, assessEnemies } from './situation.js';
@@ -34,6 +34,8 @@ export function runBot(game, bot) {
   intercepts(s);
   // --- Wormholes: a probe first, then settlers or a raid to the far side
   if (s.P.wormholes) wormholeTrips(s);
+  // Wrecks of alien carriers: metal for the taking.
+  salvage(s);
   orderFleets(s);
   if (s.hard) recall(s);
   if (s.hard) detach(s);

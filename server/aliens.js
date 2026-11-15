@@ -48,8 +48,8 @@ const hasCarrier = f => f.ships.some(s => s.type === 'alienCarrier');
  */
 const fairGame = (game, p, a) => inhabited(p) && (a?.dev || worldsOf(game, p.owner).length >= 2);
 
-/** Players who see this spot - for the log entries about rifts and swarms. */
-function watchers(game, point) {
+/** Players who see this spot - for the log entries about rifts, swarms and wrecks. */
+export function watchers(game, point) {
   return game.players.filter(p => p.alive && seesPoint(game, p.id, point)).map(p => p.id);
 }
 

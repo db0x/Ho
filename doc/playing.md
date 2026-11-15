@@ -323,6 +323,28 @@ The host sets their strength in the lobby (or switches them off):
 
 Satellites, an orbital station or a fleet in orbit stop them.
 
+**Spoils.** Whoever shoots down an alien carrier is rewarded – the colony that
+was visited, or whoever came to its aid. The kill goes to whoever did the most
+damage to the carrier:
+
+- **Insight:** research points in weapons and shields. At equal levels it is
+  20 % of the next level, 30 % more for every level the aliens were ahead (at
+  most 80 %) – so it pays most on *Strong*. Ahead of them yourself, there is
+  nothing to learn.
+- **Trophy:** your own destroyer that did the most damage to the alien carrier
+  and came through the battle gets a kill mark beside its name – in the fleet
+  panel, visible to others too. Its crew reports over the radio. And the
+  colony itself wears its kills beside its name in the ranking, for everyone
+  to see – in the fog of war too.
+- **Wreck:** the carrier stays in orbit as a wreck for 8 turns, full of metal
+  (60 % of the metal a destroyer costs at the aliens' levels). Every fleet in
+  orbit salvages a third of it per turn, two thirds with a **transporter** –
+  a foreign fleet that comes for the loot as well. Several salvagers share.
+  There is no salvage under the guns of a hostile inhabited planet or next to
+  armed enemies in orbit. The wreck shows on the map and in the planet panel,
+  and the budget counts what is salvaged. Shot down in open space, the
+  victorious fleet takes all the metal on the spot.
+
 ## The AI colonies
 
 AI colonies enter under names of their own – from *Admiral Wobblebeard* to *Czarina

@@ -7,10 +7,13 @@
 // test/budget.js checks it against what the server really books.
 //
 // What cannot be foreseen here: combat, conquest and new colonies between
-// building and settlement - they only change the income.
+// building and settlement - they only change the income. And salvage from a
+// wreck (server/spoils.js) is counted for own fleets that stay in its orbit;
+// whoever else salvages there may get a share of it.
 import {
   TECH_FIELDS, techMaxLevel, techCostToNext, BUILD_TYPES, buildCost, refitCost,
-  terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining
+  terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining,
+  SHIP_DEFS, salvageRate, travelDistance, holeZone
 } from './rules.js';
 
 /**
@@ -90,6 +93,8 @@ export function forecast(view) {
 
   // Building: world by world, per type as many as affordable - after the
   // first one that fails, the rest of that type is left over.
+  // New ships that fly join the orbit of their world - for the salvage there.
+  const launched = new Map();       // world id -> a transporter among them
   for (const [pid, q] of Object.entries(me.builds || {})) {
     if (!shipyard(view, pid)) continue;
     for (const type of BUILD_TYPES) {
@@ -99,6 +104,9 @@ export function forecast(view) {
       for (let i = 0; i < (q[type] || 0); i++) {
         if (broke) { build.planned.money += c.money; build.planned.metal += c.metal; build.planned.n++; continue; }
         broke = !book(build, c);
+        if (!broke && SHIP_DEFS[type]?.speedMul > 0) {
+          launched.set(Number(pid), launched.get(Number(pid)) || !!SHIP_DEFS[type].cargo);
+        }
       }
     }
   }
@@ -149,11 +157,59 @@ export function forecast(view) {
   const mine = view.planets.filter(p => p.owner === view.you).map(p => afterTerra.get(p.id) || p);
   const income = mine.reduce((a, p) => a + planetIncome(p), 0);
   const mining = mine.reduce((a, p) => a + planetMining(p), 0);
+  const salvage = salvageForecast(view, launched);
 
   return {
     tech, breakthrough, research, available,
-    build, refit, terra, income, mining,
+    build, refit, terra, income, mining, salvage: salvage.metal, salvageShared: salvage.shared,
     afterTerra,
-    after: { money: money + income, metal: metal + mining }
+    after: { money: money + income, metal: metal + mining + salvage.metal }
+  };
+}
+
+const allied = (view, id) => id === view.you || (view.me?.allies || []).includes(id);
+const armed = f => (f.ships || []).some(s => (SHIP_DEFS[s.type]?.attackMul || 0) > 0);
+
+/**
+ * Metal the own fleets salvage this turn: from every wreck in sight with an
+ * own fleet in its orbit that stays there, arrives there this turn or is
+ * built there (`launched`: world id -> a transporter among the new ships).
+ * `shared`: someone else is in such an orbit too, or on the way there, and
+ * may take a share.
+ */
+export function salvageForecast(view, launched = new Map()) {
+  let metal = 0, shared = false;
+  for (const w of view.planets) {
+    const x = salvageAt(view, w, launched);
+    metal += x.metal;
+    shared ||= x.metal > 0 && x.shared;
+  }
+  return { metal, shared };
+}
+
+/**
+ * The salvage at one world this turn, as the server will do it: `metal` for
+ * the own fleets, `blocked` under the guns of a hostile world or of an armed
+ * foreign fleet in that orbit, `shared` when someone else is there or on the
+ * way and may take a share.
+ */
+export function salvageAt(view, w, launched = new Map()) {
+  const none = { metal: 0, blocked: false, shared: false };
+  if (!w?.wreck || w.known !== 'live' || !(w.wreck.metal > 0) || !view.you) return none;
+  const zone = holeZone(view.galaxy);
+  const arrives = f => f.dest === w.id && f.stats?.speed > 0 && travelDistance(f, w, zone) <= f.stats.speed;
+  // A chaser whose prey sits in the same orbit stays and fights there.
+  const stays = f => !f.chase || view.fleets.find(g => g.id === f.chase)?.at === w.id;
+  const orbit = view.fleets.filter(f => f.at === w.id);
+  const own = view.fleets.filter(f => f.mine && !f.hole
+    && (f.at === w.id ? (f.dest == null || f.dest === w.id) && stays(f) : !f.chase && arrives(f)));
+  const blocked = (w.owner && w.pop >= 0.5 && !allied(view, w.owner))
+    || orbit.some(f => !allied(view, f.owner) && armed(f));
+  if (blocked) return { ...none, blocked: true };
+  if (!own.length && !launched.has(w.id)) return none;
+  const transport = launched.get(w.id) || own.some(f => f.ships.some(s => SHIP_DEFS[s.type]?.cargo));
+  return {
+    metal: Math.min(w.wreck.metal, salvageRate(w.wreck.total, transport)), blocked: false,
+    shared: view.fleets.some(f => f.owner !== view.you && (f.at === w.id || f.dest === w.id))
   };
 }

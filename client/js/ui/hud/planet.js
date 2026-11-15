@@ -5,12 +5,16 @@ import {
   habitability, planetCapacity, terraformable, terraformFullCost, terraLimits, IDEAL, planetIncome,
   planetMining, batteryStats, stationReady
 } from '../../../shared/rules.js';
+import { salvageAt } from '../../../shared/budget.js';
 import { isAlly } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { SHIELD_MIN } from '../../render/fx.js';
 import { planetThumb } from '../../render/planets.js';
 import { shipIcon } from '../../render/ships.js';
 import { fmt1, fmt, escapeHtml } from './format.js';
+
+// The wreck of an alien carrier: their green, gone dull.
+const WRECK_COLOR = '#7fa58a';
 
 export const planetMethods = {
   planetPanel(box, p) {
@@ -86,6 +90,8 @@ export const planetMethods = {
       </div>
 
       ${this.stationLine(p)}
+
+      ${this.wreckLine(p)}
 
       ${isMine ? this.defenseSection(p, orbit) : ''}
 
@@ -186,6 +192,8 @@ export const planetMethods = {
     for (const el of box.querySelectorAll('[data-station]')) {
       el.onclick = () => this.showShip('station', isMine ? me.tech : undefined, ownerP?.color);
     }
+    const wb = box.querySelector('.wreck-line .bi');
+    if (wb) wb.appendChild(shipIcon('alienCarrier', 30, WRECK_COLOR));
     const sb = box.querySelector('.station-line .bi');
     if (sb) sb.appendChild(shipIcon(stationReady(p.station) ? 'station' : 'stationSite', 30, ownerP?.color || '#9fb0c8'));
     this.wireCourse(box, p);
@@ -223,6 +231,31 @@ export const planetMethods = {
         <span><b>${t('ship.station.name')}</b> · ${state}${st.attack ? ` · ${fmt1(st.attack)} ⚔` : ''}
           <div class="meter"><i style="width:${st.maxHp ? st.hp / st.maxHp * 100 : 0}%;background:${ready ? 'var(--good)' : 'var(--gold)'}"></i></div>
           <div class="small muted">${fmt(st.hp)}/${fmt(st.maxHp)} HP${mine && ready ? ' · ' + t('planet.stationUse') : ''}</div></span>
+      </div>`;
+  },
+
+  /**
+   * The wreck of an alien carrier in the orbit (server/spoils.js) - for
+   * everyone who sees it: how much metal is left and for how long, and for
+   * the own empire whether its fleets salvage here next turn.
+   */
+  wreckLine(p) {
+    const w = p.wreck;
+    if (!w || p.known === 'unknown') return '';
+    const v = this.view;
+    const left = Math.max(1, w.until - v.turn + 1);
+    const here = salvageAt(v, p);
+    const status = p.known !== 'live' ? ''
+      : here.metal > 0 ? `<div class="small" style="color:var(--good)">${t('planet.wreckYours', { metal: fmt(here.metal) })}</div>`
+        : here.blocked && v.fleets.some(f => f.mine && (f.at === p.id || f.dest === p.id))
+          ? `<div class="small" style="color:#ffb347">${t('planet.wreckBlocked')}</div>` : '';
+    return `<div class="station-line wreck-line">
+        <span class="bi"></span>
+        <span><b>${t('planet.wreck')}</b> · ${t('planet.wreckLeft', {
+          metal: fmt(w.metal), total: fmt(w.total), turns: t('word.turns', { n: left, count: left }) })}
+          <div class="meter"><i style="width:${w.total ? w.metal / w.total * 100 : 0}%;background:${WRECK_COLOR}"></i></div>
+          ${status}
+          <div class="small muted">${t('planet.wreckHint')}</div></span>
       </div>`;
   },
 

@@ -29,6 +29,7 @@ import { speakable } from './tts.js';
  */
 export const RADIO_EVENTS = {
   'alien.appear':  { prio: 100, chance: 1,    important: true },
+  'crew.trophy':   { prio: 95,  chance: 1,    important: true },
   betray:          { prio: 90,  chance: 1,    important: true },
   war:             { prio: 85,  chance: 1,    important: true },
   victory:         { prio: 80,  chance: 0.8,  important: true },
@@ -48,6 +49,10 @@ export const RADIO_CALLS = {
   'call.engage': { prio: 1, chance: 0.6 }
 };
 export const RADIO_CALL_QUIET_TURNS = 1;
+// The listener's own crew: it speaks up when one of their destroyers shot
+// down an alien carrier (spoils.js) - in one of the crew's voices, the same
+// for the same ship.
+export const CREW = 'crew';
 // How often a line names names when it can (with the speech service).
 export const RADIO_NAMED_SHARE = 0.6;
 
@@ -124,6 +129,10 @@ export function radioTurn(game, entries, rand = Math.random) {
         const giver = byName(e.params?.player), other = byName(e.params?.other);
         if (giver?.isBot && other) want(other.id, giver.id, 'betray');
       }
+    } else if (e.type === 'alien' && e.key === 'log.alienTrophy') {
+      const ship = e.params?.vessel ?? null;
+      want(e.private, CREW, 'crew.trophy', { ship, planet: e.params?.near ?? null,
+        ...(e.planetId != null ? { where: { planetId: e.planetId } } : {}) });
     } else if (e.type === 'alien') {
       const event = e.key === 'log.alienRift' ? 'alien.appear' : e.key === 'log.alienBrokeOff' ? 'alien.defeat' : null;
       // The planet they turned up at - no battle to wait for, but a place to look at.
@@ -136,16 +145,18 @@ export function radioTurn(game, entries, rand = Math.random) {
     .filter(w => game.turn - (last[w.from] ?? -Infinity) >= quiet)
     .filter(w => rand() < rules[w.event].chance)
     .sort((a, b) => rules[b.event].prio - rules[a.event].prio)
-    .find(w => speakerOf(game, w.from) && clipsFor(clips, game, w));
+    .find(w => speakerOf(game, w.from, w.ctx) && clipsFor(clips, game, w));
   const message = (h, pick, important, short) => {
     const options = clipsFor(clips, game, pick);
     const fresh = options.filter(c => c.file !== st.lastFile[h]);
     const clip = (fresh.length ? fresh : options)[Math.floor(rand() * (fresh.length || options.length))];
     st.lastFile[h] = clip.file;
-    const speaker = speakerOf(game, pick.from);
+    const speaker = speakerOf(game, pick.from, pick.ctx);
     const event = pick.event.split('.').pop();
     const msg = {
-      t: 'radio', from: pick.from, name: pick.from === ALIEN_ID ? null : player(pick.from)?.name ?? null,
+      t: 'radio', from: pick.from,
+      // The crew goes by the name of its ship.
+      name: pick.from === ALIEN_ID ? null : pick.from === CREW ? pick.ctx?.ship ?? null : player(pick.from)?.name ?? null,
       speaker, file: clip.file, v: clip.key, text: clip.text,
       line: { say: clip.say, voice: clip.voice, speed: clip.speed },
       // For the statistics (stats.js) - counted on delivery, not sent along.
@@ -158,7 +169,7 @@ export function radioTurn(game, entries, rand = Math.random) {
     if (pick.ctx?.where) msg.where = { ...pick.ctx.where, when: pick.event === 'call.engage' ? 'start' : 'end' };
     // Sometimes with names - the fixed clip stays as the fallback.
     if (!short) {
-      const named = namedLine(radioVoices()[speaker], pick, {
+      const named = namedLine(voiceOf(speaker), pick, {
         name: msg.name, player: player(h)?.name, planet: pick.ctx?.planet, ship: pick.ctx?.ship
       }, rand);
       if (named) msg.named = { ...named, stat: `${speaker}/${event}/t${named.i}` };
@@ -263,14 +274,33 @@ export function yardLine(game, me, planetId, rand = Math.random) {
   };
 }
 
-/** The voice of a sender: its persona, or the aliens. */
-function speakerOf(game, from) {
+/**
+ * The voice of a sender: its persona, the aliens - or one of the crew's
+ * voices, picked by the name of the ship (crew1, crew2, ...).
+ */
+function speakerOf(game, from, ctx) {
   if (from === ALIEN_ID) return 'alien';
+  if (from === CREW) {
+    const n = radioVoices().crew?.voices?.length;
+    if (!n) return null;
+    let h = 0;
+    for (const ch of String(ctx?.ship ?? '')) h = (h * 31 + ch.charCodeAt(0)) | 0;
+    return `${CREW}${Math.abs(h) % n + 1}`;
+  }
   return game.players.find(p => p.id === from)?.persona ?? null;
 }
 
-function clipsFor(clips, game, { from, event }) {
-  const speaker = speakerOf(game, from);
+/** A speaker's entry in lines.json - one of several voices (crew2) with that voice set. */
+function voiceOf(speaker) {
+  const all = radioVoices();
+  if (all[speaker]) return all[speaker];
+  const m = /^(\w+?)(\d+)$/.exec(speaker);
+  const base = m && all[m[1]];
+  return base?.voices?.[m[2] - 1] ? { ...base, voice: base.voices[m[2] - 1] } : null;
+}
+
+function clipsFor(clips, game, { from, event, ctx }) {
+  const speaker = speakerOf(game, from, ctx);
   const list = clips[speaker]?.[event.split('.').pop()];
   return list?.length ? list : null;
 }

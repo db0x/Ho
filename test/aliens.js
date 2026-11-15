@@ -8,9 +8,13 @@ import { addPlayer } from '../server/game/players.js';
 import { resolveTurn } from '../server/game/turn.js';
 import { newFleet, addShip } from '../server/game/fleets.js';
 import { spawnAliens, alienTurn, alienFleets, devAliens } from '../server/aliens.js';
-import { ALIENS, ALIEN_ID, alienRules, dist } from '../shared/rules.js';
+import { ALIENS, ALIEN_ID, ALIEN_SPOILS, alienRules, dist, wreckMetal, salvageRate, alienInsight, techCostToNext } from '../shared/rules.js';
+import { wrecksOf, wreckAt } from '../server/spoils.js';
+import { forecast } from '../shared/budget.js';
+import { offerAlliance, answerOffer } from '../server/game/diplomacy.js';
 import { sanitizeSettings } from '../server/hub/lobby.js';
 import { runBot } from '../server/ai/bot.js';
+import { setOrders } from '../server/game/orders.js';
 
 let errors = 0;
 const assert = (ok, msg) => { if (!ok) { console.error('ERROR: ' + msg); errors++; } };
@@ -264,12 +268,15 @@ function swarmAt(g, world, fighters, tech) {
   g.settings.seed = 77;
   for (let i = 0; i < 6; i++) addPlayer(g, { isBot: true, level: i % 2 ? 'hard' : 'normal' });
   startGame(g);
-  let raids = 0, overruns = 0;
+  let raids = 0, overruns = 0, kills = 0, wrecks = 0, salvaged = 0;
   for (let t = 0; t < 160 && g.state === 'running'; t++) {
     for (const b of g.players.filter(p => p.alive)) runBot(g, b);
     for (const e of resolveTurn(g)) {
       if (e.key === 'log.alienRift') raids++;
       if (e.key === 'log.alienOverrun') overruns++;
+      if (e.key === 'log.alienKill' || e.key === 'log.alienKillPlain') kills++;
+      if (e.key === 'log.wreck') wrecks++;
+      if (e.key === 'log.salvaged' || e.key === 'log.salvagedAll') salvaged += e.params.metal;
     }
     for (const p of g.players) buildView(g, p);
     assert(!g.galaxy.planets.some(q => q.owner === ALIEN_ID), 'Aliens own a world');
@@ -277,7 +284,125 @@ function swarmAt(g, world, fighters, tech) {
   }
   assert(raids >= 4, `Only ${raids} raids in 160 turns with six empires`);
   const visited = Object.keys(g.aliens.visits).length;
-  console.log(`AI game: ${raids} raids, ${overruns} worlds overrun, ${visited} of 6 empires visited.`);
+  // Wrecks in orbit are worth a trip: the AI salvages them.
+  if (wrecks) assert(salvaged > 0, `${wrecks} wrecks, but the AI salvaged nothing`);
+  console.log(`AI game: ${raids} raids, ${overruns} worlds overrun, ${visited} of 6 empires visited, `
+    + `${kills} carriers shot down, ${wrecks} wrecks, ${salvaged} metal salvaged.`);
+}
+
+// 12) The spoils: whoever did the most damage to the carrier learns from it,
+// its best destroyer gets a trophy, and the wreck stays in orbit to salvage
+{
+  const g = setup(11, 2);
+  g.settings.aliens = false;           // only the swarm placed here
+  const ann = g.players[0];
+  const world = colonies(g, ann)[0];
+  ann.tech.weapons = 5; ann.tech.shields = 5;
+  ann.research.budgetPct = 0;          // no research of its own in the way
+  const tech = { weapons: 6, shields: 6, speed: 2 };
+  swarmAt(g, world, 2, tech);
+  const fleet = newFleet(g, ann.id, world);
+  addShip(g, fleet, 'destroyer', ann.tech);
+  addShip(g, fleet, 'destroyer', ann.tech);
+  for (let i = 0; i < 6; i++) addShip(g, fleet, 'fighter', ann.tech);
+  const rp = { weapons: ann.researchPoints.weapons, shields: ann.researchPoints.shields };
+  const entries = resolveTurn(g);
+  assert(!alienFleets(g).length, 'The swarm survived a fleet twice its strength');
+  const kill = entries.find(e => e.key === 'log.alienKill');
+  assert(kill && kill.private === ann.id, 'No credit for the carrier shot down');
+  const share = alienInsight(6, 5);
+  assert(kill?.params.weapons === Math.round(share * 100), `Insight ${kill?.params.weapons} % instead of ${Math.round(share * 100)} %`);
+  const gained = ann.researchPoints.weapons - rp.weapons;
+  assert(Math.abs(gained - share * techCostToNext(5)) < 1e-6 || ann.tech.weapons > 5, `Research points ${gained} instead of ${share * techCostToNext(5)}`);
+  const aces = fleet.ships.filter(s => s.trophies);
+  assert(aces.length === 1 && aces[0].type === 'destroyer' && aces[0].trophies === 1, 'Not exactly one destroyer with a trophy');
+  assert(entries.some(e => e.key === 'log.alienTrophy' && e.params.vessel === aces[0]?.name), 'The trophy is not in the log');
+  const w = wreckAt(g, world.id);
+  assert(w && w.metal === wreckMetal(tech) && w.total === w.metal, 'No wreck with the metal of the carrier in orbit');
+  const view = JSON.parse(JSON.stringify(buildView(g, ann)));
+  assert(view.planets[world.id].wreck?.metal === w.metal, 'The wreck is not in the view');
+  assert(view.fleets.find(f => f.id === fleet.id).ships.some(s => s.trophies === 1), 'The trophy is not in the view');
+  // The empire's trophy: everyone sees it in the ranking - with fog of war too.
+  g.settings.fog = true;
+  const other = buildView(g, g.players[1]);
+  assert(other.players.find(p => p.id === ann.id)?.carriers === 1, 'Others do not see the carrier shot down');
+  assert(other.players.find(p => p.id === ann.id)?.stats === null, 'Fog: the tallies should stay hidden');
+  assert(!('carriers' in other.players.find(p => p.id === g.players[1].id)), 'An empire without kills shows a trophy');
+  g.settings.fog = false;
+  // The forecast knows the salvage of the next turn - and the turn books it.
+  const f = forecast(view);
+  const rate = salvageRate(w.total, false);
+  assert(f.salvage === Math.min(w.metal, rate), `Forecast salvage ${f.salvage} instead of ${rate}`);
+  const metal = ann.metal;
+  resolveTurn(g);
+  assert(ann.ledger.salvage === Math.min(w.total, rate), `Salvaged ${ann.ledger.salvage} instead of ${rate}`);
+  assert(ann.metal >= metal + ann.ledger.salvage, 'The salvage did not reach the treasury');
+  // Salvaged to the end in ALIEN_SPOILS.haul turns, then the wreck is gone.
+  for (let t = 1; t < ALIEN_SPOILS.haul; t++) resolveTurn(g);
+  assert(!wreckAt(g, world.id), 'The wreck is still there after salvaging it all');
+  console.log(`Spoils: insight ${kill?.params.weapons} %, trophy for the ${aces[0]?.name}, wreck of ${w.total} metal salvaged in ${ALIEN_SPOILS.haul} turns.`);
+}
+
+// 13) The wreck: a transporter salvages twice as fast, allies share, a
+// hostile world keeps others away, and an untouched wreck breaks up
+{
+  const g = setup();
+  g.settings.aliens = false;
+  const [ann, bob, cid] = g.players;
+  const world = colonies(g, ann)[0];
+  const put = (owner, types) => {
+    const f = newFleet(g, owner.id, world);
+    for (const t of types) addShip(g, f, t, owner.tech);
+    return f;
+  };
+  wrecksOf(g).push({ planetId: world.id, metal: 90, total: 90, born: g.turn - 1, until: g.turn + 5 });
+  put(ann, ['transport']);
+  // Bob comes with a scout: Ann's world is hostile to him - no salvage.
+  put(bob, ['scout']);
+  resolveTurn(g);
+  assert(ann.ledger.salvage === salvageRate(90, true), `Transporter salvaged ${ann.ledger.salvage} instead of ${salvageRate(90, true)}`);
+  assert(bob.ledger.salvage === 0, 'Salvage under the guns of a hostile world');
+  // Allied, Bob takes his share.
+  offerAlliance(g, ann, bob.id, false);
+  answerOffer(g, bob, ann.id, true);
+  g.fleets = g.fleets.filter(f => f.owner !== ALIEN_ID);
+  put(bob, ['scout']);
+  const left = wreckAt(g, world.id).metal;
+  resolveTurn(g);
+  const got = ann.ledger.salvage + bob.ledger.salvage;
+  assert(g.alliances.length === 1, 'No alliance for the test');
+  assert(got === left && bob.ledger.salvage > 0 && ann.ledger.salvage > bob.ledger.salvage,
+    `Allies did not share the rest (${ann.ledger.salvage} + ${bob.ledger.salvage} of ${left})`);
+  assert(!wreckAt(g, world.id), 'The wreck is not empty');
+  // A wreck nobody comes for breaks up after its time.
+  const lone = colonies(g, cid)[0];
+  wrecksOf(g).push({ planetId: lone.id, metal: 50, total: 50, born: g.turn - 1, until: g.turn });
+  const gone = resolveTurn(g);
+  assert(!wreckAt(g, lone.id) && gone.some(e => e.key === 'log.wreckGone'), 'An old wreck did not break up');
+  console.log(`Wreck: transporter ${salvageRate(90, true)}/turn, allies shared ${left}, an old one broke up.`);
+}
+
+// 14) Shot down in open space: the victor's fleet takes the wreck on the spot
+{
+  const g = setup();
+  g.settings.aliens = false;
+  const ann = g.players[0];
+  const world = colonies(g, ann)[0];
+  const tech = { weapons: 3, shields: 3, speed: 2 };
+  const al = swarmAt(g, world, 1, tech);
+  al.at = null; al.x = world.x + 300; al.y = world.y; al.dest = world.id;
+  const hunter = newFleet(g, ann.id, world);
+  for (let i = 0; i < 10; i++) addShip(g, hunter, 'fighter', ann.tech);
+  setOrders(g, ann, { move: { fleetId: hunter.id, chase: al.id } });
+  let taken = null;
+  for (let t = 0; t < 6 && !taken; t++) {
+    const entries = resolveTurn(g);
+    taken = entries.find(e => e.key === 'log.wreckTaken');
+    if (taken) assert(ann.ledger.salvage === wreckMetal(tech), `Took ${ann.ledger.salvage} instead of ${wreckMetal(tech)}`);
+  }
+  assert(taken, 'No wreck taken after a battle in open space');
+  assert(!wrecksOf(g).length, 'A wreck in open space stayed on the map');
+  console.log(`Open space: ${taken?.params.metal} metal taken on the spot.`);
 }
 
 if (errors) { console.error(`\n${errors} alien checks failed.`); process.exit(1); }
