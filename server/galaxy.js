@@ -40,9 +40,9 @@ const MIN_GAP = 78;
 // really flies out - otherwise the next world would sit right at the new
 // border again and the galaxy would keep growing by itself.
 const MARGIN = 110;
-// 3D mode: the galaxy is a lens - wide in the plane, about 40 % of that in
-// height, and thinner towards the edge.
-const DEPTH_RATIO = 0.3;        // half thickness, relative to the shorter edge
+// 3D mode: the galaxy is a flat lens - wide in the plane, only about a sixth
+// of that in height, and thinner still towards the edge.
+const DEPTH_RATIO = 0.12;       // half thickness, relative to the shorter edge
 
 /**
  * Deterministic random numbers for map and combat: the same seed gives the
@@ -474,7 +474,7 @@ function ensureNeighbours(planets, home, names, rng, zone, b, minGap) {
     const d = minGap * 1.15 + rng() * (NEIGHBOUR_REACH - minGap * 1.15);
     const a = rng() * Math.PI * 2;
     // In 3D also up or down, but flat - the lens is thin.
-    const tilt = b.halfDepth ? (rng() * 2 - 1) * 0.5 : 0;
+    const tilt = b.halfDepth ? (rng() * 2 - 1) * 0.25 : 0;
     const p = {
       x: home.x + Math.cos(a) * Math.cos(tilt) * d,
       y: home.y + Math.sin(a) * Math.cos(tilt) * d,
