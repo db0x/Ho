@@ -956,6 +956,11 @@ body.fx-lite #rightdock.scan::before { display: none; }
 .shipitem.named .hp { flex: none; white-space: nowrap; }
 .shipitem .rename { flex: none; padding: 2px 7px; }
 .shipitem .rename-input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13.5px; }
+/* Desktop: the ships large, turning in three dimensions (shipthumbs.js). */
+.shiplist.big .shipitem { padding: 2px 10px 2px 2px; gap: 6px; }
+.shiplist.big .gi { flex: none; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; }
+.shiplist.big .gi canvas { display: block; }
+.shiplist.big .hp { flex: none; white-space: nowrap; }
 .hint-line { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
 /* Defense and fleets in orbit */
 .def-warn { margin: 0 0 8px; padding: 6px 9px; border-radius: 7px; font-size: 13px;

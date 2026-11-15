@@ -14,8 +14,8 @@
 import { shipProfile } from './shipshd.js';
 import { plume, light, tone, poly } from './shipshd/kit.js';
 
-const TEX = 1024;        // the hull's skin, pixels along an edge
-const FX = 512;          // flames and lights
+const TEX_FULL = 1024;   // the hull's skin, pixels along an edge
+const FX_FULL = 512;     // flames and lights
 const DT = 512;          // resolution the distance to the outline is measured at
 const GRID = 192;        // cells of the relief along an edge
 /** Up to this distance from the outline the hull gets thicker (units of ship length / 100) ... */
@@ -24,7 +24,10 @@ const RELIEF_R = 13;
 const RELIEF_H = 9;
 const BELLY = 0.7;
 const FOV = 26 * Math.PI / 180;
-const KEEP = 6;          // models kept ready
+const KEEP_FULL = 6;     // models kept ready
+
+/** Size on a stage per type, 1 = the hull's circle touches the edge. */
+export const SOLID_FILL = { colony: 0.9, destroyer: 1.1 };
 
 // A wall takes its color from a little way inside the part it belongs to -
 // on the outline itself the drawing only has its dark contour.
@@ -407,9 +410,13 @@ const flameLen = e => e.r * 4.3 * (e.len || 1);
 /**
  * A stage for ships in three dimensions on a canvas of its own.
  * @param {HTMLCanvasElement} canvas
+ * @param {{tex?: number, fx?: number, keep?: number}} [opt] resolution of the
+ *   skin and of what moves, and how many models are kept ready - smaller for
+ *   small pictures
  * @returns {{draw: (o: object) => boolean} | null} null where WebGL is missing
  */
-export function shipStage3D(canvas) {
+export function shipStage3D(canvas, opt = {}) {
+  const TEX = opt.tex || TEX_FULL, FX = opt.fx || FX_FULL, KEEP = opt.keep || KEEP_FULL;
   let gl = null, ok = true;
   try {
     gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: true });

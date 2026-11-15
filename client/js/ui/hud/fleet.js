@@ -8,6 +8,8 @@ import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
 import { courseTarget, portalsOf } from '../../render/courses.js';
 import { shipIcon } from '../../render/ships.js';
+import { shipThumb3D } from '../../render/shipthumbs.js';
+import { compact } from '../viewport.js';
 import { genOf, bestFighter, MARK } from '../../render/fighterlook.js';
 import { openSplit } from '../../ui/split.js';
 import { escapeHtml, fmt, fmt1 } from './format.js';
@@ -26,6 +28,9 @@ const FA_ICON = {
   jump: svg('<circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.6"/><path d="M8 4.6a3.4 3.4 0 1 1-3.1 4.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/>'),
   recycle: svg('<path d="M12.6 6.2A5 5 0 0 0 3.6 5.4M3.4 9.8a5 5 0 0 0 9 .8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M3.2 2.6v3h3M12.8 13.4v-3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>')
 };
+
+/** Edge of a ship's picture in the fleet panel on the desktop, CSS pixels. */
+const SHIP_THUMB = 64;
 
 export const fleetMethods = {
   fleetPanel(box, f) {
@@ -140,9 +145,13 @@ export const fleetMethods = {
 
     const col = (f.mine && v.me) ? v.me.color
       : ownerColor(v, f.owner, '#9fb0c8');
+    // On the desktop there is room: the ships large and in three dimensions,
+    // turning. On the phone, or without WebGL, the small flat icons.
+    const big = !compact.matches;
+    box.querySelector('.shiplist')?.classList.toggle('big', big);
     for (const g of box.querySelectorAll('.gi')) {
       const ship = g.dataset.group ? lead(groups[g.dataset.group]) : f.ships.find(s => s.id === g.closest('[data-ship]')?.dataset.ship);
-      g.appendChild(shipIcon(g.dataset.t, 26, col, ship?.tech));
+      g.appendChild((big && shipThumb3D(g.dataset.t, SHIP_THUMB, col, ship?.tech)) || shipIcon(g.dataset.t, big ? 40 : 26, col, ship?.tech));
     }
     fillTrophies(box);
     // The built-in tech of these ships, not the current levels

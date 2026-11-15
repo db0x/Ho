@@ -6,7 +6,7 @@
 import { SHIP_DEFS, BUILD_TYPES, ALIEN_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
 import { shipIcon, UPRIGHT } from '../render/ships.js';
 import { drawShipHD } from '../render/shipshd.js';
-import { shipStage3D } from '../render/ships3d.js';
+import { shipStage3D, SOLID_FILL } from '../render/ships3d.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';
 
 const fmt = n => Math.round(n).toLocaleString(localeTag());
@@ -15,9 +15,8 @@ const STAGE = 250;           // edge length of the stage in CSS pixels
 // Size on the stage relative to the others.
 const STAGE_SIZE = { colony: 0.9, destroyer: 0.88, station: 0.92, stationSite: 0.92, alienFighter: 1.35, alienCarrier: 1.35 };
 
-// In space: size on the stage, how far the view comes down from straight
+// In space: how far the view comes down from straight
 // above, and how fast the ship turns by itself (radians per second).
-const SOLID_FILL = { colony: 0.9, destroyer: 1.1 };
 const TILT = 0.95, TILT_MAX = 2.7, TURN = 0.45;
 
 let modal = null, frame = 0, current = null;
