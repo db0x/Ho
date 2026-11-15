@@ -162,9 +162,9 @@ function drawScout(ctx, L, color, phase) {
 /* -------------------------------------------------------------- Fighter */
 function drawFighter(ctx, L, color, phase, look = PLAIN) {
   // The same outlines as the detailed drawing (fighterlook.js, units of
-  // L/100): Mk I after the Viper Mk VII in plan view - a straight wedge of a
-  // fuselage, the blue canopy in front of big swept wings, gun pods beneath
-  // the wings near the tips, a dorsal spine, three engines. Mk II and III
+  // L/100): Mk I a slender fuselage with the blue canopy far forward, short
+  // clipped wings set well aft with gun pods on the tips, a dorsal spine,
+  // three engines bunched together. Mk II and III
   // change the outline; nozzles and flame follow the drive. Missiles, tanks
   // and shield emitters only once the ship is big enough to show them.
   const G = GENS[look.gen];
@@ -176,14 +176,7 @@ function drawFighter(ctx, L, color, phase, look = PLAIN) {
   for (const [i, e] of eng.entries()) engineGlow(ctx, (e.x - 2) * u, e.y * u, e.r * 6 * u * FLAME_LEN[look.v] ** 0.5, phase + i * 0.9, FLAME[look.v]);
   const [[ax, ay], [bx, by]] = G.wing;
   for (const s of [-1, 1]) {
-    // Gun pod beneath the wing: only its front and the barrel show
-    const y = s * G.podY * u, lx = podX(G);
-    ctx.strokeStyle = look.w === 3 ? '#8fe6ff' : '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
-    ctx.beginPath(); ctx.moveTo(lx * u, y); ctx.lineTo((lx + (look.w === 3 ? 8 : 4.5)) * u, y); ctx.stroke();
-    ctx.fillStyle = '#8994a8';
-    ctx.beginPath(); ctx.roundRect((lx - 13) * u, y - 1.3 * u, 13 * u, 2.6 * u, 1.3 * u); ctx.fill();
-    outline(ctx, fine(L) * 0.6);
-    // Big swept silver wings - the empire color sits on the fuselage stripes
+    // Short silver wings - the empire color sits on the fuselage stripes
     P(G.wing, s); ctx.closePath();
     ctx.fillStyle = '#b4bfd0'; ctx.fill();
     // Light from above: the lower wing lies in shade, both darken outwards
@@ -197,9 +190,12 @@ function drawFighter(ctx, L, color, phase, look = PLAIN) {
       ctx.fillStyle = 'rgba(70,80,100,.55)'; ctx.fill();
     }
     seam(ctx, L, [[(ax - 6) * u, s * (ay + 1.5) * u], [(bx - 4.6) * u, s * (by - 0.8) * u]]);
-    // Rail along the straight wing tip
-    ctx.fillStyle = '#aab4c6';
-    ctx.beginPath(); ctx.roundRect(G.tip.x0 * u, s * (by + 0.7) * u - 0.8 * u, (G.tip.x1 - G.tip.x0) * u, 1.6 * u, 0.8 * u); ctx.fill();
+    // Gun pod on the wing tip, the barrel reaching past the leading edge
+    const y = s * G.podY * u, lx = podX(G);
+    ctx.strokeStyle = look.w === 3 ? '#8fe6ff' : '#c3ccd8'; ctx.lineWidth = Math.max(0.6, L * 0.018);
+    ctx.beginPath(); ctx.moveTo(lx * u, y); ctx.lineTo((lx + (look.w === 3 ? 8 : 4.5)) * u, y); ctx.stroke();
+    ctx.fillStyle = '#9aa5b8';
+    ctx.beginPath(); ctx.roundRect((lx - 15) * u, y - 1.7 * u, 16 * u, 3.4 * u, 1.7 * u); ctx.fill();
     outline(ctx, fine(L) * 0.6);
     if (G.canards) {
       P(G.canards, s); ctx.closePath();

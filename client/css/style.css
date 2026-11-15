@@ -1389,6 +1389,8 @@ kbd { display: inline-block; min-width: 2em; padding: 3px 9px; margin: 2px 0; bo
   border: 1px solid var(--line); background: radial-gradient(circle at 50% 42%, #1c2748 0%, #0b1020 60%, #05070f 100%);
   box-shadow: inset 0 0 40px rgba(0, 0, 0, .5); }
 .si-stage canvas { grid-area: 1 / 1; }
+/* The fighter's generations beneath its picture */
+.si-variants { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; width: 266px; }
 .si-solid { cursor: grab; touch-action: pan-y; }
 .si-solid.turning { cursor: grabbing; }
 .si-text h2 { margin: 0 0 4px; }
@@ -1397,7 +1399,7 @@ kbd { display: inline-block; min-width: 2em; padding: 3px 9px; margin: 2px 0; bo
 .si-use { margin: 0; color: var(--ink-dim); font-size: 14px; }
 @media (max-width: 680px) {
   .si-body { grid-template-columns: 1fr; }
-  .si-stage { margin: 0 auto; }
+  .si-stage, .si-variants { margin-left: auto; margin-right: auto; }
 }
 /* Battle window */
 .battle-box { width: min(980px, 96vw); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }

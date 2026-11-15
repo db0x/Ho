@@ -2,7 +2,7 @@
 // with the generation (Mk I - III, from weapons, shields and speed), the
 // equipment with each research field in four steps. Shared by the detailed
 // drawing (shipshd/fighter.js) and the map icon (ships.js), so both show the
-// same ship. Mk I with nothing researched is the fighter as it always was.
+// same ship.
 
 /** Step of a research field: 1-9, 10-19, 20-29, 30-40. */
 export const tierOf = (level) => level < 10 ? 0 : level < 20 ? 1 : level < 30 ? 2 : 3;
@@ -39,38 +39,41 @@ export const FLAME_LEN = [1, 1.25, 1.3, 1.45];
 
 /**
  * The outlines on a grid of 100 units of ship length, pointing to +x.
- * Mk I is the fighter as before (after the Viper Mk VII in plan view).
+ * An interceptor of its own: a slender, almost parallel fuselage, the
+ * canopy well forward and running into the dorsal spine, a wider engine section at the back
+ * with the nozzles bunched together, short clipped wings set well aft with
+ * a gun pod on each tip, and a tall tail.
  */
 export const GENS = [
-  { // Mk I: straight wedge of a fuselage, big swept wings, one tail fin
-    hull: [[60, 1.1], [58, 1.9], [56, 2.1], [2, 12.4], [-10, 11.2], [-24, 10.2], [-31, 9.4], [-40, 8.4], [-43, 7.4], [-45, 5.6]],
-    nose: 60, tail: -45,
-    wing: [[3, 11.5], [-12.4, 30.4], [-21.6, 30.4], [-24.6, 15.6], [-27.4, 12.4], [-31.5, 9]],
-    podY: 26, tip: { x0: -22.6, x1: -8.6 },
-    spine: [[-1, 0], [-3, -3.4], [-28, -3.8], [-37, -3], [-44, -1.8], [-45, 0]],
+  { // Mk I: slim fuselage, short clipped delta wings, one tall fin
+    hull: [[46, 1.2], [45, 2.6], [42, 4], [34, 5.4], [30, 6], [18, 7], [0, 7.4], [-12, 7.8], [-20, 9.6], [-34, 10], [-40, 9.4], [-43, 7.8], [-44, 5.8]],
+    nose: 46, tail: -44,
+    wing: [[-2, 7.5], [-22, 26], [-30, 26], [-33, 14], [-37, 10]],
+    podY: 26.6, tip: { x0: -31, x1: -18 },
+    spine: [[16, 0], [14, -3.2], [-26, -3.4], [-36, -2.6], [-43, -1.6], [-44, 0]],
     fins: 'single', canards: null,
-    cab: [[16.5, 0], [15.6, -2.6], [13, -3.8], [1.5, -3.8], [-0.4, -2.6], [-0.8, 0]], cabTint: '#4f7cf0',
-    seams: [46, 30, -8, -22, -36], stripeFrom: 34, engX: -50, r: 62
+    cab: [[30, 0], [29, -2.4], [26.5, -3.6], [14, -3.6], [12, -2.8], [11.5, 0]], cabTint: '#4f7cf0',
+    seams: [38, 22, 4, -14, -30], stripeFrom: 32, engX: -49, r: 56
   },
-  { // Mk II: longer nose with canards, sharper sweep, twin tail
-    hull: [[66, 1], [64, 2], [60, 2.6], [22, 8.4], [0, 11.6], [-14, 11], [-28, 10], [-38, 9], [-44, 7.6], [-47, 5.8]],
-    nose: 66, tail: -47,
-    wing: [[-2, 11.2], [-23, 36], [-31, 36], [-31.5, 19], [-35, 13.5], [-39, 9.4]],
-    podY: 31, tip: { x0: -32, x1: -19 },
-    spine: [[4, 0], [2, -3.2], [-30, -3.6], [-40, -2.8], [-46, -1.6], [-47, 0]],
-    fins: 'twin', canards: [[36, 7], [25, 15.5], [20.5, 15.5], [22, 8]],
-    cab: [[27, 0], [26, -2.6], [22.5, -3.6], [6, -3.6], [4, -2.4], [3.5, 0]], cabTint: '#4fb6f0',
-    seams: [52, 40, 12, -12, -26, -40], stripeFrom: 44, engX: -52, r: 66
+  { // Mk II: longer, wider wings, twin tail
+    hull: [[52, 1.2], [51, 2.6], [48, 4], [40, 5.6], [36, 6.2], [22, 7.3], [2, 7.6], [-12, 8.2], [-20, 10.2], [-34, 10.6], [-41, 10], [-45, 8.2], [-46, 6]],
+    nose: 52, tail: -46,
+    wing: [[0, 7.6], [-21, 30], [-30, 30], [-33, 16], [-38, 10.6]],
+    podY: 30.6, tip: { x0: -31, x1: -17 },
+    spine: [[21, 0], [19, -3.2], [-28, -3.4], [-38, -2.6], [-45, -1.6], [-46, 0]],
+    fins: 'twin', canards: null,
+    cab: [[36, 0], [35, -2.4], [32.5, -3.6], [19, -3.6], [17, -2.8], [16.5, 0]], cabTint: '#4fb6f0',
+    seams: [44, 28, 10, -12, -28, -40], stripeFrom: 38, engX: -51, r: 60
   },
-  { // Mk III: delta with the fuselage blended into the wing, canted fins, golden canopy
-    hull: [[64, 0.8], [62, 1.8], [58, 2.8], [32, 6.4], [12, 10.4], [-16, 12.6], [-36, 12.2], [-45, 10.4], [-50, 7.4]],
-    nose: 64, tail: -50,
-    wing: [[24, 7.4], [-30, 39], [-39, 39], [-41, 24], [-45.5, 14], [-49, 9.6]],
-    podY: 33, tip: { x0: -40, x1: -26 },
-    spine: [[10, 0], [8, -3], [-34, -4.2], [-44, -3.4], [-49, -2], [-50, 0]],
+  { // Mk III: the fuselage blended into a cranked arrow wing, canted fins, golden canopy
+    hull: [[56, 1.1], [55, 2.4], [52, 3.8], [42, 5.6], [38, 6.2], [22, 8], [0, 9.6], [-20, 11], [-36, 11.4], [-45, 10], [-50, 7.2]],
+    nose: 56, tail: -50,
+    wing: [[14, 8.4], [-28, 32], [-36, 32], [-40, 20], [-45, 13], [-49, 9]],
+    podY: 32.6, tip: { x0: -37, x1: -24 },
+    spine: [[23, 0], [21, -3.4], [-34, -4.2], [-44, -3.4], [-49, -2], [-50, 0]],
     fins: 'canted', canards: null,
-    cab: [[37, 0], [36, -2.4], [32.5, -3.4], [17, -3.4], [15, -2.2], [14.6, 0]], cabTint: '#e8b04a',
-    seams: [50, 38, 0, -20, -38], stripeFrom: 46, engX: -54, r: 68
+    cab: [[38, 0], [37, -2.4], [34, -3.6], [21, -3.6], [19, -2.6], [18.6, 0]], cabTint: '#e8b04a',
+    seams: [46, 32, 4, -20, -38], stripeFrom: 40, engX: -54, r: 64
   }
 ];
 
@@ -89,7 +92,7 @@ export function leadX(G, y) {
   return x0 + (x1 - x0) * (y - y0) / (y1 - y0);
 }
 
-/** Front of the gun pods: a little ahead of the leading edge, as on the Mk I of old. */
+/** Front of the gun pods on the wing tips: a little ahead of the leading edge. */
 export function podX(G) {
   return leadX(G, G.podY) + 4.8;
 }

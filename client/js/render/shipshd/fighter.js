@@ -1,10 +1,10 @@
 // Ship profile: fighter (see ../shipshd.js). Its look follows the tech it
 // was built with (../fighterlook.js): the outline by generation Mk I - III,
 // guns, armour, nozzles and tanks by the step of each research field.
-// Mk I with nothing researched is the fighter as before: after the Viper
-// Mk VII in plan view - a straight wedge of a fuselage, the blue canopy in
-// front of big swept wings, gun pods beneath the wings near the tips, a
-// dorsal spine with the tail fin and three engines in a cage.
+// Mk I with nothing researched: a slender fuselage with a long nose, the
+// blue canopy far forward, short clipped wings set well aft with a gun pod
+// on each tip, a dorsal spine with a tall tail fin and three engines bunched
+// in a cage behind a wider engine section.
 import {
   RED, GREEN, WHITE, nozzle, capsule, inside, seam, TAU, poly, tone, fillShadowed, bevel, metal, sym,
   vents, rivets, glass, light
@@ -14,27 +14,11 @@ import { GENS, FLAME, FLAME_LEN, fighterLook, halfWidth, leadX, podX, engineLayo
 // Silver of the fighter's wings, a touch brighter than the fuselage.
 const WING = '#b4bfd0';
 const ENERGY = '#5fd2ff';
+/** The gun pods on the wing tips: radius and length. */
+const POD_R = 1.7, POD_LEN = 15;
 
 function wingParts(ctx, G, look, color, S, s) {
   const { w: tw, s: ts, r: tr } = look;
-  // Gun pod beneath the wing near the tip: the wing covers its rear, the
-  // barrel reaches past the leading edge. Doubled barrels from weapons 2,
-  // energy guns with coils from weapons 4.
-  const cy = s * G.podY;
-  const lx = podX(G);
-  const laser = tw === 3;
-  const pod = capsule(ctx, lx - 13, lx + 1, cy, laser ? 1.6 : 1.3, laser ? '#8b95ad' : '#9aa6b8', S * 0.6);
-  inside(ctx, pod, () => seam(ctx, lx - 2.5, cy - 1.6, lx - 2.5, cy + 1.6, 0.25));
-  const bl = laser ? 8 : 4.4;
-  for (const o of tw >= 1 ? [-0.7, 0.7] : [0]) {
-    ctx.fillStyle = laser ? '#3b4660' : '#2a303d'; ctx.fillRect(lx, cy + o - 0.42, bl, 0.84);
-    if (!laser) { ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(lx + bl + 0.1, cy + o, 0.55, 0, TAU); ctx.fill(); }
-  }
-  if (laser) {
-    ctx.strokeStyle = ENERGY; ctx.lineWidth = 0.35;
-    for (const x of [lx + 2, lx + 4, lx + 6]) { ctx.beginPath(); ctx.moveTo(x, cy - 1.7); ctx.lineTo(x, cy + 1.7); ctx.stroke(); }
-  }
-
   // The wing - silver, the empire color sits on the fuselage stripes instead
   const w = () => poly(ctx, G.wing.map(([x, y]) => [x, s * y]));
   w();
@@ -88,12 +72,26 @@ function wingParts(ctx, G, look, color, S, s) {
     poly(ctx, [[ax, s * ay], [bx, s * by], [bx - 1.2, s * (by - 1)], [ax - 1.2, s * (ay + 0.1)]]); ctx.fill();
   });
   bevel(ctx, w, 0.8);
-  // Rail along the wing tip, a little ahead of the leading edge
-  const ry = by + 0.7, { x0, x1 } = G.tip;
-  const rail = () => poly(ctx, [[x1, s * ry], [x1 - 1.4, s * (ry - 0.8)], [x0 + 0.6, s * (ry - 0.8)], [x0, s * ry],
-    [x0 + 0.6, s * (ry + 0.8)], [x1 - 1.4, s * (ry + 0.8)]]);
-  rail(); fillShadowed(ctx, metal(ctx, s * (ry - 0.8), s * (ry + 0.8), '#aab6c8'), S * 0.5);
-  bevel(ctx, rail, 0.35);
+  // Gun pod on the wing tip, the barrel reaching past the leading edge.
+  // Doubled barrels from weapons 2, energy guns with coils from weapons 4.
+  const cy = s * G.podY;
+  const lx = podX(G);
+  const laser = tw === 3;
+  const pr = laser ? POD_R + 0.3 : POD_R;
+  const pod = capsule(ctx, lx - POD_LEN, lx + 1, cy, pr, laser ? '#8b95ad' : '#a4afc1', S * 0.6);
+  inside(ctx, pod, () => {
+    for (const x of [lx - 2.5, lx - POD_LEN + 4]) seam(ctx, x, cy - pr, x, cy + pr, 0.25);
+    ctx.fillStyle = color; ctx.fillRect(lx - 7, cy - pr, 1.6, pr * 2);
+  });
+  const bl = laser ? 8 : 4.4;
+  for (const o of tw >= 1 ? [-0.7, 0.7] : [0]) {
+    ctx.fillStyle = laser ? '#3b4660' : '#2a303d'; ctx.fillRect(lx, cy + o - 0.42, bl, 0.84);
+    if (!laser) { ctx.fillStyle = '#ff8a5c'; ctx.beginPath(); ctx.arc(lx + bl + 0.1, cy + o, 0.55, 0, TAU); ctx.fill(); }
+  }
+  if (laser) {
+    ctx.strokeStyle = ENERGY; ctx.lineWidth = 0.35;
+    for (const x of [lx + 2, lx + 4, lx + 6]) { ctx.beginPath(); ctx.moveTo(x, cy - 1.7); ctx.lineTo(x, cy + 1.7); ctx.stroke(); }
+  }
 
   // Canards (Mk II)
   if (G.canards) {
@@ -311,9 +309,9 @@ export const fighter = {
   },
   /** Moving parts: glowing energy guns, shield emitters, the shield bubble. */
   // In space: the wings are thin plates angled down from the fuselage to
-  // their tips, and what hangs on them follows; the fuselage is low at the
-  // nose and tall at the stern, the canopy a bubble of glass on top of it,
-  // the dorsal spine a ridge behind it. The tail stands up: one fin on the
+  // their tips, the gun pods tubes on the tips; the fuselage is low at the
+  // nose and tall at the stern, the canopy and the dorsal spine one back
+  // on top of it. The tail stands up: one fin on the
   // spine (Mk I), two (Mk II), two canted outwards (Mk III).
   solid(look) {
     const G = GENS[look.gen];
@@ -324,10 +322,33 @@ export const fighter = {
         r: 2.5, h: 1.2, belly: 1, z: (x, y) => 0.6 + droop(x, y),
         path: (ctx) => poly(ctx, G.wing.map(([x, y]) => [x, s * y]))
       })),
-      { over: true, r: 4, h: 3.4, belly: 0, z: 6.4, path: (ctx) => sym(ctx, G.spine) },
-      { over: true, r: 3.8, h: 4.6, belly: 0, z: 6.2, path: (ctx) => sym(ctx, G.cab) }
+      // The gun pods: tubes on the wing tips
+      ...[-1, 1].map(s => ({
+        over: true, round: true, r: POD_R + 0.3, h: POD_R + 0.3, belly: 1, z: 0.6 + droop(0, G.podY),
+        path: (ctx) => { const lx = podX(G); ctx.beginPath(); ctx.roundRect(lx - POD_LEN, s * G.podY - POD_R - 0.3, POD_LEN + 1, (POD_R + 0.3) * 2, POD_R); }
+      })),
+      // Canopy and spine are one back: the spine starts beneath the canopy as
+      // wide as it and falls off towards the stern; the canopy rises from a
+      // sloping windscreen and runs into it at the same height.
+      { over: true, r: 3.6, h: 3.6, belly: 0, z: 5.6, path: (ctx) => sym(ctx, G.spine),
+        scale: (x) => 0.55 + 0.45 * Math.min(1, Math.max(0, (x - G.tail) / (G.spine[1][0] - G.tail))) },
+      // The canopy is set lower rather than flattened at the windscreen and
+      // its back: flattened, its rim would fall off too gently and pull the
+      // edge of the fuselage up beneath it.
+      { over: true, r: 3.6, h: 5, belly: 0, path: (ctx) => sym(ctx, G.cab),
+        z: (x) => {
+          const front = G.cab[0][0], back = G.cab[G.cab.length - 1][0];
+          return 6 - 4.4 * Math.max(0, 1 - (front - x) / 8) - 1.4 * Math.max(0, 1 - (x - back) / 6);
+        } }
     ];
-    const hull = { r: 11, h: 7.6, belly: 0.75, z: droop };
+    // The fuselage has the same cross-section from nose to stern - a flat
+    // top, steep sides, rounded edges - and the nose is a straight wedge
+    // from a thin tip to the full height at the windscreen.
+    const xj = G.cab[0][0] - 3;
+    const hull = {
+      r: 4.6, h: 7.6, belly: 0.72, z: droop,
+      scale: (x) => 0.12 + 0.88 * Math.min(1, Math.max(0, (G.nose - x) / (G.nose - xj)))
+    };
     const under = true;
     if (G.fins === 'single') return { under, hull, parts, blades: [{ x0: -14, x1: -43, y: 0, z: 8, h: 14 }] };
     const off = G.fins === 'twin' ? 6.2 : 8, lean = G.fins === 'canted' ? 6 : 0;

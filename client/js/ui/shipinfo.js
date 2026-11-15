@@ -5,6 +5,7 @@
 // drawn at a slant around its world already - it is the flat drawing.
 import { SHIP_DEFS, BUILD_TYPES, ALIEN_TYPES, shipCost, shipStats, TECH_START_LEVEL, TECH_FIELDS } from '../../shared/rules.js';
 import { shipIcon, UPRIGHT } from '../render/ships.js';
+import { MARK } from '../render/fighterlook.js';
 import { drawShipHD } from '../render/shipshd.js';
 import { shipStage3D, SOLID_FILL } from '../render/ships3d.js';
 import { t, localeTag, onLocaleChange } from '../i18n.js';
@@ -19,6 +20,11 @@ const STAGE_SIZE = { colony: 0.9, destroyer: 0.88, station: 0.92, stationSite: 0
 // above, and how fast the ship turns by itself (radians per second).
 const TILT = 0.95, TILT_MAX = 2.7, TURN = 0.45;
 
+// The fighter changes its look with tech (fighterlook.js). Its profile can
+// show each generation: tech levels typical of Mk I, II and III - picture
+// and stats together, so they always belong to each other.
+const FIGHTER_GENS = [5, 18, 32];
+
 let modal = null, frame = 0, current = null;
 /** The stage in space: null without WebGL. */
 let solid = null;
@@ -32,7 +38,10 @@ function build() {
   modal.innerHTML = `<div class="modal-box shipinfo-box">
     <div class="si-tabs"></div>
     <div class="si-body">
-      <div class="si-stage"><canvas class="si-flat"></canvas><canvas class="si-solid hidden"></canvas></div>
+      <div class="si-side">
+        <div class="si-stage"><canvas class="si-flat"></canvas><canvas class="si-solid hidden"></canvas></div>
+        <div class="si-variants hidden"></div>
+      </div>
       <div class="si-text"></div>
     </div>
     <button class="primary si-close"></button>
@@ -98,7 +107,7 @@ export function needsText(need) {
 export function openShipInfo(type, o = {}) {
   if (!SHIP_DEFS[type]) return;
   if (!modal) build();
-  current = { type, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '', types: o.types || [...BUILD_TYPES, ...ALIEN_TYPES] };
+  current = { type, own: o.tech || {}, gen: null, tech: o.tech || {}, color: o.color || '#4da6ff', note: o.note || '', types: o.types || [...BUILD_TYPES, ...ALIEN_TYPES] };
   modal.querySelector('.si-close').textContent = t('shipinfo.close');
   render();
   modal.classList.remove('hidden');
@@ -112,7 +121,29 @@ function close() {
   modal?.classList.add('hidden');
 }
 
+/** The generation buttons beneath the fighter: its own tech, Mk I - III. */
+function variants() {
+  const box = modal.querySelector('.si-variants');
+  const show = current.type === 'fighter';
+  box.classList.toggle('hidden', !show);
+  current.tech = show && current.gen != null
+    ? Object.fromEntries(TECH_FIELDS.map(f => [f, FIGHTER_GENS[current.gen]]))
+    : current.own;
+  if (!show) return;
+  box.innerHTML = '';
+  for (const g of [null, 0, 1, 2]) {
+    const b = document.createElement('button');
+    b.className = 'tiny' + (g === current.gen ? ' primary' : '');
+    b.textContent = g == null ? t('shipinfo.variantOwn') : 'Mk ' + MARK[g];
+    b.title = g == null ? t('shipinfo.variantOwnTip') : t('shipinfo.variantTip', { level: FIGHTER_GENS[g] });
+    b.setAttribute('aria-pressed', String(g === current.gen));
+    b.onclick = () => { current.gen = g; render(); };
+    box.appendChild(b);
+  }
+}
+
 function render() {
+  variants();
   const { type, tech, color, note } = current;
   const def = SHIP_DEFS[type];
   const st = shipStats(type, tech);
