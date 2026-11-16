@@ -9,7 +9,8 @@
 //   - size and brightness by distance.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, fleetScale, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
+import { drawFleetSolid } from './shipsprites.js';
 import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -579,7 +580,7 @@ export class SpaceView {
       const p = v.planets[pid];
       const pr = this.project(p.x, p.y, p.z || 0);
       if (!pr) continue;
-      const scale = Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45));
+      const scale = fleetScale(pr.s);
       const orr = planetRadius(p) * pr.s + ORBIT_R * scale;
       const slots = orbitSlots(here, f => this.headingAngle(f, pr.x, pr.y), f => f.owner === v.you);
       here.forEach((f, idx) => {
@@ -806,22 +807,93 @@ export class SpaceView {
     return null;
   }
 
+  /** Heading of a fleet with a course (from `from`, its world when in orbit) in the world - climbing or sinking too - {x, y, z} of length 1; null without a course. */
+  worldHeading(f, from = f) {
+    const target = courseTarget(this.view, f);
+    if (!target) return null;
+    for (const w of route(from, target, holeZone(this.view.galaxy))) {
+      const dx = w.x - from.x, dy = w.y - from.y, dz = (w.z || 0) - (from.z || 0), l = Math.hypot(dx, dy, dz);
+      if (l > 1) return { x: dx / l, y: dy / l, z: dz / l };
+    }
+    return null;
+  }
+
+  /**
+   * How a ship at world point P with its bow at `angle` on screen lies as a
+   * solid (shipsprites.js): in the plane of the galaxy, seen along the line
+   * from the eye to P - with perspective that is not the camera's own
+   * direction, away from the middle the plane is seen from another angle
+   * and leans sideways. Null where it cannot be worked out.
+   * @param {{x:number,y:number}} [dir] its heading in the world, if known - else from `angle`
+   * @returns {{yaw:number, tilt:number, roll:number} | null}
+   */
+  solidPose(P, angle, dir) {
+    const z = P.z || 0;
+    let hx, hy, hz = 0;
+    if (dir) ({ x: hx, y: hy, z: hz = 0 } = dir);
+    else {
+      // The direction in the plane whose picture on screen points at
+      // `angle`: the projection near P, inverted.
+      const d = 20;
+      const S = this.project(P.x, P.y, z), X = this.project(P.x + d, P.y, z), Y = this.project(P.x, P.y + d, z);
+      if (!S || !X || !Y) return null;
+      const j11 = X.x - S.x, j21 = X.y - S.y, j12 = Y.x - S.x, j22 = Y.y - S.y;
+      const det = j11 * j22 - j12 * j21;
+      if (Math.abs(det) < 1e-9) return null;
+      const cx = Math.cos(angle), cy = Math.sin(angle);
+      hx = (j22 * cx - j12 * cy) / det; hy = (-j21 * cx + j11 * cy) / det;
+      const hl = Math.hypot(hx, hy) || 1;
+      hx /= hl; hy /= hl;
+    }
+    // The view at P: toward the viewer, and the screen's right and up across it
+    const e = this._eye, b = this._b;
+    const zt = unit([e[0] - P.x, e[1] - P.y, e[2] - z]);
+    const rz = b.r[0] * zt[0] + b.r[1] * zt[1] + b.r[2] * zt[2];
+    const x = unit([b.r[0] - rz * zt[0], b.r[1] - rz * zt[1], b.r[2] - rz * zt[2]]);
+    const y = cross(zt, x);
+    // The ship's up: the galaxy's (world z), tipped only as far as a climb
+    // or a dive needs - the wings stay level.
+    const up = unit([-hz * hx, -hz * hy, 1 - hz * hz]);
+    const dot = (v, w) => v[0] * w[0] + v[1] * w[1] + v[2] * w[2];
+    // That up leans sideways on screen by `roll`; in a view turned by that
+    // the stage needs no lean, only the tilt.
+    const rho = Math.atan2(-dot(up, x), dot(up, y));
+    const c = Math.cos(rho), sn = Math.sin(rho);
+    const x2 = [c * x[0] + sn * y[0], c * x[1] + sn * y[1], c * x[2] + sn * y[2]];
+    const y2 = cross(zt, x2);
+    const tilt = Math.atan2(dot(up, y2), dot(up, zt));
+    const h = [hx, hy, hz];
+    const a = Math.atan2(dot(h, y2) * Math.cos(tilt) - dot(h, zt) * Math.sin(tilt), dot(h, x2));
+    return { yaw: a - Math.PI / 2, tilt, roll: -rho };
+  }
+
   drawFleet(ctx, it, colorOf) {
     const { f, pr } = it;
     const v = this.view;
     const col = colorOf(f.owner);
     const lead = leadType(f);
-    const scale = Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45));
+    const scale = fleetScale(pr.s);
     ctx.save();
     ctx.globalAlpha = depthFade(pr.depth, this.cam.dist) * this.dim(f.owner);
     const spot = this._spots?.get(f.id);
     let x = spot?.x ?? pr.x, y = spot?.y ?? pr.y;
+    // The heading in the world, so the ship keeps still while the camera
+    // moves: taken from the screen it would turn with the camera (and be lost
+    // when looking along the path). In flight and in orbit with a course the
+    // way to the target; parked in orbit a fixed direction - as on the flat
+    // map, own ones to +x, foreign ones the other way.
+    const dir = courseTarget(v, f) ? this.worldHeading(f, it.anchor)
+      : f.at != null ? { x: f.owner === v.you ? 1 : -1, y: 0, z: 0 } : null;
+    const ship = (o) => {
+      const pose = !this.lite && this.solidPose(it.anchor, o.angle, dir);
+      if (!pose || !drawFleetSolid(ctx, o, f, lead, pose)) drawFleetShips(ctx, o, f, lead);
+    };
     if (f.at != null) {
-      drawFleetShips(ctx, { x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) }, f, lead);
+      ship({ x, y, angle: spot?.heading ?? 0, len: 24 * scale, color: col, phase: this.phase + (spot?.idx ?? 0) });
     } else {
       const ang = spot?.heading ?? this.headingAngle(f, x, y) ?? 0;
       drawTrail(ctx, x, y, ang, 46 * scale, col);
-      drawFleetShips(ctx, { x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase }, f, lead);
+      ship({ x, y, angle: ang, len: 26 * scale, color: col, phase: this.phase });
     }
     const n = f.ships ? f.ships.length : f.count;
     if (n > 1) this.badge(ctx, x + 13 * scale, y - 11 * scale, '×' + n, col);

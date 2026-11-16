@@ -1,7 +1,11 @@
 // Star map: camera, background, planets, fleets, course lines.
 import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
-import { drawShip, drawTrail, drawFleetShips, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
+import { drawShip, drawTrail, drawFleetShips, fleetScale, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
+import { drawFleetSolid } from './shipsprites.js';
+
+// The fleets as solids (shipsprites.js), seen this far from straight above.
+const SOLID_POSE = { tilt: 0.5 };
 import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
@@ -354,8 +358,8 @@ export class MapView {
 
     // Where every fleet stands on screen - in orbit on the side of its course.
     const zone = holeZone(v.galaxy);
-    const fleetScale = Math.max(0.55, Math.min(1.8, 0.7 + this.cam.zoom * 0.45));
-    const spots = this.fleetSpots(v, zone, fleetScale);
+    const fleetSize = fleetScale(this.cam.zoom);
+    const spots = this.fleetSpots(v, zone, fleetSize);
 
     // Course lines - from the ship, around the black hole the way it is
     // flown, with an arrowhead at the target. The fleet in focus (selected
@@ -451,12 +455,13 @@ export class MapView {
       const inOrbit = f.at !== null && f.at !== undefined;
       const col = colorOf(f.owner);
       const lead = leadType(f);
-      const scale = fleetScale;
+      const scale = fleetSize;
       if (inOrbit) {
         const spot = spots.get(f.id);
         if (!spot) continue;
         const { x, y, idx } = spot;
-        drawFleetShips(ctx, { x, y, angle: spot.heading, len: 24 * scale, color: col, phase: this.phase + idx }, f, lead);
+        const o = { x, y, angle: spot.heading, len: 24 * scale, color: col, phase: this.phase + idx };
+        if (this.lite || !drawFleetSolid(ctx, o, f, lead, SOLID_POSE)) drawFleetShips(ctx, o, f, lead);
         const n = f.ships ? f.ships.length : f.count;
         if (n > 1) this.badge(ctx, x + 13 * scale, y - 11 * scale, '×' + n, col);
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, x, y, 16 * scale);
@@ -465,7 +470,8 @@ export class MapView {
         const spot = spots.get(f.id);
         const sx = spot.x, sy = spot.y, ang = spot.heading;
         drawTrail(ctx, sx, sy, ang, 46 * scale, col);
-        drawFleetShips(ctx, { x: sx, y: sy, angle: ang, len: 26 * scale, color: col, phase: this.phase }, f, lead);
+        const o = { x: sx, y: sy, angle: ang, len: 26 * scale, color: col, phase: this.phase };
+        if (this.lite || !drawFleetSolid(ctx, o, f, lead, SOLID_POSE)) drawFleetShips(ctx, o, f, lead);
         const n = f.ships ? f.ships.length : f.count;
         if (n > 1) this.badge(ctx, sx + 15 * scale, sy - 12 * scale, '×' + n, col);
         if (this.selection?.type === 'fleet' && this.selection.id === f.id) this.ringAt(ctx, sx, sy, 17 * scale);

@@ -916,6 +916,15 @@ export function drawAlienSwarm(ctx, o, ships) {
  * The ships of a fleet on the map: an alien swarm as a whole swarm, any
  * other fleet by its leading ship - a fighter as the most advanced one.
  */
+/**
+ * Size of the fleets on the map for a zoom (flat map) or projected scale
+ * (3D map): they grow with it, more slowly than the worlds, and up to a
+ * size where a ship close up still shows its build.
+ */
+export function fleetScale(z) {
+  return Math.max(0.55, Math.min(3.2, 0.7 + z * 0.45));
+}
+
 export function drawFleetShips(ctx, o, f, lead) {
   if (f.ships?.some(s => s.type === 'alienCarrier')) drawAlienSwarm(ctx, o, f.ships);
   else drawShip(ctx, { ...o, type: lead, tech: lead === 'fighter' ? bestFighter(f.ships)?.tech : undefined });
