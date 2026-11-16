@@ -306,6 +306,7 @@ export class SpaceView {
         s: Math.max(0.55, Math.min(1.8, 0.7 + pr.s * 0.45)), alpha: depthFade(pr.depth, this.cam.dist),
         shieldR: planetRadius(p) * pr.s * 1.14 + 20 * orbitScale(pr.s), shielded: p.defenses >= SHIELD_MIN };
     }, colorOf);
+    this.drawCoursePreview(ctx);
     if (this.hover?.type === 'planet' || this.hover?.type === 'station') {
       this.drawSupplyLine(ctx, v.planets[this.hover.id]);
       this.tooltip(ctx, v.planets[this.hover.id]);
@@ -645,13 +646,61 @@ export class SpaceView {
   }
 
   /**
-   * On hover with an own fleet selected: the line the supply runs along, from
-   * the nearest own world (through the wormhole, if that is shorter) to the
-   * target, labeled "need / range" - red if it is too far.
+   * On hover with an own fleet selected: the course it would fly, from the
+   * ship (in flight from where it is, in orbit from its world) along the
+   * path around the black hole to the world or wormhole under the pointer,
+   * labeled with the turns - as on the flat map.
+   */
+  drawCoursePreview(ctx) {
+    const v = this.view;
+    const f = this.selection?.type === 'fleet' ? v.fleets.find(x => x.id === this.selection.id) : null;
+    if (!f?.mine || v.spectator || !['planet', 'station', 'hole'].includes(this.hover?.type)) return;
+    const target = this.hover.type === 'hole' ? v.wormholes?.find(m => m.id === this.hover.id) : v.planets[this.hover.id];
+    const src = f.at != null ? v.planets[f.at] : f;
+    if (!target || !src || (this.hover.type !== 'hole' && target.id === f.at)) return;
+    const path = route(src, target, holeZone(v.galaxy));
+    const spot = this._spots?.get(f.id);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.45)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    // First piece from the ship on screen, the rest in space
+    const first = path[0] && this.project(path[0].x, path[0].y, path[0].z || 0);
+    let prev = [src.x, src.y, src.z || 0];
+    if (spot && first) { ctx.moveTo(spot.x, spot.y); ctx.lineTo(first.x, first.y); prev = [path[0].x, path[0].y, path[0].z || 0]; }
+    for (const w of (spot && first ? path.slice(1) : path)) {
+      const q = [w.x, w.y, w.z || 0];
+      this.seg(ctx, prev, q);
+      prev = q;
+    }
+    ctx.stroke();
+    ctx.restore();
+    const pts = [spot ? [spot.x, spot.y] : null,
+      ...path.map(w => { const q = this.project(w.x, w.y, w.z || 0); return q && [q.x, q.y]; })].filter(Boolean);
+    if (pts.length > 1 && f.stats?.speed > 0) {
+      const turns = Math.max(1, Math.ceil(routeLength(src, path) / f.stats.speed));
+      // Out of reach: the supply line says why (drawSupplyLine) - its numbers
+      // go into this one label instead of a second one on top of it.
+      const r = this.hover.type !== 'hole' && this._reach?.get(target.id);
+      const far = r && r.need > 0 && !r.ok;
+      const text = t('word.turns', { n: turns, count: turns })
+        + (far ? ' · ' + t('map.reachNeed', { need: r.need, range: this._reach.range }) : '');
+      this.badge(ctx, ...midpoint(pts), text, far ? '#ff7a7a' : '#ffd877', true);
+    }
+  }
+
+  /**
+   * On hover with an own fleet selected, for a world out of its reach: the
+   * line the supply runs along, from the nearest own world (through the
+   * wormhole, if that is shorter) to the target, labeled "need / range" in
+   * red - why the fleet cannot fly there. Within reach the course preview
+   * from the ship says all, and a second line from another world would only
+   * confuse.
    */
   drawSupplyLine(ctx, p) {
     const r = p && this._reach?.get(p.id);
-    if (!r || r.need === 0) return;
+    if (!r || r.need === 0 || r.ok) return;
     const zone = holeZone(this.view.galaxy);
     const color = r.ok ? (r.via ? '#c4a0ff' : '#8cc4ff') : '#ff7a7a';
     const legs = r.via
@@ -676,7 +725,9 @@ export class SpaceView {
       }
     }
     ctx.restore();
-    if (pts.length > 1) {
+    // Its numbers stand in the course preview's label - unless there is none.
+    const f = v => v.fleets.find(x => x.id === this.selection?.id);
+    if (pts.length > 1 && !(f(this.view)?.stats?.speed > 0)) {
       this.badge(ctx, ...midpoint(pts), t('map.reachNeed', { need: r.need, range: this._reach.range }), color, true);
     }
   }
