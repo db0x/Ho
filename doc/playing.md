@@ -12,6 +12,7 @@
 - [Two playing fields: classic and space](#two-playing-fields-classic-and-space)
 - [A galaxy without an edge](#a-galaxy-without-an-edge)
 - [Wormholes](#wormholes)
+- [Meteors](#meteors)
 - [Aliens](#aliens)
 - [The AI colonies](#the-ai-colonies)
 - [Watching](#watching)
@@ -101,7 +102,7 @@ the current values.
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbital defence"> | **Orbital defence** – a satellite placed straight into orbit of the planet that builds it, where it stays. Cheap, tough and well armed; from five upwards they raise a shield. A planet with satellites does not fall without a fight. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Colony ship"> | **Colony ship** – lands 8M settlers on a free planet and is used up in the process. Over a planet of yours that is not yet full, *Drop settlers here* tops up the population. Slow and defenceless – an escort pays off. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – does not fight, but gives the whole fleet its range, more than twice that of a fighter. Every further tanker in the same fleet adds +15%. |
-| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – takes up to five satellites aboard in orbit of a planet of yours and sets them down above another one, so the defence moves to wherever danger looms. Satellites aboard do not fight and are lost with the transporter. Does not extend the fleet's range. |
+| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – the empire's hauler, a heavy freighter with a hold and a catching maw. It takes up to five satellites aboard in orbit of a planet of yours and sets them down above another one, so the defence moves to wherever danger looms – and it is the only ship that catches [meteors](#meteors) – all of their ore. Satellites and ore aboard are lost with the transporter. Does not extend the fleet's range. |
 
 Base values at tech level 1 – research improves them, and new ships are built at
 the current level:
@@ -288,6 +289,36 @@ Wormholes can be switched off in the lobby. The curious AI personalities –
 settler, raider and vulture – use them: a scout looks first, then colony ships
 follow to free planets or a pack goes hunting on the far side; the raider also
 jumps blind. Before the wormhole collapses they come back.
+
+## Meteors
+
+From turn 5 on, meteors cross the galaxy: chunks of rock full of ore that come
+in from beyond the edge of the map, fly straight across it and leave on the
+other side. One that heads for the black hole falls into it. They cannot be
+switched off. A meteor comes into sight like a foreign fleet; the log reports
+it with its ore, and the map shows its course ahead as a dotted line. If it
+passes within reach of your transporters, your crew also announces it over
+the radio – once per meteor.
+
+- **Catching:** only **transporters** can. Select a fleet with transporters,
+  then right-click the meteor (or *Catch* in its panel). The fleet heads for
+  the point where it meets the meteor – hovering over the meteor shows where
+  and in how many turns. The meeting point must be within range.
+- **All of it:** whoever catches a meteor takes all of its ore aboard, and
+  the meteor is gone – a single transporter is enough. Several empires after
+  the same meteor: whoever gets there first takes it, the others come too late.
+- **Bringing it home:** the ore counts as metal only once the transporter
+  reaches a planet of yours – it is unloaded at the end of that turn, and the
+  budget counts it. Shot down on the way, the ore is lost: a loaded
+  transporter is worth an escort.
+- **How much:** about 120 ore early on, more later in the game (up to 600),
+  give or take a quarter.
+- **Fair shares:** every colony gets its turn. Each new meteor is aimed past
+  a planet of the colony that has had the fewest pass close by so far, and
+  comes in from the nearest edge – its neighbours may still snatch it. The
+  more colonies, the more meteors: about one aimed at each every 30 turns.
+
+The AI colonies catch meteors too, with a transporter of their own.
 
 ## Aliens
 

@@ -27,6 +27,7 @@ server/
   wormholes.js       Wurmlöcher: Öffnen, Sicht, Sprung, Zusammenbruch, Testhilfen im Entwicklungsmodus
   aliens.js          Aliens: Risse, Überfälle, überrannte Planeten, Abzug, Testhilfe im Entwicklungsmodus
   spoils.js          Beute eines abgeschossenen Trägers: Erkenntnisse, Trophäe, Wrack und Bergung, Testhilfe
+  meteors.js         Meteoriten: Hereinkommen, Flug, Sicht, Einfangen durch Transporter, Entladen des Erzes, Testhilfe
   shipnames.js       Namen für die Träger: historische Schiffe und einige aus Filmen und Serien
   bot.js             KI-Gegner mit Charakteren; spielt nach denselben Regeln
   auth.js            Zugang: Sitzungen, Anmeldung, Passwortwechsel, Torwächter
@@ -167,6 +168,7 @@ npm run test:wormhole  # Wurmlöcher: Lage, Sicht, Sprung, Versorgung hindurch, 
 npm run test:destroyer # Träger: Preis, Freischaltung, Namen, Geschütze und Feuer, Reparatur, Lobby-Option
 npm run test:station   # Raumstation: Preis, eine pro Planet, 3 Runden, Jäger-Rabatt, Kampf, Eroberung, KI
 npm run test:aliens    # Aliens: Riss in Sichtweite, faire Reihenfolge, überrannt = leer, letzter Planet verschont, Träger, Entwicklungsmodus, Beute und Wracks
+npm run test:meteor    # Meteoriten: von jenseits des Rands, geradeaus quer, Sicht, nur Transporter fangen, Laderaum, Lieferung, Verlust, Schwarzes Loch, KI
 node test/intercept.js # Abfangen beim Abflug aus einem umkämpften Orbit
 npm run test:chase     # Abfangen im Flug: Einholen, Anhalten, Tempo, Befehle, Orbit und Sicht, KI
 npm run test:budget    # Haushalt: Vorschau = Abbuchung, kein Auftrag fällt aus

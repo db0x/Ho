@@ -16,6 +16,7 @@ import { bindRanking, showRanking } from './ui/ranking.js';
 import { bindPrivacy, showPrivacy } from './ui/privacy.js';
 import { initPresets, presetsFromServer, onPresets, autoPreset } from './presets.js';
 import { presetMatches } from '../shared/presets.js';
+import { oreOf } from '../shared/rules.js';
 import { bindEmoji } from './ui/emoji.js';
 import { emojify } from '../shared/emoji.js';
 import { releaseOf } from '../shared/version.js';
@@ -226,6 +227,7 @@ const app = {
     if (!sel || !map) return;
     const target = sel.type === 'planet' || sel.type === 'station' ? map.view?.planets[sel.id]
       : sel.type === 'hole' ? map.view?.wormholes?.find(m => m.id === sel.id)
+      : sel.type === 'meteor' ? map.view?.meteors?.find(m => m.id === sel.id)
       : map.view?.fleets.find(f => f.id === sel.id);
     if (target) map.focus(target, app.freeArea());
   },
@@ -247,6 +249,16 @@ const app = {
     net.send({ t: 'orders', move: { fleetId, chase: target } });
     sfx.play('course');
     crewSay('chase', map?.view?.fleets.find(f => f.id === fleetId));
+  },
+  /** Catch a meteor - the server finds the meeting point; only transporters can. */
+  orderCatch(meteor) {
+    const fleetId = app.orderFleet();
+    if (!fleetId) return;
+    const fleet = map?.view?.fleets.find(f => f.id === fleetId);
+    if (!oreOf(fleet?.ships || []).hold) { hud?.toast(t('meteor.needTransport')); sfx.play('deny'); return; }
+    net.send({ t: 'orders', move: { fleetId, meteor } });
+    sfx.play('course');
+    crewSay('move', fleet);
   },
   /** Course into a wormhole mouth: the fleet jumps when it gets there. */
   orderHole(hole) {
@@ -489,7 +501,8 @@ net.on('view', (m) => {
 
   // Clear the selection if it no longer exists
   if ((app.selection?.type === 'fleet' && !view.fleets.some(f => f.id === app.selection.id))
-    || (app.selection?.type === 'hole' && !view.wormholes?.some(m => m.id === app.selection.id))) {
+    || (app.selection?.type === 'hole' && !view.wormholes?.some(m => m.id === app.selection.id))
+    || (app.selection?.type === 'meteor' && !view.meteors?.some(m => m.id === app.selection.id))) {
     app.selection = null;
     map.selection = null;
   }
@@ -510,7 +523,7 @@ net.on('view', (m) => {
     // pop-ups, otherwise they plaster the screen at a fast pace.
     const loud = view.spectator
       ? ['eliminated', 'victory']
-      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole', 'alien'];
+      : ['combat', 'invade', 'colonize', 'eliminated', 'victory', 'galaxy', 'wormhole', 'alien', 'meteor'];
     for (const l of settled(view)) {
       for (const e of l.entries) {
         if (!loud.includes(e.type)) continue;
@@ -603,6 +616,7 @@ function bindGame() {
     if (hit?.type === 'planet' || hit?.type === 'station') app.order(hit.id);
     if (hit?.type === 'hole') app.orderHole(hit.id);
     if (hit?.type === 'fleet') app.orderChase(hit.id);
+    if (hit?.type === 'meteor') app.orderCatch(hit.id);
   };
   map.onHoverChange = () => {};
 
@@ -856,7 +870,7 @@ function panOf(planetId) {
 }
 
 // Important things first: with many events, the rest falls by the wayside.
-const SFX_PRIO = ['victory', 'eliminated', 'lost', 'alien', 'invade', 'combat', 'wormhole', 'expand',
+const SFX_PRIO = ['victory', 'eliminated', 'lost', 'alien', 'invade', 'combat', 'wormhole', 'meteor', 'expand',
   'colonize', 'settle', 'tech', 'build', 'terra', 'arrive', 'warn'];
 
 /**

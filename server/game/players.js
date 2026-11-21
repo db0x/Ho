@@ -93,6 +93,8 @@ export function addPlayer(game, { name, isBot = false, connId = null, persona = 
     explored: new Set(),
     knowledge: {},            // planetId -> last known state
     seenMouths: new Set(),    // wormhole mouths in sight once
+    seenMeteors: new Set(),   // meteors reported once (server/meteors.js)
+    meteorsNear: 0,           // meteors that passed close by its worlds - fair shares (meteors.js)
     knownHoles: new Set(),    // wormholes jumped through: both ends known
     orders: { builds: {}, moves: {}, unload: {}, refit: {} },
     stats: { planets: 0, pop: 0, ships: 0, kills: 0, losses: 0 }

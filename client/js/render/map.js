@@ -6,7 +6,8 @@ import { drawFleetSolid } from './shipsprites.js';
 
 // The fleets as solids (shipsprites.js), seen this far from straight above.
 const SOLID_POSE = { tilt: 0.5 };
-import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE } from '../../shared/rules.js';
+import { dist, tempColor, rgb, holeZone, route, routeLength, reachOutline, supplyDistance, travelDistance, WORMHOLE, meteorMeet, oreOf } from '../../shared/rules.js';
+import { drawMeteor, drawMeteorCourse, meteorRadius, meteorLines, METEOR_MIN_PX, METEOR_COLOR } from './meteors.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
@@ -355,6 +356,7 @@ export class MapView {
 
     this.drawMouths(ctx, v);
     this.drawRifts(ctx, v);
+    this.drawMeteors(ctx, v);
 
     // Where every fleet stands on screen - in orbit on the side of its course.
     const zone = holeZone(v.galaxy);
@@ -547,6 +549,74 @@ export class MapView {
       const m = v.wormholes?.find(x => x.id === this.hover.id);
       if (m) this.tooltipAt(ctx, ...this.w2s(m.x, m.y), this.mouthRadius() * 0.7, t('hole.name'), mouthLines(v, m));
     }
+    if (this.hover?.type === 'meteor') {
+      const m = v.meteors?.find(x => x.id === this.hover.id);
+      if (m) {
+        if (selFleet?.mine && !v.spectator) this.catchPreview(ctx, selFleet, m, spots.get(selFleet.id));
+        this.tooltipAt(ctx, ...this.w2s(m.x, m.y), Math.max(METEOR_MIN_PX, meteorRadius(m) * this.cam.zoom),
+          t('meteor.name'), meteorLines(m));
+      }
+    }
+  }
+
+  /**
+   * Meteors: the course ahead first, faint (bright for the one selected or
+   * under the pointer), then the rock with its tail. They belong to nobody.
+   */
+  drawMeteors(ctx, v) {
+    const list = v.meteors || [];
+    if (!list.length) return;
+    const z = this.cam.zoom;
+    const toScreen = (p) => this.w2s(p.x, p.y);
+    ctx.globalAlpha = this.dim(null);
+    for (const m of list) {
+      const hot = (this.selection?.type === 'meteor' || this.hover?.type === 'meteor')
+        && (this.selection?.id === m.id || this.hover?.id === m.id);
+      drawMeteorCourse(ctx, m, toScreen, this.phase, { hot });
+    }
+    for (const m of list) {
+      const [sx, sy] = this.w2s(m.x, m.y);
+      const R = Math.max(METEOR_MIN_PX, meteorRadius(m) * z);
+      if (sx < -R * 8 || sy < -R * 8 || sx > this.w + R * 8 || sy > this.h + R * 8) continue;
+      const angle = Math.atan2(m.vy, m.vx);
+      // The tail reaches back most of the way it came in the last turn.
+      const tail = Math.max(R * 5, Math.hypot(m.vx, m.vy) * 0.8 * z);
+      ctx.globalAlpha = this.dim(null);
+      drawMeteor(ctx, sx, sy, R, angle, this.phase, { seed: m.seed, tail });
+      if (this.selection?.type === 'meteor' && this.selection.id === m.id) this.ringAt(ctx, sx, sy, R * 1.6 + 4);
+      if (this.showNames && z > 0.3) {
+        label(ctx, t('meteor.label', { metal: m.metal }), sx, sy + R * 1.6 + 16, METEOR_COLOR, z, 11);
+      }
+      this.hit.push({ type: 'meteor', id: m.id, x: sx, y: sy, r: Math.max(12, R * 1.3) });
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * With an own fleet selected and a meteor under the pointer: where they
+   * would meet and in how many turns - or why it will not work.
+   */
+  catchPreview(ctx, f, m, spot) {
+    const v = this.view;
+    const src = f.at != null ? v.planets[f.at] : f;
+    const [ax, ay] = spot ? [spot.x, spot.y] : this.w2s(src.x, src.y);
+    const [mx, my] = this.w2s(m.x, m.y);
+    if (!oreOf(f.ships).hold) { this.badge(ctx, mx, my - 26, t('meteor.needTransport'), '#ff7a7a', true); return; }
+    const meet = meteorMeet(src, f.stats?.speed || 0, m, holeZone(v.galaxy));
+    if (!meet) { this.badge(ctx, mx, my - 26, t('meteor.tooFast'), '#ff7a7a', true); return; }
+    const path = route(src, meet.at, holeZone(v.galaxy));
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,190,120,.55)';
+    ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(ax, ay);
+    for (const w of path) { const [wx, wy] = this.w2s(w.x, w.y); ctx.lineTo(wx, wy); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const [bx, by] = this.w2s(meet.at.x, meet.at.y);
+    ctx.strokeStyle = METEOR_COLOR;
+    ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    this.badge(ctx, (ax + bx) / 2, (ay + by) / 2, t('word.turns', { n: meet.turns, count: meet.turns }), '#ffd877', true);
   }
 
   /** Screen radius of a wormhole mouth. */

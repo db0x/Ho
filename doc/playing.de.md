@@ -12,6 +12,7 @@
 - [Zwei Spielfelder: Klassik und Raum](#zwei-spielfelder-klassik-und-raum)
 - [Eine Galaxie ohne Rand](#eine-galaxie-ohne-rand)
 - [Wurmlöcher](#wurmlöcher)
+- [Meteoriten](#meteoriten)
 - [Aliens](#aliens)
 - [Die KI-Kolonien](#die-ki-kolonien)
 - [Zusehen](#zusehen)
@@ -103,7 +104,7 @@ Steckbrief mit den aktuellen Werten.
 | <img src="screenshots/ships/satellite.webp" width="120" alt="Orbitalverteidigung"> | **Orbitalverteidigung** – ein Satellit, der direkt im Orbit des Bauplaneten entsteht und dort bleibt. Billig, zäh und kräftig bewaffnet; ab fünf Stück spannen sie einen Schild auf. Ein Planet mit Satelliten fällt nicht kampflos. |
 | <img src="screenshots/ships/colony.webp" width="120" alt="Kolonieschiff"> | **Kolonieschiff** – setzt 8 Mio. Siedler auf einem freien Planeten ab und geht dabei auf. Über einem eigenen, noch nicht vollen Planeten stockt *Siedler hier absetzen* die Bevölkerung auf. Langsam und wehrlos – Geleitschutz lohnt sich. |
 | <img src="screenshots/ships/tanker.webp" width="120" alt="Tanker"> | **Tanker** – kämpft nicht, gibt aber der ganzen Flotte seine Reichweite, mehr als doppelt so viel wie ein Jäger. Jeder weitere Tanker in derselben Flotte bringt +15 %. |
-| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – nimmt im Orbit eines eigenen Planeten bis zu fünf Satelliten an Bord und setzt sie über einem anderen eigenen Planeten wieder aus; so wandert die Verteidigung dorthin, wo Gefahr droht. Geladene Satelliten kämpfen nicht und gehen mit dem Transporter verloren. Verlängert die Reichweite der Flotte nicht. |
+| <img src="screenshots/ships/transport.webp" width="120" alt="Transporter"> | **Transporter** – der Lastesel des Imperiums, ein schwerer Frachter mit Laderaum und Fangmaul. Er nimmt im Orbit eines eigenen Planeten bis zu fünf Satelliten an Bord und setzt sie über einem anderen eigenen Planeten wieder aus; so wandert die Verteidigung dorthin, wo Gefahr droht. Und er ist das einzige Schiff, das [Meteoriten](#meteoriten) einfängt – samt ihrem ganzen Erz. Satelliten und Erz an Bord gehen mit dem Transporter verloren. Verlängert die Reichweite der Flotte nicht. |
 
 Die Grundwerte bei Technikstufe 1 – Forschung verbessert sie, Neubauten bekommen
 den jeweils aktuellen Stand:
@@ -300,6 +301,40 @@ Wurmlöcher lassen sich in der Lobby abschalten. Die neugierigen KI-Charaktere �
 Siedler, Plünderer und Aasgeier – nutzen sie: Erst schaut ein Späher nach, dann
 folgen Kolonieschiffe zu freien Planeten oder ein Rudel geht drüben auf Jagd; der
 Plünderer springt auch blind. Bevor das Wurmloch zusammenbricht, kehren sie heim.
+
+## Meteoriten
+
+Ab Runde 5 ziehen Meteoriten durch die Galaxie: Gesteinsbrocken voller Erz, die
+von jenseits des Kartenrands hereinkommen, geradlinig darüber hinwegfliegen und
+auf der anderen Seite wieder verschwinden. Wer auf das Schwarze Loch zuhält,
+stürzt hinein. Abschalten lassen sie sich nicht. Ein Meteorit kommt in Sicht
+wie eine fremde Flotte; das Protokoll meldet ihn mit seinem Erz, und die Karte
+zeigt seinen weiteren Kurs als gepunktete Linie. Zieht er in Reichweite deiner
+Transporter vorbei, kündigt ihn außerdem deine Crew über Funk an – einmal pro
+Meteorit.
+
+- **Einfangen:** geht nur mit **Transportern**. Flotte mit Transportern wählen,
+  dann Rechtsklick auf den Meteoriten (oder *Einfangen* in seinem Panel). Die
+  Flotte fliegt zu dem Punkt, an dem sie den Meteoriten trifft – fährt man mit
+  der Maus darüber, zeigt die Karte, wo und in wie vielen Runden. Der
+  Treffpunkt muss in Reichweite liegen.
+- **Alles auf einmal:** Wer einen Meteoriten erwischt, nimmt sein ganzes Erz
+  an Bord, und der Meteorit verschwindet – ein Transporter genügt. Sind mehrere
+  Kolonien hinter demselben her, bekommt ihn, wer zuerst da ist; die anderen
+  kommen zu spät.
+- **Heimbringen:** Das Erz zählt erst als Metall, wenn der Transporter einen
+  eigenen Planeten erreicht – am Ende dieser Runde wird entladen, und der
+  Haushalt rechnet es mit ein. Wird er unterwegs abgeschossen, ist das Erz
+  verloren: Ein beladener Transporter ist eine Eskorte wert.
+- **Wie viel:** anfangs etwa 120 Erz, später im Spiel mehr (bis zu 600), ein
+  Viertel mehr oder weniger.
+- **Gerecht verteilt:** Jede Kolonie kommt dran. Jeder neue Meteorit zielt an
+  einem Planeten der Kolonie vorbei, an der bisher die wenigsten vorbeigezogen
+  sind, und kommt vom nächsten Rand herein – die Nachbarn können ihn trotzdem
+  wegschnappen. Je mehr Kolonien, desto mehr Meteoriten: für jede etwa einer
+  alle 30 Runden.
+
+Die KI-Kolonien fangen Meteoriten ebenfalls, mit einem eigenen Transporter.
 
 ## Aliens
 

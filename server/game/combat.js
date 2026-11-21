@@ -286,9 +286,12 @@ function hitCarrier(onCarrier, carrier, owner, ship, dmg) {
   hits.byShip.set(ship, (hits.byShip.get(ship) || 0) + dmg);
 }
 
-/** Satellites that went down with lost transporters - told to the owner only. */
+/** Satellites and ore that went down with lost transporters - told to the owner only. */
 function cargoLost(fleet, ships, planet, entries) {
   const n = ships.reduce((a, s) => a + (s.cargo ? s.cargo.length : 0), 0);
   if (n) entries.push({ type: 'warn', playerIds: [fleet.owner], private: fleet.owner, planetId: planet.id,
     key: 'log.cargoLost', params: { planet: planet.name, count: n } });
+  const ore = ships.reduce((a, s) => a + (s.ore || 0), 0);
+  if (ore) entries.push({ type: 'warn', playerIds: [fleet.owner], private: fleet.owner, planetId: planet.id,
+    key: 'log.oreLost', params: { planet: planet.name, metal: Math.round(ore) } });
 }

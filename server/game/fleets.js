@@ -1,5 +1,6 @@
 // Fleets and their ships: creating them, what a fleet is capable of as a
-// whole, splitting and merging - and the satellites transporters carry.
+// whole, splitting and merging - and the satellites transporters carry
+// (the ore of a meteor in their holds is in server/meteors.js).
 import { shipStats, SHIP_DEFS, cargoOf } from '../../shared/rules.js';
 import { pickShipName } from '../shipnames.js';
 import { affordable } from './economy.js';
@@ -17,6 +18,7 @@ export function newFleet(game, owner, planet) {
     dest: null,
     hole: null,          // course to a wormhole mouth instead of a world
     chase: null,         // intercepting this foreign fleet (movement.js) ...
+    catch: null,         // ... or catching this meteor (meteors.js) ...
     aim: null            // ... heading for this meeting point
   };
   game.fleets.push(f);
@@ -38,13 +40,14 @@ export function addShip(game, fleet, type, tech) {
     isTanker: st.isTanker
   };
   if (st.cargo) ship.cargo = [];        // satellites on board
+  if (SHIP_DEFS[type].hold) ship.ore = 0;   // ore of a meteor in the hold
   if (SHIP_DEFS[type].named) ship.name = pickShipName(game);
   fleet.ships.push(ship);
   return ship;
 }
 
 export function orbitFleet(game, owner, planet) {
-  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && f.dest == null && !f.hole && !f.chase);
+  let f = game.fleets.find(f => f.owner === owner && f.at === planet.id && f.dest == null && !f.hole && !f.chase && !f.catch);
   if (!f) f = newFleet(game, owner, planet);
   return f;
 }
@@ -95,6 +98,7 @@ export function splitFleet(game, player, o) {
       nf.dest = fleet.dest;
       nf.hole = fleet.hole;
       nf.chase = fleet.chase ?? null;
+      nf.catch = fleet.catch ?? null;
       nf.aim = fleet.aim ? { ...fleet.aim } : null;
       if (fleet.dest != null) player.orders.moves[nf.id] = fleet.dest;
     }
@@ -107,7 +111,7 @@ export function splitFleet(game, player, o) {
 export function mergeFleets(game, player, o) {
   const planet = planetById(game, o.planetId);
   if (!planet) return;
-  const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && f.dest == null && !f.hole && !f.chase);
+  const own = game.fleets.filter(f => f.owner === player.id && f.at === planet.id && f.dest == null && !f.hole && !f.chase && !f.catch);
   if (own.length < 2) return;
   const target = own[0];
   for (const f of own.slice(1)) { target.ships.push(...f.ships); f.ships = []; }

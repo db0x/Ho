@@ -1,9 +1,10 @@
 // What the shipyards build, what gets refitted, and what goes into the
 // scrap press.
 import {
-  shipStats, travelDistance, dist, buildLock, shipCost, buildCost, stationReady, recycleValue, refitTotal
+  shipStats, travelDistance, dist, buildLock, shipCost, buildCost, stationReady, recycleValue, refitTotal, SHIP_DEFS
 } from '../../shared/rules.js';
 import { planetById } from '../game/game.js';
+import { meteorsSeen } from '../meteors.js';
 import { setOrders } from '../game/orders.js';
 
 export function build(s) {
@@ -89,6 +90,13 @@ export function build(s) {
     const have = myFleets.reduce((a, f) => a + f.ships.filter(s => s.cargo).length, 0);
     if (have < (P.satellites >= 3 ? 2 : 1) && surplus(s).length) order.push([yard, 'transport', 1]);
   };
+  const haulers = () => {
+    // Meteors in sight and no transporter to catch them: one for the ore,
+    // a second for a big empire.
+    if (mine.length < 2 || order.some(o => o[1] === 'transport') || !meteorsSeen(game, bot.id).length) return;
+    const have = myFleets.reduce((a, f) => a + f.ships.filter(s => SHIP_DEFS[s.type]?.hold).length, 0);
+    if (have < (mine.length >= 8 ? 2 : 1)) order.push([yard, 'transport', 1]);
+  };
   // The anchor for the fleet: one per so many fighters, built at an orbital
   // station - the first one goes up at the largest world that may carry one,
   // repairs then happen at home anyway. Station and destroyer each cost more
@@ -135,6 +143,7 @@ export function build(s) {
   else { colonies(); warships(); }
   if (!hit) satellites();
   transports();
+  haulers();
 
   // Ore is scarcer than money: as long as settling is still planned,
   // something is kept for the colony ships of the next turns.

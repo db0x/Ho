@@ -2,6 +2,7 @@
 // empire, eliminations and the end of the game.
 import { cargoOf } from '../../shared/rules.js';
 import { steerAliens, alienTurn } from '../aliens.js';
+import { meteorTurn, spotMeteors, unloadOre } from '../meteors.js';
 import { alienSpoils, salvageWrecks } from '../spoils.js';
 import { wormholeTurn, spotWormholes } from '../wormholes.js';
 import { colonize } from './colonization.js';
@@ -24,7 +25,7 @@ export function resolveTurn(game) {
   // What is really booked this turn, per item - to verify the client's
   // forecast (shared/budget.js, test/budget.js).
   for (const p of game.players) {
-    p.ledger = { research: 0, build: { money: 0, metal: 0 }, refit: { money: 0, metal: 0 }, terra: 0, income: 0, mined: 0, salvage: 0 };
+    p.ledger = { research: 0, build: { money: 0, metal: 0 }, refit: { money: 0, metal: 0 }, terra: 0, income: 0, mined: 0, salvage: 0, ore: 0 };
   }
 
   // 1) Research
@@ -39,7 +40,9 @@ export function resolveTurn(game) {
   // 4) Movement - the aliens pick their targets first, like everyone else
   // gives orders before the turn ends.
   steerAliens(game);
+  // Catches of meteors happen on the way (movement.js); then they fly on.
   const { departures, encounters } = moveFleets(game, entries);
+  meteorTurn(game, entries);
 
   // 5) Combat - in orbit and where chasers caught their target - intercepting and repairs
   const fought = fightBattles(game, departures, entries, encounters);
@@ -51,6 +54,8 @@ export function resolveTurn(game) {
   alienTurn(game, entries, fought);
   // Wrecks: salvaged by the fleets in their orbit - or gone after a while.
   salvageWrecks(game, entries);
+  // Transporters in the orbit of an own world unload the ore of meteors.
+  unloadOre(game, entries);
 
   // 7) Economy
   runEconomy(game, entries);
@@ -61,6 +66,7 @@ export function resolveTurn(game) {
   wormholeTurn(game, entries);
   updateVisibility(game);
   spotWormholes(game, entries);
+  spotMeteors(game, entries);
   // Allied fleets sharing an orbit in peace give a secret alliance away.
   if (game.alliances.length) exposeAlliances(game, entries, seesFleet);
   for (const p of game.players) {
