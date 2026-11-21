@@ -34,6 +34,26 @@ const order = (game, p, msg) => {
   if (r?.error === 'notice.researchCapped') rejected.research++;
 };
 
+/**
+ * Did the salvage this turn depend on something outside the player's view?
+ * The forecast only knows what the player sees - rightly so: a wreck out of
+ * sight may long be emptied, a fleet out of sight may share or block. So at
+ * every wreck the player had a fleet at or on the way to, or has one at now:
+ * was the world out of sight (only remembered), or does a foreign fleet stand
+ * there now that the player saw neither there nor heading there?
+ */
+function salvageUnforeseeable(game, p, view, wrecks) {
+  for (const id of wrecks) {
+    const mineBefore = view.fleets.some(f => f.mine && (f.at === id || f.dest === id));
+    const mineNow = game.fleets.some(f => f.owner === p.id && f.at === id);
+    if (!mineBefore && !mineNow) continue;
+    if (view.planets.find(w => w.id === id)?.known !== 'live') return true;
+    const seen = new Set(view.fleets.filter(f => f.at === id || f.dest === id).map(f => f.id));
+    if (game.fleets.some(f => f.at === id && f.owner !== p.id && f.ships.length && !seen.has(f.id))) return true;
+  }
+  return false;
+}
+
 for (let gameNo = 0; gameNo < 6; gameNo++) {
   const game = createGame('Test');
   Object.assign(game.settings, { planetsPerPlayer: 6, turnTimer: 0, maxTurns: 0, startMoney: 400 + gameNo * 900 });
@@ -72,11 +92,12 @@ for (let gameNo = 0; gameNo < 6; gameNo++) {
     for (const p of game.players.filter(q => q.alive)) {
       const view = JSON.parse(JSON.stringify(buildView(game, p)));   // as over the wire
       before.set(p.id, {
-        f: forecast(view), money: p.money, metal: p.metal,
+        view, f: forecast(view), money: p.money, metal: p.metal,
         worlds: game.galaxy.planets.filter(w => w.owner === p.id).map(w => w.id).join(',')
       });
     }
 
+    const wrecksBefore = (game.wrecks || []).map(w => w.planetId);
     const entries = resolveTurn(game);
     turns++;
     for (const e of entries) {
@@ -115,8 +136,10 @@ for (let gameNo = 0; gameNo < 6; gameNo++) {
         if (!near(L.income, f.income, 1e-6)) fail(`${where}: income ${L.income} instead of ${f.income}`);
         if (!near(L.mined, f.mining, 1e-6)) fail(`${where}: mining ${L.mined} instead of ${f.mining}`);
       }
-      // Salvage from the wrecks of alien carriers - unless someone else salvages there too.
-      if (!disturbed && !f.salvageShared && !entries.some(e => e.type === 'alien' && (e.playerIds || []).includes(p.id) && e.key !== 'log.salvaged' && e.key !== 'log.salvagedAll')) {
+      // Salvage from the wrecks of alien carriers - unless someone else salvages
+      // there too, or the outcome hung on what the player could not see.
+      if (!disturbed && !f.salvageShared && !salvageUnforeseeable(game, p, v.view, wrecksBefore)
+        && !entries.some(e => e.type === 'alien' && (e.playerIds || []).includes(p.id) && e.key !== 'log.salvaged' && e.key !== 'log.salvagedAll')) {
         if (!near(L.salvage, f.salvage)) fail(`${where}: salvage ${L.salvage} instead of ${f.salvage}`);
         if (L.salvage > 0) salvageBooked++;
       }
