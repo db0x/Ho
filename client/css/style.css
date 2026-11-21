@@ -1140,6 +1140,8 @@ body.fx-lite #rightdock.scan::before { display: none; }
   border-top: 1px solid var(--line); padding-top: 10px;
 }
 #mapsettings .volrow span { flex: none; }
+#mapsettings .volrow.sub { border-top: 0; padding-top: 0; }
+#mapsettings .musicrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #mapsettings input[type=range] { width: 84px; }
 /* Pause (host only): the label only where the top bar has room for it. */
 #topbar .pause { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
