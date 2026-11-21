@@ -1,0 +1,26 @@
+{
+  "de": [
+    "☄️ Neu: Meteoriten. Ab Runde 5 ziehen Gesteinsbrocken voller Erz geradlinig durch die Galaxie – vom einen Kartenrand zum anderen, wer aufs Schwarze Loch zuhält, stürzt hinein. Die Karte zeigt ihren Kurs voraus, das Protokoll meldet, wenn einer in Sicht kommt.",
+    "🚚 Nur Transporter können sie einfangen: Flotte mit Transportern wählen, Rechtsklick auf den Meteoriten – die Karte zeigt Treffpunkt und Runden. Wer ihn erwischt, nimmt das ganze Erz, und der Meteorit ist weg.",
+    "📻 Zieht ein Meteorit in Reichweite deiner Transporter vorbei, meldet ihn deine Crew einmal über Funk.",
+    "⚖️ Gerecht verteilt: Jeder neue Meteorit zieht an der Kolonie vorbei, die bisher am wenigsten abbekommen hat – egal ob mitten im Gedränge oder ganz am Rand.",
+    "🏠 Das Erz zählt erst als Metall, wenn der Transporter einen eigenen Planeten erreicht. Wird er unterwegs abgeschossen, ist es verloren – ein beladener Transporter ist eine Eskorte wert. Die KI-Kolonien fangen mit.",
+    "🛠️ Der Transporter hat ein neues Gesicht: ein schwerer Frachter mit breitem Laderaum, Lukendeckeln und einem Fangmaul am Bug."
+  ],
+  "en": [
+    "☄️ New: meteors. From turn 5 on, chunks of rock full of ore fly straight across the galaxy – from one edge of the map to the other; one that heads for the black hole falls in. The map shows their course ahead, the log tells when one comes into sight.",
+    "🚚 Only transporters can catch them: select a fleet with transporters and right-click the meteor – the map shows the meeting point and the turns. Whoever gets it takes all the ore, and the meteor is gone.",
+    "📻 When a meteor passes within reach of your transporters, your crew announces it over the radio – once.",
+    "⚖️ Fair shares: each new meteor passes the colony that has had the fewest so far – whether in the thick of it or out at the rim.",
+    "🏠 The ore counts as metal only once the transporter reaches a planet of yours. Shot down on the way, it is lost – a loaded transporter is worth an escort. The AI colonies catch them too.",
+    "🛠️ The transporter has a new look: a heavy freighter with a broad hold, hatch covers and a catching maw at the bow."
+  ],
+  "uk": [
+    "☄️ Нове: метеорити. З 5-го ходу брили, повні руди, летять галактикою по прямій – від одного краю мапи до іншого; той, що прямує до чорної діри, падає в неї. Мапа показує їхній курс уперед, журнал повідомляє, коли метеорит з’являється в полі зору.",
+    "🚚 Зловити їх можуть лише транспортники: виберіть флот із транспортниками й клацніть правою кнопкою по метеориту – мапа покаже точку зустрічі та кількість ходів. Хто впіймає метеорит, забирає всю руду, і метеорит зникає.",
+    "📻 Коли метеорит пролітає в межах досяжності ваших транспортників, ваш екіпаж один раз повідомляє про нього по радіо.",
+    "⚖️ Справедливо: кожен новий метеорит пролітає повз колонію, якій досі дісталося найменше, – чи то в гущі подій, чи на самому краю.",
+    "🏠 Руда рахується як метал лише тоді, коли транспортник дістанеться вашої планети. Якщо його збито дорогою, руду втрачено – навантажений транспортник вартий супроводу. ШІ-колонії теж ловлять метеорити.",
+    "🛠️ Транспортник має новий вигляд: важкий вантажник із широким трюмом, люками й ловильною пащею на носі."
+  ]
+}

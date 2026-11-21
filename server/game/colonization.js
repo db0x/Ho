@@ -39,7 +39,7 @@ export function orderSwarm(game, player, o) {
   for (const f of game.fleets) {
     if (f.owner !== player.id || f === fleet || !f.ships.some(s => s.colonists > 0)) continue;
     if (f.dest != null) claimed.add(f.dest);
-    else if (f.at != null && !f.hole && !f.chase) claimed.add(f.at);
+    else if (f.at != null && !f.hole && !f.chase && !f.catch) claimed.add(f.at);
   }
   const free = [];
   for (const p of game.galaxy.planets) {

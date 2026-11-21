@@ -7,7 +7,12 @@
 // fleets move at the same time, so the turn is played through in small
 // steps - where a chaser comes close enough to its target, both stop and
 // fight there in open space (combat.js).
-import { supplyNeed, holeZone, advance, route, dist, isAlien, travelDistance, routeLength, onMouth } from '../../shared/rules.js';
+//
+// Catching a meteor works the same way: a fleet with transporters heads for
+// the point where it meets the meteor, and where it comes close enough
+// during the turn, it stops and takes the ore aboard (meteors.js).
+import { supplyNeed, holeZone, advance, route, dist, isAlien, travelDistance, routeLength, onMouth, oreOf, meteorAt, METEOR } from '../../shared/rules.js';
+import { meteorById, seesMeteor, meteorIntercept, resolveCatches } from '../meteors.js';
 import { portalsFor, findMouth, transit } from '../wormholes.js';
 import { teamOf, hostile } from './diplomacy.js';
 import { fleetStats } from './fleets.js';
@@ -62,6 +67,7 @@ export function orderMove(game, player, o) {
   // happens (e.g. when the fleet has been merged in the meantime).
   if (!fleet || fleet.owner !== player.id) return { error: 'err.noSuchFleet' };
   if (o.chase != null) return orderChase(game, player, fleet, o.chase);
+  if (o.meteor != null) return orderCatch(game, player, fleet, o.meteor);
   if (o.hole != null) {
     // Only a mouth this empire has seen - the id of an unseen one gives nothing away.
     const found = player.seenMouths.has(o.hole) ? findMouth(game, o.hole) : null;
@@ -87,7 +93,33 @@ export function orderMove(game, player, o) {
 
 export function endChase(fleet) {
   fleet.chase = null;
+  fleet.catch = null;
   fleet.aim = null;
+}
+
+/** Is the fleet busy with a course, a jump, a chase or a catch? */
+export const underway = f => f.dest != null || !!f.hole || !!f.chase || !!f.catch;
+
+/**
+ * Catch a meteor: only with transporters, only one in sight, and only if
+ * the fleet can meet it before it is gone - within range.
+ */
+function orderCatch(game, player, fleet, id) {
+  const m = meteorById(game, id);
+  if (!m || !(m.metal > 0) || !seesMeteor(game, player.id, m)) return { error: 'err.noSuchMeteor' };
+  if (!oreOf(fleet.ships).hold) return { error: 'err.catchNoTransporter' };
+  const speed = fleetStats(fleet).speed;
+  if (speed <= 0) return { error: 'err.fleetImmobile' };
+  const aim = meteorIntercept(game, fleet, m, speed);
+  if (!aim) return { error: 'err.meteorTooFast' };
+  const reach = canReach(game, fleet, aim);
+  if (!reach.ok) return { error: reach.key, params: reach.params };
+  fleet.catch = m.id;
+  fleet.chase = null;
+  fleet.aim = aim;
+  fleet.dest = null;
+  fleet.hole = null;
+  delete player.orders.moves[fleet.id];
 }
 
 /**
@@ -107,6 +139,7 @@ function orderChase(game, player, fleet, targetId) {
   const reach = canReach(game, fleet, aim);
   if (!reach.ok) return { error: reach.key, params: reach.params };
   fleet.chase = target.id;
+  fleet.catch = null;
   fleet.aim = aim;
   fleet.dest = null;
   fleet.hole = null;
@@ -211,6 +244,26 @@ function steerChase(game, fleet, entries, zone) {
 }
 
 /**
+ * Before the fleets move: every fleet out for a meteor checks it - still
+ * there, still in sight, transporters still along - and aims anew.
+ */
+function steerCatch(game, fleet, entries, zone) {
+  const owner = playerById(game, fleet.owner);
+  const lost = (key) => {
+    endChase(fleet);
+    if (owner && key) entries.push({ type: 'warn', playerIds: [owner.id], private: owner.id,
+      key, params: { near: nearestName(game, fleet) } });
+  };
+  const m = meteorById(game, fleet.catch);
+  if (!m || !(m.metal > 0)) return lost('log.catchGone');
+  if (!oreOf(fleet.ships).hold) return lost(null);
+  if (owner && !seesMeteor(game, owner.id, m)) return lost('log.catchLost');
+  const aim = meteorIntercept(game, fleet, m, fleetStats(fleet).speed, zone);
+  if (!aim) return lost('log.catchEscaped');
+  fleet.aim = aim;
+}
+
+/**
  * Every fleet with a course moves on. First every fleet plans its way for
  * the turn, then chasers that meet their target stop with it, then the
  * moves are made. Returns the departures - fleets that left a world this
@@ -220,6 +273,7 @@ function steerChase(game, fleet, entries, zone) {
 export function moveFleets(game, entries) {
   const zone = holeZone(game.galaxy);
   for (const fleet of game.fleets) if (fleet.chase) steerChase(game, fleet, entries, zone);
+  for (const fleet of game.fleets) if (fleet.catch) steerCatch(game, fleet, entries, zone);
   const plans = [];
   for (const fleet of game.fleets) {
     if (fleet.dest == null && !fleet.hole && !fleet.aim) continue;
@@ -243,6 +297,9 @@ export function moveFleets(game, entries) {
     plans.push({ fleet, path, speed: st.speed, mouth, target, start: { x: fleet.x, y: fleet.y, z: fleet.z || 0 },
       stop: null, from: fleet.at });
   }
+  // Catches first: a fleet that stops at its meteor stands still for
+  // whoever chases it later in the turn.
+  const catches = findCatches(game, plans);
   const encounters = findEncounters(game, plans);
 
   const departures = [];            // [fleet, world it departs from this turn]
@@ -267,7 +324,32 @@ export function moveFleets(game, entries) {
     }
   }
   for (const p of game.players) p.orders.moves = {};
+  resolveCatches(game, catches, entries);
   return { departures, encounters };
+}
+
+/**
+ * Fleets out for a meteor that come close enough to it during the turn:
+ * they stop where they meet it. The meteor flies on meanwhile, straight
+ * from where it was at the start of the turn.
+ */
+function findCatches(game, plans) {
+  const out = [];
+  for (const p of plans) {
+    if (!p.fleet.catch) continue;
+    const m = meteorById(game, p.fleet.catch);
+    if (!m) continue;
+    const reach = Math.max(METEOR.catch, (p.speed + Math.hypot(m.vx, m.vy, m.vz || 0)) / STEPS + 4);
+    for (let k = 0; k <= STEPS; k++) {
+      const t = k / STEPS;
+      const at = posAt(p, t);
+      if (dist(at, meteorAt(m, t)) > reach) continue;
+      p.stop = t; p.meet = at;
+      out.push({ fleet: p.fleet, meteor: m, t });
+      break;
+    }
+  }
+  return out;
 }
 
 /** Position of a planned fleet after the share t (0..1) of the turn - standing where it stopped. */

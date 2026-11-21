@@ -1043,6 +1043,7 @@ body.fx-lite #rightdock.scan::before { display: none; }
 .logline.galaxy { color: #86e4cf; }
 .logline.victory { color: var(--gold); font-weight: 600; }
 .logline.diplomacy { color: var(--violet); }
+.logline.meteor { color: #ffc48a; }
 .logturn { margin: 8px 0 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 6px; }
 .logturn:first-child { margin-top: 0; border-top: none; padding-top: 0; }
 .logline.clickable { cursor: pointer; }

@@ -416,56 +416,63 @@ function biosphere(ctx, L, x, r, color) {
 }
 
 /* ---------------------------------------------------------- Transporter */
-// An open satellite carrier: five folded satellites in cradles along a
-// lattice spine - one look tells what it is for.
+// The hauler: cargo containers in two rows along a lattice spine and two
+// grappling arms at the bow - it carries satellites and catches meteors.
+// Same shapes as in shipshd/transport.js.
 function drawTransport(ctx, L, color, phase) {
   const u = L / 100;
+  const P = pts => pts.map(([x, y]) => [x * u, y * u]);
+  const mirror = pts => [...pts, ...pts.slice().reverse().map(([x, y]) => [x, -y])];
+  // Three flames behind the engine block
+  for (const y of [-9.6, 0, 9.6]) {
+    engineGlow(ctx, -L * 0.53, y * u, L * 0.13, phase + y, '#ffd08a');
+    nozzle(ctx, L, -50 * u, y * u, 3.9 * u);
+  }
+  // Jaws at the bow: two heavy plates opening forward, the lips in warning yellow
   for (const s of [-1, 1]) {
-    const y = s * 13 * u;
-    engineGlow(ctx, -L * 0.5, y, L * 0.18, phase + s);
-    nozzle(ctx, L, -45 * u, y, 3.8 * u);
-    ctx.fillStyle = metalGradient(ctx, y - 4.4 * u, y + 4.4 * u);
-    ctx.beginPath(); ctx.roundRect(-45 * u, y - 4.4 * u, 15 * u, 8.8 * u, 4 * u); ctx.fill(); outline(ctx, 0.8);
-    ctx.fillStyle = color; ctx.fillRect(-34.5 * u, y - 4.4 * u, 2.5 * u, 8.8 * u);
+    ctx.fillStyle = metalGradient(ctx, -23 * s * u, -9.4 * s * u);
+    tracePath(ctx, P([[33, -10.5], [33, -16], [44, -21.4], [54.6, -23], [59.4, -20.6], [58.8, -16.4], [55.6, -15.2],
+      [53.4, -16.8], [46, -14.4], [38, -9.4]].map(([x, y]) => [x, y * s])));
+    ctx.closePath(); ctx.fill(); outline(ctx, fine(L) * 0.9);
+    ctx.fillStyle = '#e8c547';
+    tracePath(ctx, P([[54.2, -22.8 * s], [59.4, -20.6 * s], [58.8, -16.4 * s], [55, -15.6 * s]]));
+    ctx.closePath(); ctx.fill();
   }
-  ctx.fillStyle = metalGradient(ctx, -10 * u, 10 * u);
-  ctx.fillRect(-40 * u, -10 * u, 6 * u, 20 * u);
-  // Spine: two light rails with bracing
-  ctx.fillStyle = '#a7b2c6';
-  const rail = Math.max(0.6, 1.8 * u);
-  ctx.fillRect(-42 * u, -4.6 * u, 78 * u, rail); ctx.fillRect(-42 * u, 4.6 * u - rail, 78 * u, rail);
-  if (L >= 40) {
-    ctx.strokeStyle = '#7d889c'; ctx.lineWidth = Math.max(0.5, 0.9 * u);
-    ctx.beginPath();
-    for (let x = -42, i = 0; x < 36; x += 6, i++) { ctx.moveTo(x * u, (i % 2 ? -3 : 3) * u); ctx.lineTo((x + 6) * u, (i % 2 ? 3 : -3) * u); }
-    ctx.stroke();
-  } else {
-    // Too small for the lattice: a solid girder reads better
-    ctx.fillStyle = '#8a95a8'; ctx.fillRect(-42 * u, -4.6 * u, 78 * u, 9.2 * u);
-    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-42 * u, -4.6 * u, 78 * u, rail * 0.6);
+  // Throat with the glowing emitter
+  ctx.fillStyle = metalGradient(ctx, -10.6 * u, 10.6 * u);
+  tracePath(ctx, P(mirror([[39.5, 0], [39.5, -7.2], [37.4, -10.6], [33, -10.6]])));
+  ctx.closePath(); ctx.fill(); outline(ctx, fine(L) * 0.8);
+  ctx.fillStyle = '#ffc98a';
+  ctx.beginPath(); ctx.ellipse(39 * u, 0, 1.2 * u, 3.6 * u, 0, 0, Math.PI * 2); ctx.fill();
+  // Engine block
+  ctx.fillStyle = metalGradient(ctx, -15.4 * u, 15.4 * u);
+  ctx.beginPath(); ctx.roundRect(-50 * u, -15.4 * u, 20 * u, 30.8 * u, 4.5 * u); ctx.fill(); outline(ctx, 1);
+  // The hold, a band in the empire colour across its stern end
+  ctx.fillStyle = hullGradient(ctx, L * 0.45);
+  tracePath(ctx, P(mirror([[34, 0], [34, -13], [31, -16.5], [-30, -16.5], [-33, -13.5]])));
+  ctx.closePath(); ctx.fill(); outline(ctx, 1);
+  ctx.fillStyle = color; ctx.fillRect(-30 * u, -16.5 * u, 3.4 * u, 33 * u);
+  // Hatch covers - at map size one ochre strip a side
+  const small = L < 40;
+  ctx.fillStyle = '#b9853f';
+  for (const s of [-1, 1]) {
+    const y0 = (s < 0 ? -13.6 : 2.6) * u, h = 11 * u;
+    if (small) { ctx.fillRect(-26.5 * u, y0, 53 * u, h); continue; }
+    for (const x of [-19, 0, 19]) {
+      ctx.fillRect((x - 7.5) * u, y0, 15 * u, h);
+      ctx.strokeStyle = 'rgba(8,10,18,.7)'; ctx.lineWidth = fine(L) * 0.6; ctx.strokeRect((x - 7.5) * u, y0, 15 * u, h);
+    }
   }
-  // Folded satellites in their cradles
-  // At map size the satellites are drawn larger, otherwise they vanish
-  const k = L < 60 ? 1.3 : 1;
-  for (const [x, s] of [[26, -1], [14, 1], [2, -1], [-10, 1], [-22, -1]]) {
-    const y = s * 11 * u * (k > 1 ? 1.1 : 1), X = x * u;
-    ctx.fillStyle = '#2c4a8a';
-    ctx.fillRect(X - 8.2 * u * k, y - 2.6 * u * k, 4.6 * u * k, 5.2 * u * k);
-    ctx.fillRect(X + 3.6 * u * k, y - 2.6 * u * k, 4.6 * u * k, 5.2 * u * k);
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6; ctx[i ? 'lineTo' : 'moveTo'](X + Math.cos(a) * 4.2 * u * k, y + Math.sin(a) * 4.2 * u * k); }
-    ctx.closePath(); ctx.fillStyle = '#b5bfd0'; ctx.fill(); outline(ctx, fine(L) * 0.8);
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(X, y, Math.max(0.7, 2.2 * u * k), 0, Math.PI * 2); ctx.fill();
-  }
-  // Flat bridge pod in front with its window band
-  ctx.fillStyle = hullGradient(ctx, L * 0.3);
-  tracePath(ctx, [[47 * u, 0], [46.6 * u, -5 * u], [44.4 * u, -8 * u], [36 * u, -9 * u], [33 * u, -7 * u],
-    [33 * u, 7 * u], [36 * u, 9 * u], [44.4 * u, 8 * u], [46.6 * u, 5 * u]]);
+  // Gantry crane across the hatches
+  ctx.fillStyle = '#d0a640'; ctx.fillRect(8.2 * u, -16 * u, 2.6 * u, 32 * u);
+  if (!small) { ctx.strokeStyle = 'rgba(8,10,18,.7)'; ctx.lineWidth = fine(L) * 0.6; ctx.strokeRect(8.2 * u, -16 * u, 2.6 * u, 32 * u); }
+  // Bridge raised on the engine block, its windscreen looking forward
+  ctx.fillStyle = hullGradient(ctx, L * 0.2);
+  tracePath(ctx, P(mirror([[-28.6, 0], [-29, -4.8], [-30.8, -8], [-44.6, -8], [-46.4, -6]])));
   ctx.closePath(); ctx.fill(); outline(ctx, 0.9);
-  ctx.fillStyle = color; ctx.fillRect(34.4 * u, -8 * u, 2 * u, 16 * u);
+  ctx.fillStyle = color; ctx.fillRect(-46 * u, -7 * u, 2.4 * u, 14 * u);
   ctx.fillStyle = 'rgba(140,225,255,.9)';
-  tracePath(ctx, [[46 * u, 0], [45.7 * u, -4 * u], [43.8 * u, -6.5 * u], [41.8 * u, -6.5 * u],
-    [41.8 * u, 6.5 * u], [43.8 * u, 6.5 * u], [45.7 * u, 4 * u]]);
+  tracePath(ctx, P(mirror([[-29.4, 0], [-29.7, -4.3], [-31.2, -6.9], [-33.8, -6.9]])));
   ctx.closePath(); ctx.fill(); outline(ctx, fine(L) * 0.7);
 }
 

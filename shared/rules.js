@@ -114,14 +114,16 @@ export const SHIP_DEFS = {
     attackMul: 0, shieldMul: 0.5, speedMul: 0.9, rangeMul: 2.6,
     tanker: true
   },
-  // Carries satellites from one own world to another - as far and as fast as
-  // a tanker, but without extending the fleet's range.
+  // The empire's hauler: carries satellites from one own world to another,
+  // and catches meteors - their ore goes into its hold and is delivered at
+  // an own world (server/meteors.js). `hold`: it can take ore. As far and as fast as a tanker, but
+  // without extending the fleet's range.
   transport: {
     icon: 'transport',
     money: 20, metal: 8, hull: 26,
     techs: ['range', 'speed'],
     attackMul: 0, shieldMul: 0.6, speedMul: 0.9, rangeMul: 2.6,
-    cargo: 5
+    cargo: 5, hold: true
   }
 };
 
@@ -320,6 +322,69 @@ export function salvageRate(total, transport) {
 export function alienInsight(alienLevel, ownLevel) {
   const S = ALIEN_SPOILS;
   return clamp(S.insight + S.insightStep * ((alienLevel || 1) - (ownLevel || 1)), 0, S.insightMax);
+}
+
+/**
+ * Meteors (server/meteors.js): chunks of rock full of ore that come in from
+ * beyond the edge of the galaxy, cross it in a straight line and leave on
+ * the other side - or vanish in the black hole. Always on, no lobby option.
+ * Only transporters can catch one: a fleet with transporters heads for the
+ * point where it meets the meteor and takes all of its ore aboard - the
+ * meteor is gone then. The ore counts as metal once the transporter reaches
+ * an own world - shot down on the way, it is lost.
+ */
+export const METEOR = {
+  firstTurn: 5,          // none before this turn
+  // Per turn, that a new one comes in - more with more empires, so that each
+  // gets its share: about one aimed at it every 30 turns, whatever the size.
+  chance: n => Math.min(0.6, Math.max(0.08, 0.03 * n)),
+  max: n => 4 + 2 * n,   // at most this many at once - bigger maps hold more
+  speed: [38, 64],       // ly per turn
+  // Ore it carries: more later in the game, give or take a quarter.
+  metal: turn => Math.min(600, 120 + 3 * Math.max(0, turn)),
+  spread: 0.25,
+  margin: 120,           // ly beyond the edge of the map where they come in and leave
+  // Fair shares (server/meteors.js): a meteor counts for every empire whose
+  // inhabited worlds it passes within `near` ly; the next one is aimed
+  // `pass` ly beside a world of the empire with the fewest.
+  near: 260,
+  pass: [40, 110],
+  catch: 14,             // how close a fleet has to come
+  horizon: 30            // turns ahead a meeting point is looked for
+};
+
+/** Ore a fleet carries, and how many ships it has that can take ore (`hold`). */
+export function oreOf(ships) {
+  let ore = 0, hold = 0;
+  for (const s of ships) {
+    if (SHIP_DEFS[s.type]?.hold) hold++;
+    ore += s.ore || 0;
+  }
+  return { ore, hold };
+}
+
+/** Where a meteor is after `turns` turns (it flies straight on). */
+export function meteorAt(m, turns) {
+  return { x: m.x + m.vx * turns, y: m.y + m.vy * turns, z: (m.z || 0) + (m.vz || 0) * turns };
+}
+
+/**
+ * Where and when a fleet flying from `from` at `speed` meets the meteor
+ * soonest - along its straight course, as long as it is still on the map
+ * (`m.left` turns). Null if the fleet cannot get there in time. The server
+ * aims with it, the map previews it.
+ * @returns {{at: {x: number, y: number, z: number}, turns: number} | null}
+ */
+export function meteorMeet(from, speed, m, zone) {
+  if (!(speed > 0)) return null;
+  const last = Math.min(METEOR.horizon, m.left ?? METEOR.horizon);
+  for (let k = 0; k <= last * 8; k++) {
+    const p = meteorAt(m, k / 8);
+    if (travelDistance(from, p, zone) <= speed * k / 8 + METEOR.catch * 0.5) {
+      return { at: { x: p.x, y: p.y, z: p.z || 0 }, turns: Math.max(1, Math.ceil(k / 8)) };
+    }
+  }
+  return null;
 }
 
 /**
@@ -734,7 +799,9 @@ export function advance(a, path, speed) {
   let left = speed, cur = { x: a.x, y: a.y, z: a.z || 0 };
   for (const p of path) {
     const d = dist(cur, p);
-    if (d <= left) { left -= d; cur = { x: p.x, y: p.y, z: p.z || 0 }; continue; }
+    // A hair of slack: a way exactly as long as the speed (out for a full
+    // turn and straight back) must not end 1e-13 short of the world.
+    if (d <= left + 1e-9) { left = Math.max(0, left - d); cur = { x: p.x, y: p.y, z: p.z || 0 }; continue; }
     const t = left / d;
     return {
       x: cur.x + (p.x - cur.x) * t,

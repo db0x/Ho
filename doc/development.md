@@ -27,6 +27,7 @@ server/
   wormholes.js       Wormholes: opening, sight, jump, collapse, dev-mode aids
   aliens.js          Aliens: rifts, raids, overrunning planets, leaving, dev-mode aid
   spoils.js          Spoils of a carrier shot down: insight, trophy, wreck and its salvage, dev-mode aid
+  meteors.js         Meteors: coming in, flight, sight, catches by transporters, unloading the ore, dev-mode aid
   shipnames.js       Names for the destroyers: historical ships and a few from films and series
   bot.js             AI opponents with personalities; play by the same rules
   auth.js            Access: sessions, sign-in, password change, gate
@@ -164,6 +165,7 @@ npm run test:wormhole  # wormholes: placement, sight, jump, supply through it, c
 npm run test:destroyer # destroyers: price, unlock, names, guns and fire, repairs, lobby option
 npm run test:station   # orbital station: price, one per planet, 3 turns, fighter discount, battle, conquest, AI
 npm run test:aliens    # aliens: rift in sight, fair turns, overrun empty, last planet spared, carrier, dev mode, spoils and wrecks
+npm run test:meteor    # meteors: from beyond the edge, straight across, sight, only transporters catch, hold, delivery, loss, black hole, AI
 node test/intercept.js # interception when leaving a contested orbit
 npm run test:chase     # intercepting in flight: catch, stop, speed, orders, orbit and sight, AI
 npm run test:budget    # budget: forecast = charges, no order fails

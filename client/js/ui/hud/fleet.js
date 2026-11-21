@@ -1,8 +1,9 @@
 // Fleets: the panel of a selected fleet with its ships, names and cargo,
 // the fleet rows other panels list - and whether a fleet can go somewhere.
 import {
-  travelDistance, holeZone, SHIP_DEFS, cargoOf, SHIP_TYPES, ALIEN_TYPES, supplyNeed, onMouth
+  travelDistance, holeZone, SHIP_DEFS, cargoOf, oreOf, SHIP_TYPES, ALIEN_TYPES, supplyNeed, onMouth
 } from '../../../shared/rules.js';
+import { METEOR_COLOR } from '../../render/meteors.js';
 import { ownerOf, ownerColor } from '../../owners.js';
 import { suppliesMe } from '../../allies.js';
 import { t } from '../../i18n.js';
@@ -110,10 +111,12 @@ export const fleetMethods = {
             ${destM ? ' ' + t('fleet.holeSuffix', { turns: turnsTo })
               .replace('<b>', '<b style="color:#cdb4ff">') : ''}
             ${f.chase && f.aim ? ' ' + t('fleet.chaseSuffix', { player: escapeHtml(ownerOf(v, prey?.owner)?.name || '?'), turns: turnsTo })
-              .replace('<b>', '<b style="color:var(--bad)">') : ''}</div>
+              .replace('<b>', '<b style="color:var(--bad)">') : ''}
+            ${f.catch && f.aim ? ' ' + t('fleet.catchSuffix', { turns: turnsTo })
+              .replace('<b>', `<b style="color:${METEOR_COLOR}">`) : ''}</div>
         </div>
       </div>
-      ${f.mine && !v.spectator ? this.fleetActions(f, where, !!(destP || destM || f.chase)) : ''}
+      ${f.mine && !v.spectator ? this.fleetActions(f, where, !!(destP || destM || f.chase || f.catch)) : ''}
       <div class="statgrid cols4">
         <div class="stat"><div class="k">${t('fleet.speed')}</div><div class="v">${Math.round(st.speed)} ${t('unit.lyPerTurn')}</div></div>
         <div class="stat"><div class="k">${t('fleet.range')}</div><div class="v">${fmt(st.range)} ${t('unit.ly')}</div></div>
@@ -141,7 +144,8 @@ export const fleetMethods = {
         </div>
       </div>
       ${f.mine && !v.spectator ? `<p class="hint-line fa-hint">${t('fleet.orderHint')}</p>` : ''}
-      ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}`;
+      ${f.mine && !v.spectator ? this.cargoSection(f, where) : ''}
+      ${f.mine && !v.spectator ? this.oreSection(f, where) : ''}`;
 
     const col = (f.mine && v.me) ? v.me.color
       : ownerColor(v, f.owner, '#9fb0c8');
@@ -283,6 +287,19 @@ export const fleetMethods = {
       ${info.map(x => `<p class="small oneline fa-info">${x}</p>`).join('')}`;
   },
 
+  /** The hold for the ore of meteors: how full, and what to do with it. */
+  oreSection(f, where) {
+    const o = oreOf(f.ships);
+    if (!o.hold) return '';
+    const home = where && where.owner === this.view.you;
+    return `
+      <div class="sec">
+        <h4>${t('fleet.ore')}</h4>
+        <div class="small" style="color:${o.ore ? METEOR_COLOR : ''}">${t('fleet.oreValue', { ore: o.ore })}</div>
+        <p class="hint-line">${t(o.ore ? (home ? 'fleet.oreUnload' : 'fleet.oreHome') : 'fleet.oreHint')}</p>
+      </div>`;
+  },
+
   cargoSection(f, where) {
     const c = cargoOf(f.ships);
     if (!c.capacity) return '';
@@ -354,7 +371,7 @@ export const fleetMethods = {
       right = `<span class="muted">${t('fleet.strengthUnknown')}</span>`;
     }
     const whither = arriving && Number.isFinite(turns) ? t('fleet.arrivesIn', { turns: t('word.turns', { n: turns, count: turns }) })
-      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : f.chase ? `→ ${t('fleet.chasing')}` : '';
+      : target ? `→ ${escapeHtml(target.name)}` : f.hole ? `→ ${t('hole.name')}` : f.chase ? `→ ${t('fleet.chasing')}` : f.catch ? `→ ${t('meteor.name')}` : '';
     return `<div class="fleetrow ${f.mine ? '' : 'foe'}" data-fleet="${f.id}">
       <div class="fr-top">
         <span class="dot" style="background:${color}"></span>

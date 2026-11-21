@@ -8,8 +8,9 @@
 // scouts and stations see farther, a foreign course shows only its
 // direction unless it is coming for an own world, and the tallies of other
 // empires stay hidden. The AI goes by the same rules.
-import { dist, travelDistance, holeZone, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
+import { dist, travelDistance, holeZone, advance, route, TECH_FIELDS, techCostToNext } from '../../shared/rules.js';
 import { riftView } from '../aliens.js';
+import { meteorById, meteorView, seesMeteor } from '../meteors.js';
 import { wreckView } from '../spoils.js';
 import { SCAN, findMouth, wormholeView } from '../wormholes.js';
 import { round1 } from './combat.js';
@@ -149,7 +150,10 @@ export function courseIntel(game, player, f, eyes = null) {
   const mouth = f.hole && player.seenMouths.has(f.hole) ? findMouth(game, f.hole)?.mouth : null;
   // A chaser shows where it is heading - whom it chases only if that one is in sight too.
   const prey = f.chase ? game.fleets.find(g => g.id === f.chase) : null;
-  const chasing = prey && seesFleet(game, player.id, prey, eyes) ? chaseView(game, f) : {};
+  // One out for a meteor likewise - if the meteor is in sight.
+  const rock = f.catch ? meteorById(game, f.catch) : null;
+  const chasing = (prey && seesFleet(game, player.id, prey, eyes)) || (rock && seesMeteor(game, player.id, rock, eyes))
+    ? chaseView(game, f) : {};
   const destP = f.dest != null ? planetById(game, f.dest) : null;
   const known = { dest: f.dest != null && !mouth ? f.dest : null, hole: mouth ? mouth.id : null, ...chasing,
     target: mouth || destP || chasing.aim || null };
@@ -168,10 +172,26 @@ export function courseIntel(game, player, f, eyes = null) {
     heading: { x: Math.round(f.x + dx * k), y: Math.round(f.y + dy * k), z: Math.round((f.z || 0) + dz * k) } };
 }
 
-/** Whom a fleet chases and the meeting point it heads for - for course lines and panels. */
+/**
+ * Does an own fleet reach the world it heads for in this turn's flight? By
+ * the very rule movement uses - the view's rounded position could tip a
+ * fleet at the edge of its speed to the wrong side (shared/budget.js).
+ */
+function arrivesNow(game, f) {
+  if (f.dest == null || f.at === f.dest) return false;
+  const speed = fleetStats(f).speed;
+  const target = planetById(game, f.dest);
+  return speed > 0 && advance(f, route(f, target, holeZone(game.galaxy)), speed).done;
+}
+
+/**
+ * Whom a fleet chases - or which meteor it is out to catch - and the
+ * meeting point it heads for - for course lines and panels.
+ */
 function chaseView(game, f) {
-  if (!f.chase || !f.aim) return {};
-  return { chase: f.chase, aim: { x: Math.round(f.aim.x), y: Math.round(f.aim.y), z: Math.round(f.aim.z || 0) } };
+  if (!(f.chase || f.catch) || !f.aim) return {};
+  return { ...(f.chase ? { chase: f.chase } : { catch: f.catch }),
+    aim: { x: Math.round(f.aim.x), y: Math.round(f.aim.y), z: Math.round(f.aim.z || 0) } };
 }
 
 export function buildView(game, player) {
@@ -231,9 +251,10 @@ export function buildView(game, player) {
         id: f.id, owner: f.owner, at: f.at,
         x: Math.round(f.x), y: Math.round(f.y), z: Math.round(f.z || 0), dest: f.dest, hole: f.hole,
         ...chaseView(game, f),
+        ...(arrivesNow(game, f) ? { arriving: true } : {}),
         mine: true,
         ships: f.ships.map(s => ({ id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp, attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-          ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}),
+          ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.ore ? { ore: s.ore } : {}), ...(s.name ? { name: s.name } : {}),
           ...(s.trophies ? { trophies: s.trophies } : {}) })),
         stats: fleetStats(f)
       });
@@ -286,6 +307,7 @@ export function buildView(game, player) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, player),
+    meteors: meteorView(game, player, eyes),
     rifts: riftView(game, player),
     aliens: game.settings.aliens !== false,
     interception: game.settings.interception !== false,
@@ -347,7 +369,7 @@ export function buildSpectatorView(game) {
     ships: f.ships.map(s => ({
       id: s.id, type: s.type, hp: Math.round(s.hp), maxHp: s.maxHp,
       attack: s.attack, speed: s.speed, range: s.range, colonists: s.colonists, tech: s.tech,
-      ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.name ? { name: s.name } : {}),
+      ...(s.cargo ? { cargo: s.cargo.length } : {}), ...(s.ore ? { ore: s.ore } : {}), ...(s.name ? { name: s.name } : {}),
       ...(s.trophies ? { trophies: s.trophies } : {})
     })),
     stats: fleetStats(f)
@@ -377,6 +399,7 @@ export function buildSpectatorView(game) {
       blackHole: game.galaxy.blackHole || null
     },
     wormholes: wormholeView(game, null),
+    meteors: meteorView(game, null),
     rifts: riftView(game, null),
     aliens: game.settings.aliens !== false,
     interception: game.settings.interception !== false,

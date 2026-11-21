@@ -477,6 +477,13 @@ const RECIPES = {
     s.noise(b, t, { dur: 1.4, type: 'bandpass', from: 3200, to: 180, q: 2.2, gain: 0.1, attack: 0.5 });
     s.seq(b, t + 0.2, [1568, 1397, 1175, 988], 0.11, { type: 'sine', dur: 0.6, gain: 0.03 });
   } },
+  // A meteor: rushing past - filtered noise sweeping down like a body
+  // through thin air, a low rumble under it, a bright crackle of hot rock.
+  meteor: { max: 1, gap: 0.5, build: (s, b, t) => {
+    s.noise(b, t, { dur: 1.1, type: 'bandpass', from: 4200, to: 380, q: 1.4, gain: 0.1, attack: 0.18 });
+    s.tone(b, t + 0.1, { type: 'sine', from: 92, to: 54, dur: 1.0, gain: 0.1, attack: 0.2 });
+    s.noise(b, t + 0.25, { dur: 0.35, type: 'highpass', from: 6000, to: 3500, gain: 0.03, attack: 0.02 });
+  } },
   // Aliens: space tears open with a hiss, then an alien call - two
   // detuned voices sliding against each other over a pulsing throb.
   alien: { max: 1, gap: 0.8, build: (s, b, t) => {
@@ -501,7 +508,7 @@ export const SFX_NAMES = Object.keys(RECIPES);
 export const LOG_SFX = {
   combat: 'combat', invade: 'invade', colonize: 'colonize', settle: 'settle',
   build: 'build', tech: 'tech', terra: 'terra', arrive: 'arrive', warn: 'warn',
-  galaxy: 'expand', wormhole: 'wormhole', alien: 'alien',
+  galaxy: 'expand', wormhole: 'wormhole', alien: 'alien', meteor: 'meteor',
   lost: 'lost', eliminated: 'eliminated', victory: 'victory'
 };
 

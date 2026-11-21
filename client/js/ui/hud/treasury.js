@@ -29,11 +29,12 @@ export const treasuryMethods = {
                short: f.refit.planned.n > f.refit.booked.n, lacksMoney: f.refit.lacksMoney, lacksMetal: f.refit.lacksMetal },
       terra: { money: r(f.terra.booked), missing: r(f.terra.planned - f.terra.booked), worlds: f.terra.worlds },
       income: { money: r(f.income), metal: r(f.mining) },
-      salvage: r(f.salvage)
+      salvage: r(f.salvage),
+      ore: r(f.ore || 0)
     };
     lg.after = {
       money: lg.now.money - lg.research - lg.build.money - lg.refit.money - lg.terra.money + lg.income.money,
-      metal: lg.now.metal - lg.build.metal - lg.refit.metal + lg.income.metal + lg.salvage
+      metal: lg.now.metal - lg.build.metal - lg.refit.metal + lg.income.metal + lg.salvage + lg.ore
     };
     lg.tight = lg.build.dropped > 0 || lg.refit.short || lg.terra.missing > 0;
 
@@ -98,6 +99,7 @@ export const treasuryMethods = {
     }
     rows.push(row('income', t('ledger.income'), plus(lg.income.money), plus(lg.income.metal)));
     if (lg.salvage) rows.push(row('income', t('ledger.salvage'), '', plus(lg.salvage)));
+    if (lg.ore) rows.push(row('income', t('ledger.ore'), '', plus(lg.ore)));
     rows.push(row('total', t('ledger.next'), fmt(lg.after.money), fmt(lg.after.metal)));
     $('#ledger').innerHTML = `
       <h4 id="ledger-title">${t('ledger.title', { turn: this.view.turn })}</h4>

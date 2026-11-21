@@ -30,6 +30,8 @@ import { speakable } from './tts.js';
 export const RADIO_EVENTS = {
   'alien.appear':  { prio: 100, chance: 1,    important: true },
   'crew.trophy':   { prio: 95,  chance: 1,    important: true },
+  // Every meteor once, however recently the crew spoke - it does not come back.
+  'crew.meteor':   { prio: 75,  chance: 1,    important: true, quiet: 0 },
   betray:          { prio: 90,  chance: 1,    important: true },
   war:             { prio: 85,  chance: 1,    important: true },
   victory:         { prio: 80,  chance: 0.8,  important: true },
@@ -51,7 +53,8 @@ export const RADIO_CALLS = {
 export const RADIO_CALL_QUIET_TURNS = 1;
 // The listener's own crew: it speaks up when one of their destroyers shot
 // down an alien carrier (spoils.js) - in one of the crew's voices, the same
-// for the same ship.
+// for the same ship - and once for every meteor that comes into sight within
+// reach of a transporter (meteors.js).
 export const CREW = 'crew';
 // How often a line names names when it can (with the speech service).
 export const RADIO_NAMED_SHARE = 0.6;
@@ -129,6 +132,9 @@ export function radioTurn(game, entries, rand = Math.random) {
         const giver = byName(e.params?.player), other = byName(e.params?.other);
         if (giver?.isBot && other) want(other.id, giver.id, 'betray');
       }
+    } else if (e.type === 'meteor' && e.key === 'log.meteorSpotted' && e.reach) {
+      want(e.private, CREW, 'crew.meteor', { planet: e.params?.near ?? null, voice: e.meteor,
+        ...(e.planetId != null ? { where: { planetId: e.planetId } } : {}) });
     } else if (e.type === 'alien' && e.key === 'log.alienTrophy') {
       const ship = e.params?.vessel ?? null;
       want(e.private, CREW, 'crew.trophy', { ship, planet: e.params?.near ?? null,
@@ -142,7 +148,7 @@ export function radioTurn(game, entries, rand = Math.random) {
   }
 
   const choose = (h, list, rules, quiet, last) => list
-    .filter(w => game.turn - (last[w.from] ?? -Infinity) >= quiet)
+    .filter(w => game.turn - (last[w.from] ?? -Infinity) >= (rules[w.event].quiet ?? quiet))
     .filter(w => rand() < rules[w.event].chance)
     .sort((a, b) => rules[b.event].prio - rules[a.event].prio)
     .find(w => speakerOf(game, w.from, w.ctx) && clipsFor(clips, game, w));
@@ -284,7 +290,7 @@ function speakerOf(game, from, ctx) {
     const n = radioVoices().crew?.voices?.length;
     if (!n) return null;
     let h = 0;
-    for (const ch of String(ctx?.ship ?? '')) h = (h * 31 + ch.charCodeAt(0)) | 0;
+    for (const ch of String(ctx?.ship ?? ctx?.voice ?? '')) h = (h * 31 + ch.charCodeAt(0)) | 0;
     return `${CREW}${Math.abs(h) % n + 1}`;
   }
   return game.players.find(p => p.id === from)?.persona ?? null;

@@ -50,6 +50,7 @@ export function createGame(hostName) {
     aliens: null,             // when the next raid is due and who had one (server/aliens.js)
     alienRifts: [],           // rifts of the last turn, for the map
     wrecks: [],               // wrecks of alien carriers to salvage (server/spoils.js)
+    meteors: [],              // meteors crossing the map (server/meteors.js)
     nextFleetId: 1,
     nextShipId: 1,
     log: [],

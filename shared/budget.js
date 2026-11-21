@@ -9,11 +9,13 @@
 // What cannot be foreseen here: combat, conquest and new colonies between
 // building and settlement - they only change the income. And salvage from a
 // wreck (server/spoils.js) is counted for own fleets that stay in its orbit;
-// whoever else salvages there may get a share of it.
+// whoever else salvages there may get a share of it. The ore of meteors
+// (server/meteors.js) counts for transporters that stay at or reach an own
+// world this turn - unless they are caught on the way.
 import {
   TECH_FIELDS, techMaxLevel, techCostToNext, BUILD_TYPES, buildCost, refitCost,
   terraformable, IDEAL, TERRA_COST_PER_DEGREE, TERRA_COST_PER_G, planetIncome, planetMining,
-  SHIP_DEFS, salvageRate, travelDistance, holeZone
+  SHIP_DEFS, salvageRate, travelDistance, holeZone, oreOf
 } from './rules.js';
 
 /**
@@ -158,13 +160,35 @@ export function forecast(view) {
   const income = mine.reduce((a, p) => a + planetIncome(p), 0);
   const mining = mine.reduce((a, p) => a + planetMining(p), 0);
   const salvage = salvageForecast(view, launched);
+  const ore = oreForecast(view);
 
   return {
     tech, breakthrough, research, available,
-    build, refit, terra, income, mining, salvage: salvage.metal, salvageShared: salvage.shared,
+    build, refit, terra, income, mining, salvage: salvage.metal, salvageShared: salvage.shared, ore,
     afterTerra,
-    after: { money: money + income, metal: metal + mining + salvage.metal }
+    after: { money: money + income, metal: metal + mining + salvage.metal + ore }
   };
+}
+
+/**
+ * Ore of meteors the own transporters unload this turn: at an own world
+ * they stay at or reach in this turn's flight.
+ */
+export function oreForecast(view) {
+  if (!view.you) return 0;
+  const zone = holeZone(view.galaxy);
+  let ore = 0;
+  for (const f of view.fleets) {
+    if (!f.mine || f.hole || f.chase || f.catch) continue;
+    const load = oreOf(f.ships).ore;
+    if (!load) continue;
+    const w = f.at != null && (f.dest == null || f.dest === f.at) ? view.planets[f.dest ?? f.at]
+      : f.dest != null && f.stats?.speed > 0
+        && (f.arriving ?? travelDistance(f, view.planets[f.dest], zone) <= f.stats.speed)
+        ? view.planets[f.dest] : null;
+    if (w && w.owner === view.you) ore += load;
+  }
+  return ore;
 }
 
 const allied = (view, id) => id === view.you || (view.me?.allies || []).includes(id);
@@ -197,12 +221,15 @@ export function salvageAt(view, w, launched = new Map()) {
   const none = { metal: 0, blocked: false, shared: false };
   if (!w?.wreck || w.known !== 'live' || !(w.wreck.metal > 0) || !view.you) return none;
   const zone = holeZone(view.galaxy);
-  const arrives = f => f.dest === w.id && f.stats?.speed > 0 && travelDistance(f, w, zone) <= f.stats.speed;
+  // The server tells whether an own fleet arrives (view.arriving) - the
+  // rounded position could tip one at the edge of its speed the wrong way.
+  const arrives = f => f.dest === w.id && f.stats?.speed > 0
+    && (f.arriving ?? travelDistance(f, w, zone) <= f.stats.speed);
   // A chaser whose prey sits in the same orbit stays and fights there.
-  const stays = f => !f.chase || view.fleets.find(g => g.id === f.chase)?.at === w.id;
+  const stays = f => !f.catch && (!f.chase || view.fleets.find(g => g.id === f.chase)?.at === w.id);
   const orbit = view.fleets.filter(f => f.at === w.id);
   const own = view.fleets.filter(f => f.mine && !f.hole
-    && (f.at === w.id ? (f.dest == null || f.dest === w.id) && stays(f) : !f.chase && arrives(f)));
+    && (f.at === w.id ? (f.dest == null || f.dest === w.id) && stays(f) : !f.chase && !f.catch && arrives(f)));
   const blocked = (w.owner && w.pop >= 0.5 && !allied(view, w.owner))
     || orbit.some(f => !allied(view, f.owner) && armed(f));
   if (blocked) return { ...none, blocked: true };

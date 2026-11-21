@@ -1,12 +1,13 @@
 // Fleet command: bundling and sorting out fleets, a course for every idle
-// one, and the transporters' errands.
-import { cargoOf, travelDistance, dist, shipStats, batteryStats, COMBAT_ROUNDS, SHIP_DEFS } from '../../shared/rules.js';
+// one, and the transporters' errands - satellites, and the ore of meteors.
+import { cargoOf, oreOf, travelDistance, dist, shipStats, batteryStats, COMBAT_ROUNDS, SHIP_DEFS } from '../../shared/rules.js';
 import { hostile } from '../game/diplomacy.js';
 import { fleetStats } from '../game/fleets.js';
 import { planetById } from '../game/game.js';
 import { seesFleet } from '../game/intel.js';
 import { wrecksSeen } from '../spoils.js';
-import { canReach } from '../game/movement.js';
+import { meteorsSeen, meteorIntercept } from '../meteors.js';
+import { canReach, underway } from '../game/movement.js';
 import { setOrders } from '../game/orders.js';
 import { friendly } from './diplomacy.js';
 import { HIT_RATE } from './situation.js';
@@ -15,6 +16,8 @@ import { formPacks, combatTarget } from './war.js';
 
 // How far a fleet goes for a wreck, in turns of flight.
 const SALVAGE_TURNS = 4;
+// How far a transporter goes for a meteor, in turns of flight.
+const METEOR_TURNS = 8;
 
 /**
  * Wrecks of alien carriers: a fleet that stands in the orbit of one stays
@@ -34,10 +37,10 @@ export function salvage(s) {
     const p = planetById(game, w.planetId);
     if (p.owner && p.pop >= 0.5 && hostile(game, bot.id, p.owner)) continue;
     if (game.fleets.some(f => f.at === p.id && f.ships.some(x => x.attack > 0) && hostile(game, bot.id, f.owner))) continue;
-    const here = mine.find(f => f.at === p.id && f.dest == null && !f.hole && !f.chase);
+    const here = mine.find(f => f.at === p.id && f.dest == null && !f.hole && !f.chase && !f.catch);
     if (here) { s.salvaging.add(here.id); continue; }
     if (mine.some(f => f.dest === p.id)) continue;
-    const idle = mine.filter(f => f.dest == null && !f.hole && !f.chase && !s.salvaging.has(f.id)
+    const idle = mine.filter(f => f.dest == null && !f.hole && !f.chase && !f.catch && !s.salvaging.has(f.id)
       && fleetStats(f).speed > 0 && !loaded(f) && !f.ships.some(x => x.colonists > 0)
       && !(f.at != null && s.threatened?.has(f.at)));
     const turns = f => travelDistance(f.at != null ? planetById(game, f.at) : f, p, zone) / fleetStats(f).speed;
@@ -48,6 +51,54 @@ export function salvage(s) {
     if (!pick) continue;
     setOrders(game, bot, { move: { fleetId: pick.f.id, planetId: p.id } });
     if (pick.f.dest === p.id) s.salvaging.add(pick.f.id);
+  }
+}
+
+/**
+ * Meteors: a transporter with ore aboard and nothing else to do flies home
+ * to the nearest own world - the ore only counts there. An idle one in an
+ * orbit that is not threatened goes for the meteor in sight that brings
+ * the most ore per turn of flight - one
+ * transporter per meteor. Not with satellites aboard: those have their own
+ * errand. The fleets sent go into s.salvaging, like those at a wreck.
+ */
+export function meteorErrands(s) {
+  const { game, bot, zone } = s;
+  s.salvaging ||= new Set();
+  const haulers = game.fleets.filter(f => f.owner === bot.id && f.ships.length && oreOf(f.ships).hold > 0);
+  if (!haulers.length) return;
+  const bases = s.mine.filter(p => p.pop >= 0.5);
+  for (const f of haulers) {
+    if (underway(f) || oreOf(f.ships).ore <= 0) continue;
+    if (f.at != null && planetById(game, f.at).owner === bot.id) continue;
+    const here = f.at != null ? planetById(game, f.at) : f;
+    const home = reachable(game, f, bases, p => -travelDistance(here, p, zone));
+    if (!home) continue;
+    setOrders(game, bot, { move: { fleetId: f.id, planetId: home.id } });
+    s.salvaging.add(f.id);
+  }
+  const meteors = meteorsSeen(game, bot.id);
+  if (!meteors.length) return;
+  const taken = new Set(haulers.filter(f => f.catch).map(f => f.catch));
+  for (const f of haulers) {
+    if (underway(f) || s.salvaging.has(f.id) || f.at == null || s.threatened?.has(f.at)) continue;
+    if (cargoOf(f.ships).used > 0 || f.ships.some(x => x.colonists > 0)) continue;
+    const speed = fleetStats(f).speed;
+    if (speed <= 0) continue;
+    const from = planetById(game, f.at);
+    let best = null;
+    for (const m of meteors) {
+      if (taken.has(m.id)) continue;
+      const aim = meteorIntercept(game, f, m, speed, zone);
+      if (!aim) continue;
+      const turns = travelDistance(from, aim, zone) / speed;
+      if (turns > METEOR_TURNS || !canReach(game, f, aim).ok) continue;
+      const score = m.metal / (turns + 1);
+      if (!best || score > best.score) best = { m, score };
+    }
+    if (!best) continue;
+    setOrders(game, bot, { move: { fleetId: f.id, meteor: best.m.id } });
+    if (f.catch === best.m.id) { taken.add(best.m.id); s.salvaging.add(f.id); }
   }
 }
 
@@ -74,7 +125,7 @@ export function logistics(s) {
     })
     .sort((x, y) => y.a - x.a);
   const donors = surplus(s);
-  for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && f.ships.some(s => s.cargo))) {
+  for (const f of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.catch && f.ships.some(s => s.cargo))) {
     if (s.salvaging?.has(f.id)) continue;
     const cargo = cargoOf(f.ships);
     const here = f.at != null ? planetById(game, f.at) : null;
@@ -167,7 +218,7 @@ export function orderFleets(s) {
     .filter(f => f.dest != null && isScout(f)).map(f => f.dest));
   // Free worlds held by a foreign ship - nobody settles there until it is gone.
   const { blocked, escorted } = clearOrbits(s, claimed);
-  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && !f.chase && f.ships.length)) {
+  for (const fleet of game.fleets.filter(f => f.owner === bot.id && f.dest == null && !f.hole && !f.chase && !f.catch && f.ships.length)) {
     if (s.salvaging?.has(fleet.id)) continue;
     const st = fleetStats(fleet);
     if (st.speed <= 0 || fleet.ships.some(s => s.cargo)) continue;
@@ -270,7 +321,7 @@ function clearOrbits(s, claimed) {
   for (const [id, need] of blocked) {
     if (!wanted.has(id) || escorted.has(id)) continue;
     const p = planets[id];
-    const guards = myFleets.filter(f => f.dest == null && !f.hole && !f.chase && f.ships.length && strike(f) >= need
+    const guards = myFleets.filter(f => f.dest == null && !f.hole && !f.chase && !f.catch && f.ships.length && strike(f) >= need
       && fleetStats(f).speed > 0 && !f.ships.some(x => x.colonists > 0 || x.cargo)
       && !(f.at != null && threatened.has(f.at)));
     const g = guards.map(f => ({ f, d: travelDistance(f.at != null ? planets[f.at] : f, p, zone) }))

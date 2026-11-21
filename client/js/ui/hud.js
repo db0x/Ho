@@ -16,6 +16,7 @@ import { shipyardMethods } from './hud/shipyard.js';
 import { topbarMethods } from './hud/topbar.js';
 import { treasuryMethods } from './hud/treasury.js';
 import { wormholeMethods } from './hud/wormhole.js';
+import { meteorMethods } from './hud/meteor.js';
 
 const $ = s => document.querySelector(s);
 
@@ -199,6 +200,7 @@ export class Hud {
     box.classList.remove('split');                      // only the planet panel is in two parts
     if (sel.type === 'planet') this.planetPanel(box, this.view.planets[sel.id]);
     else if (sel.type === 'hole') this.holePanel(box, this.view.wormholes?.find(m => m.id === sel.id));
+    else if (sel.type === 'meteor') this.meteorPanel(box, this.view.meteors?.find(m => m.id === sel.id));
     else this.fleetPanel(box, this.view.fleets.find(f => f.id === sel.id));
     box.scrollTop = keep;
   }
@@ -242,7 +244,7 @@ export class Hud {
 
 Object.assign(Hud.prototype,
   topbarMethods, treasuryMethods, researchMethods, empireMethods, playersMethods,
-  planetMethods, shipyardMethods, fleetMethods, wormholeMethods, commsMethods);
+  planetMethods, shipyardMethods, fleetMethods, wormholeMethods, meteorMethods, commsMethods);
 
 /** First call right away, then at most one per window - the last value
  *  always goes out at the end. */

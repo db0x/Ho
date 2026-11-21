@@ -11,7 +11,8 @@ import { ownerColor } from '../owners.js';
 import { drawPlanet, planetRadius, planetThumb, planetLabels, label, orbitScale } from './planets.js';
 import { drawShip, drawTrail, drawFleetShips, fleetScale, drawPlanetStation, drawPlanetWreck, WRECK_COLOR } from './ships.js';
 import { drawFleetSolid } from './shipsprites.js';
-import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE } from '../../shared/rules.js';
+import { dist, holeZone, route, routeLength, travelDistance, supplyDistance, WORMHOLE, meteorMeet, oreOf } from '../../shared/rules.js';
+import { drawMeteor, drawMeteorCourse, meteorRadius, meteorLines, METEOR_MIN_PX, METEOR_COLOR } from './meteors.js';
 import { suppliesMe } from '../allies.js';
 import { t } from '../i18n.js';
 import {
@@ -233,6 +234,7 @@ export class SpaceView {
     this._spots = this.fleetSpots(v);
     ctx.globalAlpha = this.dim(null);
     this.drawLinks(ctx);
+    this.drawMeteorCourses(ctx);
     ctx.globalAlpha = 1;
     this.drawCourses(ctx);
     // Marks, dimming and supply line only with "Show range" switched on.
@@ -263,6 +265,10 @@ export class SpaceView {
       const pr = this.project(m.x, m.y, m.z || 0);
       if (pr) items.push({ depth: pr.depth, kind: 'mouth', m, pr });
     }
+    for (const m of v.meteors || []) {
+      const pr = this.project(m.x, m.y, m.z || 0);
+      if (pr) items.push({ depth: pr.depth, kind: 'meteor', m, pr });
+    }
     const now = performance.now();
     for (const r of v.rifts || []) {
       const open = riftOpen(this, v, r, now);
@@ -283,11 +289,14 @@ export class SpaceView {
       } else if (it.kind === 'hole') {
         ctx.globalAlpha = this.dim(null);
         this.drawHole(ctx, it, labels);
+      } else if (it.kind === 'meteor') {
+        ctx.globalAlpha = this.dim(null);
+        this.drawMeteorItem(ctx, it, labels);
       } else if (it.kind === 'rift') {
         drawWormhole(ctx, it.pr.x, it.pr.y, this.mouthRadius(it.pr) * 1.3, this.phase,
           { seed: 'rift', open: it.open, alien: true, alpha: depthFade(it.pr.depth, this.cam.dist) });
       } else this.drawFleet(ctx, it, colorOf);
-      ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : it.kind === 'hole' || it.kind === 'mouth' ? this.dim(null) : 1;
+      ctx.globalAlpha = it.kind === 'planet' ? this.dim(it.p.owner) : ['hole', 'mouth', 'meteor'].includes(it.kind) ? this.dim(null) : 1;
       for (const l of labels) label(ctx, l.text, l.x, l.y, l.color, 1, l.size);
       ctx.globalAlpha = 1;
     }
@@ -316,6 +325,68 @@ export class SpaceView {
       const pr = m && this.project(m.x, m.y, m.z || 0);
       if (pr) this.tooltipAt(ctx, pr.x, pr.y, t('hole.name'), mouthLines(v, m));
     }
+    if (this.hover?.type === 'meteor') {
+      const m = v.meteors?.find(x => x.id === this.hover.id);
+      const pr = m && this.project(m.x, m.y, m.z || 0);
+      if (pr) {
+        const f = this.selection?.type === 'fleet' ? v.fleets.find(x => x.id === this.selection.id) : null;
+        if (f?.mine && !v.spectator) this.catchPreview(ctx, f, m, pr);
+        this.tooltipAt(ctx, pr.x, pr.y, t('meteor.name'), meteorLines(m));
+      }
+    }
+  }
+
+  /** A meteor: the rock with its tail along the projected direction of flight. */
+  drawMeteorItem(ctx, it, labels) {
+    const { m, pr } = it;
+    const R = Math.max(METEOR_MIN_PX, meteorRadius(m) * pr.s);
+    // The direction on screen: where it will be a little later.
+    const ahead = this.project(m.x + m.vx * 0.2, m.y + m.vy * 0.2, (m.z || 0) + (m.vz || 0) * 0.2);
+    const angle = ahead ? Math.atan2(ahead.y - pr.y, ahead.x - pr.x) : 0;
+    const back = this.project(m.x - m.vx * 0.8, m.y - m.vy * 0.8, (m.z || 0) - (m.vz || 0) * 0.8);
+    const tail = Math.max(R * 5, back ? Math.hypot(back.x - pr.x, back.y - pr.y) : 0);
+    drawMeteor(ctx, pr.x, pr.y, R, angle, this.phase,
+      { seed: m.seed, tail, alpha: depthFade(pr.depth, this.cam.dist) });
+    if (this.selection?.type === 'meteor' && this.selection.id === m.id) this.ringAt(ctx, pr.x, pr.y, R * 1.6 + 4);
+    if (this.showNames && meteorRadius(m) * pr.s > 2.3) {
+      labels.push({ text: t('meteor.label', { metal: m.metal }), x: pr.x, y: pr.y + R * 1.6 + 16, color: METEOR_COLOR, size: 11 });
+    }
+    this.hit.push({ type: 'meteor', id: m.id, x: pr.x, y: pr.y, r: Math.max(12, R * 1.3) });
+  }
+
+  /** The straight courses of the meteors ahead - below everything, like the tunnels. */
+  drawMeteorCourses(ctx) {
+    const sel = this.selection, hov = this.hover;
+    const toScreen = (p) => { const q = this.project(p.x, p.y, p.z || 0); return q && [q.x, q.y]; };
+    for (const m of this.view.meteors || []) {
+      const hot = (sel?.type === 'meteor' && sel.id === m.id) || (hov?.type === 'meteor' && hov.id === m.id);
+      drawMeteorCourse(ctx, m, toScreen, this.phase, { hot });
+    }
+  }
+
+  /**
+   * With an own fleet selected and a meteor under the pointer: where they
+   * would meet and in how many turns - or why it will not work.
+   */
+  catchPreview(ctx, f, m, mp) {
+    const v = this.view;
+    if (!oreOf(f.ships).hold) { this.badge(ctx, mp.x, mp.y - 26, t('meteor.needTransport'), '#ff7a7a', true); return; }
+    const src = f.at != null ? v.planets[f.at] : f;
+    const meet = meteorMeet(src, f.stats?.speed || 0, m, holeZone(v.galaxy));
+    if (!meet) { this.badge(ctx, mp.x, mp.y - 26, t('meteor.tooFast'), '#ff7a7a', true); return; }
+    const spot = this._spots?.get(f.id);
+    const a = spot || this.project(src.x, src.y, src.z || 0);
+    const b = this.project(meet.at.x, meet.at.y, meet.at.z || 0);
+    if (!a || !b) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,190,120,.55)';
+    ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = METEOR_COLOR;
+    ctx.beginPath(); ctx.arc(b.x, b.y, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    this.badge(ctx, (a.x + b.x) / 2, (a.y + b.y) / 2, t('word.turns', { n: meet.turns, count: meet.turns }), '#ffd877', true);
   }
 
   /** Screen radius of a mouth at this projection. */
