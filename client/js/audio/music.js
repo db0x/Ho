@@ -20,6 +20,7 @@ const KEY = 'ho-music';
 const LEVEL = 0.5;            // output at the full slider (squared curve below)
 const FADE_IN = 8;            // seconds: the music never starts abruptly
 const AHEAD = 4;              // seconds scheduled in advance
+const DRONE = 0.004;          // level of the drone, where it plays: under the pads
 
 const hz = n => 440 * 2 ** ((n - 69) / 12);
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -158,7 +159,8 @@ export class Music {
     for (const o of [...this._oscs, ...[...this._live.values()].flat()]) {
       try { o.stop(now + 2.2); } catch {}
     }
-    setTimeout(() => old.disconnect(), 3000);
+    const oldHp = this.highpass;
+    setTimeout(() => { old.disconnect(); oldHp.disconnect(); }, 3000);
     const from = this._switchUntil = now + 2.4;
     this.build(ctx, ctx.destination, from);
     this.out.gain.setValueAtTime(0, from);
@@ -202,7 +204,12 @@ export class Music {
     this._oscs = [];            // drone and LFOs, taken down by next()
     const out = this.out = ctx.createGain();
     out.gain.value = 0;
-    out.connect(dest);
+    // No rumble: nothing under 110 Hz, reverb tails included.
+    const hp = this.highpass = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 110;
+    hp.Q.value = 0.6;
+    out.connect(hp).connect(dest);
 
     // Long, dark reverb - most of what is heard comes out of it.
     const verb = this.verb = ctx.createConvolver();
@@ -249,26 +256,30 @@ export class Music {
     this.bassBus.gain.value = 0;
     const blp = ctx.createBiquadFilter();
     blp.type = 'lowpass';
-    blp.frequency.value = 320;
+    blp.frequency.value = 450;
     this.bassBus.connect(blp);
     blp.connect(dry);
     const bverb = ctx.createGain();
     bverb.gain.value = 0.3;
     blp.connect(bverb).connect(verb);
 
-    // The drone: the root against itself a hair apart (a slow beat), a
-    // fifth above, an octave below, under a lowpass, breathing slowly.
-    const drone = this.droneLevel = ctx.createGain();
-    drone.gain.value = 0.05;
+    // The drone: a soft hum an octave over the root, against itself a hair
+    // apart (a beat so slow it is hardly heard), a fifth above, under a
+    // lowpass, breathing slowly. Not always there: it carries the sparse
+    // sections, comes now and then in the calm ones and keeps silent while
+    // the arpeggio moves (_enter) - so no tone sits under everything.
+    const drone = ctx.createGain();           // breathes (LFO around 1)
+    const droneLevel = this.droneLevel = ctx.createGain();
+    droneLevel.gain.value = 0;
     const dlp = ctx.createBiquadFilter();
     dlp.type = 'lowpass';
-    dlp.frequency.value = 260;
-    drone.connect(dlp);
+    dlp.frequency.value = 420;
+    drone.connect(droneLevel).connect(dlp);
     dlp.connect(dry);
     dlp.connect(verb);
     this.drone = [];
-    for (const [semi, ratio, type, g] of [[0, 1, 'sine', 1], [0, 1.0032, 'sine', 0.8],
-      [7, 1, 'triangle', 0.35], [-12, 1, 'sine', 0.5]]) {
+    for (const [semi, ratio, type, g] of [[12, 1, 'sine', 1], [12, 1.0012, 'sine', 0.6],
+      [19, 1, 'sine', 0.3]]) {
       const o = ctx.createOscillator(), og = ctx.createGain();
       o.type = type;
       o.frequency.value = hz(MOODS[0].root + semi) * ratio;
@@ -278,7 +289,7 @@ export class Music {
       this._oscs.push(o);
       this.drone.push({ o, semi, ratio });
     }
-    this._lfo(0.043, 0.015, drone.gain);
+    this._lfo(0.043, 0.3, drone.gain);
 
     // Solar wind: one loop of noise, shared by every gust.
     if (!this.noise) {
@@ -364,7 +375,8 @@ export class Music {
     for (const { o, semi, ratio } of this.drone) set(o.frequency, hz(this.root + semi) * ratio, 2.5);
     set(this.pad.frequency, m.bright * (this.sec.pad === 'strings' || this.sec.pad === 'hollow' ? 0.8 : 1), 6);
     set(this.padLevel.gain, e.pad, 5);
-    set(this.droneLevel.gain, energy === 'sparse' ? 0.055 : 0.05, 5);
+    const hum = energy === 'sparse' || (energy === 'calm' && Math.random() < 0.5);
+    set(this.droneLevel.gain, hum ? DRONE : 0, fresh ? 0 : 6);
     set(this.delay.delayTime, Math.min(1.9, step * pick([2, 3, 3])), 3);
     set(this.feedback.gain, rnd(0.3, 0.52), 4);
     set(this.wet.gain, rnd(0.75, 1.05), 5);
@@ -406,7 +418,7 @@ export class Music {
   _padNote(n, at, attack, hold, end) {
     const ctx = this.ctx, sound = PADS[this.sec.pad];
     const g = ctx.createGain();
-    const peak = 0.018 * sound.gain * (n < 50 ? 1.2 : n > 64 ? 0.7 : 1);
+    const peak = 0.018 * sound.gain * (n < 50 ? 0.75 : n > 64 ? 0.7 : 1);
     const oscs = [];
     g.gain.value = 0;
     g.gain.setValueAtTime(0, at);
@@ -509,11 +521,11 @@ export class Music {
     const lvl = this.sec.pulse[i % this.sec.pulse.length];
     if (!lvl) return step;
     let n = this._cur[0];
-    while (n > 45) n -= 12;
-    while (n < 33) n += 12;
+    while (n > 57) n -= 12;
+    while (n < 46) n += 12;
     const ctx = this.ctx, g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.09 * lvl, t + 0.025);
+    g.gain.linearRampToValueAtTime(0.055 * lvl, t + 0.025);
     g.gain.exponentialRampToValueAtTime(0.0001, t + step * 1.6);
     g.connect(this.bassBus);
     for (const [type, mult, l] of [['sine', 1, 1], ['triangle', 2, 0.25]]) {
